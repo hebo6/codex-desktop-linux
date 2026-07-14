@@ -1,0 +1,421 @@
+.section {
+  position: relative;
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  padding: var(--space-3);
+}
+
+.sectionHeader {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 var(--space-1) var(--space-1) var(--space-2);
+}
+
+.sectionHeader h2 {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--space-3) var(--space-2);
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  margin-bottom: var(--space-1);
+  border-radius: var(--radius-sm);
+  color: var(--color-status-danger);
+  background: var(--color-fill-subtle);
+  font-size: 12px;
+}
+
+.error span {
+  min-width: 0;
+  flex: 1;
+}
+
+.loadMore,
+.threadRow,
+.rowActions button,
+.undoNotice button {
+  border: 0;
+  font: inherit;
+}
+
+.skeleton {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.skeleton span {
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--color-fill-subtle);
+  animation: pulse 1.4s ease-in-out infinite alternate;
+}
+
+.scroller {
+  position: relative;
+  min-height: 0;
+  padding-inline-end: var(--space-2);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.stickyGroupHeading {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  height: 32px;
+  margin-bottom: -32px;
+}
+
+.virtualCanvas {
+  position: relative;
+  width: 100%;
+}
+
+.virtualEntry {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  opacity: 1;
+  transition:
+    height 200ms ease,
+    min-height 200ms ease,
+    opacity 120ms ease,
+    transform 200ms ease;
+}
+
+.virtualEntry[data-removing="true"] {
+  opacity: 0;
+}
+
+.groupHeading {
+  height: 32px;
+  overflow: hidden;
+  margin: 0;
+  font-size: 11px;
+}
+
+.stickyGroupHeading .groupHeading {
+  background: var(--color-sidebar-bg);
+}
+
+.groupHeading button {
+  display: flex;
+  width: 100%;
+  height: 32px;
+  align-items: center;
+  gap: var(--space-1);
+  overflow: hidden;
+  padding: var(--space-2) var(--space-2) 0;
+  border: 0;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+}
+
+.groupHeading button span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groupHeading button:hover {
+  color: var(--color-text-secondary);
+}
+
+.groupArrow {
+  width: 0;
+  height: 0;
+  flex: 0 0 auto;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+  transition: transform 120ms ease;
+}
+
+.groupHeading button[aria-expanded="true"] .groupArrow {
+  transform: rotate(90deg);
+}
+
+.threadRow {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 40px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: padding-right 120ms ease;
+}
+
+.threadRowContainer {
+  position: relative;
+}
+
+.threadRowContainer[data-pending="true"] {
+  opacity: 0.62;
+}
+
+.rowActions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.threadRowContainer:hover .rowActions,
+.threadRowContainer:focus-within .rowActions {
+  opacity: 1;
+}
+
+.threadRowContainer:hover .threadRow,
+.threadRowContainer:focus-within .threadRow {
+  padding-right: 64px;
+}
+
+.rowActions button {
+  display: grid;
+  width: 30px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.rowActions button:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: var(--color-fill-hover);
+}
+
+.contextMenu {
+  position: fixed;
+  z-index: 1000;
+  width: 200px;
+  padding: var(--space-1);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-content-bg);
+  box-shadow: 0 12px 36px rgb(20 20 18 / 20%);
+}
+
+.contextMenu button {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+
+.contextMenu button:hover,
+.contextMenu button:focus-visible {
+  background: var(--color-fill-hover);
+}
+
+.rowActions svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.threadRow::before {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 0;
+  width: 2px;
+  border-radius: 999px;
+  background: transparent;
+  content: "";
+}
+
+.threadRow:hover,
+.threadRow:focus-visible {
+  background: var(--color-fill-hover);
+}
+
+.threadRow[data-current="true"] {
+  color: var(--color-text-primary);
+  background: var(--color-fill-subtle);
+}
+
+.threadRow[data-current="true"]::before {
+  background: currentColor;
+}
+
+.threadStatus {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.threadStatus[data-status="running"] {
+  width: 13px;
+  height: 13px;
+  min-height: 0;
+  padding: 0;
+  border: 2px solid color-mix(in srgb, var(--color-status-progress) 28%, transparent);
+  border-top-color: var(--color-status-progress);
+  animation: spin 800ms linear infinite;
+}
+
+.threadStatus[data-status="approval"] {
+  border-radius: 999px;
+  color: var(--color-status-warning);
+  background: color-mix(in srgb, var(--color-status-warning) 12%, transparent);
+}
+
+.threadStatus[data-status="input"] {
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: var(--color-fill-strong);
+}
+
+.threadStatus[data-status="error"] {
+  border-radius: 999px;
+  color: var(--color-status-danger);
+  background: color-mix(in srgb, var(--color-status-danger) 12%, transparent);
+}
+
+.threadTitle {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loadMore {
+  width: 100%;
+  min-height: 36px;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.loadMore:hover:not(:disabled) {
+  color: var(--color-text-secondary);
+  background: var(--color-fill-hover);
+}
+
+.loadMore:disabled {
+  cursor: wait;
+}
+
+.undoNotice {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  left: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-content-bg);
+  box-shadow: 0 8px 24px rgb(20 20 18 / 14%);
+  font-size: 12px;
+}
+
+.undoNotice span {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undoNotice button {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.45;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton span,
+  .threadStatus[data-status="running"] {
+    animation: none;
+  }
+
+  .virtualEntry,
+  .groupArrow {
+    transition: none;
+  }
+}

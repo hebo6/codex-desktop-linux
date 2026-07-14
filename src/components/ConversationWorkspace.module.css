@@ -1,0 +1,12 @@
+.workspace {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.content {
+  min-height: 0;
+  overflow: hidden;
+}

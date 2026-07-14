@@ -1,0 +1,25 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+import { SafeMarkdown } from "./SafeMarkdown";
+
+describe("SafeMarkdown", () => {
+  it("渲染 GFM 常用块并忽略原始 HTML", () => {
+    render(<SafeMarkdown source={'# 标题\n\n- [x] 完成\n- [ ] 待办\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\n> 引用\n\n```ts\nconst x = 1\n```\n\n<script>危险</script>正文'} />);
+    expect(screen.getByRole("heading", { name: "标题" })).toBeVisible();
+    expect(screen.getByRole("checkbox", { name: "已完成" })).toBeChecked();
+    expect(screen.getByRole("table")).toBeVisible();
+    expect(screen.getByText("const x = 1")).toBeVisible();
+    expect(document.querySelector("script")).toBeNull();
+    expect(screen.getByText("危险正文")).toBeVisible();
+  });
+
+  it("所有链接统一交给调用者处理", () => {
+    const onOpenLink = vi.fn();
+    render(<SafeMarkdown onOpenLink={onOpenLink} source="[网页](https://example.com) ![图片](./a.png)" />);
+    fireEvent.click(screen.getByRole("button", { name: "网页" }));
+    fireEvent.click(screen.getByRole("button", { name: "图片：图片" }));
+    expect(onOpenLink).toHaveBeenNthCalledWith(1, "https://example.com");
+    expect(onOpenLink).toHaveBeenNthCalledWith(2, "./a.png");
+  });
+});

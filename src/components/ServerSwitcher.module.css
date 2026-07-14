@@ -1,0 +1,557 @@
+.root {
+  position: relative;
+  width: 100%;
+}
+
+.trigger,
+.createButton,
+.connectButton,
+.actionButton,
+.diagnosticsButton,
+.configurationRetryButton,
+.menuButton,
+.menuItem,
+.emptyCreateButton {
+  border: 0;
+  font: inherit;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 52px;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.trigger:hover,
+.trigger[aria-expanded="true"] {
+  background: var(--color-fill-hover);
+}
+
+.triggerIcon,
+.typeIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+}
+
+.triggerIcon {
+  width: 24px;
+  height: 24px;
+}
+
+.triggerIcon svg,
+.typeIcon svg,
+.createButton svg,
+.expandIcon svg,
+.menuButton svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.triggerIcon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.triggerText {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.triggerText strong {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.triggerText > span {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+
+.trigger[data-high-risk="true"] .triggerText > span {
+  color: var(--color-status-danger);
+  font-weight: 650;
+}
+
+.triggerStatusDot,
+.statusDot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-status-neutral);
+}
+
+.trigger[data-phase="connecting"] .triggerStatusDot,
+.trigger[data-phase="initializing"] .triggerStatusDot,
+.trigger[data-phase="reconnecting"] .triggerStatusDot,
+.rowStatus[data-phase="connecting"] .statusDot,
+.rowStatus[data-phase="initializing"] .statusDot,
+.rowStatus[data-phase="reconnecting"] .statusDot {
+  background: var(--color-status-progress);
+}
+
+.rowStatus[data-phase="ready"] .statusDot {
+  background: var(--color-status-ready);
+}
+
+.trigger[data-phase="error"] .triggerStatusDot,
+.rowStatus[data-phase="error"] .statusDot {
+  background: var(--color-status-danger);
+}
+
+.expandIcon {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  place-items: center;
+  transition: transform var(--duration-panel) var(--ease-standard);
+}
+
+.expandIcon[data-open="true"] {
+  transform: rotate(180deg);
+}
+
+.expandIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.panel {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 2;
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  max-height: 60vh;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  box-shadow: 0 16px 42px rgb(20 20 18 / 20%);
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-divider-subtle);
+}
+
+.panelHeader h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.createButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-fill-subtle);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.createButton:hover,
+.actionButton:hover,
+.emptyCreateButton:hover {
+  color: var(--color-text-primary);
+  background: var(--color-fill-hover);
+}
+
+.createButton:disabled,
+.actionButton:disabled,
+.menuButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.createButton svg {
+  width: 16px;
+  height: 16px;
+}
+
+.configurationBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-status-danger);
+  background: var(--color-danger-surface);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.configurationBanner[data-severity="warning"] {
+  color: var(--color-text-secondary);
+  background: color-mix(
+    in srgb,
+    var(--color-status-warning) 10%,
+    var(--color-content-bg)
+  );
+}
+
+.configurationRetryButton {
+  min-height: 28px;
+  flex: none;
+  padding: 0 var(--space-2);
+  border-radius: 6px;
+  color: var(--color-status-danger);
+  background: var(--color-danger-surface);
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.configurationRetryButton:hover {
+  filter: brightness(0.96);
+}
+
+.configurationBanner[data-severity="warning"] .configurationRetryButton {
+  color: var(--color-text-secondary);
+  background: transparent;
+}
+
+.loadingStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+
+.loadingIndicator {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border: 1.5px solid var(--color-spinner-track);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
+.serverList {
+  min-height: 0;
+  padding: var(--space-2);
+  margin: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.serverRow {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+}
+
+.serverRow + .serverRow {
+  border-top: 1px solid var(--color-divider-subtle);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.serverRow[data-current="true"] {
+  background: var(--color-fill-subtle);
+}
+
+.serverDetails {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.typeIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-fill-subtle);
+}
+
+.typeIcon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.serverIdentity {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.serverIdentity strong,
+.serverSummary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.serverIdentity strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.serverSummary {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.rowStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.rowStatus[data-phase="error"] {
+  color: var(--color-status-danger);
+}
+
+.rowError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-left: 36px;
+  color: var(--color-status-danger);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.rowSecurityWarning {
+  width: fit-content;
+  padding: 3px var(--space-2);
+  margin-left: 36px;
+  border-radius: 5px;
+  color: var(--color-status-danger);
+  background: var(--color-danger-surface);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.rowError > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.diagnosticsButton {
+  min-height: 28px;
+  flex: none;
+  padding: 0 var(--space-2);
+  border-radius: 6px;
+  color: var(--color-status-danger);
+  background: var(--color-danger-surface);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.diagnosticsButton:hover {
+  filter: brightness(0.96);
+}
+
+.actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  padding-left: 36px;
+}
+
+.connectButton,
+.actionButton,
+.menuButton,
+.menuItem,
+.emptyCreateButton {
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.connectButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-primary);
+  background: var(--color-fill-subtle);
+}
+
+.connectButton:hover:not(:disabled) {
+  background: var(--color-fill-hover);
+}
+
+.connectButton:disabled {
+  color: var(--color-text-tertiary);
+  cursor: default;
+  opacity: 0.75;
+}
+
+.menuContainer {
+  display: grid;
+  justify-items: end;
+}
+
+.menuButton {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.menuButton:hover,
+.menuButton[aria-expanded="true"] {
+  color: var(--color-text-primary);
+  background: var(--color-fill-hover);
+}
+
+.menuButton svg {
+  width: 17px;
+  height: 17px;
+}
+
+.menu {
+  position: static;
+  display: grid;
+  min-width: 132px;
+  gap: 2px;
+  padding: var(--space-1);
+  margin: var(--space-1) 0 0 36px;
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-content-bg);
+  box-shadow: 0 8px 24px rgb(20 20 18 / 18%);
+}
+
+.menuItem {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: 5px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  color: var(--color-text-primary);
+  background: var(--color-fill-hover);
+}
+
+.dangerMenuItem {
+  color: var(--color-status-danger);
+}
+
+.dangerMenuItem:hover {
+  color: var(--color-status-danger);
+  background: var(--color-danger-surface);
+}
+
+.emptyState {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+}
+
+.emptyState strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.emptyState > span {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+
+.emptyCreateButton {
+  min-height: 34px;
+  padding-inline: var(--space-3);
+  margin-top: var(--space-1);
+  background: var(--color-fill-subtle);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expandIcon {
+    transition: none;
+  }
+
+  .loadingIndicator {
+    animation: none;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .panel,
+  .menu {
+    box-shadow: 0 16px 42px rgb(0 0 0 / 48%);
+  }
+}

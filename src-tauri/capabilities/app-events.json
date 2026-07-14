@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "app-events",
+  "description": "Allows application windows to subscribe and unsubscribe from application-owned events",
+  "windows": ["main", "app-*"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
+  ]
+}

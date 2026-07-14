@@ -1,0 +1,194 @@
+.root {
+  position: relative;
+  flex: none;
+}
+
+.trigger {
+  position: relative;
+  display: grid;
+  width: 52px;
+  height: 52px;
+  padding: 5px;
+  border: 0;
+  place-items: center;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ring {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  transform: rotate(-90deg);
+}
+
+.track,
+.value {
+  fill: none;
+  stroke-width: 3;
+}
+
+.track {
+  stroke: var(--color-divider-subtle);
+}
+
+.value {
+  stroke: var(--color-text-tertiary);
+  stroke-linecap: round;
+  transition: stroke-dasharray 220ms var(--ease-standard), stroke 150ms ease;
+}
+
+.trigger[data-attention="warning"],
+.popover article[data-attention="warning"] {
+  color: var(--color-status-warning);
+}
+
+.trigger[data-attention="danger"],
+.popover article[data-attention="danger"] {
+  color: var(--color-status-danger);
+}
+
+.trigger[data-attention="warning"] .value,
+.popover article[data-attention="warning"] .progress span {
+  stroke: var(--color-status-warning);
+  background: var(--color-status-warning);
+}
+
+.trigger[data-attention="danger"] .value,
+.popover article[data-attention="danger"] .progress span {
+  stroke: var(--color-status-danger);
+  background: var(--color-status-danger);
+}
+
+.trigger[data-attention="unknown"] .value {
+  stroke-dasharray: 2 5;
+  stroke-linecap: butt;
+}
+
+.trigger > span {
+  z-index: 1;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.popover {
+  position: absolute;
+  z-index: var(--z-popover);
+  top: calc(100% + 4px);
+  right: 0;
+  display: grid;
+  width: min(380px, calc(100vw - 24px));
+  max-height: min(560px, calc(100vh - 80px));
+  gap: var(--space-4);
+  padding: var(--space-4);
+  overflow: auto;
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  box-shadow: 0 18px 48px rgb(20 20 18 / 22%);
+}
+
+.popover > header,
+.windowHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.popover > header > div {
+  display: grid;
+  gap: 2px;
+}
+
+.popover > header strong {
+  font-size: 14px;
+}
+
+.popover > header small,
+.popover footer,
+.windows article > small {
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+}
+
+.popover > header button {
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.windows {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.windows article {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+}
+
+.windowHeading strong {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windowHeading span {
+  flex: none;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.progress {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-divider-subtle);
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-text-tertiary);
+  transition: width 220ms var(--ease-standard), background 150ms ease;
+}
+
+.empty,
+.stale,
+.credits {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.stale {
+  color: var(--color-status-warning);
+}
+
+.credits {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-fill-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .value,
+  .progress span {
+    transition: none;
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "configuration",
+  "description": "Allows application windows to manage validated server and proxy configuration and credential state",
+  "windows": ["main", "app-*"],
+  "permissions": [
+    "allow-list-configuration-profiles",
+    "allow-create-server-profile",
+    "allow-update-server-profile",
+    "allow-delete-server-profile",
+    "allow-create-proxy-profile",
+    "allow-update-proxy-profile",
+    "allow-delete-proxy-profile",
+    "allow-remove-proxy-ssh-host-key",
+    "allow-set-server-credential",
+    "allow-clear-server-credential",
+    "allow-set-proxy-credential",
+    "allow-clear-proxy-credential"
+  ]
+}

@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-send-remote-websocket-message"
+description = "Allows sending validated JSON to an owned remote WebSocket connection"
+commands.allow = ["send_remote_websocket_message"]
+
+[[permission]]
+identifier = "allow-disconnect-remote-websocket"
+description = "Allows closing an owned remote WebSocket connection"
+commands.allow = ["disconnect_remote_websocket"]

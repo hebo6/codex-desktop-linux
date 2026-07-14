@@ -1,0 +1,50 @@
+{
+  "name": "codex-desktop-linux",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@11.3.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "pnpm protocol:check && tsc -b && vite build",
+    "protocol:generate": "node scripts/generate-protocol-code.mjs",
+    "protocol:check": "node scripts/generate-protocol-code.mjs --check",
+    "release:assemble": "node scripts/assemble-release.mjs",
+    "release:sign": "bash scripts/sign-release.sh",
+    "test": "pnpm protocol:check && vitest run",
+    "test:e2e:controlled": "vitest run src/e2e/controlledAppServer.e2e.test.ts",
+    "test:e2e:real": "node scripts/smoke-real-app-server.mjs",
+    "test:watch": "vitest",
+    "visual:list": "node scripts/visual-regression.mjs list",
+    "visual:regression": "node scripts/visual-regression.mjs verify",
+    "visual:update": "node scripts/visual-regression.mjs update",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "2.12.0",
+    "@tauri-apps/api": "2.11.1",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "react-redux": "9.3.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.1",
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.3",
+    "ajv": "8.20.0",
+    "jsdom": "29.1.1",
+    "json-schema-to-typescript": "15.0.4",
+    "typescript": "7.0.2",
+    "vite": "8.1.4",
+    "vitest": "4.1.10"
+  }
+}

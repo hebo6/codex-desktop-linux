@@ -1,0 +1,59 @@
+[[permission]]
+identifier = "allow-list-configuration-profiles"
+description = "Allows reading persisted non-sensitive server and proxy configuration"
+commands.allow = ["list_configuration_profiles"]
+
+[[permission]]
+identifier = "allow-create-server-profile"
+description = "Allows creating a validated non-sensitive server profile"
+commands.allow = ["create_server_profile"]
+
+[[permission]]
+identifier = "allow-update-server-profile"
+description = "Allows updating a validated non-sensitive server profile"
+commands.allow = ["update_server_profile"]
+
+[[permission]]
+identifier = "allow-delete-server-profile"
+description = "Allows deleting an unused server profile at an expected version"
+commands.allow = ["delete_server_profile"]
+
+[[permission]]
+identifier = "allow-create-proxy-profile"
+description = "Allows creating a validated non-sensitive proxy profile"
+commands.allow = ["create_proxy_profile"]
+
+[[permission]]
+identifier = "allow-update-proxy-profile"
+description = "Allows updating a validated non-sensitive proxy profile"
+commands.allow = ["update_proxy_profile"]
+
+[[permission]]
+identifier = "allow-delete-proxy-profile"
+description = "Allows deleting an unreferenced proxy profile at an expected version"
+commands.allow = ["delete_proxy_profile"]
+
+[[permission]]
+identifier = "allow-remove-proxy-ssh-host-key"
+description = "Allows explicitly removing a saved SSH host key at an expected proxy version"
+commands.allow = ["remove_proxy_ssh_host_key"]
+
+[[permission]]
+identifier = "allow-set-server-credential"
+description = "Allows replacing a server credential in the system credential service"
+commands.allow = ["set_server_credential"]
+
+[[permission]]
+identifier = "allow-clear-server-credential"
+description = "Allows explicitly clearing a server credential"
+commands.allow = ["clear_server_credential"]
+
+[[permission]]
+identifier = "allow-set-proxy-credential"
+description = "Allows replacing a proxy credential in the system credential service"
+commands.allow = ["set_proxy_credential"]
+
+[[permission]]
+identifier = "allow-clear-proxy-credential"
+description = "Allows explicitly clearing a proxy credential"
+commands.allow = ["clear_proxy_credential"]

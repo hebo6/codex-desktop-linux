@@ -1,0 +1,210 @@
+.panel {
+  position: relative;
+  display: grid;
+  gap: var(--space-3);
+  max-height: min(58vh, 560px);
+  padding: var(--space-4);
+  margin-bottom: var(--space-2);
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--color-status-warning) 36%, var(--color-divider-strong));
+  border-radius: 16px;
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  box-shadow: 0 16px 44px rgb(20 20 18 / 18%);
+  pointer-events: auto;
+}
+
+.panel > header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.panel > header > div {
+  display: grid;
+  gap: 2px;
+}
+
+.panel > header strong {
+  font-size: 14px;
+}
+
+.panel > header small,
+.detail > span,
+.permissions > span,
+.field > span,
+.field small,
+.otherWindow,
+.unsupported {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.attention {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-status-warning);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-status-warning) 13%, transparent);
+}
+
+.reason,
+.otherWindow,
+.unsupported,
+.confirmation p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.reason {
+  color: var(--color-text-secondary);
+}
+
+.detail,
+.permissions {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.detail code {
+  max-height: 132px;
+  padding: var(--space-2) var(--space-3);
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-fill-subtle);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.permissions ul {
+  display: grid;
+  gap: var(--space-1);
+  padding-left: 20px;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.formFields {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.formFields fieldset,
+.field {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+}
+
+.formFields legend {
+  display: grid;
+  gap: 2px;
+  padding: 0 0 var(--space-2);
+  font-size: 12px;
+}
+
+.formFields legend span {
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+}
+
+.option,
+.checkField {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.option > span {
+  display: grid;
+  gap: 2px;
+}
+
+.option small {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.formFields input:is([type="text"], [type="password"], [type="email"], [type="date"], [type="number"]),
+.formFields select {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  font: inherit;
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.actions button {
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.actions .primaryAction {
+  border-color: transparent;
+  color: var(--color-button-primary-text);
+  background: var(--color-button-primary-bg);
+}
+
+.actions .dangerAction {
+  border-color: transparent;
+  color: #fff;
+  background: var(--color-status-danger);
+}
+
+.actions button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.confirmation {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-status-danger) 34%, var(--color-divider-strong));
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-surface);
+}
+
+.confirmation strong {
+  color: var(--color-status-danger);
+  font-size: 12px;
+}
+
+.panel[data-responding="true"] {
+  border-color: var(--color-divider-strong);
+}
+
+@media (max-width: 560px) {
+  .panel {
+    max-height: 52vh;
+    padding: var(--space-3);
+  }
+}

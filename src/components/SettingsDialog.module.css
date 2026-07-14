@@ -1,0 +1,57 @@
+.backdrop { position: fixed; z-index: 60; inset: 0; display: grid; padding: 32px; place-items: center; background: var(--color-backdrop); }
+.dialog { display: grid; width: min(960px, 100%); height: min(720px, 100%); grid-template-columns: 220px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--color-divider-strong); border-radius: 16px; color: var(--color-text-primary); background: var(--color-content-bg); box-shadow: 0 24px 72px rgb(10 10 9 / 30%); }
+.dialog > aside { padding: var(--space-5) var(--space-3); border-right: 1px solid var(--color-divider-subtle); background: var(--color-sidebar-bg); }
+.dialog h1 { margin: 0 var(--space-2) var(--space-5); font-size: 20px; }
+.dialog nav { display: grid; gap: 2px; }
+.dialog nav button { min-height: 36px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); color: var(--color-text-secondary); background: transparent; text-align: left; cursor: pointer; }
+.dialog nav button[aria-current="page"] { color: var(--color-text-primary); background: var(--color-fill-subtle); font-weight: 600; }
+.dialog > main { display: grid; min-width: 0; min-height: 0; grid-template-rows: auto auto minmax(0, 1fr); }
+.dialog > main > header { display: flex; min-height: 64px; align-items: center; justify-content: space-between; padding: 0 var(--space-6); border-bottom: 1px solid var(--color-divider-subtle); }
+.dialog > main > header > div { display: flex; align-items: baseline; gap: var(--space-2); }
+.dialog > main > header strong { font-size: 16px; }
+.dialog > main > header small { color: var(--color-text-tertiary); font-size: 10px; }
+.dialog > main > header button { display: grid; width: 34px; height: 34px; padding: 0; border: 0; place-items: center; border-radius: 50%; color: var(--color-text-secondary); background: transparent; font-size: 22px; cursor: pointer; }
+.content { padding: var(--space-6); overflow: auto; }
+.section { display: grid; gap: var(--space-4); max-width: 680px; padding-bottom: var(--space-6); }
+.section + .section { padding-top: var(--space-6); border-top: 1px solid var(--color-divider-subtle); }
+.section header h2 { margin: 0; font-size: 14px; }
+.section header p, .muted { margin: var(--space-1) 0 0; color: var(--color-text-tertiary); font-size: 12px; line-height: 1.6; }
+.segmented { display: flex; gap: var(--space-2); }
+.segmented label { cursor: pointer; }
+.segmented input { position: absolute; opacity: 0; }
+.segmented span { display: block; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-divider-strong); border-radius: var(--radius-sm); color: var(--color-text-secondary); font-size: 12px; }
+.segmented input:checked + span { color: var(--color-text-primary); background: var(--color-fill-hover); }
+.toggle { display: flex; min-height: 40px; align-items: center; justify-content: space-between; gap: var(--space-4); color: var(--color-text-secondary); font-size: 13px; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--color-text-primary); }
+.primary, .rows article > button, .rowActions button, .dangerRow button { width: fit-content; min-height: 34px; padding: 0 var(--space-3); border: 1px solid var(--color-divider-strong); border-radius: var(--radius-sm); color: var(--color-text-primary); background: var(--color-content-bg); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.primary { color: var(--color-button-primary-text); background: var(--color-button-primary-bg); }
+.rows { display: grid; gap: var(--space-2); }
+.rows article, .dangerRow { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-divider-subtle); border-radius: var(--radius-sm); }
+.rows article > div, .dangerRow > div { display: grid; min-width: 0; gap: 3px; }
+.rows article strong, .dangerRow strong { font-size: 12px; }
+.rows article small, .dangerRow small { overflow: hidden; color: var(--color-text-tertiary); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.rowActions { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.rowActions .dangerText { color: var(--color-status-danger); }
+.dangerRow span { display: flex; gap: var(--space-2); }
+.dangerRow .danger { color: #fff; background: var(--color-status-danger); }
+.inlineSuccess, .inlineError { flex: none; color: var(--color-text-tertiary); font-size: 11px; }
+.inlineError { color: var(--color-status-danger); }
+.shortcuts { display: grid; margin: 0; }
+.shortcuts div { display: grid; min-height: 40px; grid-template-columns: 140px 1fr; align-items: center; border-bottom: 1px solid var(--color-divider-subtle); }
+.shortcuts dt, .shortcuts dd { margin: 0; color: var(--color-text-secondary); font-size: 12px; }
+.shortcuts kbd { padding: 3px 6px; border: 1px solid var(--color-divider-strong); border-radius: 5px; background: var(--color-fill-subtle); }
+.report { max-height: 360px; padding: var(--space-4); overflow: auto; border-radius: var(--radius-sm); color: var(--color-text-secondary); background: var(--color-fill-subtle); font-size: 11px; line-height: 1.6; white-space: pre-wrap; }
+.error, .success { margin: var(--space-3) var(--space-6) 0; color: var(--color-status-danger); font-size: 11px; }
+.section .error, .section .success { margin: 0; }
+.success { color: var(--color-text-secondary); }
+@media (max-width: 720px) { .backdrop { padding: 12px; } .dialog { grid-template-columns: 150px minmax(0, 1fr); } .content { padding: var(--space-4); } }
+@media (max-width: 520px) {
+  .backdrop { padding: 0; }
+  .dialog { width: 100%; height: 100%; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); border: 0; border-radius: 0; }
+  .dialog > aside { padding: var(--space-3); overflow: hidden; border-right: 0; border-bottom: 1px solid var(--color-divider-subtle); }
+  .dialog h1 { margin: 0 var(--space-2) var(--space-2); font-size: 16px; }
+  .dialog nav { display: flex; overflow-x: auto; }
+  .dialog nav button { flex: none; }
+  .rows article, .dangerRow { align-items: flex-start; flex-direction: column; }
+  .rows article small, .dangerRow small { white-space: normal; }
+}

@@ -1,0 +1,751 @@
+.conversation {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.placeholder {
+  display: grid;
+  height: 100%;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+.placeholder strong {
+  font-size: 18px;
+}
+
+.placeholder span {
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+}
+
+.placeholder button {
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  cursor: pointer;
+  font: inherit;
+}
+
+.placeholder button:hover {
+  background: var(--color-fill-hover);
+}
+
+.scroller {
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.messageColumn {
+  width: min(100%, 880px);
+  min-height: 100%;
+  padding: 28px 24px 120px;
+  margin: 0 auto;
+}
+
+.virtualConversation {
+  position: relative;
+  width: 100%;
+}
+
+.virtualConversationRow {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  box-sizing: border-box;
+  padding-bottom: var(--space-3);
+}
+
+.virtualConversationRow[data-first-in-turn="true"] {
+  padding-top: var(--space-6);
+}
+
+.loadOlder {
+  display: block;
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  margin: 0 auto var(--space-5);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.actionError {
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-status-danger) 28%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--color-status-danger);
+  background: var(--color-danger-surface);
+  font-size: 12px;
+}
+
+.userMessage {
+  position: relative;
+  width: fit-content;
+  max-width: min(76%, 680px);
+  margin-left: auto;
+  color: var(--color-text-primary);
+}
+
+.userMessageBubble {
+  padding: var(--space-3) var(--space-4);
+  border-radius: 16px 16px 4px;
+  background: var(--color-fill-subtle);
+  white-space: pre-wrap;
+}
+
+.userMessage p,
+.agentMessage p,
+.activityDetail p,
+.timeline p {
+  margin: 0;
+  line-height: 1.65;
+}
+
+.agentMessage {
+  position: relative;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text-primary);
+  background: transparent;
+}
+
+.agentText {
+  line-height: 1.72;
+  white-space: pre-wrap;
+}
+
+.inlineCopyButton {
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  background: transparent;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.messageActionButton {
+  position: relative;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.messageActionButton:hover {
+  color: var(--color-text-secondary);
+  background: var(--color-fill-hover);
+}
+
+.messageActionButton svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.messageActionTooltip {
+  position: absolute;
+  z-index: 4;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  padding: 5px 8px;
+  border: 1px solid var(--color-divider-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  box-shadow: 0 6px 18px rgb(20 20 18 / 16%);
+  font-size: 11px;
+  line-height: 1.2;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 2px);
+  transition:
+    opacity 100ms ease,
+    transform 100ms var(--ease-standard),
+    visibility 0s linear 100ms;
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+.messageActionButton:hover .messageActionTooltip,
+.messageActionButton:focus-visible .messageActionTooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  transition-delay: 0s;
+  visibility: visible;
+}
+
+.userActions,
+.agentActions {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.userActions {
+  justify-content: flex-end;
+  margin-top: var(--space-1);
+  opacity: 0;
+}
+
+.agentActions {
+  margin-top: var(--space-2);
+}
+
+.agentActions .messageActionButton {
+  opacity: 0;
+}
+
+:is(.userMessage:hover, .userMessage:focus, .userMessage:focus-within) .userActions,
+:is(.agentMessage:hover, .agentMessage:focus, .agentMessage:focus-within) .agentActions .messageActionButton,
+.messageActionButton:focus-visible {
+  opacity: 1;
+}
+
+.agentMessage[data-final-answer="true"][data-latest-turn="true"] .agentActions .messageActionButton {
+  opacity: 1;
+}
+
+.messageTimestamp {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.answerTimestamp {
+  opacity: 0;
+}
+
+.agentMessage:hover .answerTimestamp,
+.agentMessage:focus .answerTimestamp,
+.agentMessage:focus-within .answerTimestamp {
+  opacity: 1;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  border: 0;
+  white-space: nowrap;
+}
+
+.chip,
+.attachment {
+  display: inline-flex;
+  padding: 2px 7px;
+  margin: 2px;
+  border: 1px solid var(--color-divider-strong);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: var(--color-content-bg);
+  font-size: 12px;
+}
+
+.activityGroup {
+  overflow: clip;
+}
+
+.activityGroupHeader {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.activityGroupHeader > span:first-child {
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.activityGroupHeader > span:last-child {
+  transition: transform var(--duration-panel) var(--ease-standard);
+}
+
+.activityGroupHeader::after {
+  height: 1px;
+  background: var(--color-divider-subtle);
+  content: "";
+}
+
+.activityGroup[data-status="failed"] .activityGroupHeader {
+  color: var(--color-status-danger);
+}
+
+.activityGroup[data-expanded="true"] .activityGroupHeader > span:last-child {
+  transform: rotate(90deg);
+}
+
+.activityGroup[data-expanded="true"] > .activityGroupHeader {
+  position: sticky;
+  z-index: 3;
+  top: 0;
+  background: var(--color-content-bg);
+}
+
+.activityGroupSize {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-panel) var(--ease-standard);
+}
+
+.activityGroup[data-expanded="true"] .activityGroupSize {
+  grid-template-rows: 1fr;
+}
+
+.activityGroupClip {
+  min-height: 0;
+  overflow: clip;
+}
+
+.activityGroupContent {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) 0 0 var(--space-2);
+  opacity: 0;
+  transition: opacity 140ms ease;
+  visibility: hidden;
+}
+
+.activityGroupContent[data-visible="true"] {
+  opacity: 1;
+  visibility: visible;
+}
+
+.thinking,
+.activityProgress {
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+}
+
+.thinking {
+  animation: thinking-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes thinking-pulse {
+  50% {
+    color: var(--color-text-secondary);
+  }
+}
+
+.activityRowHeader {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+button.activityRowHeader {
+  cursor: pointer;
+}
+
+.activityDisclosure[data-status="failed"] .activityRowHeader,
+.activityLine[data-status="failed"],
+.fileChangeRow[data-status="failed"] {
+  color: var(--color-status-danger);
+}
+
+.activityRowTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.reasoningTitle {
+  display: grid;
+  min-width: 0;
+}
+
+.reasoningTitleLine {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.activityDisclosure[data-expanded="true"] .activityRowTitle {
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.activityDisclosure[data-expanded="true"] .reasoningTitleLine {
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.activityRowChevron {
+  color: var(--color-text-tertiary);
+  transition: transform var(--duration-panel) var(--ease-standard);
+}
+
+.activityDisclosure[data-expanded="true"] .activityRowChevron {
+  transform: rotate(90deg);
+}
+
+.activityDisclosure[data-expanded="true"] > .activityRowHeader {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  background: var(--color-content-bg);
+}
+
+.activityGroupContent > .activityDisclosure[data-expanded="true"] > .activityRowHeader {
+  top: 36px;
+}
+
+.activityDetailSize {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-panel) var(--ease-standard);
+}
+
+.activityDisclosure[data-expanded="true"] .activityDetailSize {
+  grid-template-rows: 1fr;
+}
+
+.activityDetailClip {
+  min-height: 0;
+  overflow: clip;
+}
+
+.activityDetail {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0 var(--space-2) var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  visibility: hidden;
+}
+
+.activityDetail[data-visible="true"] {
+  opacity: 1;
+  visibility: visible;
+}
+
+.activityDetail > code,
+.activityDetail > pre,
+.json {
+  overflow: auto;
+  max-height: 320px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  color: var(--color-text-primary);
+  background: transparent;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.activityDetail > code {
+  display: block;
+}
+
+.activityLine {
+  display: block;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 0;
+  overflow: hidden;
+  border: 0;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.activityLine {
+  cursor: pointer;
+}
+
+.fileChanges {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.fileChangeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+button.fileChangeRow {
+  cursor: pointer;
+}
+
+.fileChangeTitle {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.fileChangeTitle strong {
+  flex: none;
+  font-weight: 500;
+}
+
+.fileChangeTitle code {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileChangeStats {
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.timeline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+
+.timeline::before,
+.timeline::after {
+  height: 1px;
+  flex: 1;
+  background: var(--color-divider-subtle);
+  content: "";
+}
+
+.empty {
+  display: grid;
+  min-height: 240px;
+  place-items: center;
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+}
+
+.jumpToBottom {
+  position: absolute;
+  right: 24px;
+  bottom: 120px;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: 999px;
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  box-shadow: 0 8px 24px rgb(20 20 18 / 14%);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.questionNavigation {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: var(--space-3);
+  display: grid;
+  gap: 3px;
+  transform: translateY(-50%);
+}
+
+.questionMarker {
+  position: relative;
+  display: flex;
+  width: 52px;
+  height: 12px;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.questionMarkerLine {
+  width: 12px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transition:
+    width 140ms var(--ease-standard),
+    color 140ms ease;
+}
+
+.questionMarker:hover .questionMarkerLine,
+.questionMarker:focus-visible .questionMarkerLine {
+  width: 40px;
+  color: var(--color-text-secondary);
+}
+
+.questionPreview {
+  position: absolute;
+  top: 50%;
+  left: 52px;
+  display: grid;
+  width: min(380px, calc(100vw - 96px));
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-divider-subtle);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  box-shadow: 0 12px 32px rgb(20 20 18 / 18%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(4px, -50%);
+  transition:
+    opacity 120ms ease,
+    transform 120ms var(--ease-standard),
+    visibility 0s linear 120ms;
+  visibility: hidden;
+}
+
+.questionPreview strong,
+.questionPreview span {
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.questionPreview strong {
+  font-size: 13px;
+}
+
+.questionPreview span {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.questionMarker:hover .questionPreview,
+.questionMarker:focus-visible .questionPreview {
+  opacity: 1;
+  transform: translate(0, -50%);
+  transition-delay: 0s;
+  visibility: visible;
+}
+
+@media (max-width: 1000px) {
+  .messageColumnWithQuestionNavigation {
+    padding-left: 64px;
+  }
+}
+
+@media (max-width: 720px) {
+  .messageColumn {
+    padding-inline: 12px;
+  }
+
+  .userMessage {
+    max-width: 88%;
+  }
+
+  .questionPreview {
+    width: min(320px, calc(100vw - 76px));
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .userActions,
+  .agentActions .messageActionButton {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activityGroupHeader > span:last-child,
+  .activityGroupSize,
+  .activityGroupContent,
+  .activityRowChevron,
+  .activityDetailSize,
+  .activityDetail,
+  .messageActionTooltip,
+  .questionMarkerLine,
+  .questionPreview {
+    transition: none;
+  }
+
+  .thinking {
+    animation: none;
+  }
+}

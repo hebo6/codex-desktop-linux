@@ -1,0 +1,13 @@
+.credentialSummary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-divider-subtle); border-radius: var(--radius-sm); color: var(--color-text-secondary); font-size: 12px; }
+.credentialSummary button, .hostKey button { min-height: 30px; padding: 0 var(--space-3); border: 1px solid var(--color-divider-strong); border-radius: var(--radius-sm); color: var(--color-text-primary); background: var(--color-content-bg); font: inherit; font-size: 11px; cursor: pointer; }
+.hostKey { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-divider-subtle); border-radius: var(--radius-sm); color: var(--color-text-secondary); font-size: 11px; }
+.hostKey code { overflow-wrap: anywhere; }
+.hostKey button { width: fit-content; }
+.keyValues { display: grid; gap: var(--space-2); }
+.keyValueRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: var(--space-2); }
+.keyValueRow button { width: 34px; padding: 0; border: 1px solid var(--color-divider-strong); border-radius: var(--radius-sm); color: var(--color-text-secondary); background: transparent; cursor: pointer; }
+.addButton { width: fit-content; min-height: 30px; padding: 0 var(--space-3); border: 1px solid var(--color-divider-strong); border-radius: var(--radius-sm); color: var(--color-text-secondary); background: transparent; font: inherit; font-size: 11px; cursor: pointer; }
+.testTarget { display: grid; gap: var(--space-2); padding-top: var(--space-4); border-top: 1px solid var(--color-divider-subtle); }
+.testTarget > span { color: var(--color-text-secondary); font-size: 12px; font-weight: 600; }
+.testTarget small { color: var(--color-text-tertiary); font-size: 11px; }
+.warning { margin: 0; color: var(--color-status-warning); font-size: 11px; line-height: 1.5; }

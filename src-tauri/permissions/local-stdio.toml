@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-send-local-stdio-message"
+description = "Allows sending validated JSON to an application-owned local stdio connection"
+commands.allow = ["send_local_stdio_message"]
+
+[[permission]]
+identifier = "allow-disconnect-local-stdio"
+description = "Allows stopping an application-owned local stdio connection"
+commands.allow = ["disconnect_local_stdio"]

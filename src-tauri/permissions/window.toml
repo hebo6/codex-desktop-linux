@@ -1,0 +1,27 @@
+[[permission]]
+identifier = "allow-open-app-window"
+description = "Allows application windows to manage their own state and create a server-bound window"
+commands.allow = [
+    "load_window_state",
+    "bind_window_server",
+    "update_window_session",
+    "open_app_window",
+    "pick_local_directory",
+    "open_external_url",
+    "save_remote_file",
+    "load_thread_cache",
+    "save_thread_cache",
+    "load_draft",
+    "save_draft",
+    "delete_draft",
+    "load_preferences",
+    "save_preferences",
+    "clear_thread_cache",
+    "clear_application_logs",
+    "clear_temporary_files",
+    "clear_all_local_data",
+    "read_system_diagnostics",
+    "take_pending_deep_link",
+    "confirm_proxy_ssh_host_key",
+    "record_proxy_test",
+]

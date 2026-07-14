@@ -1,0 +1,13 @@
+.backdrop { position: fixed; z-index: 80; inset: 0; display: grid; padding-top: min(16vh, 140px); align-items: start; justify-items: center; background: var(--color-backdrop); }
+.dialog { display: grid; width: min(620px, calc(100% - 32px)); max-height: min(620px, 70vh); grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid var(--color-divider-strong); border-radius: 14px; color: var(--color-text-primary); background: var(--color-content-bg); box-shadow: 0 24px 70px rgb(10 10 9 / 30%); }
+.search { display: flex; align-items: center; gap: var(--space-3); min-height: 56px; padding: 0 var(--space-4); border-bottom: 1px solid var(--color-divider-subtle); }
+.search span { color: var(--color-text-tertiary); font-size: 14px; }
+.search input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--color-text-primary); background: transparent; font: inherit; font-size: 14px; }
+.results { padding: var(--space-2); overflow: auto; }
+.results button { display: grid; width: 100%; min-height: 52px; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--radius-sm); color: var(--color-text-primary); background: transparent; text-align: left; cursor: pointer; }
+.results button[data-selected="true"] { background: var(--color-fill-hover); }
+.results button > span:first-child { display: grid; min-width: 0; gap: 3px; }
+.results strong, .results small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results strong { font-size: 12px; }
+.results small, .results time, .empty { color: var(--color-text-tertiary); font-size: 10px; }
+.empty { padding: var(--space-6); text-align: center; }

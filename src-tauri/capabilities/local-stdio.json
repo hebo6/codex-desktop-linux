@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "local-stdio",
+  "description": "Allows application windows to interact with an owned local app-server stdio connection",
+  "windows": ["main", "app-*"],
+  "permissions": [
+    "allow-send-local-stdio-message",
+    "allow-disconnect-local-stdio"
+  ]
+}

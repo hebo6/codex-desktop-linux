@@ -1,0 +1,399 @@
+{
+  "schemaCommit": "ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c",
+  "recordingSource": "controlled-app-server",
+  "deidentified": true,
+  "clientRequests": [
+    {
+      "area": "initialization",
+      "message": {
+        "id": "client-1",
+        "method": "initialize",
+        "params": {
+          "clientInfo": {
+            "name": "codex-desktop-linux",
+            "title": "Codex Desktop Linux",
+            "version": "0.1.0"
+          },
+          "capabilities": {
+            "experimentalApi": true
+          }
+        }
+      }
+    },
+    {
+      "area": "thread",
+      "message": {
+        "id": "client-2",
+        "method": "thread/list",
+        "params": {
+          "archived": false,
+          "limit": 30,
+          "sortDirection": "desc",
+          "sortKey": "updated_at"
+        }
+      }
+    },
+    {
+      "area": "thread",
+      "message": {
+        "id": "client-3",
+        "method": "thread/turns/list",
+        "params": {
+          "threadId": "thread-redacted",
+          "itemsView": "full",
+          "limit": 30,
+          "sortDirection": "desc"
+        }
+      }
+    },
+    {
+      "area": "turn",
+      "message": {
+        "id": "client-4",
+        "method": "turn/start",
+        "params": {
+          "threadId": "thread-redacted",
+          "clientUserMessageId": "message-redacted",
+          "input": [
+            {
+              "type": "text",
+              "text": "脱敏测试消息"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "area": "skills",
+      "message": {
+        "id": "client-5",
+        "method": "skills/list",
+        "params": {
+          "cwds": ["/workspace"]
+        }
+      }
+    },
+    {
+      "area": "fileSearch",
+      "message": {
+        "id": "client-6",
+        "method": "fuzzyFileSearch",
+        "params": {
+          "query": "readme",
+          "roots": ["/workspace"],
+          "cancellationToken": "search-redacted"
+        }
+      }
+    },
+    {
+      "area": "rateLimits",
+      "message": {
+        "id": "client-7",
+        "method": "account/rateLimits/read"
+      }
+    }
+  ],
+  "serverResults": [
+    {
+      "area": "initialization",
+      "method": "initialize",
+      "result": {
+        "codexHome": "/home/user/.codex",
+        "platformFamily": "unix",
+        "platformOs": "linux",
+        "userAgent": "codex-contract"
+      }
+    },
+    {
+      "area": "thread",
+      "method": "thread/list",
+      "result": {
+        "data": [
+          {
+            "cliVersion": "0.1.0",
+            "createdAt": 100,
+            "cwd": "/workspace",
+            "ephemeral": false,
+            "id": "thread-redacted",
+            "modelProvider": "openai",
+            "preview": "脱敏会话",
+            "sessionId": "session-redacted",
+            "source": "appServer",
+            "status": { "type": "idle" },
+            "turns": [],
+            "updatedAt": 200
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "area": "thread",
+      "method": "thread/turns/list",
+      "result": {
+        "data": [
+          {
+            "id": "turn-redacted",
+            "items": [
+              {
+                "id": "item-redacted",
+                "text": "脱敏回答",
+                "type": "agentMessage"
+              }
+            ],
+            "itemsView": "full",
+            "status": "completed"
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "area": "turn",
+      "method": "turn/start",
+      "result": {
+        "turn": {
+          "id": "turn-redacted",
+          "items": [],
+          "itemsView": "full",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "area": "skills",
+      "method": "skills/list",
+      "result": {
+        "data": [
+          {
+            "cwd": "/workspace",
+            "errors": [],
+            "skills": [
+              {
+                "description": "脱敏技能",
+                "enabled": true,
+                "name": "sample-skill",
+                "path": "/workspace/.codex/skills/sample/SKILL.md",
+                "scope": "repo"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "area": "fileSearch",
+      "method": "fuzzyFileSearch",
+      "result": {
+        "files": [
+          {
+            "file_name": "README.md",
+            "indices": [0, 1, 2],
+            "match_type": "file",
+            "path": "/workspace/README.md",
+            "root": "/workspace",
+            "score": 100
+          }
+        ]
+      }
+    },
+    {
+      "area": "rateLimits",
+      "method": "account/rateLimits/read",
+      "result": {
+        "rateLimits": {
+          "limitId": "codex",
+          "primary": {
+            "resetsAt": 2000000000,
+            "usedPercent": 40,
+            "windowDurationMins": 300
+          }
+        }
+      }
+    }
+  ],
+  "serverNotifications": [
+    {
+      "area": "turn",
+      "message": {
+        "method": "turn/started",
+        "params": {
+          "threadId": "thread-redacted",
+          "turn": {
+            "id": "turn-redacted",
+            "items": [],
+            "itemsView": "full",
+            "status": "inProgress"
+          }
+        }
+      }
+    },
+    {
+      "area": "turn",
+      "message": {
+        "method": "item/completed",
+        "params": {
+          "completedAtMs": 200,
+          "item": {
+            "id": "item-redacted",
+            "text": "脱敏回答",
+            "type": "agentMessage"
+          },
+          "threadId": "thread-redacted",
+          "turnId": "turn-redacted"
+        }
+      }
+    },
+    {
+      "area": "skills",
+      "message": {
+        "method": "skills/changed",
+        "params": {}
+      }
+    },
+    {
+      "area": "fileSearch",
+      "message": {
+        "method": "fuzzyFileSearch/sessionCompleted",
+        "params": {
+          "sessionId": "search-redacted"
+        }
+      }
+    },
+    {
+      "area": "rateLimits",
+      "message": {
+        "method": "account/rateLimits/updated",
+        "params": {
+          "rateLimits": {
+            "limitId": "codex",
+            "primary": {
+              "usedPercent": 41
+            }
+          }
+        }
+      }
+    }
+  ],
+  "serverRequests": [
+    {
+      "id": "server-1",
+      "method": "item/commandExecution/requestApproval",
+      "params": {
+        "itemId": "command-redacted",
+        "startedAtMs": 100,
+        "threadId": "thread-redacted",
+        "turnId": "turn-redacted"
+      }
+    },
+    {
+      "id": "server-2",
+      "method": "item/fileChange/requestApproval",
+      "params": {
+        "itemId": "patch-redacted",
+        "startedAtMs": 101,
+        "threadId": "thread-redacted",
+        "turnId": "turn-redacted"
+      }
+    },
+    {
+      "id": "server-3",
+      "method": "item/tool/requestUserInput",
+      "params": {
+        "itemId": "question-redacted",
+        "questions": [
+          {
+            "header": "选择",
+            "id": "choice",
+            "question": "请选择测试项",
+            "options": [
+              {
+                "description": "脱敏选项",
+                "label": "选项一"
+              }
+            ]
+          }
+        ],
+        "threadId": "thread-redacted",
+        "turnId": "turn-redacted"
+      }
+    },
+    {
+      "id": "server-4",
+      "method": "mcpServer/elicitation/request",
+      "params": {
+        "message": "填写脱敏内容",
+        "mode": "form",
+        "requestedSchema": {
+          "properties": {},
+          "type": "object"
+        },
+        "serverName": "example",
+        "threadId": "thread-redacted",
+        "turnId": "turn-redacted"
+      }
+    },
+    {
+      "id": "server-5",
+      "method": "item/permissions/requestApproval",
+      "params": {
+        "cwd": "/workspace",
+        "itemId": "permission-redacted",
+        "permissions": {},
+        "startedAtMs": 102,
+        "threadId": "thread-redacted",
+        "turnId": "turn-redacted"
+      }
+    },
+    {
+      "id": "server-6",
+      "method": "item/tool/call",
+      "params": {
+        "arguments": {},
+        "callId": "call-redacted",
+        "threadId": "thread-redacted",
+        "tool": "sample-tool",
+        "turnId": "turn-redacted"
+      }
+    },
+    {
+      "id": "server-7",
+      "method": "account/chatgptAuthTokens/refresh",
+      "params": {
+        "reason": "unauthorized"
+      }
+    },
+    {
+      "id": "server-8",
+      "method": "attestation/generate",
+      "params": {}
+    },
+    {
+      "id": "server-9",
+      "method": "currentTime/read",
+      "params": {
+        "threadId": "thread-redacted"
+      }
+    },
+    {
+      "id": "server-10",
+      "method": "applyPatchApproval",
+      "params": {
+        "callId": "legacy-patch-redacted",
+        "conversationId": "thread-redacted",
+        "fileChanges": {}
+      }
+    },
+    {
+      "id": "server-11",
+      "method": "execCommandApproval",
+      "params": {
+        "callId": "legacy-command-redacted",
+        "command": ["pwd"],
+        "conversationId": "thread-redacted",
+        "cwd": "/workspace",
+        "parsedCmd": []
+      }
+    }
+  ]
+}

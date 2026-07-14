@@ -1,0 +1,29 @@
+[[permission]]
+identifier = "allow-connect-configured-server"
+description = "Allows opening an app-server connection through a persisted validated server profile"
+commands.allow = ["connect_configured_server"]
+
+[[permission]]
+identifier = "allow-cancel-configured-server-connection"
+description = "Allows cancelling this window's pending or active persisted-profile connection lifecycle"
+commands.allow = ["cancel_configured_server_connection"]
+
+[[permission]]
+identifier = "allow-send-configured-server-message"
+description = "Allows sending protocol messages through this window's configured server connection"
+commands.allow = ["send_configured_server_message"]
+
+[[permission]]
+identifier = "allow-disconnect-configured-server"
+description = "Allows releasing this window's configured server connection"
+commands.allow = ["disconnect_configured_server"]
+
+[[permission]]
+identifier = "allow-connect-server-connection-test"
+description = "Allows testing a validated server draft without persisting it or creating a thread"
+commands.allow = ["connect_server_connection_test"]
+
+[[permission]]
+identifier = "allow-cancel-server-connection-test"
+description = "Allows cancelling this window's pending or active server draft connection test"
+commands.allow = ["cancel_server_connection_test"]

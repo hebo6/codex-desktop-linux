@@ -1,0 +1,9 @@
+{
+  "sizes": [
+    { "name": "large", "width": 1440, "height": 900 },
+    { "name": "medium", "width": 1280, "height": 800 },
+    { "name": "compact", "width": 960, "height": 640 }
+  ],
+  "themes": ["light", "dark"],
+  "states": ["conversation", "slash", "model", "settings"]
+}

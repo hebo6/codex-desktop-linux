@@ -1,0 +1,116 @@
+name: Linux release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x86_64
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - architecture: aarch64
+            runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libappindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev patchelf rpm
+      - name: Install project dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Select Rust toolchain
+        run: rustup target add "${{ matrix.target }}"
+      - name: Test frontend and Rust
+        run: |
+          pnpm test
+          cargo test --locked --manifest-path src-tauri/Cargo.toml --target "${{ matrix.target }}"
+      - name: Build Linux packages
+        run: pnpm tauri build --ci --target "${{ matrix.target }}" --bundles appimage,deb,rpm
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-${{ matrix.architecture }}
+          path: src-tauri/target/${{ matrix.target }}/release/bundle
+          if-no-files-found: error
+
+  publish:
+    name: Sign and publish
+    needs:
+      - build
+      - smoke
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          path: release-input
+      - name: Assemble checksummed artifacts
+        run: node scripts/assemble-release.mjs release-input release-artifacts
+      - name: Import release signing key
+        env:
+          RELEASE_GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
+        run: echo "$RELEASE_GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
+      - name: Sign release artifacts
+        env:
+          GPG_KEY_ID: ${{ secrets.RELEASE_GPG_KEY_ID }}
+          GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+        run: bash scripts/sign-release.sh release-artifacts
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" release-artifacts/* --notes-file docs/releases/0.1.0.md --title "Codex Desktop Linux ${{ github.ref_name }}" --verify-tag
+
+  smoke:
+    name: Smoke ${{ matrix.distribution }} ${{ matrix.session }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution:
+          - ubuntu
+          - debian
+          - fedora
+          - arch
+        session:
+          - x11
+          - wayland
+        include:
+          - distribution: ubuntu
+            container: ubuntu:22.04
+          - distribution: debian
+            container: debian:12
+          - distribution: fedora
+            container: fedora:latest
+          - distribution: arch
+            container: archlinux:latest
+    runs-on: ubuntu-24.04
+    container: ${{ matrix.container }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux-x86_64
+          path: release-input
+      - name: Verify package and graphical startup
+        run: bash scripts/smoke-linux-package.sh "${{ matrix.distribution }}" "${{ matrix.session }}" release-input

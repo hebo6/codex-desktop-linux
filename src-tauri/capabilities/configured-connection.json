@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "configured-connection",
+  "description": "Allows application windows to connect through a persisted server profile",
+  "windows": ["main", "app-*"],
+  "permissions": [
+    "allow-connect-configured-server",
+    "allow-cancel-configured-server-connection",
+    "allow-send-configured-server-message",
+    "allow-disconnect-configured-server",
+    "allow-connect-server-connection-test",
+    "allow-cancel-server-connection-test"
+  ]
+}
