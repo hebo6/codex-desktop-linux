@@ -37,7 +37,7 @@ launch_argv=()
 case $distro_id in
   ubuntu|debian)
     apt-get update
-    DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends cage dbus-x11 desktop-file-utils xauth xvfb
+    DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends cage dbus-x11 desktop-file-utils xauth xvfb xwayland
     mapfile -t package_paths < <(find "$artifact_root" -type f -name '*.deb' -print)
     if [[ ${#package_paths[@]} -ne 1 ]]; then
       echo "必须且只能找到一个 deb 产物" >&2
