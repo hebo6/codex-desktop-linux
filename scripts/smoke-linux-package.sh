@@ -70,7 +70,7 @@ case $distro_id in
       exit 1
     fi
     package_path=${package_paths[0]}
-    chmod u+x "$package_path"
+    chmod a+x "$package_path"
     launch_argv=("$package_path" --appimage-extract-and-run)
     ;;
   *)
@@ -107,7 +107,14 @@ if [[ $session_type == "x11" ]]; then
     WEBKIT_DISABLE_COMPOSITING_MODE=1 \
     "${launch_argv[@]}"
 else
-  timeout 45s dbus-run-session -- env \
+  chown -R nobody "$HOME" "$XDG_RUNTIME_DIR"
+  timeout 45s runuser --user nobody -- env \
+    HOME="$HOME" \
+    XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+    XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
+    XDG_DATA_HOME="$XDG_DATA_HOME" \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+    dbus-run-session -- env \
     CODEX_DESKTOP_RELEASE_SMOKE=1 \
     GDK_BACKEND=wayland \
     LIBGL_ALWAYS_SOFTWARE=1 \
