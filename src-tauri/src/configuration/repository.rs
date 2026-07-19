@@ -5442,8 +5442,6 @@ mod tests {
                 .unwrap();
             assert!(references.iter().all(Option::is_none));
         }
-        repository.close().await;
-
         for entry in fs::read_dir(&test_path.directory).unwrap() {
             let bytes = fs::read(entry.unwrap().path()).unwrap();
             assert!(
@@ -5452,5 +5450,6 @@ mod tests {
                     .any(|window| window == TEST_SECRET.as_bytes())
             );
         }
+        repository.close().await;
     }
 }
