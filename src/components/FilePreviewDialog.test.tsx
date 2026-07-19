@@ -52,6 +52,30 @@ describe("FilePreviewDialog", () => {
     expect(document.getElementById("preview-line-3")).toHaveAttribute("data-highlighted", "true");
   });
 
+  it("高亮链接携带的行范围并在手动跳转后恢复单行", async () => {
+    render(
+      <FilePreviewDialog
+        client={clientFor("first\nsecond\nthird\nfourth")}
+        onClose={vi.fn()}
+        request={{ path: "/remote/src/App.tsx", line: 2, endLine: 3 }}
+        serverName="远程开发机"
+      />,
+    );
+    await waitFor(() => expect(screen.getByText("second", { exact: true })).toBeVisible());
+    expect(document.getElementById("preview-line-1")).toHaveAttribute("data-highlighted", "false");
+    expect(document.getElementById("preview-line-2")).toHaveAttribute("data-highlighted", "true");
+    expect(document.getElementById("preview-line-3")).toHaveAttribute("data-highlighted", "true");
+    expect(document.getElementById("preview-line-4")).toHaveAttribute("data-highlighted", "false");
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "跳转到行" }), {
+      target: { value: "4" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "跳转" }));
+    expect(document.getElementById("preview-line-2")).toHaveAttribute("data-highlighted", "false");
+    expect(document.getElementById("preview-line-3")).toHaveAttribute("data-highlighted", "false");
+    expect(document.getElementById("preview-line-4")).toHaveAttribute("data-highlighted", "true");
+  });
+
   it("Markdown 预览不执行原始 HTML", async () => {
     render(
       <FilePreviewDialog

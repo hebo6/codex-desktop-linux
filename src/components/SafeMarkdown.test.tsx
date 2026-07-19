@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { resolveLink } from "../content/linkResolver";
 import { SafeMarkdown } from "./SafeMarkdown";
 
 describe("SafeMarkdown", () => {
@@ -21,5 +22,25 @@ describe("SafeMarkdown", () => {
     fireEvent.click(screen.getByRole("button", { name: "图片：图片" }));
     expect(onOpenLink).toHaveBeenNthCalledWith(1, "https://example.com");
     expect(onOpenLink).toHaveBeenNthCalledWith(2, "./a.png");
+  });
+
+  it("将尖括号包裹的带空格文件链接交给统一解析器", () => {
+    let resolved: ReturnType<typeof resolveLink> | null = null;
+    render(
+      <SafeMarkdown
+        onOpenLink={(link) => {
+          resolved = resolveLink(link, "/workspace");
+        }}
+        source="[源码](<My Project/App.tsx:42>)"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "源码" }));
+    expect(resolved).toEqual({
+      type: "file",
+      path: "/workspace/My Project/App.tsx",
+      line: 42,
+      endLine: null,
+      column: null,
+    });
   });
 });

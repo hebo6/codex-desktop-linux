@@ -1106,6 +1106,7 @@ export function App({
         setPreviewRequest({
           path: resolved.path,
           line: resolved.line,
+          endLine: resolved.endLine,
           column: resolved.column,
         });
         return;

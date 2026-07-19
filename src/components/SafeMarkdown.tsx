@@ -276,7 +276,7 @@ function renderInline(
     if (link !== null) {
       const image = link[1] === "!";
       const label = link[2] || link[3] || "链接";
-      const target = link[3] ?? "";
+      const target = markdownLinkDestination(link[3] ?? "");
       const content = image ? `图片：${label}` : label;
       nodes.push(interactiveLinks
         ? (
@@ -305,8 +305,17 @@ function renderInline(
   return nodes;
 }
 
+function markdownLinkDestination(value: string): string {
+  return value.startsWith("<") && value.endsWith(">")
+    ? value.slice(1, -1)
+    : value;
+}
+
 function stripRawHtml(source: string): string {
-  return source.replace(/<\/?[A-Za-z][^>]*>/gu, "");
+  return source.replace(
+    /(!?\[[^\]]*\]\(<[^<>]*>\))|<\/?[A-Za-z][A-Za-z\d-]*(?:\s[^<>]*?)?\s*\/?>/gu,
+    (token, markdownLink: string | undefined) => markdownLink === undefined ? "" : token,
+  );
 }
 
 function isTableDivider(line: string): boolean {

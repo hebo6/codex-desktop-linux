@@ -1,6 +1,6 @@
 export type ResolvedLink =
   | ExtractedLink
-  | { readonly type: "file"; readonly path: string; readonly line: number | null; readonly column: number | null }
+  | { readonly type: "file"; readonly path: string; readonly line: number | null; readonly endLine: number | null; readonly column: number | null }
   | { readonly type: "anchor"; readonly id: string }
   | { readonly type: "blocked"; readonly reason: string };
 
@@ -12,6 +12,21 @@ export interface ExtractedLink {
 
 const SCHEME_PATTERN = /^[A-Za-z][A-Za-z\d+.-]*:/u;
 const WINDOWS_ABSOLUTE_PATTERN = /^[A-Za-z]:[\\/]/u;
+
+interface FileLocation {
+  readonly line: number | null;
+  readonly endLine: number | null;
+  readonly column: number | null;
+}
+
+type ParsedLocation =
+  | { readonly type: "none" }
+  | { readonly type: "valid"; readonly value: FileLocation }
+  | { readonly type: "invalid" };
+
+type ParsedFileReference =
+  | { readonly type: "valid"; readonly path: string; readonly location: FileLocation }
+  | { readonly type: "invalid" };
 
 export function resolveLink(raw: string, cwd: string | null): ResolvedLink {
   const value = raw.trim();
@@ -38,27 +53,44 @@ export function resolveLink(raw: string, cwd: string | null): ResolvedLink {
       if (url.hostname.length > 0) {
         return { type: "blocked", reason: "不支持带主机名的文件链接" };
       }
-      return fileLink(decodeURIComponent(url.pathname), url.hash);
+      return resolveFileLink(decodeURIComponent(url.pathname), url.hash, null);
     } catch {
       return { type: "blocked", reason: "文件链接格式无效" };
     }
   }
-  if (SCHEME_PATTERN.test(value) && !WINDOWS_ABSOLUTE_PATTERN.test(value)) {
-    return { type: "blocked", reason: "此链接协议不允许打开" };
-  }
 
   const { path, fragment } = splitFragment(value);
-  if (isAbsolutePath(path)) {
-    return fileLink(normalizePath(path), fragment);
+  const reference = parseFileReference(path, fragment);
+  if (reference.type === "invalid") {
+    return { type: "blocked", reason: "文件定位行列无效" };
+  }
+  if (SCHEME_PATTERN.test(reference.path) && !WINDOWS_ABSOLUTE_PATTERN.test(reference.path)) {
+    return { type: "blocked", reason: "此链接协议不允许打开" };
+  }
+  if (isAbsolutePath(reference.path)) {
+    return fileLink(normalizePath(reference.path), reference.location);
   }
   if (cwd === null) {
     return { type: "blocked", reason: "缺少服务器工作目录，无法解析相对路径" };
   }
-  return fileLink(resolveRelativePath(cwd, path), fragment);
+  return fileLink(resolveRelativePath(cwd, reference.path), reference.location);
 }
 
-function fileLink(path: string, fragment: string): ResolvedLink {
-  const location = parseLineFragment(fragment);
+function resolveFileLink(path: string, fragment: string, cwd: string | null): ResolvedLink {
+  const reference = parseFileReference(path, fragment);
+  if (reference.type === "invalid") {
+    return { type: "blocked", reason: "文件定位行列无效" };
+  }
+  const resolvedPath = isAbsolutePath(reference.path)
+    ? normalizePath(reference.path)
+    : cwd === null ? null : resolveRelativePath(cwd, reference.path);
+  if (resolvedPath === null) {
+    return { type: "blocked", reason: "缺少服务器工作目录，无法解析相对路径" };
+  }
+  return fileLink(resolvedPath, reference.location);
+}
+
+function fileLink(path: string, location: FileLocation): ResolvedLink {
   return { type: "file", path, ...location };
 }
 
@@ -69,15 +101,78 @@ function splitFragment(value: string): { path: string; fragment: string } {
     : { path: decodeSafely(value.slice(0, index)), fragment: value.slice(index) };
 }
 
-function parseLineFragment(fragment: string): { line: number | null; column: number | null } {
-  const match = /^#(?:L)?(\d+)(?::(\d+)|C(\d+))?/iu.exec(fragment);
-  if (match === null) {
-    return { line: null, column: null };
+function parseLineFragment(fragment: string): ParsedLocation {
+  const range = /^#L?(\d+)-L?(\d+)$/iu.exec(fragment);
+  if (range !== null) {
+    return location(range[1], null, range[2]);
   }
-  return {
-    line: Number(match[1]),
-    column: Number(match[2] ?? match[3] ?? 0) || null,
-  };
+  const point = /^#L?(\d+)(?:C(\d+)|:(\d+))?$/iu.exec(fragment);
+  if (point !== null) {
+    return location(point[1], point[2] ?? point[3] ?? null, null);
+  }
+  return /^#L?\d/iu.test(fragment) ? { type: "invalid" } : { type: "none" };
+}
+
+function parseFileReference(path: string, fragment: string): ParsedFileReference {
+  if (fragment.length === 0) {
+    return parseLineSuffix(path);
+  }
+  const parsed = parseLineFragment(fragment);
+  return parsed.type === "invalid"
+    ? parsed
+    : { type: "valid", path, location: parsed.type === "valid" ? parsed.value : emptyLocation() };
+}
+
+function parseLineSuffix(path: string): ParsedFileReference {
+  const range = /^(.+):(\d+)-(\d+)$/u.exec(path);
+  if (range !== null) {
+    return fileReference(range[1], location(range[2], null, range[3]));
+  }
+  const pointWithColumn = /^(.+):(\d+):(\d+)$/u.exec(path);
+  if (pointWithColumn !== null) {
+    return fileReference(pointWithColumn[1], location(pointWithColumn[2], pointWithColumn[3], null));
+  }
+  const point = /^(.+):(\d+)$/u.exec(path);
+  if (point !== null) {
+    return fileReference(point[1], location(point[2], null, null));
+  }
+  return { type: "valid", path, location: emptyLocation() };
+}
+
+function fileReference(path: string | undefined, parsed: ParsedLocation): ParsedFileReference {
+  return path === undefined || parsed.type === "invalid"
+    ? { type: "invalid" }
+    : { type: "valid", path, location: parsed.type === "valid" ? parsed.value : emptyLocation() };
+}
+
+function location(
+  lineValue: string | undefined,
+  columnValue: string | null | undefined,
+  endLineValue: string | null | undefined,
+): ParsedLocation {
+  const line = positiveInteger(lineValue);
+  const column = columnValue === null || columnValue === undefined
+    ? null
+    : positiveInteger(columnValue);
+  const endLine = endLineValue === null || endLineValue === undefined
+    ? null
+    : positiveInteger(endLineValue);
+  const invalidColumn = columnValue !== null && columnValue !== undefined && column === null;
+  const invalidEndLine = endLineValue !== null && endLineValue !== undefined && endLine === null;
+  if (line === null || invalidColumn || invalidEndLine || endLine !== null && endLine < line) {
+    return { type: "invalid" };
+  }
+  return { type: "valid", value: { line, endLine, column } };
+}
+
+function positiveInteger(value: string | undefined): number | null {
+  if (value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function emptyLocation(): FileLocation {
+  return { line: null, endLine: null, column: null };
 }
 
 function resolveRelativePath(cwd: string, path: string): string {

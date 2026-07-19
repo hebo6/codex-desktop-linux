@@ -29,6 +29,7 @@ const MAX_PREVIEW_BYTES = 16 * 1024 * 1024;
 export interface FilePreviewRequest {
   readonly path: string;
   readonly line?: number | null;
+  readonly endLine?: number | null;
   readonly column?: number | null;
   readonly diff?: string | null;
 }
@@ -77,6 +78,7 @@ export function FilePreviewDialog({
   const imageViewportRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
   const [activeLine, setActiveLine] = useState<number | null>(null);
+  const [activeEndLine, setActiveEndLine] = useState<number | null>(null);
   const [jumpLine, setJumpLine] = useState("");
   const [jumpError, setJumpError] = useState<string | null>(null);
   const [diffMode, setDiffMode] = useState<"unified" | "split">("unified");
@@ -102,6 +104,7 @@ export function FilePreviewDialog({
     setImageSize({ width: 0, height: 0 });
     setCanPanImage(false);
     setActiveLine(request?.line ?? null);
+    setActiveEndLine(request?.endLine ?? null);
     setJumpLine(request?.line === undefined || request.line === null ? "" : String(request.line));
     setJumpError(null);
     setDiffMode("unified");
@@ -294,6 +297,7 @@ export function FilePreviewDialog({
     }
     setJumpError(null);
     setActiveLine(line);
+    setActiveEndLine(null);
   };
   const updateZoom = (nextZoom: number, clientX?: number, clientY?: number) => {
     setZoom((current) => {
@@ -420,7 +424,7 @@ export function FilePreviewDialog({
           ) : displayedText !== null && isMarkdown(request.path) && markdownView ? (
             <article className={styles.markdownPreview}><SafeMarkdown {...(onOpenLink === undefined ? {} : { onOpenLink })} source={displayedText} /></article>
           ) : displayedText !== null ? (
-            <TextSource column={activeLine === request.line ? request.column ?? null : null} line={activeLine} matchingLines={matchingLines} query={search} text={displayedText} wrap={wrap} />
+            <TextSource column={activeLine === request.line ? request.column ?? null : null} endLine={activeEndLine} line={activeLine} matchingLines={matchingLines} query={search} text={displayedText} wrap={wrap} />
           ) : null}
         </main>
       </section>
@@ -460,10 +464,11 @@ function decodePreview(path: string, dataBase64: string): DecodedPreview {
   }
 }
 
-function TextSource({ column, line, matchingLines, query, text, wrap }: { readonly column: number | null; readonly line: number | null; readonly matchingLines: ReadonlySet<number>; readonly query: string; readonly text: string; readonly wrap: boolean }) {
+function TextSource({ column, endLine, line, matchingLines, query, text, wrap }: { readonly column: number | null; readonly endLine: number | null; readonly line: number | null; readonly matchingLines: ReadonlySet<number>; readonly query: string; readonly text: string; readonly wrap: boolean }) {
   return <ol className={styles.source} data-wrapped={wrap}>{text.split(/\r?\n/u).map((value, index) => {
     const lineNumber = index + 1;
-    return <li data-highlighted={line === lineNumber} id={`preview-line-${lineNumber}`} key={lineNumber}><code>{matchingLines.has(lineNumber) ? highlightQuery(value, query) : value}{line === lineNumber && column !== null ? <span className={styles.columnHint}> · 列 {column}</span> : null}</code></li>;
+    const highlighted = line !== null && lineNumber >= line && lineNumber <= (endLine ?? line);
+    return <li data-highlighted={highlighted} id={`preview-line-${lineNumber}`} key={lineNumber}><code>{matchingLines.has(lineNumber) ? highlightQuery(value, query) : value}{line === lineNumber && column !== null ? <span className={styles.columnHint}> · 列 {column}</span> : null}</code></li>;
   })}</ol>;
 }
 
