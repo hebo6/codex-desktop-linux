@@ -76,6 +76,8 @@ jobs:
           GPG_KEY_ID: ${{ secrets.RELEASE_GPG_KEY_ID }}
           GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
         run: bash scripts/sign-release.sh release-artifacts
+      - name: Include release signing key
+        run: cp docs/releases/codex-desktop-linux-release-key.asc release-artifacts/
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

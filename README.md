@@ -8,7 +8,7 @@ An independent Linux desktop client for the Codex app-server protocol, built wit
 > This is an unofficial community project. It is not affiliated with, sponsored by, or endorsed by OpenAI. Codex and OpenAI are trademarks of OpenAI
 
 > [!WARNING]
-> The project is under active development and has not published its first release. Expect protocol and user-interface changes before version 0.1.0
+> The project is under active development. Expect protocol and user-interface changes throughout the 0.x releases
 
 ![Codex Desktop Linux conversation view](tests/visual/baselines/1440x900-dark-conversation.png)
 
@@ -39,7 +39,7 @@ This is a comparison of deployment models, not a complete feature comparison. Th
 
 ## Project status
 
-The current source tree targets the first P0 release. Public AppImage, deb, and rpm packages are not available yet
+The first P0 release is available from [GitHub Releases](https://github.com/hebo6/codex-desktop-linux/releases)
 
 The interface is currently available in Simplified Chinese. Internationalization is not implemented yet
 
@@ -56,7 +56,7 @@ Running the application requires
 - Linux Secret Service for persistent credentials
 - A compatible [Codex CLI](https://developers.openai.com/codex/cli) installation for local stdio connections, already authenticated for the intended account
 
-deb and rpm packages use GTK 3 and WebKitGTK 4.1 from the distribution. The planned AppImage build carries its WebKit runtime dependencies
+deb and rpm packages use GTK 3 and WebKitGTK 4.1 from the distribution. The AppImage carries its WebKit runtime dependencies
 
 ## First connection
 

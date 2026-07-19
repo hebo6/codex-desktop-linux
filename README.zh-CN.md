@@ -8,7 +8,7 @@
 > 这是非官方社区项目，与 OpenAI 不存在隶属、赞助或背书关系。Codex 和 OpenAI 是 OpenAI 的商标
 
 > [!WARNING]
-> 项目仍在积极开发，尚未发布首个版本。0.1.0 发布前协议和用户界面可能继续变化
+> 项目仍在积极开发，0.x 版本中的协议和用户界面可能继续变化
 
 ![Codex Desktop Linux 会话界面](tests/visual/baselines/1440x900-dark-conversation.png)
 
@@ -39,7 +39,7 @@
 
 ## 项目状态
 
-当前源码面向首个 P0 版本，尚未提供公开的 AppImage、deb 或 rpm 安装包
+首个 P0 版本可从 [GitHub Releases](https://github.com/hebo6/codex-desktop-linux/releases) 下载
 
 界面当前仅提供简体中文，尚未实现国际化
 
@@ -56,7 +56,7 @@
 - 用于持久化凭据的 Linux Secret Service
 - 本机 stdio 连接需要安装兼容的 [Codex CLI](https://developers.openai.com/codex/cli)，并提前完成目标账户认证
 
-deb 和 rpm 安装包使用发行版提供的 GTK 3 与 WebKitGTK 4.1。计划中的 AppImage 构建会携带 WebKit 运行时依赖
+deb 和 rpm 安装包使用发行版提供的 GTK 3 与 WebKitGTK 4.1。AppImage 会携带 WebKit 运行时依赖
 
 ## 首次连接
 
