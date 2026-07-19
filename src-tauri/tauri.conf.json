@@ -56,6 +56,9 @@
     "shortDescription": "Codex Desktop client for Linux",
     "longDescription": "A native Linux desktop client for local and remote Codex app-server connections.",
     "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      },
       "deb": {
         "desktopTemplate": "linux/codex-desktop.desktop"
       },

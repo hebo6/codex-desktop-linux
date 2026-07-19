@@ -56,7 +56,7 @@ Running the application requires
 - Linux Secret Service for persistent credentials
 - A compatible [Codex CLI](https://developers.openai.com/codex/cli) installation for local stdio connections, already authenticated for the intended account
 
-deb and rpm packages use GTK 3 and WebKitGTK 4.1 from the distribution. The AppImage carries its WebKit runtime dependencies
+deb and rpm packages use GTK 3 and WebKitGTK 4.1 from the distribution. The AppImage carries its WebKit and GStreamer runtime dependencies
 
 ## First connection
 

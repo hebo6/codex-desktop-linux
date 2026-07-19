@@ -20,6 +20,8 @@ if [[ ! -d $artifact_root ]]; then
   exit 2
 fi
 
+artifact_root=$(realpath "$artifact_root")
+
 export HOME=/tmp/codex-desktop-release-smoke-home
 export XDG_CACHE_HOME=$HOME/.cache
 export XDG_CONFIG_HOME=$HOME/.config
@@ -61,7 +63,7 @@ case $distro_id in
     removal_kind="rpm"
     ;;
   arch)
-    pacman --sync --refresh --noconfirm cage dbus desktop-file-utils gtk3 webkit2gtk-4.1 xorg-server-xvfb xorg-xauth
+    pacman --sync --refresh --noconfirm cage dbus desktop-file-utils gtk3 webkit2gtk-4.1 xorg-server-xvfb xorg-xauth xorg-xwayland
     mapfile -t package_paths < <(find "$artifact_root" -type f -name '*.AppImage' -print)
     if [[ ${#package_paths[@]} -ne 1 ]]; then
       echo "必须且只能找到一个 AppImage 产物" >&2

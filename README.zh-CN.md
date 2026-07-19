@@ -56,7 +56,7 @@
 - 用于持久化凭据的 Linux Secret Service
 - 本机 stdio 连接需要安装兼容的 [Codex CLI](https://developers.openai.com/codex/cli)，并提前完成目标账户认证
 
-deb 和 rpm 安装包使用发行版提供的 GTK 3 与 WebKitGTK 4.1。AppImage 会携带 WebKit 运行时依赖
+deb 和 rpm 安装包使用发行版提供的 GTK 3 与 WebKitGTK 4.1。AppImage 会携带 WebKit 和 GStreamer 运行时依赖
 
 ## 首次连接
 
