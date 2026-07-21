@@ -1,6 +1,6 @@
 .composer {
   position: relative;
-  z-index: 2;
+  z-index: 5;
   width: min(calc(100% - 48px), 880px);
   padding-bottom: 18px;
   margin: -96px auto 0;
