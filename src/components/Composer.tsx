@@ -184,6 +184,8 @@ export function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [loadedDraftKey, setLoadedDraftKey] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const plusMenuRef = useRef<HTMLDivElement>(null);
   const fileSearchRef = useRef(0);
   const composingRef = useRef(false);
   const sendingRef = useRef(false);
@@ -246,6 +248,17 @@ export function Composer({
       setSelectedPermission(null);
     }
   }, [permissions, selectedPermission]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleOutsideClick = (event: PointerEvent) => {
+      if (event.target instanceof Node && !plusMenuRef.current?.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handleOutsideClick);
+    return () => document.removeEventListener("pointerdown", handleOutsideClick);
+  }, [menuOpen]);
 
   useEffect(() => {
     let disposed = false;
@@ -520,6 +533,31 @@ export function Composer({
     }
   };
 
+  const handleUploadClick = () => {
+    setMenuOpen(false);
+    attachmentInputRef.current?.click();
+  };
+
+  const triggerMention = () => {
+    setMenuOpen(false);
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const value = text;
+    const cursor = textarea.selectionStart ?? value.length;
+
+    const newValue = value.slice(0, cursor) + "@" + value.slice(textarea.selectionEnd ?? cursor);
+    setText(newValue);
+
+    textarea.focus();
+    setTimeout(() => {
+      const newCursor = cursor + 1;
+      textarea.selectionStart = newCursor;
+      textarea.selectionEnd = newCursor;
+      updateTrigger(newValue, newCursor);
+    }, 0);
+  };
+
   const addFiles = async (files: FileList | readonly File[]) => {
     const pending = await Promise.all([...files].map(readAttachment));
     setAttachments((current) => [...current, ...pending]);
@@ -703,18 +741,65 @@ export function Composer({
         )}
         <footer>
           <div className={styles.context}>
-            <button
-              aria-label="添加内容"
-              className={styles.addButton}
-              disabled={submitting || preparingAttachments}
-              onClick={() => attachmentInputRef.current?.click()}
-              title="添加图片"
-              type="button"
-            >
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
+            <div className={styles.plusMenuContainer} ref={plusMenuRef}>
+              <button
+                aria-expanded={menuOpen}
+                aria-haspopup="true"
+                aria-label="添加内容"
+                className={styles.addButton}
+                disabled={submitting || preparingAttachments}
+                onClick={() => setMenuOpen((prev) => !prev)}
+                title="添加内容"
+                type="button"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path
+                    d="M12 5v14M5 12h14"
+                    style={{
+                      transform: menuOpen ? "rotate(45deg)" : "rotate(0deg)",
+                      transformOrigin: "center",
+                      transition: "transform 0.2s ease",
+                    }}
+                  />
+                </svg>
+              </button>
+              {menuOpen && (
+                <div className={styles.plusMenu} role="menu">
+                  <button
+                    onClick={handleUploadClick}
+                    role="menuitem"
+                    type="button"
+                  >
+                    <svg aria-hidden="true" className={styles.menuIcon} viewBox="0 0 24 24">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="9" cy="9" r="2" />
+                      <path d="M21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                    </svg>
+                    <div className={styles.menuText}>
+                      <strong>添加图片</strong>
+                      <small>选择本地图片并上传</small>
+                    </div>
+                  </button>
+                  <button
+                    onClick={triggerMention}
+                    role="menuitem"
+                    type="button"
+                  >
+                    <svg aria-hidden="true" className={styles.menuIcon} viewBox="0 0 24 24">
+                      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                      <path d="M10 9H8" />
+                      <path d="M16 13H8" />
+                      <path d="M16 17H8" />
+                    </svg>
+                    <div className={styles.menuText}>
+                      <strong>引用项目引用</strong>
+                      <small>提及文件、目录或符号 (@)</small>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
             <PermissionPicker
               disabled={activeTurn || permissionsLoading}
               loading={permissionsLoading}

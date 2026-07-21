@@ -77,6 +77,7 @@ describe("Composer", () => {
     const openPicker = vi.spyOn(picker, "click");
 
     await user.click(screen.getByRole("button", { name: "添加内容" }));
+    await user.click(screen.getByRole("menuitem", { name: /添加图片/ }));
 
     expect(openPicker).toHaveBeenCalledTimes(1);
   });
