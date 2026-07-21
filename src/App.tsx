@@ -738,6 +738,9 @@ export function App({
       return;
     }
     mutations.resetSave();
+    setPendingPlaintextCredentialConfirmation((current) =>
+      current?.kind === "server" ? null : current,
+    );
     setEditor((current) =>
       current?.sessionId === activeEditor.sessionId ? null : current,
     );
@@ -839,6 +842,9 @@ export function App({
     }
     proxyMutations.resetSave();
     persistedProxyTestRef.current = null;
+    setPendingPlaintextCredentialConfirmation((current) =>
+      current?.kind === "proxy" ? null : current,
+    );
     setProxyEditor(null);
   };
 
