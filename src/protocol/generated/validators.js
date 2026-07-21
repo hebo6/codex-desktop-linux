@@ -115717,3 +115717,326 @@ errors++;
 validate539.errors = vErrors;
 return errors === 0;
 }
+
+export const validateGetAccountTokenUsageResponse = validate540;
+const schema858 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"AccountTokenUsageDailyBucket":{"properties":{"startDate":{"type":"string"},"tokens":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}},"required":["startDate","tokens"],"type":"object"},"AccountTokenUsageSummary":{"properties":{"currentStreakDays":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"lifetimeTokens":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"longestRunningTurnSec":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"longestStreakDays":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"peakDailyTokens":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991}},"type":"object"}},"properties":{"dailyUsageBuckets":{"items":{"$ref":"#/definitions/AccountTokenUsageDailyBucket"},"type":["array","null"]},"summary":{"$ref":"#/definitions/AccountTokenUsageSummary"}},"required":["summary"],"title":"GetAccountTokenUsageResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:GetAccountTokenUsageResponse"};
+const schema859 = {"properties":{"startDate":{"type":"string"},"tokens":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}},"required":["startDate","tokens"],"type":"object"};
+const schema860 = {"properties":{"currentStreakDays":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"lifetimeTokens":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"longestRunningTurnSec":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"longestStreakDays":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"peakDailyTokens":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991}},"type":"object"};
+
+function validate540(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+/*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:GetAccountTokenUsageResponse" */;
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.summary === undefined){
+const err0 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "summary"},message:"must have required property '"+"summary"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.dailyUsageBuckets !== undefined){
+let data0 = data.dailyUsageBuckets;
+if((!(Array.isArray(data0))) && (data0 !== null)){
+const err1 = {instancePath:instancePath+"/dailyUsageBuckets",schemaPath:"#/properties/dailyUsageBuckets/type",keyword:"type",params:{type: schema858.properties.dailyUsageBuckets.type},message:"must be array,null"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+if(Array.isArray(data0)){
+const len0 = data0.length;
+for(let i0=0; i0<len0; i0++){
+let data1 = data0[i0];
+if(data1 && typeof data1 == "object" && !Array.isArray(data1)){
+if(data1.startDate === undefined){
+const err2 = {instancePath:instancePath+"/dailyUsageBuckets/" + i0,schemaPath:"#/definitions/AccountTokenUsageDailyBucket/required",keyword:"required",params:{missingProperty: "startDate"},message:"must have required property '"+"startDate"+"'"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+if(data1.tokens === undefined){
+const err3 = {instancePath:instancePath+"/dailyUsageBuckets/" + i0,schemaPath:"#/definitions/AccountTokenUsageDailyBucket/required",keyword:"required",params:{missingProperty: "tokens"},message:"must have required property '"+"tokens"+"'"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+if(data1.startDate !== undefined){
+if(typeof data1.startDate !== "string"){
+const err4 = {instancePath:instancePath+"/dailyUsageBuckets/" + i0+"/startDate",schemaPath:"#/definitions/AccountTokenUsageDailyBucket/properties/startDate/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+}
+if(data1.tokens !== undefined){
+let data3 = data1.tokens;
+if(!(((typeof data3 == "number") && (!(data3 % 1) && !isNaN(data3))) && (isFinite(data3)))){
+const err5 = {instancePath:instancePath+"/dailyUsageBuckets/" + i0+"/tokens",schemaPath:"#/definitions/AccountTokenUsageDailyBucket/properties/tokens/type",keyword:"type",params:{type: "integer"},message:"must be integer"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+if((typeof data3 == "number") && (isFinite(data3))){
+if(data3 > 9007199254740991 || isNaN(data3)){
+const err6 = {instancePath:instancePath+"/dailyUsageBuckets/" + i0+"/tokens",schemaPath:"#/definitions/AccountTokenUsageDailyBucket/properties/tokens/maximum",keyword:"maximum",params:{comparison: "<=", limit: 9007199254740991},message:"must be <= 9007199254740991"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+if(data3 < -9007199254740991 || isNaN(data3)){
+const err7 = {instancePath:instancePath+"/dailyUsageBuckets/" + i0+"/tokens",schemaPath:"#/definitions/AccountTokenUsageDailyBucket/properties/tokens/minimum",keyword:"minimum",params:{comparison: ">=", limit: -9007199254740991},message:"must be >= -9007199254740991"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+}
+}
+}
+else {
+const err8 = {instancePath:instancePath+"/dailyUsageBuckets/" + i0,schemaPath:"#/definitions/AccountTokenUsageDailyBucket/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+}
+}
+}
+if(data.summary !== undefined){
+let data4 = data.summary;
+if(data4 && typeof data4 == "object" && !Array.isArray(data4)){
+if(data4.currentStreakDays !== undefined){
+let data5 = data4.currentStreakDays;
+if((!(((typeof data5 == "number") && (!(data5 % 1) && !isNaN(data5))) && (isFinite(data5)))) && (data5 !== null)){
+const err9 = {instancePath:instancePath+"/summary/currentStreakDays",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/currentStreakDays/type",keyword:"type",params:{type: schema860.properties.currentStreakDays.type},message:"must be integer,null"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+if((typeof data5 == "number") && (isFinite(data5))){
+if(data5 > 9007199254740991 || isNaN(data5)){
+const err10 = {instancePath:instancePath+"/summary/currentStreakDays",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/currentStreakDays/maximum",keyword:"maximum",params:{comparison: "<=", limit: 9007199254740991},message:"must be <= 9007199254740991"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+if(data5 < -9007199254740991 || isNaN(data5)){
+const err11 = {instancePath:instancePath+"/summary/currentStreakDays",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/currentStreakDays/minimum",keyword:"minimum",params:{comparison: ">=", limit: -9007199254740991},message:"must be >= -9007199254740991"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+}
+}
+if(data4.lifetimeTokens !== undefined){
+let data6 = data4.lifetimeTokens;
+if((!(((typeof data6 == "number") && (!(data6 % 1) && !isNaN(data6))) && (isFinite(data6)))) && (data6 !== null)){
+const err12 = {instancePath:instancePath+"/summary/lifetimeTokens",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/lifetimeTokens/type",keyword:"type",params:{type: schema860.properties.lifetimeTokens.type},message:"must be integer,null"};
+if(vErrors === null){
+vErrors = [err12];
+}
+else {
+vErrors.push(err12);
+}
+errors++;
+}
+if((typeof data6 == "number") && (isFinite(data6))){
+if(data6 > 9007199254740991 || isNaN(data6)){
+const err13 = {instancePath:instancePath+"/summary/lifetimeTokens",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/lifetimeTokens/maximum",keyword:"maximum",params:{comparison: "<=", limit: 9007199254740991},message:"must be <= 9007199254740991"};
+if(vErrors === null){
+vErrors = [err13];
+}
+else {
+vErrors.push(err13);
+}
+errors++;
+}
+if(data6 < -9007199254740991 || isNaN(data6)){
+const err14 = {instancePath:instancePath+"/summary/lifetimeTokens",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/lifetimeTokens/minimum",keyword:"minimum",params:{comparison: ">=", limit: -9007199254740991},message:"must be >= -9007199254740991"};
+if(vErrors === null){
+vErrors = [err14];
+}
+else {
+vErrors.push(err14);
+}
+errors++;
+}
+}
+}
+if(data4.longestRunningTurnSec !== undefined){
+let data7 = data4.longestRunningTurnSec;
+if((!(((typeof data7 == "number") && (!(data7 % 1) && !isNaN(data7))) && (isFinite(data7)))) && (data7 !== null)){
+const err15 = {instancePath:instancePath+"/summary/longestRunningTurnSec",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/longestRunningTurnSec/type",keyword:"type",params:{type: schema860.properties.longestRunningTurnSec.type},message:"must be integer,null"};
+if(vErrors === null){
+vErrors = [err15];
+}
+else {
+vErrors.push(err15);
+}
+errors++;
+}
+if((typeof data7 == "number") && (isFinite(data7))){
+if(data7 > 9007199254740991 || isNaN(data7)){
+const err16 = {instancePath:instancePath+"/summary/longestRunningTurnSec",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/longestRunningTurnSec/maximum",keyword:"maximum",params:{comparison: "<=", limit: 9007199254740991},message:"must be <= 9007199254740991"};
+if(vErrors === null){
+vErrors = [err16];
+}
+else {
+vErrors.push(err16);
+}
+errors++;
+}
+if(data7 < -9007199254740991 || isNaN(data7)){
+const err17 = {instancePath:instancePath+"/summary/longestRunningTurnSec",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/longestRunningTurnSec/minimum",keyword:"minimum",params:{comparison: ">=", limit: -9007199254740991},message:"must be >= -9007199254740991"};
+if(vErrors === null){
+vErrors = [err17];
+}
+else {
+vErrors.push(err17);
+}
+errors++;
+}
+}
+}
+if(data4.longestStreakDays !== undefined){
+let data8 = data4.longestStreakDays;
+if((!(((typeof data8 == "number") && (!(data8 % 1) && !isNaN(data8))) && (isFinite(data8)))) && (data8 !== null)){
+const err18 = {instancePath:instancePath+"/summary/longestStreakDays",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/longestStreakDays/type",keyword:"type",params:{type: schema860.properties.longestStreakDays.type},message:"must be integer,null"};
+if(vErrors === null){
+vErrors = [err18];
+}
+else {
+vErrors.push(err18);
+}
+errors++;
+}
+if((typeof data8 == "number") && (isFinite(data8))){
+if(data8 > 9007199254740991 || isNaN(data8)){
+const err19 = {instancePath:instancePath+"/summary/longestStreakDays",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/longestStreakDays/maximum",keyword:"maximum",params:{comparison: "<=", limit: 9007199254740991},message:"must be <= 9007199254740991"};
+if(vErrors === null){
+vErrors = [err19];
+}
+else {
+vErrors.push(err19);
+}
+errors++;
+}
+if(data8 < -9007199254740991 || isNaN(data8)){
+const err20 = {instancePath:instancePath+"/summary/longestStreakDays",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/longestStreakDays/minimum",keyword:"minimum",params:{comparison: ">=", limit: -9007199254740991},message:"must be >= -9007199254740991"};
+if(vErrors === null){
+vErrors = [err20];
+}
+else {
+vErrors.push(err20);
+}
+errors++;
+}
+}
+}
+if(data4.peakDailyTokens !== undefined){
+let data9 = data4.peakDailyTokens;
+if((!(((typeof data9 == "number") && (!(data9 % 1) && !isNaN(data9))) && (isFinite(data9)))) && (data9 !== null)){
+const err21 = {instancePath:instancePath+"/summary/peakDailyTokens",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/peakDailyTokens/type",keyword:"type",params:{type: schema860.properties.peakDailyTokens.type},message:"must be integer,null"};
+if(vErrors === null){
+vErrors = [err21];
+}
+else {
+vErrors.push(err21);
+}
+errors++;
+}
+if((typeof data9 == "number") && (isFinite(data9))){
+if(data9 > 9007199254740991 || isNaN(data9)){
+const err22 = {instancePath:instancePath+"/summary/peakDailyTokens",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/peakDailyTokens/maximum",keyword:"maximum",params:{comparison: "<=", limit: 9007199254740991},message:"must be <= 9007199254740991"};
+if(vErrors === null){
+vErrors = [err22];
+}
+else {
+vErrors.push(err22);
+}
+errors++;
+}
+if(data9 < -9007199254740991 || isNaN(data9)){
+const err23 = {instancePath:instancePath+"/summary/peakDailyTokens",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/peakDailyTokens/minimum",keyword:"minimum",params:{comparison: ">=", limit: -9007199254740991},message:"must be >= -9007199254740991"};
+if(vErrors === null){
+vErrors = [err23];
+}
+else {
+vErrors.push(err23);
+}
+errors++;
+}
+}
+}
+}
+else {
+const err24 = {instancePath:instancePath+"/summary",schemaPath:"#/definitions/AccountTokenUsageSummary/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err24];
+}
+else {
+vErrors.push(err24);
+}
+errors++;
+}
+}
+}
+else {
+const err25 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err25];
+}
+else {
+vErrors.push(err25);
+}
+errors++;
+}
+validate540.errors = vErrors;
+return errors === 0;
+}

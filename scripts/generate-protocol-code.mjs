@@ -230,6 +230,15 @@ const schemaDeclarations = [
     schemaPath: "v2/ConsumeAccountRateLimitResetCreditResponse.json",
     validatorName: "validateConsumeAccountRateLimitResetCreditResponse",
   },
+  {
+    typeName: "ConsumeAccountRateLimitResetCreditParams",
+    schemaPath: "v2/ConsumeAccountRateLimitResetCreditParams.json",
+  },
+  {
+    typeName: "GetAccountTokenUsageResponse",
+    schemaPath: "v2/GetAccountTokenUsageResponse.json",
+    validatorName: "validateGetAccountTokenUsageResponse",
+  },
 ];
 
 const validatorDeclarations = schemaDeclarations.filter(

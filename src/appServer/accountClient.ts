@@ -2,15 +2,16 @@ import type {
   ConsumeAccountRateLimitResetCreditParams,
   ConsumeAccountRateLimitResetCreditResponse,
   GetAccountRateLimitsResponse,
+  GetAccountTokenUsageResponse,
   ServerNotification,
 } from "../protocol/generated";
 import type { RequestHandle, ResultValidator } from "../protocol/rpc";
 import {
   validateConsumeAccountRateLimitResetCreditResponse,
   validateGetAccountRateLimitsResponse,
+  validateGetAccountTokenUsageResponse,
 } from "../protocol/validation";
 import type { AppServerSession } from "./session";
-
 type RateLimitsNotification = Extract<
   ServerNotification,
   { method: "account/rateLimits/updated" }
@@ -26,6 +27,7 @@ export interface AccountClient {
   consumeRateLimitResetCredit(
     params: ConsumeAccountRateLimitResetCreditParams,
   ): RequestHandle<ConsumeAccountRateLimitResetCreditResponse>;
+  readTokenUsage(): RequestHandle<GetAccountTokenUsageResponse>;
 }
 
 export class AppServerAccountClient implements AccountClient {
@@ -57,7 +59,17 @@ export class AppServerAccountClient implements AccountClient {
       validateResult: validateConsumeAccountRateLimitResetCreditResponse,
     });
   }
+
+  readTokenUsage(): RequestHandle<GetAccountTokenUsageResponse> {
+    return this.session.sendRequest({
+      method: "account/usage/read",
+      validateResult: getAccountTokenUsageResponseValidator,
+    });
+  }
 }
 
 const getAccountRateLimitsResponseValidator: ResultValidator<GetAccountRateLimitsResponse> =
   validateGetAccountRateLimitsResponse;
+
+const getAccountTokenUsageResponseValidator: ResultValidator<GetAccountTokenUsageResponse> =
+  validateGetAccountTokenUsageResponse;

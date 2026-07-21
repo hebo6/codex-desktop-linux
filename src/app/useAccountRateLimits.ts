@@ -107,7 +107,7 @@ export function useAccountRateLimits(client: AppServerAccountClient | null) {
     try {
       const response = await target.consumeRateLimitResetCredit({
         idempotencyKey: crypto.randomUUID(),
-        creditId,
+        ...(creditId !== undefined ? { creditId } : {}),
       }).result;
       if (clientRef.current !== target) return;
       if (response.outcome === "reset" || response.outcome === "alreadyRedeemed") {

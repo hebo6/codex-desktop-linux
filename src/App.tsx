@@ -22,6 +22,7 @@ import {
 import { useServerThreads, type RestoredThread, type ThreadSummary } from "./app/useServerThreads";
 import { useServerInteractions } from "./app/useServerInteractions";
 import { useAccountRateLimits } from "./app/useAccountRateLimits";
+import { useAccountTokenUsage } from "./app/useAccountTokenUsage";
 import { usePreferences } from "./app/usePreferences";
 import {
   useServerConnectionTest,
@@ -266,6 +267,7 @@ export function App({
   );
   const serverInteractions = useServerInteractions(connection.interactionClient);
   const accountRateLimits = useAccountRateLimits(connection.accountClient);
+  const accountTokenUsage = useAccountTokenUsage(connection.accountClient);
   const preferences = usePreferences(preferencesStore);
   const connectionTest = useServerConnectionTest(connectionTestOptions);
   const mutations = useServerProfileMutations(
@@ -1459,6 +1461,9 @@ export function App({
             updatedAt={accountRateLimits.updatedAt}
             onConsumeResetCredit={accountRateLimits.consumeResetCredit}
             resetting={accountRateLimits.resetting}
+            tokenUsageData={accountTokenUsage.data}
+            tokenUsageError={accountTokenUsage.error}
+            tokenUsageLoading={accountTokenUsage.loading}
           />
         }
       />

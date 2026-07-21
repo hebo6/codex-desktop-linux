@@ -64,6 +64,8 @@ export type { McpServerElicitationRequestResponse } from "./types/McpServerElici
 export type { ApplyPatchApprovalResponse } from "./types/ApplyPatchApprovalResponse";
 export type { ExecCommandApprovalResponse } from "./types/ExecCommandApprovalResponse";
 export type { ConsumeAccountRateLimitResetCreditResponse } from "./types/ConsumeAccountRateLimitResetCreditResponse";
+export type { ConsumeAccountRateLimitResetCreditParams } from "./types/ConsumeAccountRateLimitResetCreditParams";
+export type { GetAccountTokenUsageResponse } from "./types/GetAccountTokenUsageResponse";
 
 export {
   KNOWN_SERVER_NOTIFICATION_METHODS,
