@@ -1157,9 +1157,9 @@ function activityGroupLabel(
   }
   const completed = status === "completed" || finalAnswerStarted;
   if (duration === null) {
-    return completed ? "Worked" : "Working";
+    return completed ? "已完成" : "正在运行";
   }
-  return `${completed ? "Worked for" : "Working for"} ${formatWorkDuration(duration)}`;
+  return `${completed ? "已运行" : "正在运行"} ${formatDuration(duration)}`;
 }
 
 function JsonBlock({ value }: { readonly value: unknown }) {
@@ -1714,9 +1714,18 @@ function toolActivityLabel(
 }
 
 function formatDuration(durationMs: number): string {
-  return durationMs < 1_000
-    ? `${durationMs} 毫秒`
-    : `${(durationMs / 1_000).toFixed(durationMs < 10_000 ? 1 : 0)} 秒`;
+  if (durationMs < 1_000) {
+    return `${durationMs} 毫秒`;
+  }
+  const totalSeconds = Math.round(durationMs / 1_000);
+  if (totalSeconds < 60) {
+    return durationMs < 10_000
+      ? `${(durationMs / 1_000).toFixed(1)} 秒`
+      : `${totalSeconds} 秒`;
+  }
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds === 0 ? `${minutes} 分钟` : `${minutes} 分 ${seconds} 秒`;
 }
 
 function panelTransitionDuration(): number {
@@ -1724,10 +1733,6 @@ function panelTransitionDuration(): number {
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ? 0
     : PANEL_TRANSITION_MS;
-}
-
-function formatWorkDuration(durationMs: number): string {
-  return `${Math.max(0, Math.round(durationMs / 1_000))}s`;
 }
 
 function formatTurnTime(timestamp: Date): string {

@@ -143,7 +143,7 @@ describe("ConversationView", () => {
       />,
     );
 
-    const activityGroups = screen.getAllByRole("button", { name: /Worked for/u });
+    const activityGroups = screen.getAllByRole("button", { name: /已运行/u });
     expect(activityGroups).toHaveLength(1);
     expect(getComputedStyle(activityGroups[0]!).position).toBe("static");
     expect(screen.getByText("已经完成检查")).toBeVisible();
@@ -202,7 +202,7 @@ describe("ConversationView", () => {
         restoredThread={{ ...RESTORED, nextCursor: null }}
       />,
     );
-    const groupHeading = screen.getByRole("button", { name: /Worked for/u });
+    const groupHeading = screen.getByRole("button", { name: /已运行/u });
     const virtualRow = groupHeading.closest<HTMLElement>("[data-virtual-key]");
     if (virtualRow === null) {
       throw new Error("缺少活动项虚拟行");
@@ -211,7 +211,7 @@ describe("ConversationView", () => {
     expect(virtualRow.style.top).toMatch(/^\d+px$/u);
     expect(virtualRow.style.transform).toBe("");
     fireEvent.click(groupHeading);
-    expect(screen.getAllByRole("button", { name: /Worked for/u })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /已运行/u })).toHaveLength(1);
     expect(getComputedStyle(groupHeading).position).toBe("sticky");
   });
 
@@ -275,7 +275,7 @@ describe("ConversationView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Worked for/u }));
+    fireEvent.click(screen.getByRole("button", { name: /已运行/u }));
     const semanticCommand = await screen.findByRole("button", {
       name: "Read App.tsx · Searched “expanded” in src",
     });
@@ -343,7 +343,7 @@ describe("ConversationView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Worked for/u }));
+    fireEvent.click(screen.getByRole("button", { name: /已运行/u }));
     await waitFor(() => expect(screen.getByText("仅有摘要")).toBeVisible());
     expect(screen.queryByRole("button", { name: "短摘要" })).not.toBeInTheDocument();
     const summaryOnly = await screen.findByRole("button", { name: "仅有摘要" });
@@ -427,7 +427,7 @@ describe("ConversationView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Worked for/u }));
+    fireEvent.click(screen.getByRole("button", { name: /已运行/u }));
     const added = await screen.findByRole("button", { name: "Added src/new.ts +2" });
     expect(added).not.toHaveAttribute("aria-expanded");
     expect(screen.getByRole("button", {
@@ -467,7 +467,7 @@ describe("ConversationView", () => {
       />,
     );
 
-    for (const activityGroup of screen.getAllByRole("button", { name: /Working for/u })) {
+    for (const activityGroup of screen.getAllByRole("button", { name: /正在运行/u })) {
       expect(activityGroup).toHaveAttribute("aria-expanded", "true");
     }
 
@@ -485,7 +485,7 @@ describe("ConversationView", () => {
     );
 
     await waitFor(() => {
-      for (const activityGroup of screen.getAllByRole("button", { name: /Worked for/u })) {
+      for (const activityGroup of screen.getAllByRole("button", { name: /已运行/u })) {
         expect(activityGroup).toHaveAttribute("aria-expanded", "false");
       }
     });
@@ -511,7 +511,7 @@ describe("ConversationView", () => {
     scroller.scrollTop = 800;
     fireEvent.scroll(scroller);
 
-    fireEvent.click(screen.getByRole("button", { name: /Worked for/u }));
+    fireEvent.click(screen.getByRole("button", { name: /已运行/u }));
 
     const expandedTurn = {
       ...TURN,
