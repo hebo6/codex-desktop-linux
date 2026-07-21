@@ -188,9 +188,21 @@ describe("ServerSwitcher", () => {
     expect(onConnect).toHaveBeenCalledWith(REMOTE_ID);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "在新窗口打开 本机开发" }),
+      screen.getByRole("button", { name: "在新窗口打开 远程工作区" }),
     );
-    expect(onOpenInNewWindow).toHaveBeenCalledWith(LOCAL_ID);
+    expect(onOpenInNewWindow).toHaveBeenCalledWith(REMOTE_ID);
+  });
+
+  it("已连接的服务器不渲染新窗口直接操作按钮", () => {
+    const onOpenInNewWindow = vi.fn();
+    render(
+      <ServerSwitcher {...createProps({ onOpenInNewWindow })} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /打开服务器选择器/ }));
+    expect(
+      screen.queryByRole("button", { name: "在新窗口打开 本机开发" }),
+    ).not.toBeInTheDocument();
   });
 
   it("未提供新窗口操作时不渲染对应按钮", () => {

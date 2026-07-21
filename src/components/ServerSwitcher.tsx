@@ -647,7 +647,7 @@ export function ServerSwitcher({
                         ) : null}
                         <span>{connectLabel}</span>
                       </button>
-                      {onOpenInNewWindow ? (
+                      {onOpenInNewWindow && serverPhase !== "ready" ? (
                         <button
                           aria-label={`在新窗口打开 ${server.name}`}
                           className={styles.actionButton}
