@@ -576,7 +576,7 @@ export function ConnectionShell({
           >
             <MenuIcon />
           </button>
-          <div>
+          <div className={styles.topbarTitle}>
             <strong>{contentTitle}</strong>
             <span>{contentSubtitle ?? content.eyebrow}</span>
           </div>

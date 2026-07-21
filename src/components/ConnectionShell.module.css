@@ -261,10 +261,11 @@
   border-bottom: 1px solid var(--color-divider-subtle);
 }
 
-.topbar > div {
+.topbarTitle {
   display: grid;
   min-width: 0;
   gap: 2px;
+  margin-right: auto;
 }
 
 .topbar strong {
@@ -276,7 +277,7 @@
   white-space: nowrap;
 }
 
-.topbar > div > span {
+.topbarTitle > span {
   color: var(--color-text-tertiary);
   font-size: 12px;
 }
@@ -664,7 +665,7 @@
     padding: 0 var(--space-4);
   }
 
-  .topbar > div > span {
+  .topbarTitle > span {
     display: none;
   }
 
