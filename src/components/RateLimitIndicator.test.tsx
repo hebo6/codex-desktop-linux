@@ -50,7 +50,7 @@ describe("RateLimitIndicator", () => {
     expect(onRefresh).toHaveBeenCalledOnce();
   });
 
-  it("可用重置次数大于 0 时展示重置限额按钮且点击时触发回调", () => {
+  it("可用重置次数大于 0 时支持折叠展开，并在无详情时显示快速重置", () => {
     const onConsumeResetCredit = vi.fn(() => Promise.resolve());
     const originalConfirm = window.confirm;
     window.confirm = vi.fn(() => true);
@@ -74,12 +74,74 @@ describe("RateLimitIndicator", () => {
 
       fireEvent.click(screen.getByRole("button", { name: /账户剩余限额/u }));
 
-      const resetButton = screen.getByRole("button", { name: "重置限额" });
-      expect(resetButton).toBeVisible();
+      const headerButton = screen.getByRole("button", { name: /可用限额重置次数 3/u });
+      expect(headerButton).toBeVisible();
+      expect(screen.queryByText("暂无详细凭证信息")).toBeNull();
 
-      fireEvent.click(resetButton);
+      fireEvent.click(headerButton);
+      expect(screen.getByText("暂无详细凭证信息")).toBeVisible();
+
+      const quickResetButton = screen.getByRole("button", { name: "快速重置" });
+      expect(quickResetButton).toBeVisible();
+
+      fireEvent.click(quickResetButton);
       expect(window.confirm).toHaveBeenCalledWith("确定要消耗一次重置次数来重置账户限额吗？");
       expect(onConsumeResetCredit).toHaveBeenCalledOnce();
+      expect(onConsumeResetCredit).toHaveBeenCalledWith();
+    } finally {
+      window.confirm = originalConfirm;
+    }
+  });
+
+  it("可用重置次数大于 0 且包含详情时，展开并支持针对特定凭证重置", () => {
+    const onConsumeResetCredit = vi.fn(() => Promise.resolve());
+    const originalConfirm = window.confirm;
+    window.confirm = vi.fn(() => true);
+
+    try {
+      render(
+        <RateLimitIndicator
+          data={{
+            rateLimits: { planType: "plus", primary: { usedPercent: 80 } },
+            rateLimitResetCredits: {
+              availableCount: 2,
+              credits: [
+                {
+                  id: "credit-123",
+                  status: "available",
+                  resetType: "codexRateLimits",
+                  title: "新用户福利凭证",
+                  description: "赠送的限额重置凭证",
+                  grantedAt: Math.floor(Date.now() / 1000),
+                  expiresAt: Math.floor(Date.now() / 1000) + 3600,
+                },
+              ],
+            },
+          }}
+          error={null}
+          loading={false}
+          onRefresh={vi.fn()}
+          refreshing={false}
+          updatedAt={Date.now()}
+          onConsumeResetCredit={onConsumeResetCredit}
+          resetting={false}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /账户剩余限额/u }));
+
+      fireEvent.click(screen.getByRole("button", { name: /可用限额重置次数 2/u }));
+
+      expect(screen.getByText("新用户福利凭证")).toBeVisible();
+      expect(screen.getByText("赠送的限额重置凭证")).toBeVisible();
+
+      const useButton = screen.getByRole("button", { name: "使用" });
+      expect(useButton).toBeVisible();
+
+      fireEvent.click(useButton);
+      expect(window.confirm).toHaveBeenCalledWith("确定要使用凭证“新用户福利凭证”重置限额吗？");
+      expect(onConsumeResetCredit).toHaveBeenCalledOnce();
+      expect(onConsumeResetCredit).toHaveBeenCalledWith("credit-123");
     } finally {
       window.confirm = originalConfirm;
     }

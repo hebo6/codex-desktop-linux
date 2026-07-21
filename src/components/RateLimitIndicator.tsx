@@ -30,6 +30,7 @@ export function RateLimitIndicator({
   resetting = false,
 }: RateLimitIndicatorProps) {
   const [open, setOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const windows = collectRemainingLimitWindows(data);
@@ -111,22 +112,68 @@ export function RateLimitIndicator({
             </div>
           )}
           {data?.rateLimitResetCredits && data.rateLimitResetCredits.availableCount > 0 ? (
-            <p className={styles.credits}>
-              <span>可用限额重置次数 {data.rateLimitResetCredits.availableCount}</span>
-              {onConsumeResetCredit ? (
-                <button
-                  disabled={loading || refreshing || resetting}
-                  onClick={() => {
-                    if (window.confirm("确定要消耗一次重置次数来重置账户限额吗？")) {
-                      void onConsumeResetCredit();
-                    }
-                  }}
-                  type="button"
-                >
-                  {resetting ? "重置中" : "重置限额"}
-                </button>
+            <div className={styles.creditsContainer}>
+              <button
+                aria-expanded={detailsOpen}
+                className={styles.creditsHeader}
+                onClick={() => setDetailsOpen((prev) => !prev)}
+                type="button"
+              >
+                <span>可用限额重置次数 {data.rateLimitResetCredits.availableCount}</span>
+                <span className={`${styles.arrow} ${detailsOpen ? styles.arrowOpen : ""}`}>▼</span>
+              </button>
+              {detailsOpen ? (
+                <div className={styles.creditsDetails}>
+                  {data.rateLimitResetCredits.credits === null || data.rateLimitResetCredits.credits === undefined ? (
+                    <div className={styles.emptyDetails}>
+                      <span>暂无详细凭证信息</span>
+                      {onConsumeResetCredit ? (
+                        <button
+                          disabled={loading || refreshing || resetting}
+                          onClick={() => {
+                            if (window.confirm("确定要消耗一次重置次数来重置账户限额吗？")) {
+                              void onConsumeResetCredit();
+                            }
+                          }}
+                          type="button"
+                        >
+                          {resetting ? "重置中" : "快速重置"}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : data.rateLimitResetCredits.credits.length === 0 ? (
+                    <div className={styles.emptyDetails}>暂无可用重置凭证</div>
+                  ) : (
+                    <div className={styles.creditList}>
+                      {data.rateLimitResetCredits.credits.map((credit) => (
+                        <div className={styles.creditItem} key={credit.id}>
+                          <div className={styles.creditInfo}>
+                            <strong>{credit.title || "限额重置凭证"}</strong>
+                            {credit.description ? <small>{credit.description}</small> : null}
+                            <span className={styles.expiry}>
+                              {credit.expiresAt ? `${new Date(credit.expiresAt * 1000).toLocaleString()} 过期` : "永久有效"}
+                            </span>
+                          </div>
+                          {onConsumeResetCredit && credit.status === "available" ? (
+                            <button
+                              disabled={loading || refreshing || resetting}
+                              onClick={() => {
+                                if (window.confirm(`确定要使用凭证“${credit.title || "限额重置凭证"}”重置限额吗？`)) {
+                                  void onConsumeResetCredit(credit.id);
+                                }
+                              }}
+                              type="button"
+                            >
+                              {resetting ? "重置中" : "使用"}
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ) : null}
-            </p>
+            </div>
           ) : null}
           {error === null || windows.length === 0 ? null : <p className={styles.stale} role="status">{error}，当前保留上次成功数据</p>}
           {updatedAt === null ? null : <footer>更新于 {new Date(updatedAt).toLocaleString()}</footer>}

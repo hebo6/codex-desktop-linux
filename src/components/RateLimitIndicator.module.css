@@ -180,19 +180,106 @@
   color: var(--color-status-warning);
 }
 
-.credits {
+.creditsContainer {
+  display: grid;
+  border-radius: var(--radius-sm);
+  background: var(--color-fill-subtle);
+  overflow: hidden;
+}
+
+.creditsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.creditsHeader:hover {
+  background: var(--color-divider-subtle);
+}
+
+.arrow {
+  display: inline-block;
+  font-size: 8px;
+  transform: rotate(0deg);
+  transition: transform 150ms var(--ease-standard);
+}
+
+.arrowOpen {
+  transform: rotate(180deg);
+}
+
+.creditsDetails {
+  padding: var(--space-3);
+  border-top: 1px solid var(--color-divider-subtle);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.emptyDetails {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-text-tertiary);
+  gap: var(--space-3);
+}
+
+.creditList {
+  display: grid;
+  gap: var(--space-3);
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.creditItem {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  background: var(--color-fill-subtle);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px dashed var(--color-divider-subtle);
 }
 
-.credits button {
+.creditItem:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.creditInfo {
+  display: grid;
+  gap: 2px;
+}
+
+.creditInfo strong {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.creditInfo small {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+}
+
+.expiry {
+  font-size: 9px;
+  color: var(--color-text-tertiary);
+}
+
+.creditsDetails button,
+.emptyDetails button {
   flex: none;
-  min-height: 26px;
+  min-height: 24px;
   padding: 0 var(--space-2);
   border: 1px solid var(--color-divider-strong);
   border-radius: var(--radius-sm);
@@ -201,13 +288,16 @@
   font: inherit;
   font-size: 10px;
   cursor: pointer;
+  transition: background 150ms ease;
 }
 
-.credits button:hover {
+.creditsDetails button:hover,
+.emptyDetails button:hover {
   background: var(--color-divider-subtle);
 }
 
-.credits button:disabled {
+.creditsDetails button:disabled,
+.emptyDetails button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
