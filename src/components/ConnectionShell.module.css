@@ -319,6 +319,10 @@
   color: var(--color-text-secondary);
   background: transparent;
   cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.2s ease,
+              color 0.2s ease,
+              box-shadow 0.2s ease;
 }
 
 .desktopSidebarButton {
@@ -327,6 +331,35 @@
 
 .menuButton {
   display: none;
+}
+
+.sidebarInnerToggle {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.2s ease,
+              color 0.2s ease,
+              box-shadow 0.2s ease;
+}
+
+.sidebarInnerToggle:hover {
+  background: var(--color-fill-hover);
+  color: var(--color-text-primary);
+  transform: scale(1.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.sidebarInnerToggle:active {
+  transform: scale(0.96);
 }
 
 .settingsButton {
@@ -358,6 +391,14 @@
 .desktopSidebarButton:hover,
 .menuButton:hover {
   background: var(--color-fill-hover);
+  color: var(--color-text-primary);
+  transform: scale(1.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.desktopSidebarButton:active,
+.menuButton:active {
+  transform: scale(0.96);
 }
 
 .connectionStage {

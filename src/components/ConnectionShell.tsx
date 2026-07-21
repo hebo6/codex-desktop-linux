@@ -131,6 +131,25 @@ function MenuIcon() {
   );
 }
 
+function SidebarCollapseIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      style={{
+        transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+        transform: collapsed ? "rotate(180deg)" : "rotate(0deg)",
+      }}
+    >
+      <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.8" fill="none" />
+      <path d="M9 4v16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M14 9l-3 3 3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function ComposeIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18">
@@ -369,6 +388,24 @@ export function ConnectionShell({
           error={threadListError}
           grouped={groupThreads}
           hasMore={hasMoreThreads}
+          sidebarToggle={
+            <button
+              aria-controls={sidebarId}
+              aria-expanded={true}
+              aria-label="隐藏侧栏"
+              className={styles.sidebarInnerToggle}
+              onClick={() => {
+                if (isSidebarOpen) {
+                  setIsSidebarOpen(false);
+                } else {
+                  setIsSidebarCollapsed(true);
+                }
+              }}
+              type="button"
+            >
+              <SidebarCollapseIcon collapsed={false} />
+            </button>
+          }
           headerActions={
             <div className={styles.taskActions}>
               <button
@@ -555,16 +592,18 @@ export function ConnectionShell({
       <main className={styles.main}>
         <header className={styles.topbar} data-tauri-drag-region>
           <WindowControls side="left" />
-          <button
-            aria-controls={sidebarId}
-            aria-expanded={!isSidebarCollapsed}
-            aria-label={isSidebarCollapsed ? "显示侧栏" : "隐藏侧栏"}
-            className={styles.desktopSidebarButton}
-            onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
-            type="button"
-          >
-            <MenuIcon />
-          </button>
+          {isSidebarCollapsed && (
+            <button
+              aria-controls={sidebarId}
+              aria-expanded={false}
+              aria-label="显示侧栏"
+              className={styles.desktopSidebarButton}
+              onClick={() => setIsSidebarCollapsed(false)}
+              type="button"
+            >
+              <SidebarCollapseIcon collapsed={true} />
+            </button>
+          )}
           <button
             aria-controls={sidebarId}
             aria-expanded={isSidebarOpen}
@@ -574,7 +613,7 @@ export function ConnectionShell({
             ref={menuButtonRef}
             type="button"
           >
-            <MenuIcon />
+            <SidebarCollapseIcon collapsed={!isSidebarOpen} />
           </button>
           <div className={styles.topbarTitle} title={`${contentSubtitle ?? content.eyebrow} / ${contentTitle}`}>
             <span className={styles.topbarSubtitle}>{contentSubtitle ?? content.eyebrow}</span>

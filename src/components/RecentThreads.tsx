@@ -20,6 +20,7 @@ export interface RecentThreadsProps {
   readonly error: string | null;
   readonly grouped: boolean;
   readonly headerActions?: ReactNode;
+  readonly sidebarToggle?: ReactNode;
   readonly hasMore: boolean;
   readonly loadingMore: boolean;
   readonly pendingThreadIds: readonly string[];
@@ -82,6 +83,7 @@ export function RecentThreads({
   error,
   grouped,
   headerActions,
+  sidebarToggle,
   hasMore,
   loadingMore,
   pendingThreadIds,
@@ -291,7 +293,10 @@ export function RecentThreads({
   return (
     <section aria-labelledby="recent-threads-title" className={styles.section}>
       <header className={styles.sectionHeader}>
-        <h2 id="recent-threads-title">最近会话</h2>
+        <div className={styles.titleGroup}>
+          {sidebarToggle}
+          <h2 id="recent-threads-title">最近会话</h2>
+        </div>
         {headerActions}
       </header>
       {error === null ? null : (
