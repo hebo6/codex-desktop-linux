@@ -269,11 +269,6 @@
   margin: 0;
   overflow-y: auto;
   list-style: none;
-  transition: padding-bottom var(--duration-panel) var(--ease-standard);
-}
-
-.serverList:has(.serverRow:last-child button[aria-expanded="true"]) {
-  padding-bottom: 80px;
 }
 
 .serverRow {
@@ -466,8 +461,8 @@
 
 .menu {
   position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
+  bottom: -6px;
+  right: calc(100% + 4px);
   z-index: 10;
   display: grid;
   min-width: 132px;
