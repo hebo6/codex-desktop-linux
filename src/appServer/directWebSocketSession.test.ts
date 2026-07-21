@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import packageMetadata from "../../package.json";
 import type { DirectWebSocketIpc } from "../transport/directWebSocket";
 import { createDirectWebSocketAppServerSession } from "./directWebSocketSession";
 
@@ -115,7 +116,7 @@ describe("createDirectWebSocketAppServerSession", () => {
           clientInfo: {
             name: "codex-desktop-linux",
             title: "Codex Desktop Linux",
-            version: "0.1.0",
+            version: packageMetadata.version,
           },
           capabilities: { experimentalApi: true },
         },

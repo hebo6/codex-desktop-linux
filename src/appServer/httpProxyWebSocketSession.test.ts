@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import packageMetadata from "../../package.json";
 import type { HttpProxyWebSocketIpc } from "../transport/httpProxyWebSocket";
 import { createHttpProxyWebSocketAppServerSession } from "./httpProxyWebSocketSession";
 
@@ -120,7 +121,7 @@ describe("createHttpProxyWebSocketAppServerSession", () => {
           clientInfo: {
             name: "codex-desktop-linux",
             title: "Codex Desktop Linux",
-            version: "0.1.0",
+            version: packageMetadata.version,
           },
           capabilities: { experimentalApi: true },
         },
