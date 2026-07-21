@@ -647,19 +647,21 @@ function AgentMessage({
   readonly onOpenLink?: (link: string) => void;
   readonly turnCompletedAt?: number | null;
 }) {
+  const [now, setNow] = useState(() => Date.now());
   const isFinalAnswer = item.phase === "final_answer";
   const completedAt = typeof turnCompletedAt === "number"
     ? new Date(turnCompletedAt * 1_000)
     : null;
   const timestamp = completedAt === null
     ? null
-    : formatTurnTime(completedAt);
+    : formatRelativeTime(completedAt, now);
   return (
     <article
       className={styles.agentMessage}
       data-final-answer={isFinalAnswer}
       data-latest-turn={isLatestTurn}
       tabIndex={0}
+      onMouseEnter={() => setNow(Date.now())}
     >
       <div className={styles.agentText}><SafeMarkdown {...(onOpenLink === undefined ? {} : { onOpenLink })} source={item.text} /></div>
       {isFinalAnswer ? (
@@ -1717,3 +1719,18 @@ function formatTurnTime(timestamp: Date): string {
     minute: "2-digit",
   }).format(timestamp);
 }
+
+function formatRelativeTime(completedAt: Date, nowMs: number): string {
+  const diffMs = Math.max(0, nowMs - completedAt.getTime());
+  if (diffMs < 30 * 60 * 1000) {
+    const mins = Math.floor(diffMs / (60 * 1000));
+    return mins <= 0 ? "刚刚" : `${mins}分钟之前`;
+  } else if (diffMs < 24 * 60 * 60 * 1000) {
+    const hours = Math.floor(diffMs / (60 * 60 * 1000));
+    return hours <= 0 ? "1小时之前" : `${hours}小时之前`;
+  } else {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${completedAt.getFullYear()}-${pad(completedAt.getMonth() + 1)}-${pad(completedAt.getDate())} ${pad(completedAt.getHours())}:${pad(completedAt.getMinutes())}`;
+  }
+}
+

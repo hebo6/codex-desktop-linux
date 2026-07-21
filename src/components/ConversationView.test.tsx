@@ -754,10 +754,11 @@ describe("ConversationView", () => {
       name: "在新会话中继续",
     });
     const historicalQuestionTime = within(historicalQuestion).getByText("12:09");
-    const historicalTime = within(historicalAnswer).getByText("12:10");
-    const latestTime = within(latestAnswer).getByText("12:20");
+    const historicalTime = within(historicalAnswer).getByText("2026-07-19 12:10");
+    const latestTime = within(latestAnswer).getByText("2026-07-19 12:20");
     const latestCopyTooltip = within(latestCopy).getByText("复制");
     const latestContinueTooltip = within(latestContinue).getByText("在新会话中继续");
+
 
     expect(historicalAnswer).toHaveAttribute("data-latest-turn", "false");
     expect(latestAnswer).toHaveAttribute("data-latest-turn", "true");
