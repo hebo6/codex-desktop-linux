@@ -616,7 +616,7 @@ button.fileChangeRow {
   background: var(--color-content-bg);
   box-shadow: 0 4px 12px rgb(20 20 18 / 8%), 0 1px 3px rgb(20 20 18 / 4%);
   cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s ease, background-color 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s ease, background-color 0.2s ease, right 0.2s ease;
   animation: jumpToBottomFadeIn 0.2s ease-out;
 }
 
@@ -624,6 +624,12 @@ button.fileChangeRow {
   transform: translateY(2px);
   box-shadow: 0 6px 16px rgb(20 20 18 / 14%);
   background-color: var(--color-bg-hover);
+}
+
+@media (min-width: 928px) {
+  .jumpToBottom {
+    right: calc(50% - 440px);
+  }
 }
 
 @keyframes jumpToBottomFadeIn {
@@ -636,6 +642,7 @@ button.fileChangeRow {
     transform: scale(1) translateY(0);
   }
 }
+
 
 
 .questionNavigation {
