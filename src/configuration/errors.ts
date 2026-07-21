@@ -43,6 +43,8 @@ const CONFIGURATION_COMMAND_ERROR_MESSAGES = {
   credentialAccessDenied: "Access to the system credential service was denied",
   credentialNotFound: "The saved credential does not exist",
   credentialRecordInvalid: "The saved credential record is invalid",
+  plaintextCredentialConfirmationRequired:
+    "Plaintext credential storage requires explicit confirmation",
   credentialStorageFailed: "The system credential operation failed",
   sshHostKeyRemovalRequired:
     "The saved SSH host key must be removed before changing the endpoint",

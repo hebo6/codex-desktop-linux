@@ -4,6 +4,7 @@
   "description": "Allows application windows to manage validated server and proxy configuration and credential state",
   "windows": ["main", "app-*"],
   "permissions": [
+    "allow-credential-storage-status",
     "allow-list-configuration-profiles",
     "allow-create-server-profile",
     "allow-update-server-profile",

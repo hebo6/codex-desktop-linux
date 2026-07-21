@@ -146,7 +146,7 @@ function ProxyEditorDialogContent({
     <div className={serverStyles.backdrop}>
       <div aria-labelledby={titleId} aria-modal="true" className={serverStyles.dialog} ref={panelRef} role="dialog">
         <header className={serverStyles.header}>
-          <div><h2 id={titleId}>{mode.type === "create" ? "新建代理" : "编辑代理"}</h2><p>代理仅用于远程 WebSocket，认证凭据保存在 Secret Service</p></div>
+          <div><h2 id={titleId}>{mode.type === "create" ? "新建代理" : "编辑代理"}</h2><p>代理仅用于远程 WebSocket，认证凭据优先保存在 Secret Service</p></div>
           <button aria-label="关闭代理编辑器" className={serverStyles.closeButton} disabled={saving || testing} onClick={onCancel} type="button">×</button>
         </header>
         <form className={serverStyles.form} onSubmit={submit}>

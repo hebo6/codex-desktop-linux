@@ -49,7 +49,7 @@ export type ProxyProfileDeleteOutcome =
   | { readonly status: "failed"; readonly error: string; readonly errorCode: ConfigurationCommandErrorCode | null };
 
 export interface ProxyProfileMutationControls {
-  readonly saveProfile: (mode: ProxyEditorMode, submission: ProxyEditorSubmission) => Promise<ProxyProfileSaveOutcome>;
+  readonly saveProfile: (mode: ProxyEditorMode, submission: ProxyEditorSubmission, plaintextFallbackConfirmed?: boolean) => Promise<ProxyProfileSaveOutcome>;
   readonly deleteProfile: (proxyId: ProxyId, version: number) => Promise<ProxyProfileDeleteOutcome>;
   readonly removeHostKey: (profile: ProxyProfile) => Promise<ProxyProfileSaveOutcome>;
   readonly confirmHostKey: (
@@ -103,6 +103,7 @@ const ERROR_SUMMARIES: Partial<Record<ConfigurationCommandErrorCode, string>> = 
   credentialAccessDenied: "系统拒绝访问凭据服务",
   credentialNotFound: "已保存的代理凭据不存在，请重新填写",
   credentialRecordInvalid: "已保存的代理凭据记录无效，请重新填写",
+  plaintextCredentialConfirmationRequired: "使用明文文件保存代理凭据前需要明确确认",
   credentialStorageFailed: "系统未能完成代理凭据操作，请重试",
   sshHostKeyRemovalRequired: "更改 SSH 端点前必须先移除已保存的主机密钥",
   sshHostKeyNotFound: "已保存的 SSH 主机密钥不存在",
@@ -140,6 +141,7 @@ export async function executeProxyProfileSave(
   submission: ProxyEditorSubmission,
   commands: ProxyProfileMutationCommands,
   confirm: (profile: ProxyProfile) => ProxyProfile,
+  plaintextFallbackConfirmed = false,
 ): Promise<ProxyProfileSaveOutcome> {
   const finalize = async (profile: ProxyProfile): Promise<ProxyProfileSaveOutcome> => {
     const hostKey = submission.sshHostKey;
@@ -182,6 +184,7 @@ export async function executeProxyProfileSave(
         proxyId: created.proxyId,
         expectedVersion: created.version,
         credential: submission.credentialIntent.credential,
+        ...(plaintextFallbackConfirmed ? { plaintextFallbackConfirmed: true } : {}),
       }));
       return finalize(updated);
     } catch (error) {
@@ -253,6 +256,7 @@ export async function executeProxyProfileSave(
       proxyId: original.proxyId,
       expectedVersion,
       credential: submission.credentialIntent.credential,
+      ...(plaintextFallbackConfirmed ? { plaintextFallbackConfirmed: true } : {}),
     }));
     return finalize(latest);
   } catch (error) {
@@ -279,13 +283,13 @@ export function useProxyProfileMutations(
     return profile;
   }, [dispatch]);
 
-  const saveProfile = useCallback(async (mode: ProxyEditorMode, submission: ProxyEditorSubmission) => {
+  const saveProfile = useCallback(async (mode: ProxyEditorMode, submission: ProxyEditorSubmission, plaintextFallbackConfirmed = false) => {
     if (activeRef.current) return { status: "failed", error: BUSY_ERROR, errorCode: null } as const;
     activeRef.current = true;
     setSaveState({ saving: true, error: null, outcome: null });
     let outcome: ProxyProfileSaveOutcome;
     try {
-      outcome = await runMutation(() => executeProxyProfileSave(mode, submission, commands, confirm));
+      outcome = await runMutation(() => executeProxyProfileSave(mode, submission, commands, confirm, plaintextFallbackConfirmed));
     } catch (error) {
       outcome = failed(error);
     } finally {

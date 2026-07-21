@@ -1,4 +1,9 @@
 [[permission]]
+identifier = "allow-credential-storage-status"
+description = "Allows checking whether a new credential requires the permission-protected plaintext fallback"
+commands.allow = ["credential_storage_status"]
+
+[[permission]]
 identifier = "allow-list-configuration-profiles"
 description = "Allows reading persisted non-sensitive server and proxy configuration"
 commands.allow = ["list_configuration_profiles"]
@@ -40,7 +45,7 @@ commands.allow = ["remove_proxy_ssh_host_key"]
 
 [[permission]]
 identifier = "allow-set-server-credential"
-description = "Allows replacing a server credential in the system credential service"
+description = "Allows replacing a server credential in the preferred credential store"
 commands.allow = ["set_server_credential"]
 
 [[permission]]
@@ -50,7 +55,7 @@ commands.allow = ["clear_server_credential"]
 
 [[permission]]
 identifier = "allow-set-proxy-credential"
-description = "Allows replacing a proxy credential in the system credential service"
+description = "Allows replacing a proxy credential in the preferred credential store"
 commands.allow = ["set_proxy_credential"]
 
 [[permission]]

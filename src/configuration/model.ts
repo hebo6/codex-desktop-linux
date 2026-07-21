@@ -127,6 +127,15 @@ export interface ConfigurationSnapshot {
   readonly proxies: readonly ProxyProfile[];
 }
 
+export type CredentialStorageBackend =
+  | "secretService"
+  | "plaintextFile"
+  | "mixed";
+
+export interface CredentialStorageStatus {
+  readonly backend: CredentialStorageBackend;
+}
+
 export interface LocalStdioServerConfigurationInput {
   readonly type: "localStdio";
   readonly executablePath: string;
@@ -256,6 +265,7 @@ export interface SetServerCredentialRequest {
   readonly serverId: ServerId;
   readonly expectedVersion: number;
   readonly credential: ServerCredential;
+  readonly plaintextFallbackConfirmed?: boolean;
 }
 
 export interface ClearServerCredentialRequest {
@@ -280,6 +290,7 @@ export interface SetProxyCredentialRequest {
   readonly proxyId: ProxyId;
   readonly expectedVersion: number;
   readonly credential: ProxyCredential;
+  readonly plaintextFallbackConfirmed?: boolean;
 }
 
 export interface ClearProxyCredentialRequest {

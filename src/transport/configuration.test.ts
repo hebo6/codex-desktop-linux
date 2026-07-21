@@ -29,6 +29,7 @@ import {
   createServerProfile,
   deleteProxyProfile,
   deleteServerProfile,
+  getCredentialStorageStatus,
   listConfigurationProfiles,
   removeProxySshHostKey,
   recordProxyTest,
@@ -145,6 +146,26 @@ function sshProxyProfileWithHostKey() {
 }
 
 describe("configuration IPC", () => {
+  it("读取并严格校验凭据存储状态", async () => {
+    const ipc = new FakeIpc();
+    ipc.responses.set("credential_storage_status", { backend: "plaintextFile" });
+
+    await expect(getCredentialStorageStatus(ipc)).resolves.toEqual({
+      backend: "plaintextFile",
+    });
+    expect(ipc.calls).toEqual([
+      { command: "credential_storage_status", arguments: {} },
+    ]);
+
+    ipc.responses.set("credential_storage_status", {
+      backend: "plaintextFile",
+      credentialPath: "/secret",
+    });
+    await expect(getCredentialStorageStatus(ipc)).rejects.toBeInstanceOf(
+      ConfigurationContractError,
+    );
+  });
+
   it("读取快照时不带参数并严格校验响应", async () => {
     const ipc = new FakeIpc();
     ipc.responses.set("list_configuration_profiles", {
@@ -413,6 +434,7 @@ describe("configuration IPC", () => {
         values: { OPENAI_API_KEY: serverSecret },
         ignored: "DROP_SERVER_CREDENTIAL_FIELD",
       },
+      plaintextFallbackConfirmed: true,
     } as unknown as SetServerCredentialRequest;
     const clearServerRequest = {
       serverId: SERVER_ID,
@@ -456,6 +478,7 @@ describe("configuration IPC", () => {
               type: "sensitiveEnvironment",
               values: { OPENAI_API_KEY: serverSecret },
             },
+            plaintextFallbackConfirmed: true,
           },
         },
       },

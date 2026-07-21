@@ -73,9 +73,9 @@ describe("proxy profile mutations", () => {
   it("创建配置后按服务端返回版本保存凭据", async () => {
     const api = commands();
     const confirmed: ProxyProfile[] = [];
-    const outcome = await executeProxyProfileSave({ type: "create" }, submission, api, (value) => { confirmed.push(value); return value; });
+    const outcome = await executeProxyProfileSave({ type: "create" }, submission, api, (value) => { confirmed.push(value); return value; }, true);
     expect(outcome.status).toBe("saved");
-    expect(api.setProxyCredential).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 1 }));
+    expect(api.setProxyCredential).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 1, plaintextFallbackConfirmed: true }));
     expect(confirmed.map(({ version }) => version)).toEqual([1, 2]);
   });
 

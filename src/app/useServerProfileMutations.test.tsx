@@ -173,6 +173,7 @@ describe("executeServerProfileSave", () => {
         setServerCredential: setCredential,
       }),
       dispatch: eventDispatch(events),
+      plaintextFallbackConfirmed: true,
     });
 
     expect(events).toEqual(["create", "dispatch:1", "set", "dispatch:2"]);
@@ -180,6 +181,7 @@ describe("executeServerProfileSave", () => {
       serverId: SERVER_ID,
       expectedVersion: 1,
       credential,
+      plaintextFallbackConfirmed: true,
     });
     expect(outcome).toEqual({ status: "saved", profile: credentialSaved });
     expect(JSON.stringify(outcome)).not.toContain("new-secret");

@@ -15,6 +15,7 @@ import {
   normalizeUpdateServerProfileRequest,
   parseConfigurationCommandError,
   parseConfigurationSnapshot,
+  parseCredentialStorageStatus,
   parseEmptyConfigurationResponse,
   parseProxyProfile,
   parseServerProfile,
@@ -24,6 +25,7 @@ import type {
   ConfirmProxySshHostKeyRequest,
   ClearServerCredentialRequest,
   ConfigurationSnapshot,
+  CredentialStorageStatus,
   CreateProxyProfileRequest,
   CreateServerProfileRequest,
   DeleteProxyProfileRequest,
@@ -44,6 +46,7 @@ import type { TauriIpc } from "./tauriIpc";
 import { listen } from "@tauri-apps/api/event";
 
 const LIST_CONFIGURATION_PROFILES_COMMAND = "list_configuration_profiles";
+const CREDENTIAL_STORAGE_STATUS_COMMAND = "credential_storage_status";
 const CREATE_SERVER_PROFILE_COMMAND = "create_server_profile";
 const UPDATE_SERVER_PROFILE_COMMAND = "update_server_profile";
 const DELETE_SERVER_PROFILE_COMMAND = "delete_server_profile";
@@ -222,6 +225,17 @@ export async function listConfigurationProfiles(
     {},
   );
   return parseConfigurationSnapshot(response);
+}
+
+export async function getCredentialStorageStatus(
+  ipc: ConfigurationIpc = tauriIpc,
+): Promise<CredentialStorageStatus> {
+  const response = await invokeConfiguration(
+    ipc,
+    CREDENTIAL_STORAGE_STATUS_COMMAND,
+    {},
+  );
+  return parseCredentialStorageStatus(response);
 }
 
 export async function createServerProfile(

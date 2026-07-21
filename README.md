@@ -18,7 +18,7 @@ The screenshot is generated from the project's deterministic visual-regression f
 
 - Local stdio connections to a Codex app-server process
 - Experimental remote WebSocket connections over direct TLS, HTTP CONNECT, SOCKS5, or SSH direct-tcpip paths
-- Reusable server and proxy profiles with credentials stored through Linux Secret Service
+- Reusable server and proxy profiles with credentials stored in Linux Secret Service when available and, after explicit confirmation, permission-restricted plaintext files otherwise
 - Restorable conversations, streaming responses, tool activity, approvals, steering, interruption, and forking
 - Model, reasoning effort, working directory, approval policy, and sandbox configuration
 - Safe Markdown rendering and previews for common local and remote file references
@@ -53,7 +53,7 @@ Running the application requires
 
 - x86_64 or aarch64 Linux with glibc 2.35 or newer
 - An X11 or Wayland desktop session
-- Linux Secret Service for persistent credentials
+- Linux Secret Service is recommended; without it, the app requires confirmation before persisting credentials in plaintext protected only by local file permissions
 - A compatible [Codex CLI](https://developers.openai.com/codex/cli) installation for local stdio connections, already authenticated for the intended account
 
 deb and rpm packages use GTK 3 and WebKitGTK 4.1 from the distribution. The AppImage carries its WebKit and GStreamer runtime dependencies

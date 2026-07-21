@@ -1,10 +1,14 @@
+mod plaintext_file_store;
+mod preferred_store;
 mod secret_service_store;
 
-use std::{fmt, future::Future, pin::Pin};
+use std::{fmt, future::Future, io, pin::Pin};
 
 use uuid::{Uuid, Variant};
 use zeroize::Zeroizing;
 
+pub(crate) use plaintext_file_store::PlaintextFileCredentialStore;
+pub(crate) use preferred_store::{CredentialStorageBackend, PreferredCredentialStore};
 pub(crate) use secret_service_store::SecretServiceCredentialStore;
 
 const CREDENTIAL_REFERENCE_PREFIX: &str = "credential:v1:";
@@ -36,6 +40,15 @@ impl CredentialReference {
 
     pub(crate) fn as_str(&self) -> &str {
         &self.0
+    }
+
+    fn file_name(&self) -> String {
+        format!(
+            "{}.credential",
+            self.0
+                .strip_prefix(CREDENTIAL_REFERENCE_PREFIX)
+                .expect("a credential reference always has the canonical prefix")
+        )
     }
 }
 
@@ -209,7 +222,9 @@ pub(crate) enum CredentialStoreError {
     AlreadyExists,
     Duplicate,
     InvalidItem,
+    PlaintextFallbackConfirmationRequired,
     Backend(secret_service::Error),
+    Filesystem(io::Error),
 }
 
 impl fmt::Display for CredentialStoreError {
@@ -226,7 +241,13 @@ impl fmt::Display for CredentialStoreError {
             Self::AlreadyExists => formatter.write_str("the credential already exists"),
             Self::Duplicate => formatter.write_str("the credential reference is duplicated"),
             Self::InvalidItem => formatter.write_str("the credential item is invalid"),
+            Self::PlaintextFallbackConfirmationRequired => {
+                formatter.write_str("plaintext credential storage requires confirmation")
+            }
             Self::Backend(_) => formatter.write_str("the credential store operation failed"),
+            Self::Filesystem(_) => {
+                formatter.write_str("the credential file operation failed")
+            }
         }
     }
 }
@@ -235,6 +256,7 @@ impl std::error::Error for CredentialStoreError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Backend(source) => Some(source),
+            Self::Filesystem(source) => Some(source),
             _ => None,
         }
     }
@@ -262,6 +284,10 @@ pub(crate) trait CredentialStore: Send + Sync {
         reference: &'a CredentialReference,
         descriptor: CredentialDescriptor,
     ) -> CredentialStoreFuture<'a, ()>;
+}
+
+pub(crate) trait CredentialStoreProbe: CredentialStore {
+    fn probe(&self) -> CredentialStoreFuture<'_, ()>;
 }
 
 #[cfg(test)]

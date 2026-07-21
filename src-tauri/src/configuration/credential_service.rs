@@ -1,10 +1,11 @@
-use std::{fmt, sync::Arc, time::Duration};
+use std::{fmt, path::PathBuf, sync::Arc, time::Duration};
 
 use tokio::{sync::Mutex, time::timeout};
 
 use crate::credentials::{
-    CredentialDescriptor, CredentialReference, CredentialStore, CredentialStoreError,
-    PendingCredentialCleanup, ProxyCredentialKind, SecretServiceCredentialStore,
+    CredentialDescriptor, CredentialReference, CredentialStorageBackend, CredentialStore,
+    CredentialStoreError, PendingCredentialCleanup, PlaintextFileCredentialStore,
+    PreferredCredentialStore, ProxyCredentialKind, SecretServiceCredentialStore,
     ServerCredentialKind,
 };
 
@@ -35,15 +36,32 @@ pub(crate) struct DraftProxyConnectionInput {
 
 pub(crate) struct CredentialManager {
     store: Arc<dyn CredentialStore>,
+    preferred_store: Option<Arc<PreferredCredentialStore>>,
     operation_lock: Mutex<()>,
 }
 
 impl CredentialManager {
-    pub(crate) fn system() -> Self {
+    pub(crate) fn system(plaintext_directory: PathBuf) -> Self {
+        let preferred_store = Arc::new(PreferredCredentialStore::new(
+            Arc::new(SecretServiceCredentialStore::default()),
+            Arc::new(PlaintextFileCredentialStore::new(plaintext_directory)),
+        ));
         Self {
-            store: Arc::new(SecretServiceCredentialStore::default()),
+            store: preferred_store.clone(),
+            preferred_store: Some(preferred_store),
             operation_lock: Mutex::new(()),
         }
+    }
+
+    pub(crate) async fn storage_backend(
+        &self,
+    ) -> Result<CredentialStorageBackend, CredentialOperationError> {
+        let _guard = self.operation_lock.lock().await;
+        let preferred_store = self
+            .preferred_store
+            .as_ref()
+            .expect("the system credential manager always has a preferred store");
+        preferred_store.storage_backend().await.map_err(Into::into)
     }
 
     pub(crate) async fn delete_all(
@@ -64,6 +82,7 @@ impl CredentialManager {
     pub(super) fn new(store: Arc<dyn CredentialStore>) -> Self {
         Self {
             store,
+            preferred_store: None,
             operation_lock: Mutex::new(()),
         }
     }
@@ -384,9 +403,20 @@ impl CredentialManager {
                 ));
             }
         };
-        self.store
-            .create(&reference, write.descriptor, secret)
-            .await?;
+        if let Some(preferred_store) = &self.preferred_store {
+            preferred_store
+                .create_with_plaintext_confirmation(
+                    &reference,
+                    write.descriptor,
+                    secret,
+                    write.plaintext_fallback_confirmed,
+                )
+                .await?;
+        } else {
+            self.store
+                .create(&reference, write.descriptor, secret)
+                .await?;
+        }
         Ok(reference)
     }
 
@@ -773,7 +803,11 @@ fn store_error_category(error: &CredentialStoreError) -> &'static str {
         CredentialStoreError::AlreadyExists => "already-exists",
         CredentialStoreError::Duplicate => "duplicate",
         CredentialStoreError::InvalidItem => "invalid-item",
+        CredentialStoreError::PlaintextFallbackConfirmationRequired => {
+            "plaintext-fallback-confirmation-required"
+        }
         CredentialStoreError::Backend(_) => "backend",
+        CredentialStoreError::Filesystem(_) => "filesystem",
     }
 }
 

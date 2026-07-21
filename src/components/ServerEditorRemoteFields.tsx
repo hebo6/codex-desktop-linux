@@ -62,7 +62,7 @@ export function ServerEditorRemoteFields({
     <section aria-label="远程 WebSocket 配置" className={styles.section}>
       <div className={styles.sectionHeading}>
         <h3>远程连接</h3>
-        <p>凭据只保存到系统 Secret Service</p>
+        <p>凭据优先保存到系统 Secret Service</p>
       </div>
 
       <label className={styles.field} htmlFor={support.fieldId("url")}>

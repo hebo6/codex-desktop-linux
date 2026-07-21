@@ -270,7 +270,7 @@ function PrivacySection({ clearData, setState, state }: { readonly clearData: (k
     { kind: "cache", title: "清理会话缓存", description: "删除 SQLite 中的离线只读投影，不影响服务端会话" },
     { kind: "logs", title: "清理日志", description: "删除应用日志目录中的持久化诊断日志" },
     { kind: "temporary", title: "清理临时文件", description: "删除 /tmp/codex-desktop-linux 中的预览和保存中间文件" },
-    { kind: "all", title: "清理全部本地数据", description: "删除服务器、代理、窗口、偏好、缓存、草稿以及 Linux Secret Service 中的凭据" },
+    { kind: "all", title: "清理全部本地数据", description: "删除服务器、代理、窗口、偏好、缓存、草稿以及凭据存储中的凭据" },
   ] as const;
   return <Section title="本地数据" description="清理只影响此客户端的本地数据，不会删除 app-server 上的会话或文件">{rows.map((row) => {
     const active = state?.kind === row.kind ? state.status : null;

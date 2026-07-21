@@ -18,7 +18,7 @@
 
 - 通过本机 stdio 连接 Codex app-server 进程
 - 通过直连 TLS、HTTP CONNECT、SOCKS5 或 SSH direct-tcpip 实验性连接远程 WebSocket app-server
-- 保存服务器和代理配置，并通过 Linux Secret Service 存储凭据
+- 保存服务器和代理配置，凭据优先存入 Linux Secret Service，不可用时经用户确认改用权限受限的明文文件
 - 恢复会话，展示流式回答和工具活动，处理审批、追加、停止和分叉
 - 配置模型、思考程度、工作目录、审批策略和沙箱策略
 - 安全渲染 Markdown，并预览常见的本机与远程文件引用
@@ -53,7 +53,7 @@
 
 - 使用 glibc 2.35 或更高版本的 x86_64 或 aarch64 Linux
 - X11 或 Wayland 桌面会话
-- 用于持久化凭据的 Linux Secret Service
+- 建议提供 Linux Secret Service；缺失时应用会在保存凭据前要求确认仅受本机文件权限保护的明文存储
 - 本机 stdio 连接需要安装兼容的 [Codex CLI](https://developers.openai.com/codex/cli)，并提前完成目标账户认证
 
 deb 和 rpm 安装包使用发行版提供的 GTK 3 与 WebKitGTK 4.1。AppImage 会携带 WebKit 和 GStreamer 运行时依赖

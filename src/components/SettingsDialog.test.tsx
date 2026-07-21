@@ -88,7 +88,7 @@ describe("SettingsDialog", () => {
     }
 
     fireEvent.click(screen.getByRole("button", { name: "清理全部本地数据" }));
-    expect(screen.getByText(/Linux Secret Service 中的凭据/u)).toBeVisible();
+    expect(screen.getByText(/凭据存储中的凭据/u)).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "确认清理全部本地数据" }));
     await waitFor(() => expect(store.clearAllLocalData).toHaveBeenCalledTimes(1));
     expect(props.onBeforeClearAllLocalData).toHaveBeenCalledTimes(1);

@@ -42,6 +42,7 @@ import { ApprovalPanel } from "./components/ApprovalPanel";
 import { RateLimitIndicator } from "./components/RateLimitIndicator";
 import { ExternalLinkDialog } from "./components/ExternalLinkDialog";
 import { FilePreviewDialog, type FilePreviewRequest } from "./components/FilePreviewDialog";
+import { PlaintextCredentialConfirmDialog } from "./components/PlaintextCredentialConfirmDialog";
 import { ServerDeleteDialog } from "./components/ServerDeleteDialog";
 import { ServerEditorDialog } from "./components/ServerEditorDialog";
 import { ServerReconnectDialog } from "./components/ServerReconnectDialog";
@@ -57,7 +58,13 @@ import type {
   ServerConnectionStartResult,
   ServerConnectionView,
 } from "./components/ServerSwitcher";
-import type { ProxyId, ProxyProfile, ServerId, ServerProfile } from "./configuration";
+import type {
+  CredentialStorageStatus,
+  ProxyId,
+  ProxyProfile,
+  ServerId,
+  ServerProfile,
+} from "./configuration";
 import { resolveLink, type ExtractedLink } from "./content/linkResolver";
 import type {
   ServerEditorMode,
@@ -95,11 +102,14 @@ import {
   type ConfiguredServerStatus,
   type ConfiguredServerStatusSubscriber,
 } from "./transport/configuredServerStatuses";
+import { getCredentialStorageStatus } from "./transport/configuration";
 
 export type AppWindowOpener = typeof openAppWindow;
+export type CredentialStorageStatusLoader = () => Promise<CredentialStorageStatus>;
 
 export interface AppProps {
   readonly configurationLoader?: ConfigurationProfilesLoader;
+  readonly credentialStorageStatusLoader?: CredentialStorageStatusLoader;
   readonly connectionOptions?: ConfiguredServerConnectionControllerOptions;
   readonly connectionTestOptions?: ServerConnectionTestControllerOptions;
   readonly mutationCommands?: Partial<ServerProfileMutationCommands>;
@@ -129,6 +139,16 @@ interface ActiveProxyEditor {
   readonly mode: ProxyEditorMode;
   readonly origin: "settings" | "server";
 }
+
+type PendingPlaintextCredentialConfirmation =
+  | {
+      readonly kind: "server";
+      readonly submission: ServerEditorSubmission;
+    }
+  | {
+      readonly kind: "proxy";
+      readonly submission: ProxyEditorSubmission;
+    };
 
 function matchesPersistedProxyDraft(
   profile: ProxyProfile,
@@ -182,6 +202,7 @@ export function collectHighRiskServerIds(
 
 export function App({
   configurationLoader,
+  credentialStorageStatusLoader = getCredentialStorageStatus,
   connectionOptions,
   connectionTestOptions,
   mutationCommands,
@@ -258,6 +279,12 @@ export function App({
   const [pendingReconnect, setPendingReconnect] =
     useState<PendingServerReconnect | null>(null);
   const [proxyEditor, setProxyEditor] = useState<ActiveProxyEditor | null>(null);
+  const [credentialStorageChecking, setCredentialStorageChecking] =
+    useState(false);
+  const [
+    pendingPlaintextCredentialConfirmation,
+    setPendingPlaintextCredentialConfirmation,
+  ] = useState<PendingPlaintextCredentialConfirmation | null>(null);
   const [deletingProxyId, setDeletingProxyId] = useState<ProxyId | null>(null);
   const [deletingServerId, setDeletingServerId] = useState<ServerId | null>(
     null,
@@ -717,12 +744,17 @@ export function App({
   };
   const saveEditor = async (
     submission: ServerEditorSubmission,
+    plaintextFallbackConfirmed = false,
   ): Promise<void> => {
     const activeEditor = editor;
     if (activeEditor === null) {
       return;
     }
-    const outcome = await mutations.saveProfile(activeEditor.mode, submission);
+    const outcome = await mutations.saveProfile(
+      activeEditor.mode,
+      submission,
+      plaintextFallbackConfirmed,
+    );
     const promptReconnectForCurrentEdit = (profile: ServerProfile) => {
       if (
         activeEditor.mode.type === "edit" &&
@@ -743,7 +775,12 @@ export function App({
       return;
     }
     if (outcome.status === "partiallySaved") {
-      if (outcome.dataEffect === "configurationSavedCredentialNotSaved") {
+      const confirmationRequired =
+        outcome.errorCode === "plaintextCredentialConfirmationRequired";
+      if (
+        outcome.dataEffect === "configurationSavedCredentialNotSaved" &&
+        !confirmationRequired
+      ) {
         promptReconnectForCurrentEdit(outcome.profile);
       }
       setEditor((current) => {
@@ -758,6 +795,12 @@ export function App({
             : {}),
         };
       });
+      if (confirmationRequired) {
+        setPendingPlaintextCredentialConfirmation({
+          kind: "server",
+          submission,
+        });
+      }
     }
   };
 
@@ -799,22 +842,84 @@ export function App({
     setProxyEditor(null);
   };
 
-  const saveProxyEditor = async (submission: ProxyEditorSubmission) => {
+  const saveProxyEditor = async (
+    submission: ProxyEditorSubmission,
+    plaintextFallbackConfirmed = false,
+  ) => {
     const active = proxyEditor;
     if (active === null) return;
-    const outcome = await proxyMutations.saveProfile(active.mode, submission);
+    const outcome = await proxyMutations.saveProfile(
+      active.mode,
+      submission,
+      plaintextFallbackConfirmed,
+    );
+    const confirmationRequired =
+      outcome.status === "partiallySaved" &&
+      outcome.errorCode === "plaintextCredentialConfirmationRequired";
     if (outcome.status === "saved") {
       setProxyEditor(null);
     } else if (outcome.status === "partiallySaved") {
       setProxyEditor({ ...active, mode: { type: "edit", profile: outcome.profile } });
+      if (confirmationRequired) {
+        setPendingPlaintextCredentialConfirmation({
+          kind: "proxy",
+          submission,
+        });
+      }
     }
     if (
       outcome.status !== "failed" &&
+      !confirmationRequired &&
       active.mode.type === "edit" &&
       boundServer?.configuration.type === "remoteWebSocket" &&
       boundServer.configuration.proxyId === active.mode.profile.proxyId
     ) {
       setPendingReconnect({ serverId: boundServer.serverId, serverName: boundServer.name });
+    }
+  };
+
+  const prepareCredentialSave = async (
+    pending: PendingPlaintextCredentialConfirmation,
+  ): Promise<void> => {
+    if (pending.submission.credentialIntent.type !== "set") {
+      if (pending.kind === "server") {
+        await saveEditor(pending.submission);
+      } else {
+        await saveProxyEditor(pending.submission);
+      }
+      return;
+    }
+
+    setCredentialStorageChecking(true);
+    let plaintextConfirmationRequired = false;
+    try {
+      const status = await credentialStorageStatusLoader();
+      plaintextConfirmationRequired = status.backend === "plaintextFile";
+    } catch {
+      // The Rust write boundary still denies an unconfirmed plaintext fallback.
+    } finally {
+      setCredentialStorageChecking(false);
+    }
+
+    if (plaintextConfirmationRequired) {
+      setPendingPlaintextCredentialConfirmation(pending);
+      return;
+    }
+    if (pending.kind === "server") {
+      await saveEditor(pending.submission);
+    } else {
+      await saveProxyEditor(pending.submission);
+    }
+  };
+
+  const confirmPlaintextCredentialSave = (): void => {
+    const pending = pendingPlaintextCredentialConfirmation;
+    if (pending === null) return;
+    setPendingPlaintextCredentialConfirmation(null);
+    if (pending.kind === "server") {
+      void saveEditor(pending.submission, true);
+    } else {
+      void saveProxyEditor(pending.submission, true);
     }
   };
 
@@ -1505,12 +1610,14 @@ export function App({
           onCancelTest={() =>
             void connectionTest.cancel().catch(() => undefined)
           }
-          onSubmit={(submission) => void saveEditor(submission)}
+          onSubmit={(submission) =>
+            void prepareCredentialSave({ kind: "server", submission })
+          }
           onCreateProxy={() => void openCreateProxyEditor("server")}
           onTest={(submission) => connectionTest.test(editor.mode, submission)}
           open
           proxies={proxies}
-          saving={mutations.saveState.saving}
+          saving={mutations.saveState.saving || credentialStorageChecking}
           {...(connectionTest.state === undefined
             ? {}
             : { testState: connectionTest.state })}
@@ -1528,14 +1635,22 @@ export function App({
           onRemoveHostKey={proxyEditor.mode.type === "edit" && proxyEditor.mode.profile.sshHostKey !== undefined
             ? () => void removeProxyHostKey()
             : undefined}
-          onSubmit={(submission) => void saveProxyEditor(submission)}
+          onSubmit={(submission) =>
+            void prepareCredentialSave({ kind: "proxy", submission })
+          }
           onTest={testProxy}
           open
           remoteServers={servers.filter(({ configuration }) => configuration.type === "remoteWebSocket")}
-          saving={proxyMutations.saveState.saving}
+          saving={proxyMutations.saveState.saving || credentialStorageChecking}
           testState={connectionTest.state}
         />
       )}
+
+      <PlaintextCredentialConfirmDialog
+        onCancel={() => setPendingPlaintextCredentialConfirmation(null)}
+        onConfirm={confirmPlaintextCredentialSave}
+        open={pendingPlaintextCredentialConfirmation !== null}
+      />
 
       <ServerReconnectDialog
         onLater={() => setPendingReconnect(null)}

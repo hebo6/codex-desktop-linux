@@ -88,6 +88,7 @@ export interface ServerProfileMutationControls {
   readonly saveProfile: (
     mode: ServerEditorMode,
     submission: ServerEditorSubmission,
+    plaintextFallbackConfirmed?: boolean,
   ) => Promise<ServerProfileSaveOutcome>;
   readonly deleteProfile: (
     serverId: ServerId,
@@ -109,6 +110,7 @@ interface SaveExecutionOptions {
   readonly submission: ServerEditorSubmission;
   readonly commands: ServerProfileMutationCommands;
   readonly dispatch: ServerProfileMutationDispatch;
+  readonly plaintextFallbackConfirmed?: boolean;
 }
 
 interface DeleteExecutionOptions {
@@ -160,6 +162,7 @@ const CONFIGURATION_ERROR_SUMMARIES = {
   credentialNotConfigured: "当前服务器尚未配置所需凭据，请重新填写",
   credentialNotFound: "已保存的凭据不存在，请重新填写",
   credentialRecordInvalid: "已保存的凭据记录无效，请重新填写",
+  plaintextCredentialConfirmationRequired: "使用明文文件保存凭据前需要明确确认",
   credentialStorageFailed: "系统未能完成凭据存储操作，请重试",
   sshHostKeyRemovalRequired: "修改连接端点前需要先移除 SSH 主机密钥",
   sshHostKeyNotFound: "已保存的 SSH 主机密钥不存在",
@@ -258,6 +261,7 @@ async function executeCreate({
   submission,
   commands,
   dispatch,
+  plaintextFallbackConfirmed = false,
 }: Omit<SaveExecutionOptions, "mode">): Promise<ServerProfileSaveOutcome> {
   if (submission.credentialIntent.type === "clear") {
     return {
@@ -290,6 +294,9 @@ async function executeCreate({
         serverId: created.serverId,
         expectedVersion: created.version,
         credential: submission.credentialIntent.credential,
+        ...(plaintextFallbackConfirmed
+          ? { plaintextFallbackConfirmed: true }
+          : {}),
       }),
     );
     return { status: "saved", profile };
@@ -303,6 +310,7 @@ async function executeEdit({
   submission,
   commands,
   dispatch,
+  plaintextFallbackConfirmed = false,
 }: SaveExecutionOptions & {
   readonly mode: Extract<ServerEditorMode, { readonly type: "edit" }>;
 }): Promise<ServerProfileSaveOutcome> {
@@ -406,6 +414,9 @@ async function executeEdit({
         serverId: original.serverId,
         expectedVersion,
         credential: submission.credentialIntent.credential,
+        ...(plaintextFallbackConfirmed
+          ? { plaintextFallbackConfirmed: true }
+          : {}),
       }),
     );
     return { status: "saved", profile };
@@ -423,11 +434,23 @@ export async function executeServerProfileSave({
   submission,
   commands,
   dispatch,
+  plaintextFallbackConfirmed = false,
 }: SaveExecutionOptions): Promise<ServerProfileSaveOutcome> {
   if (mode.type === "create") {
-    return executeCreate({ submission, commands, dispatch });
+    return executeCreate({
+      submission,
+      commands,
+      dispatch,
+      plaintextFallbackConfirmed,
+    });
   }
-  return executeEdit({ mode, submission, commands, dispatch });
+  return executeEdit({
+    mode,
+    submission,
+    commands,
+    dispatch,
+    plaintextFallbackConfirmed,
+  });
 }
 
 export async function executeServerProfileDelete({
@@ -495,6 +518,7 @@ export function useServerProfileMutations(
     async (
       mode: ServerEditorMode,
       submission: ServerEditorSubmission,
+      plaintextFallbackConfirmed = false,
     ): Promise<ServerProfileSaveOutcome> => {
       if (!mountedRef.current) {
         return unavailableSave(UNMOUNTED_ERROR_SUMMARY);
@@ -513,6 +537,7 @@ export function useServerProfileMutations(
             submission,
             commands,
             dispatch,
+            plaintextFallbackConfirmed,
           }),
         );
       } catch (error) {

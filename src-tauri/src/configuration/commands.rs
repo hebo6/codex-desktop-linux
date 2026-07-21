@@ -3,7 +3,7 @@ use std::fmt;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
-use crate::credentials::CredentialStoreError;
+use crate::credentials::{CredentialStorageBackend, CredentialStoreError};
 
 use super::{
     ClearProxyCredentialRequest, ClearServerCredentialRequest, ConfigurationRepository,
@@ -15,6 +15,12 @@ use super::{
 };
 
 const CONFIGURATION_PROFILES_CHANGED_EVENT: &str = "configuration-profiles-changed";
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CredentialStorageStatus {
+    backend: CredentialStorageBackend,
+}
 
 pub(crate) fn emit_configuration_changed(app: &AppHandle) {
     if let Err(error) = app.emit(CONFIGURATION_PROFILES_CHANGED_EVENT, ()) {
@@ -145,6 +151,10 @@ impl From<CredentialOperationError> for ConfigurationCommandError {
                     "credentialRecordInvalid",
                     "The saved credential record is invalid",
                 ),
+                CredentialStoreError::PlaintextFallbackConfirmationRequired => Self::new(
+                    "plaintextCredentialConfirmationRequired",
+                    "Plaintext credential storage requires explicit confirmation",
+                ),
                 CredentialStoreError::Backend(_) => {
                     tracing::error!("system credential service operation failed");
                     Self::new(
@@ -152,9 +162,27 @@ impl From<CredentialOperationError> for ConfigurationCommandError {
                         "The system credential operation failed",
                     )
                 }
+                CredentialStoreError::Filesystem(_) => {
+                    tracing::error!("plaintext credential file operation failed");
+                    Self::new(
+                        "credentialStorageFailed",
+                        "The credential file operation failed",
+                    )
+                }
             },
         }
     }
+}
+
+#[tauri::command]
+pub(crate) async fn credential_storage_status(
+    credentials: State<'_, CredentialManager>,
+) -> Result<CredentialStorageStatus, ConfigurationCommandError> {
+    credentials
+        .storage_backend()
+        .await
+        .map(|backend| CredentialStorageStatus { backend })
+        .map_err(Into::into)
 }
 
 #[tauri::command]
@@ -426,8 +454,18 @@ mod tests {
             (CredentialStoreError::Duplicate, "credentialRecordInvalid"),
             (CredentialStoreError::InvalidItem, "credentialRecordInvalid"),
             (
+                CredentialStoreError::PlaintextFallbackConfirmationRequired,
+                "plaintextCredentialConfirmationRequired",
+            ),
+            (
                 CredentialStoreError::Backend(secret_service::Error::Crypto(
                     "BACKEND_SECRET_SENTINEL",
+                )),
+                "credentialStorageFailed",
+            ),
+            (
+                CredentialStoreError::Filesystem(std::io::Error::other(
+                    "FILESYSTEM_SECRET_SENTINEL",
                 )),
                 "credentialStorageFailed",
             ),
@@ -439,10 +477,16 @@ mod tests {
             assert_eq!(command_error.code, expected_code);
             let serialized = serde_json::to_string(&command_error).unwrap();
             assert!(!serialized.contains("BACKEND_SECRET_SENTINEL"));
+            assert!(!serialized.contains("FILESYSTEM_SECRET_SENTINEL"));
             assert!(
                 !command_error
                     .to_string()
                     .contains("BACKEND_SECRET_SENTINEL")
+            );
+            assert!(
+                !command_error
+                    .to_string()
+                    .contains("FILESYSTEM_SECRET_SENTINEL")
             );
         }
     }

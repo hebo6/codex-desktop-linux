@@ -30,6 +30,8 @@ pub(crate) struct SetServerCredentialRequest {
     server_id: ServerId,
     expected_version: u64,
     credential: ServerCredentialInput,
+    #[serde(default)]
+    plaintext_fallback_confirmed: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -82,6 +84,8 @@ pub(crate) struct SetProxyCredentialRequest {
     proxy_id: ProxyId,
     expected_version: u64,
     credential: ProxyCredentialInput,
+    #[serde(default)]
+    plaintext_fallback_confirmed: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -143,6 +147,7 @@ enum ProxyCredentialType {
 pub(super) struct ValidatedCredentialWrite {
     pub(super) descriptor: CredentialDescriptor,
     pub(super) expected_version: u64,
+    pub(super) plaintext_fallback_confirmed: bool,
     secret: CredentialSecret,
 }
 
@@ -152,6 +157,10 @@ impl fmt::Debug for ValidatedCredentialWrite {
             .debug_struct("ValidatedCredentialWrite")
             .field("descriptor", &self.descriptor)
             .field("expected_version", &self.expected_version)
+            .field(
+                "plaintext_fallback_confirmed",
+                &self.plaintext_fallback_confirmed,
+            )
             .field("secret", &"[redacted]")
             .finish()
     }
@@ -549,6 +558,7 @@ impl SetServerCredentialRequest {
                 kind,
             },
             expected_version: self.expected_version,
+            plaintext_fallback_confirmed: self.plaintext_fallback_confirmed,
             secret,
         })
     }
@@ -604,6 +614,7 @@ impl SetProxyCredentialRequest {
                 kind,
             },
             expected_version: self.expected_version,
+            plaintext_fallback_confirmed: self.plaintext_fallback_confirmed,
             secret: CredentialSecret::Text(value),
         })
     }
@@ -740,7 +751,8 @@ mod tests {
             "credential": {
                 "type": "sensitiveEnvironment",
                 "values": { "OPENAI_API_KEY": "server-secret-sentinel" }
-            }
+            },
+            "plaintextFallbackConfirmed": true
         }))
         .validate()
         .unwrap();
@@ -755,6 +767,7 @@ mod tests {
             write.secret.environment_names().unwrap(),
             ["OPENAI_API_KEY".to_owned()].into_iter().collect()
         );
+        assert!(write.plaintext_fallback_confirmed);
         let encoded = write.secret.encoded_environment().unwrap().unwrap();
         assert!(encoded.windows(6).any(|window| window == b"secret"));
 

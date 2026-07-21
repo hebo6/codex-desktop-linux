@@ -3,6 +3,7 @@ import type {
   ConfirmProxySshHostKeyRequest,
   ClearServerCredentialRequest,
   ConfigurationSnapshot,
+  CredentialStorageStatus,
   CreateProxyProfileRequest,
   CreateServerProfileRequest,
   DeleteProxyProfileRequest,
@@ -1305,6 +1306,20 @@ export function parseConfigurationSnapshot(
   return { servers, proxies };
 }
 
+export function parseCredentialStorageStatus(
+  value: unknown,
+): CredentialStorageStatus {
+  const record = expectRecord(value, "credentialStorageStatus");
+  assertExactKeys(record, ["backend"], [], "credentialStorageStatus");
+  return {
+    backend: expectEnum(
+      record.backend,
+      ["secretService", "plaintextFile", "mixed"],
+      "credentialStorageStatus.backend",
+    ),
+  };
+}
+
 export function parseEmptyConfigurationResponse(value: unknown): void {
   if (value !== null) {
     invalid("configurationResponse", "expected an empty null response");
@@ -1733,7 +1748,7 @@ export function normalizeSetServerCredentialRequest(
   value: SetServerCredentialRequest,
 ): SetServerCredentialRequest {
   const record = expectRecord(value, "request");
-  return {
+  const normalized: SetServerCredentialRequest = {
     serverId: expectServerId(record.serverId, "request.serverId"),
     expectedVersion: expectVersion(
       record.expectedVersion,
@@ -1744,6 +1759,15 @@ export function normalizeSetServerCredentialRequest(
       "request.credential",
     ),
   };
+  return record.plaintextFallbackConfirmed === undefined
+    ? normalized
+    : {
+        ...normalized,
+        plaintextFallbackConfirmed: expectBoolean(
+          record.plaintextFallbackConfirmed,
+          "request.plaintextFallbackConfirmed",
+        ),
+      };
 }
 
 export function normalizeClearServerCredentialRequest(
@@ -1768,7 +1792,7 @@ export function normalizeSetProxyCredentialRequest(
   value: SetProxyCredentialRequest,
 ): SetProxyCredentialRequest {
   const record = expectRecord(value, "request");
-  return {
+  const normalized: SetProxyCredentialRequest = {
     proxyId: expectProxyId(record.proxyId, "request.proxyId"),
     expectedVersion: expectVersion(
       record.expectedVersion,
@@ -1776,6 +1800,15 @@ export function normalizeSetProxyCredentialRequest(
     ),
     credential: normalizeProxyCredential(record.credential, "request.credential"),
   };
+  return record.plaintextFallbackConfirmed === undefined
+    ? normalized
+    : {
+        ...normalized,
+        plaintextFallbackConfirmed: expectBoolean(
+          record.plaintextFallbackConfirmed,
+          "request.plaintextFallbackConfirmed",
+        ),
+      };
 }
 
 export function normalizeClearProxyCredentialRequest(

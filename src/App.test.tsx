@@ -21,6 +21,7 @@ import {
   collectHighRiskServerIds,
   recentWorkingDirectories,
   type AppWindowOpener,
+  type CredentialStorageStatusLoader,
 } from "./App";
 import {
   ConfigurationCommandError,
@@ -142,6 +143,7 @@ function renderApp(
   snapshot: () => ConfigurationSnapshot | Promise<ConfigurationSnapshot>,
   options: {
     readonly sessionFactory?: ConfiguredServerSessionFactory;
+    readonly credentialStorageStatusLoader?: CredentialStorageStatusLoader;
     readonly connectionTestOptions?: ServerConnectionTestControllerOptions;
     readonly mutationCommands?: Partial<ServerProfileMutationCommands>;
     readonly windowStateOptions?: WindowStateControllerOptions;
@@ -185,6 +187,10 @@ function renderApp(
     <Provider store={testStore}>
       <App
         configurationLoader={loader}
+        credentialStorageStatusLoader={
+          options.credentialStorageStatusLoader ??
+          (async () => ({ backend: "secretService" }))
+        }
         connectionOptions={{
           connectionIdFactory: () => connectionIds.shift() ?? "connection-next",
           ...(options.sessionFactory === undefined
@@ -217,6 +223,65 @@ function renderApp(
 }
 
 describe("App", () => {
+  it("密钥环不可用时在创建凭据前要求确认明文存储", async () => {
+    const user = userEvent.setup();
+    let authoritativeSnapshot: ConfigurationSnapshot = {
+      servers: [],
+      proxies: [],
+    };
+    const createServerProfile = vi.fn(async () => {
+      const profile = remoteServer(1, false);
+      authoritativeSnapshot = { servers: [profile], proxies: [] };
+      return profile;
+    });
+    const setServerCredential = vi.fn(async () => {
+      const profile = remoteServer(2, true);
+      authoritativeSnapshot = { servers: [profile], proxies: [] };
+      return profile;
+    });
+    renderApp(() => authoritativeSnapshot, {
+      credentialStorageStatusLoader: async () => ({ backend: "plaintextFile" }),
+      mutationCommands: { createServerProfile, setServerCredential },
+    });
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "选择服务器，未连接，打开服务器选择器",
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "新建第一个服务器" }));
+    await user.type(screen.getByLabelText(/^名称/u), "远程开发");
+    await user.click(screen.getByRole("radio", { name: /远程 WebSocket/u }));
+    await user.type(
+      screen.getByLabelText(/^WebSocket URL/u),
+      "wss://codex.example.test/app-server",
+    );
+    await user.selectOptions(screen.getByLabelText(/^认证方式/u), "bearer");
+    await user.type(screen.getByLabelText(/^Bearer 令牌/u), "plain-secret");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(
+      await screen.findByRole("alertdialog", {
+        name: "使用明文文件保存凭据？",
+      }),
+    ).toBeVisible();
+    expect(createServerProfile).not.toHaveBeenCalled();
+    expect(setServerCredential).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "返回编辑" }));
+    expect(screen.getByLabelText(/^Bearer 令牌/u)).toHaveValue("plain-secret");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await user.click(
+      await screen.findByRole("button", { name: "确认使用明文文件" }),
+    );
+
+    await waitFor(() => expect(setServerCredential).toHaveBeenCalledTimes(1));
+    expect(createServerProfile).toHaveBeenCalledTimes(1);
+    expect(setServerCredential).toHaveBeenCalledWith(
+      expect.objectContaining({ plaintextFallbackConfirmed: true }),
+    );
+  });
+
   it("按会话新旧顺序提取去重后的最近工作目录", () => {
     expect(recentWorkingDirectories([
       { cwd: "/workspace/alpha" },

@@ -35,7 +35,6 @@ pub fn run() {
         .manage(connection::RemoteWebSocketConnectionManager::default())
         .manage(connection::ConfiguredConnectionManager::default())
         .manage(connection::ServerConnectionTestManager::default())
-        .manage(configuration::CredentialManager::system())
         .manage(deep_link_state)
         // The single-instance plugin must be registered first so later plugins cannot
         // initialize in a process that is about to exit.
@@ -59,8 +58,17 @@ pub fn run() {
         .setup(|app| {
             use tauri::Manager;
 
-            let database_path = app.path().app_data_dir()?.join("configuration.sqlite3");
+            let app_data_directory = app.path().app_data_dir()?;
+            let database_path = app_data_directory.join("configuration.sqlite3");
             let pool = tauri::async_runtime::block_on(storage::open_database(database_path))?;
+            if !app.manage(configuration::CredentialManager::system(
+                app_data_directory.join("credentials"),
+            )) {
+                return Err(std::io::Error::other(
+                    "credential manager was already initialized",
+                )
+                .into());
+            }
             let window_state_repository = window_state::WindowStateRepository::new(pool.clone());
             tauri::async_runtime::block_on(window_state_repository.initialize())?;
             if !app.manage(window_state_repository) {
@@ -200,6 +208,7 @@ pub fn run() {
             connection::local_stdio::disconnect_local_stdio,
             connection::remote_websocket::disconnect_remote_websocket,
             connection::remote_websocket::send_remote_websocket_message,
+            configuration::commands::credential_storage_status,
             configuration::commands::list_configuration_profiles,
             configuration::commands::create_server_profile,
             configuration::commands::update_server_profile,

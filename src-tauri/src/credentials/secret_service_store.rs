@@ -6,7 +6,7 @@ use zeroize::Zeroizing;
 
 use super::{
     CredentialDescriptor, CredentialReference, CredentialStore, CredentialStoreError,
-    CredentialStoreFuture,
+    CredentialStoreFuture, CredentialStoreProbe,
 };
 
 const APPLICATION_ID: &str = "com.codexdesktop.linux";
@@ -17,6 +17,23 @@ const OPERATION_TIMEOUT: Duration = Duration::from_secs(120);
 #[derive(Default)]
 pub(crate) struct SecretServiceCredentialStore {
     operation_lock: Mutex<()>,
+}
+
+impl CredentialStoreProbe for SecretServiceCredentialStore {
+    fn probe(&self) -> CredentialStoreFuture<'_, ()> {
+        Box::pin(async move {
+            let _guard = self.operation_lock.lock().await;
+            run_with_timeout(async move {
+                let service = connect().await?;
+                service
+                    .get_default_collection()
+                    .await
+                    .map(|_| ())
+                    .map_err(map_default_collection_error)
+            })
+            .await
+        })
+    }
 }
 
 struct ItemAttributes {

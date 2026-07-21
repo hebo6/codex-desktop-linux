@@ -9,6 +9,7 @@ import {
   normalizeSetProxyCredentialRequest,
   normalizeSetServerCredentialRequest,
   parseConfigurationSnapshot,
+  parseCredentialStorageStatus,
   parseProxyProfile,
   parseServerProfile,
 } from "./validation";
@@ -153,6 +154,24 @@ function mutableRecord(value: unknown): Record<string, unknown> {
 }
 
 describe("configuration runtime contract", () => {
+  it("严格解析凭据存储后端状态", () => {
+    expect(parseCredentialStorageStatus({ backend: "secretService" })).toEqual({
+      backend: "secretService",
+    });
+    expect(parseCredentialStorageStatus({ backend: "plaintextFile" })).toEqual({
+      backend: "plaintextFile",
+    });
+    expect(parseCredentialStorageStatus({ backend: "mixed" })).toEqual({
+      backend: "mixed",
+    });
+    expect(() =>
+      parseCredentialStorageStatus({ backend: "plaintextFile", path: "/secret" }),
+    ).toThrow(ConfigurationContractError);
+    expect(() => parseCredentialStorageStatus({ backend: "unknown" })).toThrow(
+      ConfigurationContractError,
+    );
+  });
+
   it("严格解析全部非敏感配置形态并规范化键顺序", () => {
     const snapshot = parseConfigurationSnapshot(validSnapshot());
 
@@ -582,6 +601,7 @@ describe("configuration runtime contract", () => {
         values: { Z_SECRET: "last", A_SECRET: "first" },
         ignored: "DROP_CREDENTIAL_FIELD",
       },
+      plaintextFallbackConfirmed: true,
     } as never);
     expect(setEnvironment).toEqual({
       serverId: SERVER_LOCAL_ID,
@@ -590,7 +610,16 @@ describe("configuration runtime contract", () => {
         type: "sensitiveEnvironment",
         values: { A_SECRET: "first", Z_SECRET: "last" },
       },
+      plaintextFallbackConfirmed: true,
     });
+    expect(() =>
+      normalizeSetServerCredentialRequest({
+        serverId: SERVER_LOCAL_ID,
+        expectedVersion: 1,
+        credential: { type: "bearerToken", value: "valid-token" },
+        plaintextFallbackConfirmed: "yes",
+      } as never),
+    ).toThrow(ConfigurationContractError);
 
     expect(
       normalizeSetServerCredentialRequest({
