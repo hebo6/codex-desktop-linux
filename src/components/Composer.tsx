@@ -738,10 +738,32 @@ export function Composer({
           />
           <div className={styles.actions}>
             {activeTurn && canSend ? (
-              <button aria-label="停止当前回合" className={styles.stopSecondary} disabled={stopping} onClick={() => void onStop()} type="button">停止</button>
+              <button
+                aria-label="停止当前回合"
+                className={styles.stopSecondary}
+                disabled={stopping}
+                onClick={() => void onStop()}
+                title="停止"
+                type="button"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <rect x="7" y="7" width="10" height="10" rx="1.5" />
+                </svg>
+              </button>
             ) : null}
             {activeTurn && !canSend ? (
-              <button className={styles.stopButton} disabled={stopping} onClick={() => void onStop()} type="button">{stopping ? "正在停止" : "停止"}</button>
+              <button
+                aria-label={stopping ? "正在停止" : "停止"}
+                className={styles.stopButton}
+                disabled={stopping}
+                onClick={() => void onStop()}
+                title="停止"
+                type="button"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <rect x="7" y="7" width="10" height="10" rx="1.5" />
+                </svg>
+              </button>
             ) : (
               <button
                 aria-label={preparingAttachments ? "正在准备" : submitting ? "正在提交" : activeTurn ? "追加" : "发送"}

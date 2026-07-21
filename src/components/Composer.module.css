@@ -689,27 +689,23 @@
 .actions button {
   min-width: 36px;
   min-height: 36px;
-  padding: 0 var(--space-3);
+  padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: 50%;
   font: inherit;
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
+  display: grid;
+  place-items: center;
 }
 
 .actions .sendButton {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  place-items: center;
-  border-radius: 50%;
   color: var(--color-button-primary-text);
   background: var(--color-button-primary-bg);
 }
 
-.sendButton svg {
+.actions button svg {
   width: 19px;
   height: 19px;
   fill: none;
@@ -727,6 +723,11 @@
 .stopSecondary {
   color: var(--color-status-danger);
   background: var(--color-danger-surface);
+}
+
+.actions button svg rect {
+  fill: currentColor;
+  stroke: none;
 }
 
 .actions button:disabled {
