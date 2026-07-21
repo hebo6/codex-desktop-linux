@@ -269,6 +269,11 @@
   margin: 0;
   overflow-y: auto;
   list-style: none;
+  transition: padding-bottom var(--duration-panel) var(--ease-standard);
+}
+
+.serverList:has(.serverRow:last-child button[aria-expanded="true"]) {
+  padding-bottom: 80px;
 }
 
 .serverRow {
