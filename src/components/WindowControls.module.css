@@ -1,0 +1,41 @@
+.windowControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  margin-left: 4px;
+}
+
+.controlButton {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-fill-subtle);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.controlButton:hover {
+  background: var(--color-fill-hover);
+  color: var(--color-text-primary);
+}
+
+.controlButton svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.closeButton:hover {
+  background: var(--color-status-danger);
+  color: #fff;
+}

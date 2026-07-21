@@ -524,6 +524,7 @@ pub(crate) async fn open_app_window<R: Runtime>(
         .inner_size(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
         .min_inner_size(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
         .center()
+        .decorations(false)
         .prevent_overflow()
         .build();
 
@@ -631,6 +632,24 @@ fn activate_window<R: Runtime>(window: &WebviewWindow<R>) -> tauri::Result<()> {
     }
     window.show()?;
     window.set_focus()
+}
+
+#[tauri::command]
+pub(crate) fn get_window_button_layout() -> String {
+    std::process::Command::new("gsettings")
+        .args(["get", "org.gnome.desktop.wm.preferences", "button-layout"])
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                String::from_utf8(output.stdout)
+                    .ok()
+                    .map(|s| s.trim().trim_matches('\'').to_owned())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| "appmenu:close".to_owned())
 }
 
 #[cfg(test)]

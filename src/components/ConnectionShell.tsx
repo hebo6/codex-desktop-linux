@@ -11,6 +11,7 @@ import type { ServerThreadsPhase, ThreadSummary } from "../app/useServerThreads"
 import type { ReconnectViewState } from "../app/useConfiguredServerConnection";
 import type { ConnectionPhase } from "../store/connectionSlice";
 import { RecentThreads } from "./RecentThreads";
+import { WindowControls } from "./WindowControls";
 import styles from "./ConnectionShell.module.css";
 
 export type { ConnectionPhase } from "../store/connectionSlice";
@@ -565,7 +566,8 @@ export function ConnectionShell({
       </aside>
 
       <main className={styles.main}>
-        <header className={styles.topbar}>
+        <header className={styles.topbar} data-tauri-drag-region>
+          <WindowControls side="left" />
           <button
             aria-controls={sidebarId}
             aria-expanded={!isSidebarCollapsed}
@@ -610,6 +612,7 @@ export function ConnectionShell({
               </svg>
             </button>
           ) : null}
+          <WindowControls side="right" />
           <span aria-live="polite" className={styles.visuallyHidden}>{announcement}</span>
         </header>
 

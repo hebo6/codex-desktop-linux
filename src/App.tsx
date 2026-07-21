@@ -54,6 +54,7 @@ import { ServerSwitcher } from "./components/ServerSwitcher";
 import { ThreadDeleteDialog } from "./components/ThreadDeleteDialog";
 import { ThreadForkDialog } from "./components/ThreadForkDialog";
 import { ThreadQuickSwitcher } from "./components/ThreadQuickSwitcher";
+import { WindowResizeHandles } from "./components/WindowResizeHandles";
 import type {
   ServerConnectionStartResult,
   ServerConnectionView,
@@ -1309,6 +1310,7 @@ export function App({
 
   return (
     <>
+      <WindowResizeHandles />
       <ConnectionShell
         announcement={shortcutStatus}
         archivedThread={serverThreads.archivedThread}

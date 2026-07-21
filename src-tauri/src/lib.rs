@@ -242,7 +242,8 @@ pub fn run() {
             preferences::clear_application_logs,
             preferences::clear_temporary_files,
             preferences::clear_all_local_data,
-            diagnostics::read_system_diagnostics
+            diagnostics::read_system_diagnostics,
+            windows::get_window_button_layout
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Codex Desktop");

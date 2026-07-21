@@ -24,4 +24,5 @@ commands.allow = [
     "take_pending_deep_link",
     "confirm_proxy_ssh_host_key",
     "record_proxy_test",
+    "get_window_button_layout",
 ]

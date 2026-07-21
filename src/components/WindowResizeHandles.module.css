@@ -1,0 +1,24 @@
+.resizeHandles {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.edge,
+.corner {
+  position: absolute;
+  pointer-events: auto;
+}
+
+/* Edges */
+.edgeN { top: 0; left: 5px; right: 5px; height: 5px; cursor: n-resize; }
+.edgeS { bottom: 0; left: 5px; right: 5px; height: 5px; cursor: s-resize; }
+.edgeW { top: 5px; bottom: 5px; left: 0; width: 5px; cursor: w-resize; }
+.edgeE { top: 5px; bottom: 5px; right: 0; width: 5px; cursor: e-resize; }
+
+/* Corners */
+.cornerNW { top: 0; left: 0; width: 5px; height: 5px; cursor: nw-resize; }
+.cornerNE { top: 0; right: 0; width: 5px; height: 5px; cursor: ne-resize; }
+.cornerSW { bottom: 0; left: 0; width: 5px; height: 5px; cursor: sw-resize; }
+.cornerSE { bottom: 0; right: 0; width: 5px; height: 5px; cursor: se-resize; }

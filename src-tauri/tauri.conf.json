@@ -25,11 +25,13 @@
         "minHeight": 640,
         "center": true,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "decorations": false
       }
     ],
     "security": {
       "capabilities": [
+        "window-controls",
         "app-events",
         "app-windows",
         "configuration",

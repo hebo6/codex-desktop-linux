@@ -37,7 +37,7 @@ createRoot(rootElement).render(
 
 function StartupShell() {
   return (
-    <div className="startup-shell" role="status">
+    <div className="startup-shell" data-tauri-drag-region role="status">
       <aside aria-hidden="true">
         <strong>Codex</strong>
         <span />
