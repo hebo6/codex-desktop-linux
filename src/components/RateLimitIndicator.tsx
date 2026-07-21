@@ -283,7 +283,7 @@ function TokenUsageChart({ buckets }: TokenUsageChartProps) {
         {activeBucket ? (
           <>
             <span className={styles.chartHeaderDate}>{formatChartDate(activeBucket.startDate)}</span>
-            <span className={styles.chartHeaderValue}>{activeBucket.tokens.toLocaleString()} tokens</span>
+            <span className={styles.chartHeaderValue}>{formatTokenCount(activeBucket.tokens)} tokens</span>
           </>
         ) : (
           <span className={styles.chartHeaderTip}>悬停于柱状图查看每日消耗</span>
@@ -358,4 +358,17 @@ function formatShortDate(dateStr: string): string {
   } catch {
     return dateStr;
   }
+}
+
+function formatTokenCount(tokens: number): string {
+  if (tokens >= 1_000_000_000) {
+    return `${(tokens / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
+  }
+  if (tokens >= 1_000_000) {
+    return `${(tokens / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  }
+  if (tokens >= 1_000) {
+    return `${(tokens / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  }
+  return tokens.toLocaleString();
 }
