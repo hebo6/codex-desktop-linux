@@ -236,7 +236,6 @@ export function ConnectionShell({
   const threadActionsMenuRef = useRef<HTMLDivElement>(null);
   const content = PHASE_CONTENT[phase];
   const isError = phase === "error";
-  const [clock, setClock] = useState(() => Date.now());
   const [liveSidebarWidth, setLiveSidebarWidth] = useState(sidebarWidth);
   const resizeRef = useRef<{
     readonly pointerId: number;
@@ -271,18 +270,6 @@ export function ConnectionShell({
     }
   }, [threadListPhase]);
 
-  useEffect(() => {
-    if (reconnect?.nextAttemptAt === null || reconnect?.nextAttemptAt === undefined) return;
-    setClock(Date.now());
-    const interval = window.setInterval(() => setClock(Date.now()), 250);
-    return () => window.clearInterval(interval);
-  }, [reconnect?.nextAttemptAt]);
-
-  const reconnectLabel = reconnect === null
-    ? null
-    : reconnect.nextAttemptAt === null
-      ? `正在进行第 ${reconnect.attempt} 次重连`
-      : `${Math.max(0, Math.ceil((reconnect.nextAttemptAt - clock) / 1000))} 秒后重连`;
 
   useEffect(() => {
     if (!isSidebarOpen) {
@@ -593,10 +580,7 @@ export function ConnectionShell({
             <strong>{contentTitle}</strong>
             <span>{contentSubtitle ?? content.eyebrow}</span>
           </div>
-          <span className={styles.topbarStatus} data-phase={phase}>
-            <span aria-hidden="true" className={styles.compactDot} />
-            {reconnectLabel ?? (offline ? "离线只读" : content.shortLabel)}
-          </span>
+
           {topbarAccessory}
           {onOpenSettings ? (
             <button

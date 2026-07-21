@@ -50,7 +50,6 @@ describe("ConnectionShell", () => {
       />,
     );
 
-    expect(screen.getByText(/秒后重连/u)).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "立即重试" }));
     fireEvent.click(screen.getByRole("button", { name: "停止重连" }));
     expect(onRetry).toHaveBeenCalledOnce();
@@ -169,6 +168,5 @@ describe("ConnectionShell", () => {
 
     expect(screen.getByText("缓存消息")).toBeVisible();
     expect(screen.getByText(/离线只读内容/u)).toBeVisible();
-    expect(screen.getByText("离线只读")).toBeVisible();
   });
 });
