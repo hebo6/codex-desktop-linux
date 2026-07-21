@@ -517,7 +517,9 @@ export function App({
           ? "新任务"
           : "正在恢复会话"
         : threadDisplayTitle(restoredThread.metadata);
-  const contentSubtitle = restoredThread?.metadata.cwd ?? boundServerName;
+  const contentSubtitle = restoredThread?.metadata.cwd
+    ? getBasename(restoredThread.metadata.cwd)
+    : boundServerName;
   const isWindowStateLoading =
     windowState.status === "idle" ||
     windowState.status === "loading";
@@ -1749,4 +1751,16 @@ function composerDraftKey(
     return null;
   }
   return `${windowId}:${serverId}:${draftKey ?? threadId ?? "new"}`;
+}
+
+function getBasename(path: string): string {
+  const trimmed = path.trim().replace(/[/\\]+$/, "");
+  if (!trimmed) {
+    return path;
+  }
+  const index = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  if (index === -1) {
+    return trimmed;
+  }
+  return trimmed.slice(index + 1);
 }
