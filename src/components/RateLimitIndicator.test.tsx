@@ -49,4 +49,39 @@ describe("RateLimitIndicator", () => {
     fireEvent.click(screen.getByRole("button", { name: "刷新" }));
     expect(onRefresh).toHaveBeenCalledOnce();
   });
+
+  it("可用重置次数大于 0 时展示重置限额按钮且点击时触发回调", () => {
+    const onConsumeResetCredit = vi.fn(() => Promise.resolve());
+    const originalConfirm = window.confirm;
+    window.confirm = vi.fn(() => true);
+
+    try {
+      render(
+        <RateLimitIndicator
+          data={{
+            rateLimits: { planType: "plus", primary: { usedPercent: 80 } },
+            rateLimitResetCredits: { availableCount: 3, credits: null },
+          }}
+          error={null}
+          loading={false}
+          onRefresh={vi.fn()}
+          refreshing={false}
+          updatedAt={Date.now()}
+          onConsumeResetCredit={onConsumeResetCredit}
+          resetting={false}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /账户剩余限额/u }));
+
+      const resetButton = screen.getByRole("button", { name: "重置限额" });
+      expect(resetButton).toBeVisible();
+
+      fireEvent.click(resetButton);
+      expect(window.confirm).toHaveBeenCalledWith("确定要消耗一次重置次数来重置账户限额吗？");
+      expect(onConsumeResetCredit).toHaveBeenCalledOnce();
+    } finally {
+      window.confirm = originalConfirm;
+    }
+  });
 });

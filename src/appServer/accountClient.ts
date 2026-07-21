@@ -1,9 +1,14 @@
 import type {
+  ConsumeAccountRateLimitResetCreditParams,
+  ConsumeAccountRateLimitResetCreditResponse,
   GetAccountRateLimitsResponse,
   ServerNotification,
 } from "../protocol/generated";
 import type { RequestHandle, ResultValidator } from "../protocol/rpc";
-import { validateGetAccountRateLimitsResponse } from "../protocol/validation";
+import {
+  validateConsumeAccountRateLimitResetCreditResponse,
+  validateGetAccountRateLimitsResponse,
+} from "../protocol/validation";
 import type { AppServerSession } from "./session";
 
 type RateLimitsNotification = Extract<
@@ -18,6 +23,9 @@ export interface AccountClient {
   subscribeRateLimitUpdates(
     handler: (notification: RateLimitsNotification) => void,
   ): () => void;
+  consumeRateLimitResetCredit(
+    params: ConsumeAccountRateLimitResetCreditParams,
+  ): RequestHandle<ConsumeAccountRateLimitResetCreditResponse>;
 }
 
 export class AppServerAccountClient implements AccountClient {
@@ -37,6 +45,16 @@ export class AppServerAccountClient implements AccountClient {
       if (notification.method === "account/rateLimits/updated") {
         handler(notification);
       }
+    });
+  }
+
+  consumeRateLimitResetCredit(
+    params: ConsumeAccountRateLimitResetCreditParams,
+  ): RequestHandle<ConsumeAccountRateLimitResetCreditResponse> {
+    return this.session.sendRequest({
+      method: "account/rateLimitResetCredit/consume",
+      params,
+      validateResult: validateConsumeAccountRateLimitResetCreditResponse,
     });
   }
 }

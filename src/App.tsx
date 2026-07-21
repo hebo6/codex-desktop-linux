@@ -1457,6 +1457,8 @@ export function App({
             onRefresh={accountRateLimits.refresh}
             refreshing={accountRateLimits.refreshing}
             updatedAt={accountRateLimits.updatedAt}
+            onConsumeResetCredit={accountRateLimits.consumeResetCredit}
+            resetting={accountRateLimits.resetting}
           />
         }
       />

@@ -28,4 +28,52 @@ describe("useAccountRateLimits", () => {
     expect(result.current.error).toBe("无法读取账户限额");
     expect(result.current.data?.rateLimits.primary?.usedPercent).toBe(55);
   });
+
+  it("重置限额成功并自动刷新", async () => {
+    const consumeRateLimitResetCredit = vi.fn().mockReturnValue({
+      result: Promise.resolve({ outcome: "reset" }),
+    });
+    const readRateLimits = vi.fn()
+      .mockReturnValueOnce({ result: Promise.resolve({ rateLimits: { limitId: "codex", primary: { usedPercent: 80 } } }) })
+      .mockReturnValueOnce({ result: Promise.resolve({ rateLimits: { limitId: "codex", primary: { usedPercent: 0 } } }) });
+    const client = {
+      readRateLimits,
+      subscribeRateLimitUpdates: () => () => {},
+      consumeRateLimitResetCredit,
+    } as unknown as AppServerAccountClient;
+
+    const { result } = renderHook(() => useAccountRateLimits(client));
+    await waitFor(() => expect(result.current.data?.rateLimits.primary?.usedPercent).toBe(80));
+
+    await act(() => result.current.consumeResetCredit("test-credit-id"));
+
+    expect(consumeRateLimitResetCredit).toHaveBeenCalledWith({
+      idempotencyKey: expect.any(String),
+      creditId: "test-credit-id",
+    });
+    expect(result.current.data?.rateLimits.primary?.usedPercent).toBe(0);
+    expect(result.current.resetting).toBe(false);
+  });
+
+  it("重置限额失败时显示错误信息", async () => {
+    const consumeRateLimitResetCredit = vi.fn().mockReturnValue({
+      result: Promise.resolve({ outcome: "noCredit" }),
+    });
+    const readRateLimits = vi.fn().mockReturnValue({
+      result: Promise.resolve({ rateLimits: { limitId: "codex", primary: { usedPercent: 80 } } }),
+    });
+    const client = {
+      readRateLimits,
+      subscribeRateLimitUpdates: () => () => {},
+      consumeRateLimitResetCredit,
+    } as unknown as AppServerAccountClient;
+
+    const { result } = renderHook(() => useAccountRateLimits(client));
+    await waitFor(() => expect(result.current.data?.rateLimits.primary?.usedPercent).toBe(80));
+
+    await act(() => result.current.consumeResetCredit("test-credit-id"));
+
+    expect(result.current.error).toBe("无可用的重置次数");
+    expect(result.current.resetting).toBe(false);
+  });
 });

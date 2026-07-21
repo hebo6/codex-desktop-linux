@@ -15,6 +15,8 @@ export interface RateLimitIndicatorProps {
   readonly onRefresh: () => Promise<void>;
   readonly refreshing: boolean;
   readonly updatedAt: number | null;
+  readonly onConsumeResetCredit?: (creditId?: string | null) => Promise<void>;
+  readonly resetting?: boolean;
 }
 
 export function RateLimitIndicator({
@@ -24,6 +26,8 @@ export function RateLimitIndicator({
   onRefresh,
   refreshing,
   updatedAt,
+  onConsumeResetCredit,
+  resetting = false,
 }: RateLimitIndicatorProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -107,7 +111,22 @@ export function RateLimitIndicator({
             </div>
           )}
           {data?.rateLimitResetCredits && data.rateLimitResetCredits.availableCount > 0 ? (
-            <p className={styles.credits}>可用限额重置次数 {data.rateLimitResetCredits.availableCount}</p>
+            <p className={styles.credits}>
+              <span>可用限额重置次数 {data.rateLimitResetCredits.availableCount}</span>
+              {onConsumeResetCredit ? (
+                <button
+                  disabled={loading || refreshing || resetting}
+                  onClick={() => {
+                    if (window.confirm("确定要消耗一次重置次数来重置账户限额吗？")) {
+                      void onConsumeResetCredit();
+                    }
+                  }}
+                  type="button"
+                >
+                  {resetting ? "重置中" : "重置限额"}
+                </button>
+              ) : null}
+            </p>
           ) : null}
           {error === null || windows.length === 0 ? null : <p className={styles.stale} role="status">{error}，当前保留上次成功数据</p>}
           {updatedAt === null ? null : <footer>更新于 {new Date(updatedAt).toLocaleString()}</footer>}

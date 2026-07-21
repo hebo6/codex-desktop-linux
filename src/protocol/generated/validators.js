@@ -115534,3 +115534,186 @@ errors++;
 validate531.errors = vErrors;
 return errors === 0;
 }
+
+export const validateConsumeAccountRateLimitResetCreditResponse = validate539;
+const schema856 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"ConsumeAccountRateLimitResetCreditOutcome":{"oneOf":[{"description":"A reset credit was consumed and the eligible rate-limit windows were reset.","enum":["reset"],"type":"string"},{"description":"No current rate-limit window is eligible for a reset.","enum":["nothingToReset"],"type":"string"},{"description":"The account has no earned reset credits available.","enum":["noCredit"],"type":"string"},{"description":"The same idempotency key already completed a reset successfully.","enum":["alreadyRedeemed"],"type":"string"}]}},"properties":{"outcome":{"$ref":"#/definitions/ConsumeAccountRateLimitResetCreditOutcome"}},"required":["outcome"],"title":"ConsumeAccountRateLimitResetCreditResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ConsumeAccountRateLimitResetCreditResponse"};
+const schema857 = {"oneOf":[{"description":"A reset credit was consumed and the eligible rate-limit windows were reset.","enum":["reset"],"type":"string"},{"description":"No current rate-limit window is eligible for a reset.","enum":["nothingToReset"],"type":"string"},{"description":"The account has no earned reset credits available.","enum":["noCredit"],"type":"string"},{"description":"The same idempotency key already completed a reset successfully.","enum":["alreadyRedeemed"],"type":"string"}]};
+
+function validate539(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+/*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ConsumeAccountRateLimitResetCreditResponse" */;
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.outcome === undefined){
+const err0 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "outcome"},message:"must have required property '"+"outcome"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.outcome !== undefined){
+let data0 = data.outcome;
+const _errs3 = errors;
+let valid2 = false;
+let passing0 = null;
+const _errs4 = errors;
+if(typeof data0 !== "string"){
+const err1 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/0/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+if(!(data0 === "reset")){
+const err2 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema857.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+var _valid0 = _errs4 === errors;
+if(_valid0){
+valid2 = true;
+passing0 = 0;
+}
+const _errs6 = errors;
+if(typeof data0 !== "string"){
+const err3 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/1/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+if(!(data0 === "nothingToReset")){
+const err4 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema857.oneOf[1].enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+var _valid0 = _errs6 === errors;
+if(_valid0 && valid2){
+valid2 = false;
+passing0 = [passing0, 1];
+}
+else {
+if(_valid0){
+valid2 = true;
+passing0 = 1;
+}
+const _errs8 = errors;
+if(typeof data0 !== "string"){
+const err5 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/2/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+if(!(data0 === "noCredit")){
+const err6 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/2/enum",keyword:"enum",params:{allowedValues: schema857.oneOf[2].enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+var _valid0 = _errs8 === errors;
+if(_valid0 && valid2){
+valid2 = false;
+passing0 = [passing0, 2];
+}
+else {
+if(_valid0){
+valid2 = true;
+passing0 = 2;
+}
+const _errs10 = errors;
+if(typeof data0 !== "string"){
+const err7 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/3/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+if(!(data0 === "alreadyRedeemed")){
+const err8 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/3/enum",keyword:"enum",params:{allowedValues: schema857.oneOf[3].enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+var _valid0 = _errs10 === errors;
+if(_valid0 && valid2){
+valid2 = false;
+passing0 = [passing0, 3];
+}
+else {
+if(_valid0){
+valid2 = true;
+passing0 = 3;
+}
+}
+}
+}
+if(!valid2){
+const err9 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf",keyword:"oneOf",params:{passingSchemas: passing0},message:"must match exactly one schema in oneOf"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+else {
+errors = _errs3;
+if(vErrors !== null){
+if(_errs3){
+vErrors.length = _errs3;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+}
+else {
+const err10 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+validate539.errors = vErrors;
+return errors === 0;
+}

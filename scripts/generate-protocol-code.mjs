@@ -225,6 +225,11 @@ const schemaDeclarations = [
     typeName: "ExecCommandApprovalResponse",
     schemaPath: "ExecCommandApprovalResponse.json",
   },
+  {
+    typeName: "ConsumeAccountRateLimitResetCreditResponse",
+    schemaPath: "v2/ConsumeAccountRateLimitResetCreditResponse.json",
+    validatorName: "validateConsumeAccountRateLimitResetCreditResponse",
+  },
 ];
 
 const validatorDeclarations = schemaDeclarations.filter(

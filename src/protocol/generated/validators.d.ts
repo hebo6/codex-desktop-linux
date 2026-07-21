@@ -4,6 +4,7 @@ import type { ErrorObject } from "ajv";
 
 import type {
   AppsListResponse,
+  ConsumeAccountRateLimitResetCreditResponse,
   FsGetMetadataResponse,
   FsReadFileResponse,
   FuzzyFileSearchResponse,
@@ -66,3 +67,4 @@ export const validateThreadForkResponse: StandaloneValidateFunction<ThreadForkRe
 export const validateFsReadFileResponse: StandaloneValidateFunction<FsReadFileResponse>;
 export const validateFsGetMetadataResponse: StandaloneValidateFunction<FsGetMetadataResponse>;
 export const validateGetAccountRateLimitsResponse: StandaloneValidateFunction<GetAccountRateLimitsResponse>;
+export const validateConsumeAccountRateLimitResetCreditResponse: StandaloneValidateFunction<ConsumeAccountRateLimitResetCreditResponse>;

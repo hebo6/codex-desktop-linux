@@ -63,6 +63,7 @@ export type { ToolRequestUserInputResponse } from "./types/ToolRequestUserInputR
 export type { McpServerElicitationRequestResponse } from "./types/McpServerElicitationRequestResponse";
 export type { ApplyPatchApprovalResponse } from "./types/ApplyPatchApprovalResponse";
 export type { ExecCommandApprovalResponse } from "./types/ExecCommandApprovalResponse";
+export type { ConsumeAccountRateLimitResetCreditResponse } from "./types/ConsumeAccountRateLimitResetCreditResponse";
 
 export {
   KNOWN_SERVER_NOTIFICATION_METHODS,

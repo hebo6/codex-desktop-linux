@@ -31,6 +31,7 @@ import type {
   FsReadFileResponse,
   FsGetMetadataResponse,
   GetAccountRateLimitsResponse,
+  ConsumeAccountRateLimitResetCreditResponse,
 } from "../generated";
 import {
   validateInitializeResponse as validateInitializeResponseSchema,
@@ -61,6 +62,7 @@ import {
   validateFsReadFileResponse as validateFsReadFileResponseSchema,
   validateFsGetMetadataResponse as validateFsGetMetadataResponseSchema,
   validateGetAccountRateLimitsResponse as validateGetAccountRateLimitsResponseSchema,
+  validateConsumeAccountRateLimitResetCreditResponse as validateConsumeAccountRateLimitResetCreditResponseSchema,
 } from "../generated/validators.js";
 
 export type ProtocolValidationStage = "parse" | "envelope" | "method" | "params";
@@ -363,6 +365,12 @@ export function validateGetAccountRateLimitsResponse(
   value: unknown,
 ): ProtocolValidationResult<GetAccountRateLimitsResponse> {
   return validateWithSchema(value, validateGetAccountRateLimitsResponseSchema, "invalid_params", "params", "account/rateLimits/read 响应校验失败");
+}
+
+export function validateConsumeAccountRateLimitResetCreditResponse(
+  value: unknown,
+): ProtocolValidationResult<ConsumeAccountRateLimitResetCreditResponse> {
+  return validateWithSchema(value, validateConsumeAccountRateLimitResetCreditResponseSchema, "invalid_params", "params", "account/rateLimitResetCredit/consume 响应校验失败");
 }
 
 function validateWithSchema<T>(

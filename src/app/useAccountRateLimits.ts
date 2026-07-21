@@ -9,6 +9,7 @@ export interface AccountRateLimitsState {
   readonly error: string | null;
   readonly loading: boolean;
   readonly refreshing: boolean;
+  readonly resetting: boolean;
   readonly updatedAt: number | null;
 }
 
@@ -17,6 +18,7 @@ const EMPTY_STATE = Object.freeze({
   error: null,
   loading: false,
   refreshing: false,
+  resetting: false,
   updatedAt: null,
 }) satisfies AccountRateLimitsState;
 
@@ -37,12 +39,13 @@ export function useAccountRateLimits(client: AppServerAccountClient | null) {
       error: null,
       loading: initial && current.data === null,
       refreshing: !initial || current.data !== null,
+      resetting: false,
     }));
     try {
       const response = await target.readRateLimits().result;
       if (generation !== generationRef.current || clientRef.current !== target) return;
       setState((current) => ({
-        data: notificationVersionRef.current === notificationVersion && current.data === null
+        data: notificationVersionRef.current === notificationVersion
           ? response
           : current.data === null
             ? response
@@ -50,6 +53,7 @@ export function useAccountRateLimits(client: AppServerAccountClient | null) {
         error: null,
         loading: false,
         refreshing: false,
+        resetting: false,
         updatedAt: Date.now(),
       }));
     } catch {
@@ -59,6 +63,7 @@ export function useAccountRateLimits(client: AppServerAccountClient | null) {
         error: "无法读取账户限额",
         loading: false,
         refreshing: false,
+        resetting: false,
       }));
     }
   }, []);
@@ -77,6 +82,7 @@ export function useAccountRateLimits(client: AppServerAccountClient | null) {
         error: null,
         loading: false,
         refreshing: false,
+        resetting: false,
         updatedAt: Date.now(),
       }));
     });
@@ -90,5 +96,44 @@ export function useAccountRateLimits(client: AppServerAccountClient | null) {
     await read(target, generationRef.current, false);
   }, [read]);
 
-  return { ...state, refresh };
+  const consumeResetCredit = useCallback(async (creditId?: string | null) => {
+    const target = clientRef.current;
+    if (target === null) return;
+    setState((current) => ({
+      ...current,
+      error: null,
+      resetting: true,
+    }));
+    try {
+      const response = await target.consumeRateLimitResetCredit({
+        idempotencyKey: crypto.randomUUID(),
+        creditId,
+      }).result;
+      if (clientRef.current !== target) return;
+      if (response.outcome === "reset" || response.outcome === "alreadyRedeemed") {
+        await read(target, generationRef.current, false);
+      } else {
+        const errorMsg =
+          response.outcome === "nothingToReset"
+            ? "当前没有可重置的限额窗口"
+            : response.outcome === "noCredit"
+              ? "无可用的重置次数"
+              : "重置限额未成功";
+        setState((current) => ({
+          ...current,
+          error: errorMsg,
+          resetting: false,
+        }));
+      }
+    } catch {
+      if (clientRef.current !== target) return;
+      setState((current) => ({
+        ...current,
+        error: "重置限额失败，请稍后重试",
+        resetting: false,
+      }));
+    }
+  }, [read]);
+
+  return { ...state, refresh, consumeResetCredit };
 }
