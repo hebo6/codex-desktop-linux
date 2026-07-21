@@ -707,42 +707,41 @@ export function ServerSwitcher({
                         >
                           <MoreIcon />
                         </button>
-                      </div>
-                    </div>
-
-                    {openMenuServerId === server.serverId ? (
-                      <div
-                        aria-label={`${server.name} 管理菜单`}
-                        className={styles.menu}
-                        id={`${panelId}-menu-${server.serverId}`}
-                        onKeyDown={handleMenuKeyDown}
-                        ref={menuRef}
-                        role="menu"
-                      >
-                        <button
-                          className={styles.menuItem}
-                          onClick={() =>
-                            closeForAction(() => onEdit(server.serverId))
-                          }
-                          role="menuitem"
-                          type="button"
-                        >
-                          编辑服务器
-                        </button>
-                        {onDelete ? (
-                          <button
-                            className={`${styles.menuItem} ${styles.dangerMenuItem}`}
-                            onClick={() =>
-                              closeForAction(() => onDelete(server.serverId))
-                            }
-                            role="menuitem"
-                            type="button"
+                        {openMenuServerId === server.serverId ? (
+                          <div
+                            aria-label={`${server.name} 管理菜单`}
+                            className={styles.menu}
+                            id={`${panelId}-menu-${server.serverId}`}
+                            onKeyDown={handleMenuKeyDown}
+                            ref={menuRef}
+                            role="menu"
                           >
-                            删除服务器
-                          </button>
+                            <button
+                              className={styles.menuItem}
+                              onClick={() =>
+                                closeForAction(() => onEdit(server.serverId))
+                              }
+                              role="menuitem"
+                              type="button"
+                            >
+                              编辑服务器
+                            </button>
+                            {onDelete ? (
+                              <button
+                                className={`${styles.menuItem} ${styles.dangerMenuItem}`}
+                                onClick={() =>
+                                  closeForAction(() => onDelete(server.serverId))
+                                }
+                                role="menuitem"
+                                type="button"
+                              >
+                                删除服务器
+                              </button>
+                            ) : null}
+                          </div>
                         ) : null}
                       </div>
-                    ) : null}
+                    </div>
                   </li>
                 );
               })}

@@ -431,6 +431,7 @@
 }
 
 .menuContainer {
+  position: relative;
   display: grid;
   justify-items: end;
 }
@@ -459,12 +460,15 @@
 }
 
 .menu {
-  position: static;
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 10;
   display: grid;
   min-width: 132px;
   gap: 2px;
   padding: var(--space-1);
-  margin: var(--space-1) 0 0 36px;
+  margin: 0;
   border: 1px solid var(--color-divider-strong);
   border-radius: var(--radius-sm);
   background: var(--color-content-bg);

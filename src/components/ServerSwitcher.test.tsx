@@ -242,7 +242,7 @@ describe("ServerSwitcher", () => {
 
     const editItem = screen.getByRole("menuitem", { name: "编辑服务器" });
     const deleteItem = screen.getByRole("menuitem", { name: "删除服务器" });
-    expect(getComputedStyle(screen.getByRole("menu")).position).toBe("static");
+    expect(getComputedStyle(screen.getByRole("menu")).position).toBe("absolute");
     expect(deleteItem.className).toContain("dangerMenuItem");
     expect(editItem).toHaveFocus();
     fireEvent.keyDown(editItem, { key: "ArrowDown" });
