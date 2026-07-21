@@ -500,7 +500,10 @@ export function ConnectionShell({
           onArchiveThread={(threadId) => onArchiveThread?.(threadId)}
           onDeleteThread={(threadId) => onDeleteThread?.(threadId)}
           onLoadMore={() => onLoadMoreThreads?.()}
-          onOpenThread={(threadId) => onOpenThread?.(threadId)}
+          onOpenThread={(threadId) => {
+            onOpenThread?.(threadId);
+            setIsSidebarOpen(false);
+          }}
           {...(onOpenThreadInNewWindow === undefined
             ? {}
             : { onOpenThreadInNewWindow })}
