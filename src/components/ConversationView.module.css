@@ -605,17 +605,38 @@ button.fileChangeRow {
   position: absolute;
   right: 24px;
   bottom: 120px;
-  min-height: 36px;
-  padding: 0 var(--space-3);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--color-divider-strong);
-  border-radius: 999px;
+  border-radius: 50%;
   color: var(--color-text-primary);
   background: var(--color-content-bg);
-  box-shadow: 0 8px 24px rgb(20 20 18 / 14%);
-  font: inherit;
-  font-size: 12px;
+  box-shadow: 0 4px 12px rgb(20 20 18 / 8%), 0 1px 3px rgb(20 20 18 / 4%);
   cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s ease, background-color 0.2s ease;
+  animation: jumpToBottomFadeIn 0.2s ease-out;
 }
+
+.jumpToBottom:hover {
+  transform: translateY(2px);
+  box-shadow: 0 6px 16px rgb(20 20 18 / 14%);
+  background-color: var(--color-bg-hover);
+}
+
+@keyframes jumpToBottomFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 
 .questionNavigation {
   position: absolute;
