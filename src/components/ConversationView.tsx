@@ -595,13 +595,18 @@ function UserMessage({
   readonly item: Extract<ThreadItem, { type: "userMessage" }>;
   readonly turnStartedAt?: number | null;
 }) {
+  const [now, setNow] = useState(() => Date.now());
   const plainText = item.content.map(userInputText).join("\n");
   const startedAt = typeof turnStartedAt === "number"
     ? new Date(turnStartedAt * 1_000)
     : null;
-  const timestamp = startedAt === null ? null : formatTurnTime(startedAt);
+  const timestamp = startedAt === null ? null : formatRelativeTime(startedAt, now);
   return (
-    <article className={styles.userMessage} tabIndex={0}>
+    <article
+      className={styles.userMessage}
+      tabIndex={0}
+      onMouseEnter={() => setNow(Date.now())}
+    >
       <div className={styles.userMessageBubble}>
         {item.content.map((input, index) => {
           switch (input.type) {

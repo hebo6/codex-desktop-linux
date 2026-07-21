@@ -753,7 +753,7 @@ describe("ConversationView", () => {
     const latestContinue = within(latestAnswer).getByRole("button", {
       name: "在新会话中继续",
     });
-    const historicalQuestionTime = within(historicalQuestion).getByText("12:09");
+    const historicalQuestionTime = within(historicalQuestion).getByText("2026-07-19 12:09");
     const historicalTime = within(historicalAnswer).getByText("2026-07-19 12:10");
     const latestTime = within(latestAnswer).getByText("2026-07-19 12:20");
     const latestCopyTooltip = within(latestCopy).getByText("复制");
