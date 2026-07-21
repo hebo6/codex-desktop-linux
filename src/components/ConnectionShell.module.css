@@ -262,10 +262,26 @@
 }
 
 .topbarTitle {
-  display: grid;
+  display: flex;
+  align-items: center;
   min-width: 0;
-  gap: 2px;
   margin-right: auto;
+}
+
+.topbarSubtitle {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+}
+
+.topbarSeparator {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  margin: 0 var(--space-2);
+  flex-shrink: 0;
 }
 
 .topbar strong {
@@ -275,11 +291,7 @@
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.topbarTitle > span {
-  color: var(--color-text-tertiary);
-  font-size: 12px;
+  flex-shrink: 2;
 }
 
 .topbarStatus {
@@ -665,7 +677,8 @@
     padding: 0 var(--space-4);
   }
 
-  .topbarTitle > span {
+  .topbarSubtitle,
+  .topbarSeparator {
     display: none;
   }
 

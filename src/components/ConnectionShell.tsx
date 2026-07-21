@@ -576,9 +576,10 @@ export function ConnectionShell({
           >
             <MenuIcon />
           </button>
-          <div className={styles.topbarTitle}>
+          <div className={styles.topbarTitle} title={`${contentSubtitle ?? content.eyebrow} / ${contentTitle}`}>
+            <span className={styles.topbarSubtitle}>{contentSubtitle ?? content.eyebrow}</span>
+            <span className={styles.topbarSeparator}>/</span>
             <strong>{contentTitle}</strong>
-            <span>{contentSubtitle ?? content.eyebrow}</span>
           </div>
 
           {topbarAccessory}
