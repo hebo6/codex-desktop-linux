@@ -64,10 +64,9 @@ pub fn run() {
             if !app.manage(configuration::CredentialManager::system(
                 app_data_directory.join("credentials"),
             )) {
-                return Err(std::io::Error::other(
-                    "credential manager was already initialized",
-                )
-                .into());
+                return Err(
+                    std::io::Error::other("credential manager was already initialized").into(),
+                );
             }
             let window_state_repository = window_state::WindowStateRepository::new(pool.clone());
             tauri::async_runtime::block_on(window_state_repository.initialize())?;

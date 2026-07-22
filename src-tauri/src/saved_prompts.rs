@@ -237,10 +237,7 @@ impl SavedPromptRepository {
         }
     }
 
-    async fn delete(
-        &self,
-        request: DeleteSavedPromptRequest,
-    ) -> Result<(), SavedPromptError> {
+    async fn delete(&self, request: DeleteSavedPromptRequest) -> Result<(), SavedPromptError> {
         validate_prompt_id(&request.prompt_id)?;
         validate_version(request.expected_version)?;
         let result = sqlx::query("DELETE FROM saved_prompts WHERE prompt_id = ? AND version = ?")
@@ -255,14 +252,13 @@ impl SavedPromptRepository {
         Ok(())
     }
 
-    async fn reorder(
-        &self,
-        request: ReorderSavedPromptsRequest,
-    ) -> Result<(), SavedPromptError> {
+    async fn reorder(&self, request: ReorderSavedPromptsRequest) -> Result<(), SavedPromptError> {
         let requested = request.prompt_ids;
         let unique = requested.iter().collect::<HashSet<_>>();
         if unique.len() != requested.len()
-            || requested.iter().any(|prompt_id| validate_prompt_id(prompt_id).is_err())
+            || requested
+                .iter()
+                .any(|prompt_id| validate_prompt_id(prompt_id).is_err())
         {
             return Err(SavedPromptError::Invalid);
         }
@@ -275,9 +271,7 @@ impl SavedPromptRepository {
             .fetch_all(&mut *transaction)
             .await
             .map_err(SavedPromptError::Database)?;
-        if current.len() != requested.len()
-            || current.iter().collect::<HashSet<_>>() != unique
-        {
+        if current.len() != requested.len() || current.iter().collect::<HashSet<_>>() != unique {
             return Err(SavedPromptError::CollectionConflict);
         }
         for (sort_order, prompt_id) in requested.iter().enumerate() {
@@ -514,7 +508,10 @@ mod tests {
             })
             .await
             .unwrap();
-        assert_eq!(repository.list().await.unwrap()[0].prompt_id, second.prompt_id);
+        assert_eq!(
+            repository.list().await.unwrap()[0].prompt_id,
+            second.prompt_id
+        );
 
         repository
             .delete(DeleteSavedPromptRequest {

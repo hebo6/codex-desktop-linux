@@ -40,9 +40,7 @@ impl PreferredCredentialStore {
                     Ok(CredentialStorageBackend::SecretService)
                 }
             }
-            Err(CredentialStoreError::Unavailable) => {
-                Ok(CredentialStorageBackend::PlaintextFile)
-            }
+            Err(CredentialStoreError::Unavailable) => Ok(CredentialStorageBackend::PlaintextFile),
             Err(error) => Err(error),
         }
     }
@@ -251,12 +249,7 @@ mod tests {
         };
 
         store
-            .create_with_plaintext_confirmation(
-                &reference,
-                descriptor,
-                b"FALLBACK_SECRET",
-                true,
-            )
+            .create_with_plaintext_confirmation(&reference, descriptor, b"FALLBACK_SECRET", true)
             .await
             .unwrap();
         assert_eq!(

@@ -245,9 +245,7 @@ impl fmt::Display for CredentialStoreError {
                 formatter.write_str("plaintext credential storage requires confirmation")
             }
             Self::Backend(_) => formatter.write_str("the credential store operation failed"),
-            Self::Filesystem(_) => {
-                formatter.write_str("the credential file operation failed")
-            }
+            Self::Filesystem(_) => formatter.write_str("the credential file operation failed"),
         }
     }
 }

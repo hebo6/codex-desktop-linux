@@ -89,13 +89,7 @@ impl CredentialStore for PlaintextFileCredentialStore {
         let secret = Zeroizing::new(secret.to_vec());
         Box::pin(async move {
             tokio::task::spawn_blocking(move || {
-                create_sync(
-                    &directory,
-                    &path,
-                    &reference,
-                    descriptor,
-                    secret.as_slice(),
-                )
+                create_sync(&directory, &path, &reference, descriptor, secret.as_slice())
             })
             .await
             .map_err(join_error)?
@@ -251,8 +245,8 @@ fn ensure_private_directory(directory: &Path) -> Result<(), CredentialStoreError
                 Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
                 Err(error) => return Err(CredentialStoreError::Filesystem(error)),
             }
-            let metadata = fs::symlink_metadata(directory)
-                .map_err(CredentialStoreError::Filesystem)?;
+            let metadata =
+                fs::symlink_metadata(directory).map_err(CredentialStoreError::Filesystem)?;
             validate_private_directory_metadata(&metadata)
         }
         Err(error) => Err(CredentialStoreError::Filesystem(error)),
@@ -389,7 +383,11 @@ mod tests {
                 .contains("PLAIN_TEXT_SECRET")
         );
         assert_eq!(
-            store.read(&reference, descriptor()).await.unwrap().as_slice(),
+            store
+                .read(&reference, descriptor())
+                .await
+                .unwrap()
+                .as_slice(),
             b"PLAIN_TEXT_SECRET"
         );
         store.delete(&reference, descriptor()).await.unwrap();
