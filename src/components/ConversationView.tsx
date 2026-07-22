@@ -170,6 +170,7 @@ export function ConversationView({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickyQuestionRef = useRef<HTMLDivElement>(null);
   const pageFollowingRef = useRef(false);
+  const pendingQuestionPositionRef = useRef<string | null>(null);
   const loadingAnchorRef = useRef(false);
   const observedThreadIdRef = useRef(restoredThread.metadata.id);
   const initialBottomScrollRef = useRef<{
@@ -263,6 +264,9 @@ export function ConversationView({
     !virtual.virtualized ||
     virtual.rows.every(({ key }) => virtual.isMeasured(key));
   const setPageFollowingMode = useCallback((following: boolean) => {
+    if (!following) {
+      pendingQuestionPositionRef.current = null;
+    }
     pageFollowingRef.current = following;
     setPageFollowing(following);
   }, []);
@@ -397,21 +401,27 @@ export function ConversationView({
       return;
     }
     const latestQuestionId = latestQuestion?.itemId ?? null;
-    if (
-      latestQuestion === null ||
-      observedQuestionIdRef.current === latestQuestionId
-    ) {
+    if (latestQuestion === null) {
       return;
     }
-    observedQuestionIdRef.current = latestQuestionId;
-    setPreservePageEndSpace(true);
-    setPageFollowingMode(true);
-    setShowJumpToBottom(false);
+    if (observedQuestionIdRef.current !== latestQuestionId) {
+      observedQuestionIdRef.current = latestQuestionId;
+      pendingQuestionPositionRef.current = latestQuestionId;
+      setPreservePageEndSpace(true);
+      setPageFollowingMode(true);
+      setShowJumpToBottom(false);
+    }
+    if (pendingQuestionPositionRef.current !== latestQuestionId) {
+      return;
+    }
     const scroller = scrollerRef.current;
     const top = questionTop(latestQuestion);
     if (scroller !== null && top !== null) {
       scroller.scrollTop = top;
       updateStickyQuestion(scroller);
+      if (Math.abs(scroller.scrollTop - top) < 0.5) {
+        pendingQuestionPositionRef.current = null;
+      }
     }
   }, [
     latestQuestion,
@@ -484,6 +494,7 @@ export function ConversationView({
     };
     observedThreadIdRef.current = restoredThread.metadata.id;
     observedQuestionIdRef.current = latestQuestion?.itemId ?? null;
+    pendingQuestionPositionRef.current = null;
     setPreservePageEndSpace(activeTurn !== undefined);
     setPageFollowingMode(activeTurn !== undefined);
     setShowJumpToBottom(false);

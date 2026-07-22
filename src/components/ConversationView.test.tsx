@@ -920,6 +920,108 @@ describe("ConversationView", () => {
     expect(screen.getByRole("button", { name: "继续跟随" })).toBeVisible();
   });
 
+  it("新问题首次定位受限时在回答到达后重试", () => {
+    const firstTurn = {
+      id: "turn-position-1",
+      items: [
+        {
+          content: [{ text: "较早问题", type: "text" as const }],
+          id: "user-position-1",
+          type: "userMessage" as const,
+        },
+        {
+          id: "answer-position-1",
+          phase: "final_answer" as const,
+          text: "较早回答",
+          type: "agentMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "completed" as const,
+    } satisfies ThreadTurn;
+    const { rerender } = render(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...RESTORED, nextCursor: null, turns: [firstTurn] }}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    let scrollTop = 0;
+    let maximumScrollTop = 250;
+    Object.defineProperty(scroller, "scrollTop", {
+      configurable: true,
+      get: () => scrollTop,
+      set: (value: number) => {
+        scrollTop = Math.min(value, maximumScrollTop);
+      },
+    });
+    Object.defineProperty(scroller, "clientHeight", {
+      configurable: true,
+      value: 500,
+    });
+    const activeQuestion = {
+      id: "turn-position-2",
+      items: [
+        {
+          content: [{ text: "正在回答的问题", type: "text" as const }],
+          id: "user-position-2",
+          type: "userMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "inProgress" as const,
+    } satisfies ThreadTurn;
+
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{
+          ...RESTORED,
+          nextCursor: null,
+          turns: [firstTurn, activeQuestion],
+        }}
+      />,
+    );
+
+    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
+      .toHaveAttribute("data-sticky-question", "user-position-1");
+
+    maximumScrollTop = 1_000;
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{
+          ...RESTORED,
+          nextCursor: null,
+          turns: [
+            firstTurn,
+            {
+              ...activeQuestion,
+              items: [
+                ...activeQuestion.items,
+                {
+                  id: "answer-position-2",
+                  text: "回答开始生成",
+                  type: "agentMessage" as const,
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(scroller.scrollTop).toBe(300);
+    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
+      .toHaveAttribute("data-sticky-question", "user-position-2");
+  });
+
   it("从回答所在 turn 发起分叉并标记最新回合", () => {
     const onForkTurn = vi.fn();
     render(
