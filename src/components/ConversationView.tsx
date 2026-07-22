@@ -68,6 +68,7 @@ type ReasoningItem = Extract<ThreadItem, { type: "reasoning" }>;
 
 const PANEL_TRANSITION_MS = 210;
 const ANSWER_BOTTOM_INSET = 120;
+const ACTIVITY_BOTTOM_GAP = 20;
 const FIRST_TURN_ROW_PADDING = 24;
 const MANUAL_SCROLL_SETTLE_MS = 300;
 
@@ -339,7 +340,7 @@ export function ConversationView({
     const tail = conversationTailRef.current;
     const atBottom = tail === null ||
       tail.getBoundingClientRect().bottom <=
-        answerReadableBottom(scroller) + 0.5;
+        followingContentBottom(scroller, activeTurnRef.current) + 0.5;
     setShowJumpToBottom(!atBottom);
     return atBottom;
   }, []);
@@ -417,7 +418,7 @@ export function ConversationView({
       return;
     }
     const distanceToTail = tail.getBoundingClientRect().bottom -
-      answerReadableBottom(scroller);
+      followingContentBottom(scroller, activeTurnRef.current);
     manualForwardScrollLimitRef.current = scroller.scrollTop +
       Math.max(0, distanceToTail);
   }, []);
@@ -551,6 +552,34 @@ export function ConversationView({
       pagingTurnId === null ||
       !pageFollowingRef.current
     ) {
+      return;
+    }
+    const followingActivities = activeTurn !== undefined &&
+      isFollowingActivities(activeTurn);
+    if (followingActivities) {
+      const tail = conversationTailRef.current;
+      if (tail === null) {
+        return;
+      }
+      const overflow = tail.getBoundingClientRect().bottom -
+        followingContentBottom(scroller, activeTurn);
+      if (overflow <= 0.5) {
+        return;
+      }
+      const maximumTop = Math.max(
+        0,
+        scroller.scrollHeight - scroller.clientHeight,
+      );
+      const nextTop = Math.min(
+        maximumTop,
+        scroller.scrollTop + overflow + ACTIVITY_BOTTOM_GAP,
+      );
+      if (nextTop <= scroller.scrollTop + 0.5) {
+        return;
+      }
+      scroller.scrollTop = nextTop;
+      updateStickyQuestion(scroller);
+      updateConversationBottom(scroller);
       return;
     }
     const pageHeight = Math.max(
@@ -1934,6 +1963,25 @@ function conversationListTop(scroller: HTMLElement): number {
 function answerReadableBottom(scroller: HTMLElement): number {
   return scroller.getBoundingClientRect().top + scroller.clientHeight -
     ANSWER_BOTTOM_INSET;
+}
+
+function followingContentBottom(
+  scroller: HTMLElement,
+  activeTurn: ThreadTurn | undefined,
+): number {
+  return activeTurn !== undefined && isFollowingActivities(activeTurn)
+    ? scroller.getBoundingClientRect().top + scroller.clientHeight
+    : answerReadableBottom(scroller);
+}
+
+function isFollowingActivities(turn: ThreadTurn): boolean {
+  if (turn.items.some(isFinalAnswer)) {
+    return false;
+  }
+  const latestResponseItem = turn.items.findLast(
+    (item) => item.type !== "userMessage",
+  );
+  return latestResponseItem !== undefined && isWorkActivity(latestResponseItem);
 }
 
 function isScrollKey(key: string): boolean {

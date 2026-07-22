@@ -1145,6 +1145,91 @@ describe("ConversationView", () => {
     expect(scroller.scrollTop).toBe(0);
   });
 
+  it("活动项更新先使用下方可见空白，实际越界后仅滚动溢出距离", () => {
+    const activeTurn = {
+      durationMs: 1_000,
+      id: "turn-activity-following",
+      items: [
+        {
+          content: [{ text: "检查活动滚动", type: "text" as const }],
+          id: "user-activity-following",
+          type: "userMessage" as const,
+        },
+        {
+          id: "reasoning-activity-following",
+          summary: ["正在检查可见空白"],
+          type: "reasoning" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "inProgress" as const,
+    } satisfies ThreadTurn;
+    const activeThread = {
+      ...RESTORED,
+      nextCursor: null,
+      turns: [activeTurn],
+    } satisfies RestoredThread;
+    const { rerender } = render(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={activeThread}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    const conversationTail = scroller.querySelector<HTMLElement>(
+      "[data-conversation-tail]",
+    );
+    if (conversationTail === null) {
+      throw new Error("缺少会话内容末尾标记");
+    }
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 500 },
+      scrollHeight: { configurable: true, value: 1_500 },
+    });
+    let tailDocumentBottom = 560;
+    mockElementBottom(
+      conversationTail,
+      () => tailDocumentBottom - scroller.scrollTop,
+    );
+    scroller.scrollTop = 100;
+    fireEvent.scroll(scroller);
+
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{
+          ...activeThread,
+          turns: [{ ...activeTurn, durationMs: 2_000 }],
+        }}
+      />,
+    );
+
+    expect(scroller.scrollTop).toBe(100);
+    expect(screen.queryByRole("button", { name: "回到底部" }))
+      .not.toBeInTheDocument();
+
+    tailDocumentBottom = 630;
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{
+          ...activeThread,
+          turns: [{ ...activeTurn, durationMs: 3_000 }],
+        }}
+      />,
+    );
+
+    expect(scroller.scrollTop).toBe(150);
+    expect(screen.queryByRole("button", { name: "回到底部" }))
+      .not.toBeInTheDocument();
+  });
+
   it("新问题离散翻页并在手动滚动延时后重新判断跟随", () => {
     const firstTurn = {
       id: "turn-page-1",
