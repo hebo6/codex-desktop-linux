@@ -92,6 +92,15 @@ function renderThreads(
 }
 
 describe("RecentThreads", () => {
+  it("重新加载期间保留已显示的会话列表", () => {
+    renderThreads({ phase: "loading" });
+
+    expect(screen.getByRole("list", { name: "最近会话" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "服务端标题 正在运行" })).toBeVisible();
+    expect(screen.queryByRole("status", { name: "正在加载最近会话" }))
+      .not.toBeInTheDocument();
+  });
+
   it("展示当前会话、服务端状态和标题回退", () => {
     renderThreads();
 

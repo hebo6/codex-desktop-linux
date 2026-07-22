@@ -436,7 +436,7 @@ export function RecentThreads({
       )}
       {phase === "idle" ? (
         <p className={styles.empty}>连接完成后加载会话</p>
-      ) : phase === "loading" ? (
+      ) : phase === "loading" && threads.length === 0 ? (
         <div aria-label="正在加载最近会话" className={styles.skeleton} role="status">
           <span />
           <span />

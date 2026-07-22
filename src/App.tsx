@@ -1356,7 +1356,9 @@ export function App({
           >
             {displayedRestoredThread !== null ? (
               <ConversationView
-                actionError={forkError ?? contentError}
+                actionError={
+                  forkError ?? contentError ?? serverThreads.threadRestoreError
+                }
                 hasOlderTurns={displayedRestoredThread.nextCursor !== null}
                 loadingOlderTurns={serverThreads.loadingOlderTurns}
                 onLoadOlderTurns={serverThreads.loadOlderTurns}
@@ -1379,7 +1381,7 @@ export function App({
                     ? "deleted"
                     : windowState.windowState?.currentThreadId === undefined
                       ? "blank"
-                      : serverThreads.phase === "error"
+                      : serverThreads.threadRestorePhase === "error"
                         ? "error"
                         : "loading"
                 }
@@ -1425,8 +1427,8 @@ export function App({
         offlineSyncedAt={serverThreads.lastSyncedAt}
         serverControl={serverControl}
         sidebarWidth={preferences.preferences.sidebarWidth}
-        threadListError={serverThreads.error}
-        threadListPhase={serverThreads.phase}
+        threadListError={serverThreads.threadListError}
+        threadListPhase={serverThreads.threadListPhase}
         threads={serverThreads.threads}
         topbarAccessory={
           <RateLimitIndicator
@@ -1470,8 +1472,9 @@ export function App({
           serverThreads.pendingThreadIds.includes(deletingThreadId)
         }
         error={
-          deletingThreadId !== null && serverThreads.error === "无法删除会话"
-            ? serverThreads.error
+          deletingThreadId !== null &&
+          serverThreads.threadListError === "无法删除会话"
+            ? serverThreads.threadListError
             : null
         }
         onCancel={() => setDeletingThreadId(null)}

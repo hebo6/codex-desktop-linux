@@ -26,7 +26,8 @@ export interface RestoredThread {
 }
 
 export interface ServerThreadsState {
-  readonly phase: ServerThreadsPhase;
+  readonly threadListPhase: ServerThreadsPhase;
+  readonly threadRestorePhase: ServerThreadsPhase;
   readonly threads: readonly ThreadSummary[];
   readonly nextThreadCursor: string | null;
   readonly restoredThread: RestoredThread | null;
@@ -37,7 +38,8 @@ export interface ServerThreadsState {
   readonly removingThreadIds: readonly string[];
   readonly currentThreadDeleted: boolean;
   readonly archivedThread: ThreadSummary | null;
-  readonly error: string | null;
+  readonly threadListError: string | null;
+  readonly threadRestoreError: string | null;
   readonly offline: boolean;
   readonly lastSyncedAt: number | null;
 }
@@ -89,7 +91,8 @@ export interface ServerThreadsClient {
 }
 
 const IDLE_STATE = Object.freeze({
-  phase: "idle",
+  threadListPhase: "idle",
+  threadRestorePhase: "idle",
   threads: Object.freeze([]),
   nextThreadCursor: null,
   restoredThread: null,
@@ -100,7 +103,8 @@ const IDLE_STATE = Object.freeze({
   removingThreadIds: Object.freeze([]),
   currentThreadDeleted: false,
   archivedThread: null,
-  error: null,
+  threadListError: null,
+  threadRestoreError: null,
   offline: false,
   lastSyncedAt: null,
 }) satisfies ServerThreadsState;
@@ -131,6 +135,11 @@ interface RetainedSelection {
   readonly currentThreadId: string | null;
 }
 
+interface RetainedThreadList {
+  readonly client: ServerThreadsClient;
+  readonly serverId: ServerId | null;
+}
+
 export function useServerThreads(
   client: ServerThreadsClient | null,
   currentThreadId: string | null,
@@ -143,6 +152,7 @@ export function useServerThreads(
   const loadingTurnsRef = useRef<ActiveSource | null>(null);
   const preparedStartedThreadRef = useRef<PreparedStartedThread | null>(null);
   const retainedSelectionRef = useRef<RetainedSelection | null>(null);
+  const retainedThreadListRef = useRef<RetainedThreadList | null>(null);
 
   const prepareStartedThread = useCallback((response: ThreadStartResponse) => {
     if (client === null) {
@@ -170,25 +180,30 @@ export function useServerThreads(
     loadingTurnsRef.current = null;
     if (client === null) {
       sourceRef.current = null;
-      const canRetain = matchesRetainedSelection(
+      const canRetainThreadList = matchesRetainedThreadList(
+        retainedThreadListRef.current,
+        serverId,
+      );
+      const canRetainSelection = matchesRetainedSelection(
         retainedSelectionRef.current,
         serverId,
         currentThreadId,
       );
-      setState((current) => canRetain
-        ? {
-            ...current,
-            phase: "ready",
-            loadingMoreThreads: false,
-            refreshingThreads: false,
-            loadingOlderTurns: false,
-            pendingThreadIds: Object.freeze([]),
-            removingThreadIds: Object.freeze([]),
-            archivedThread: null,
-            error: null,
-            offline: true,
-          }
-        : IDLE_STATE);
+      setState((current) => ({
+        ...IDLE_STATE,
+        threadListPhase: canRetainThreadList ? "ready" : "idle",
+        threadRestorePhase: canRetainSelection ? "ready" : "idle",
+        threads: canRetainThreadList ? current.threads : IDLE_STATE.threads,
+        nextThreadCursor: canRetainThreadList
+          ? current.nextThreadCursor
+          : null,
+        restoredThread: canRetainSelection ? current.restoredThread : null,
+        currentThreadDeleted: canRetainSelection
+          ? current.currentThreadDeleted
+          : false,
+        offline: canRetainThreadList || canRetainSelection,
+        lastSyncedAt: canRetainThreadList ? current.lastSyncedAt : null,
+      }));
       return;
     }
 
@@ -201,7 +216,7 @@ export function useServerThreads(
       setState((current) => {
         const currentDeleted =
           deleted && source.currentThreadId === threadId;
-        if (current.phase !== "ready") {
+        if (current.threadListPhase !== "ready") {
           return currentDeleted
             ? {
                 ...current,
@@ -271,7 +286,7 @@ export function useServerThreads(
           return;
         }
         setState((current) =>
-          current.phase === "ready" &&
+          current.threadListPhase === "ready" &&
           !current.pendingThreadIds.includes(threadId)
             ? {
                 ...current,
@@ -284,7 +299,10 @@ export function useServerThreads(
         );
       } catch {
         if (sourceRef.current === source) {
-          setState((current) => ({ ...current, error: THREAD_SYNC_FAILED }));
+          setState((current) => ({
+            ...current,
+            threadListError: THREAD_SYNC_FAILED,
+          }));
         }
       }
     };
@@ -297,7 +315,7 @@ export function useServerThreads(
           case "thread/started":
             removedThreadIds.delete(notification.params.thread.id);
             setState((current) =>
-              current.phase === "ready"
+              current.threadListPhase === "ready"
                 ? {
                     ...current,
                     threads: insertThreadByRecency(
@@ -361,104 +379,153 @@ export function useServerThreads(
         }
       },
     );
+    const retainedThreadList = retainedThreadListRef.current;
+    const canRetainThreadList = matchesRetainedThreadList(
+      retainedThreadList,
+      serverId,
+    );
+    const shouldLoadThreadList =
+      !canRetainThreadList || retainedThreadList?.client !== client;
+    const canRetainSelection = matchesRetainedSelection(
+      retainedSelectionRef.current,
+      serverId,
+      currentThreadId,
+    );
     const preparedStartedThread = preparedStartedThreadRef.current;
-    if (
+    const preparedRestoredThread =
       preparedStartedThread?.client === client &&
       preparedStartedThread.restoredThread.metadata.id === currentThreadId
-    ) {
+        ? preparedStartedThread.restoredThread
+        : null;
+    if (preparedStartedThread !== null) {
       preparedStartedThreadRef.current = null;
+    }
+    const shouldRestoreThread =
+      currentThreadId !== null && preparedRestoredThread === null;
+    let threadListReconciled =
+      !shouldLoadThreadList || !canRetainThreadList;
+    let threadRestoreReconciled =
+      !shouldRestoreThread || !canRetainSelection;
+    const isReconcilingRetainedState = () =>
+      !threadListReconciled || !threadRestoreReconciled;
+
+    if (preparedRestoredThread !== null || currentThreadId === null) {
       retainedSelectionRef.current = { serverId, currentThreadId };
-      setState((current) => ({
-        ...current,
-        phase: "ready",
-        threads: insertThreadByRecency(
-          current.threads,
-          preparedStartedThread.restoredThread.metadata,
-        ),
-        restoredThread: preparedStartedThread.restoredThread,
-        loadingMoreThreads: false,
-        refreshingThreads: false,
-        loadingOlderTurns: false,
-        currentThreadDeleted: false,
-        error: null,
-        offline: false,
-        lastSyncedAt: Date.now(),
-      }));
-    } else {
-      if (preparedStartedThread !== null) {
-        preparedStartedThreadRef.current = null;
-      }
-      const canRetain = matchesRetainedSelection(
-        retainedSelectionRef.current,
-        serverId,
-        currentThreadId,
-      );
-      setState((current) => canRetain
-        ? {
-            ...current,
-            phase: "loading",
-            loadingMoreThreads: false,
-            refreshingThreads: false,
-            loadingOlderTurns: false,
-            pendingThreadIds: Object.freeze([]),
-            removingThreadIds: Object.freeze([]),
-            archivedThread: null,
-            error: null,
-            offline: true,
-          }
-        : { ...IDLE_STATE, phase: "loading" });
-      void loadInitialState(source).then(
-        ({ list, restoredThread }) => {
-          if (sourceRef.current !== source) {
-            return;
-          }
-          const currentThreadWasDeleted =
-            source.currentThreadId !== null &&
-            removedThreadIds.has(source.currentThreadId);
-          const listedThreads = list.data.filter(
-            ({ id }) => !removedThreadIds.has(id),
-          );
-          retainedSelectionRef.current = { serverId, currentThreadId };
-          setState({
-            phase: "ready",
-            threads:
-              currentThreadWasDeleted || restoredThread === null
-                ? Object.freeze(listedThreads)
-                : insertThreadByRecency(listedThreads, restoredThread.metadata),
-            nextThreadCursor: list.nextCursor ?? null,
-            restoredThread: currentThreadWasDeleted ? null : restoredThread,
-            loadingMoreThreads: false,
-            refreshingThreads: false,
-            loadingOlderTurns: false,
-            pendingThreadIds: Object.freeze([]),
-            removingThreadIds: Object.freeze([]),
-            currentThreadDeleted: currentThreadWasDeleted,
-            archivedThread: null,
-            error: null,
-            offline: false,
-            lastSyncedAt: Date.now(),
-          });
-        },
-        (failure: InitialLoadFailure) => {
-          if (sourceRef.current !== source) {
-            return;
-          }
-          const error = failure.stage === "restore"
-            ? THREAD_RESTORE_FAILED
-            : THREAD_LIST_FAILED;
-          setState((current) => canRetain
-            ? {
+    }
+    setState((current) => {
+      const retainedThreads = canRetainThreadList
+        ? current.threads
+        : IDLE_STATE.threads;
+      return {
+        ...IDLE_STATE,
+        threadListPhase: shouldLoadThreadList ? "loading" : "ready",
+        threadRestorePhase: shouldRestoreThread ? "loading" : "ready",
+        threads: preparedRestoredThread === null
+          ? retainedThreads
+          : insertThreadByRecency(
+              retainedThreads,
+              preparedRestoredThread.metadata,
+            ),
+        nextThreadCursor: canRetainThreadList
+          ? current.nextThreadCursor
+          : null,
+        restoredThread:
+          preparedRestoredThread ??
+          (canRetainSelection ? current.restoredThread : null),
+        currentThreadDeleted: canRetainSelection
+          ? current.currentThreadDeleted
+          : false,
+        offline: isReconcilingRetainedState(),
+        lastSyncedAt: canRetainThreadList ? current.lastSyncedAt : null,
+      };
+    });
+
+    if (shouldLoadThreadList) {
+      void Promise.resolve()
+        .then(() => source.client.listRecentThreads().result)
+        .then(
+          (list) => {
+            if (sourceRef.current !== source) {
+              return;
+            }
+            threadListReconciled = true;
+            retainedThreadListRef.current = { client, serverId };
+            const listedThreads = list.data.filter(
+              ({ id }) => !removedThreadIds.has(id),
+            );
+            setState((current) => {
+              const restored = current.restoredThread;
+              const threads =
+                restored === null ||
+                restored.metadata.id !== source.currentThreadId ||
+                removedThreadIds.has(restored.metadata.id)
+                  ? Object.freeze(listedThreads)
+                  : insertThreadByRecency(listedThreads, restored.metadata);
+              return {
                 ...current,
-                phase: "ready",
-                loadingMoreThreads: false,
-                refreshingThreads: false,
-                loadingOlderTurns: false,
-                error,
-                offline: true,
-              }
-            : { ...IDLE_STATE, phase: "error", error });
-        },
-      );
+                threadListPhase: "ready",
+                threads,
+                nextThreadCursor: list.nextCursor ?? null,
+                threadListError: null,
+                offline: isReconcilingRetainedState(),
+                lastSyncedAt: Date.now(),
+              };
+            });
+          },
+          () => {
+            if (sourceRef.current !== source) {
+              return;
+            }
+            setState((current) => ({
+              ...current,
+              threadListPhase: canRetainThreadList ? "ready" : "error",
+              threadListError: THREAD_LIST_FAILED,
+              offline: isReconcilingRetainedState(),
+            }));
+          },
+        );
+    }
+
+    if (shouldRestoreThread && currentThreadId !== null) {
+      void Promise.resolve()
+        .then(() => source.client.resumeThread(currentThreadId).result)
+        .then((response) => restoredThreadFrom(response))
+        .then(
+          (restoredThread) => {
+            if (sourceRef.current !== source) {
+              return;
+            }
+            threadRestoreReconciled = true;
+            retainedSelectionRef.current = { serverId, currentThreadId };
+            const currentThreadWasDeleted = removedThreadIds.has(currentThreadId);
+            setState((current) => ({
+              ...current,
+              threadRestorePhase: "ready",
+              threads:
+                currentThreadWasDeleted || current.threadListPhase !== "ready"
+                  ? current.threads
+                  : insertThreadByRecency(
+                      current.threads,
+                      restoredThread.metadata,
+                    ),
+              restoredThread: currentThreadWasDeleted ? null : restoredThread,
+              currentThreadDeleted: currentThreadWasDeleted,
+              threadRestoreError: null,
+              offline: isReconcilingRetainedState(),
+            }));
+          },
+          () => {
+            if (sourceRef.current !== source) {
+              return;
+            }
+            setState((current) => ({
+              ...current,
+              threadRestorePhase: canRetainSelection ? "ready" : "error",
+              threadRestoreError: THREAD_RESTORE_FAILED,
+              offline: isReconcilingRetainedState(),
+            }));
+          },
+        );
     }
 
     return () => {
@@ -479,7 +546,7 @@ export function useServerThreads(
     const source = sourceRef.current;
     if (
       source === null ||
-      state.phase !== "ready" ||
+      state.threadListPhase !== "ready" ||
       state.offline ||
       loadingThreadsRef.current !== null ||
       state.nextThreadCursor === null
@@ -491,7 +558,7 @@ export function useServerThreads(
     setState((current) => ({
       ...current,
       loadingMoreThreads: true,
-      error: null,
+      threadListError: null,
     }));
     try {
       const page = await source.client.listRecentThreads({ cursor }).result;
@@ -509,7 +576,7 @@ export function useServerThreads(
         setState((current) => ({
           ...current,
           loadingMoreThreads: false,
-          error: THREAD_PAGE_FAILED,
+          threadListError: THREAD_PAGE_FAILED,
         }));
       }
     } finally {
@@ -517,14 +584,14 @@ export function useServerThreads(
         loadingThreadsRef.current = null;
       }
     }
-  }, [state.nextThreadCursor, state.offline, state.phase]);
+  }, [state.nextThreadCursor, state.offline, state.threadListPhase]);
 
   const loadProjectThreads = useCallback(async (
     cwd: string,
     limit: number,
   ): Promise<ProjectThreadPage> => {
     const source = sourceRef.current;
-    if (source === null || state.phase !== "ready" || state.offline) {
+    if (source === null || state.threadListPhase !== "ready" || state.offline) {
       throw new Error("project threads are unavailable");
     }
     const page = await source.client.listRecentThreads({ cwd, limit }).result;
@@ -536,13 +603,13 @@ export function useServerThreads(
       threads: mergeUniqueById(current.threads, page.data),
     }));
     return { hasMore: page.nextCursor !== null && page.nextCursor !== undefined };
-  }, [state.offline, state.phase]);
+  }, [state.offline, state.threadListPhase]);
 
   const refreshThreads = useCallback(async (): Promise<void> => {
     const source = sourceRef.current;
     if (
       source === null ||
-      state.phase !== "ready" ||
+      state.threadListPhase !== "ready" ||
       state.offline ||
       refreshingThreadsRef.current !== null
     ) {
@@ -552,7 +619,7 @@ export function useServerThreads(
     setState((current) => ({
       ...current,
       refreshingThreads: true,
-      error: null,
+      threadListError: null,
     }));
     try {
       const page = await source.client.listRecentThreads().result;
@@ -571,7 +638,7 @@ export function useServerThreads(
         setState((current) => ({
           ...current,
           refreshingThreads: false,
-          error: THREAD_REFRESH_FAILED,
+          threadListError: THREAD_REFRESH_FAILED,
         }));
       }
     } finally {
@@ -579,14 +646,14 @@ export function useServerThreads(
         refreshingThreadsRef.current = null;
       }
     }
-  }, [state.offline, state.phase]);
+  }, [state.offline, state.threadListPhase]);
 
   const loadOlderTurns = useCallback(async (): Promise<void> => {
     const source = sourceRef.current;
     const restored = state.restoredThread;
     if (
       source === null ||
-      state.phase !== "ready" ||
+      state.threadRestorePhase !== "ready" ||
       state.offline ||
       loadingTurnsRef.current !== null ||
       restored === null ||
@@ -600,7 +667,7 @@ export function useServerThreads(
     setState((current) => ({
       ...current,
       loadingOlderTurns: true,
-      error: null,
+      threadRestoreError: null,
     }));
     try {
       const page = await source.client.listOlderTurns(threadId, cursor).result;
@@ -627,7 +694,7 @@ export function useServerThreads(
         setState((current) => ({
           ...current,
           loadingOlderTurns: false,
-          error: TURN_PAGE_FAILED,
+          threadRestoreError: TURN_PAGE_FAILED,
         }));
       }
     } finally {
@@ -635,7 +702,7 @@ export function useServerThreads(
         loadingTurnsRef.current = null;
       }
     }
-  }, [state.offline, state.phase, state.restoredThread]);
+  }, [state.offline, state.restoredThread, state.threadRestorePhase]);
 
   const archiveThread = useCallback(
     async (threadId: string): Promise<boolean> => {
@@ -643,7 +710,7 @@ export function useServerThreads(
       const threadIndex = state.threads.findIndex(({ id }) => id === threadId);
       if (
         source === null ||
-        state.phase !== "ready" ||
+        state.threadListPhase !== "ready" ||
         state.offline ||
         threadIndex < 0 ||
         state.pendingThreadIds.includes(threadId)
@@ -657,7 +724,7 @@ export function useServerThreads(
       setState((current) => ({
         ...current,
         pendingThreadIds: addPendingThread(current.pendingThreadIds, threadId),
-        error: null,
+        threadListError: null,
       }));
       try {
         await source.client.archiveThread(threadId).result;
@@ -695,13 +762,13 @@ export function useServerThreads(
               current.removingThreadIds,
               threadId,
             ),
-            error: THREAD_ARCHIVE_FAILED,
+            threadListError: THREAD_ARCHIVE_FAILED,
           }));
         }
         return false;
       }
     },
-    [state.offline, state.pendingThreadIds, state.phase, state.threads],
+    [state.offline, state.pendingThreadIds, state.threadListPhase, state.threads],
   );
 
   const undoArchive = useCallback(async (): Promise<boolean> => {
@@ -709,7 +776,7 @@ export function useServerThreads(
     const thread = state.archivedThread;
     if (
       source === null ||
-      state.phase !== "ready" ||
+      state.threadListPhase !== "ready" ||
       state.offline ||
       thread === null ||
       state.pendingThreadIds.includes(thread.id)
@@ -719,7 +786,7 @@ export function useServerThreads(
     setState((current) => ({
       ...current,
       pendingThreadIds: addPendingThread(current.pendingThreadIds, thread.id),
-      error: null,
+      threadListError: null,
     }));
     try {
       const response = await source.client.unarchiveThread(thread.id).result;
@@ -738,19 +805,24 @@ export function useServerThreads(
         setState((current) => ({
           ...current,
           pendingThreadIds: removePendingThread(current.pendingThreadIds, thread.id),
-          error: THREAD_UNARCHIVE_FAILED,
+          threadListError: THREAD_UNARCHIVE_FAILED,
         }));
       }
       return false;
     }
-  }, [state.archivedThread, state.offline, state.pendingThreadIds, state.phase]);
+  }, [
+    state.archivedThread,
+    state.offline,
+    state.pendingThreadIds,
+    state.threadListPhase,
+  ]);
 
   const deleteThread = useCallback(
     async (threadId: string): Promise<boolean> => {
       const source = sourceRef.current;
       if (
         source === null ||
-        state.phase !== "ready" ||
+        state.threadListPhase !== "ready" ||
         state.offline ||
         !state.threads.some(({ id }) => id === threadId) ||
         state.pendingThreadIds.includes(threadId)
@@ -760,7 +832,7 @@ export function useServerThreads(
       setState((current) => ({
         ...current,
         pendingThreadIds: addPendingThread(current.pendingThreadIds, threadId),
-        error: null,
+        threadListError: null,
       }));
       try {
         await source.client.deleteThread(threadId).result;
@@ -799,13 +871,13 @@ export function useServerThreads(
               current.removingThreadIds,
               threadId,
             ),
-            error: THREAD_DELETE_FAILED,
+            threadListError: THREAD_DELETE_FAILED,
           }));
         }
         return false;
       }
     },
-    [state.offline, state.pendingThreadIds, state.phase, state.threads],
+    [state.offline, state.pendingThreadIds, state.threadListPhase, state.threads],
   );
 
   return {
@@ -826,7 +898,7 @@ function updateThreadMetadata(
   threadId: string,
   update: (thread: ThreadSummary) => ThreadSummary,
 ): ServerThreadsState {
-  if (state.phase !== "ready") {
+  if (state.threadListPhase !== "ready") {
     return state;
   }
   let changed = false;
@@ -923,43 +995,11 @@ function matchesRetainedSelection(
     retained.currentThreadId === currentThreadId;
 }
 
-interface InitialLoadFailure {
-  readonly stage: "list" | "restore";
-}
-
-async function loadInitialState(source: ActiveSource): Promise<{
-  readonly list: ThreadListResponse;
-  readonly restoredThread: RestoredThread | null;
-}> {
-  const listPromise = Promise.resolve()
-    .then(() => source.client.listRecentThreads().result)
-    .catch(() => {
-      throw { stage: "list" } satisfies InitialLoadFailure;
-    });
-  const currentThreadId = source.currentThreadId;
-  const restorePromise =
-    currentThreadId === null
-      ? Promise.resolve<RestoredThread | null>(null)
-      : Promise.resolve()
-          .then(() => source.client.resumeThread(currentThreadId).result)
-          .then((response) => restoredThreadFrom(response))
-          .catch(() => {
-            throw { stage: "restore" } satisfies InitialLoadFailure;
-          });
-  const [listResult, restoreResult] = await Promise.allSettled([
-    listPromise,
-    restorePromise,
-  ]);
-  if (listResult.status === "rejected") {
-    throw { stage: "list" } satisfies InitialLoadFailure;
-  }
-  if (restoreResult.status === "rejected") {
-    throw { stage: "restore" } satisfies InitialLoadFailure;
-  }
-  return {
-    list: listResult.value,
-    restoredThread: restoreResult.value,
-  };
+function matchesRetainedThreadList(
+  retained: RetainedThreadList | null,
+  serverId: ServerId | null,
+): retained is RetainedThreadList {
+  return retained !== null && retained.serverId === serverId;
 }
 
 function restoredThreadFrom(response: ThreadResumeResponse): RestoredThread {

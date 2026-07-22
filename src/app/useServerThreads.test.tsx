@@ -204,8 +204,12 @@ describe("useServerThreads", () => {
       useServerThreads(client, THREAD_ONE.id),
     );
 
-    expect(result.current.phase).toBe("loading");
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    expect(result.current.threadListPhase).toBe("loading");
+    expect(result.current.threadRestorePhase).toBe("loading");
+    await waitFor(() => {
+      expect(result.current.threadListPhase).toBe("ready");
+      expect(result.current.threadRestorePhase).toBe("ready");
+    });
 
     expect(client.listCalls).toEqual([{}]);
     expect(client.resumeCalls).toEqual([THREAD_ONE.id]);
@@ -235,7 +239,9 @@ describe("useServerThreads", () => {
       useServerThreads(client, THREAD_THREE.id),
     );
 
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() =>
+      expect(result.current.restoredThread?.metadata.id).toBe(THREAD_THREE.id),
+    );
 
     expect(result.current.threads.map(({ id }) => id)).toEqual([
       THREAD_ONE.id,
@@ -256,7 +262,7 @@ describe("useServerThreads", () => {
       ({ threadId }) => useServerThreads(client, threadId),
       { initialProps: { threadId: null as string | null } },
     );
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => expect(result.current.threadListPhase).toBe("ready"));
 
     act(() => {
       result.current.prepareStartedThread(startResponse(startedThread));
@@ -292,7 +298,7 @@ describe("useServerThreads", () => {
       ({ threadId }) => useServerThreads(client, threadId),
       { initialProps: { threadId: null as string | null } },
     );
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => expect(result.current.threadListPhase).toBe("ready"));
 
     act(() => {
       result.current.prepareStartedThread(startResponse(startedThread));
@@ -350,7 +356,6 @@ describe("useServerThreads", () => {
     const client = new FakeThreadClient();
     client.listResults.push(
       Promise.resolve({ data: [THREAD_ONE], nextCursor: null }),
-      Promise.resolve({ data: [THREAD_THREE, THREAD_ONE], nextCursor: null }),
     );
     client.resumeResults.push(
       Promise.resolve({
@@ -362,7 +367,7 @@ describe("useServerThreads", () => {
       ({ threadId }) => useServerThreads(client, threadId),
       { initialProps: { threadId: null as string | null } },
     );
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => expect(result.current.threadListPhase).toBe("ready"));
 
     let cancelPreparation: (() => void) | undefined;
     act(() => {
@@ -376,7 +381,7 @@ describe("useServerThreads", () => {
     await waitFor(() =>
       expect(result.current.restoredThread?.metadata.id).toBe(THREAD_THREE.id),
     );
-    expect(client.listCalls).toEqual([{}, {}]);
+    expect(client.listCalls).toEqual([{}]);
     expect(client.resumeCalls).toEqual([THREAD_THREE.id]);
     expect(result.current.restoredThread?.turns).toEqual([TURN_ONE]);
   });
@@ -399,7 +404,10 @@ describe("useServerThreads", () => {
     const { result } = renderHook(() =>
       useServerThreads(client, THREAD_ONE.id),
     );
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => {
+      expect(result.current.threadListPhase).toBe("ready");
+      expect(result.current.threadRestorePhase).toBe("ready");
+    });
 
     await act(async () => result.current.loadMoreThreads());
     await act(async () => result.current.loadOlderTurns());
@@ -427,7 +435,7 @@ describe("useServerThreads", () => {
       Promise.resolve({ data: [THREAD_ONE, THREAD_TWO, THREAD_THREE] }),
     );
     const { result } = renderHook(() => useServerThreads(client, null));
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => expect(result.current.threadListPhase).toBe("ready"));
 
     let page;
     await act(async () => {
@@ -454,7 +462,7 @@ describe("useServerThreads", () => {
       refreshResult.promise,
     );
     const { result } = renderHook(() => useServerThreads(client, null));
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => expect(result.current.threadListPhase).toBe("ready"));
 
     let refresh: Promise<void> | undefined;
     act(() => {
@@ -487,7 +495,7 @@ describe("useServerThreads", () => {
     );
 
     rerender({ client: second });
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => expect(result.current.threadListPhase).toBe("ready"));
     expect(result.current.threads.map(({ id }) => id)).toEqual([
       THREAD_TWO.id,
     ]);
@@ -499,31 +507,45 @@ describe("useServerThreads", () => {
     ]);
   });
 
-  it("切换当前会话时取消旧逻辑订阅", async () => {
+  it("切换当前会话时保留最近列表并取消旧逻辑订阅", async () => {
     const client = new FakeThreadClient();
     client.listResults.push(
       Promise.resolve({ data: [THREAD_ONE, THREAD_TWO] }),
-      Promise.resolve({ data: [THREAD_ONE, THREAD_TWO] }),
     );
+    const secondResume = deferred<ThreadResumeResponse>();
     client.resumeResults.push(
       Promise.resolve(resumeResponse([], null)),
-      Promise.resolve({
-        ...resumeResponse([], null),
-        thread: { ...THREAD_TWO, turns: [] },
-      }),
+      secondResume.promise,
     );
-    const { rerender } = renderHook(
+    const { result, rerender } = renderHook(
       ({ threadId }) => useServerThreads(client, threadId),
       { initialProps: { threadId: THREAD_ONE.id } },
     );
-    await waitFor(() => expect(client.resumeCalls).toEqual([THREAD_ONE.id]));
+    await waitFor(() => {
+      expect(result.current.threadListPhase).toBe("ready");
+      expect(result.current.threadRestorePhase).toBe("ready");
+    });
 
     rerender({ threadId: THREAD_TWO.id });
 
-    await waitFor(() =>
-      expect(client.resumeCalls).toEqual([THREAD_ONE.id, THREAD_TWO.id]),
-    );
+    expect(result.current.threadListPhase).toBe("ready");
+    expect(result.current.threadRestorePhase).toBe("loading");
+    expect(result.current.threads.map(({ id }) => id)).toEqual([
+      THREAD_ONE.id,
+      THREAD_TWO.id,
+    ]);
+    expect(result.current.restoredThread).toBeNull();
+    expect(client.listCalls).toEqual([{}]);
     expect(client.unsubscribeCalls).toEqual([THREAD_ONE.id]);
+
+    secondResume.resolve({
+      ...resumeResponse([], null),
+      thread: { ...THREAD_TWO, turns: [] },
+    });
+    await waitFor(() =>
+      expect(result.current.threadRestorePhase).toBe("ready"),
+    );
+    expect(result.current.restoredThread?.metadata.id).toBe(THREAD_TWO.id);
   });
 
   it("同步其他窗口的会话名称、状态、归档、恢复和删除事实", async () => {
@@ -538,7 +560,10 @@ describe("useServerThreads", () => {
     const { result } = renderHook(() =>
       useServerThreads(client, THREAD_ONE.id),
     );
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => {
+      expect(result.current.threadListPhase).toBe("ready");
+      expect(result.current.threadRestorePhase).toBe("ready");
+    });
 
     act(() => {
       client.emit({
@@ -618,7 +643,10 @@ describe("useServerThreads", () => {
       resumeResult.resolve(resumeResponse([], null));
     });
 
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => {
+      expect(result.current.threadListPhase).toBe("ready");
+      expect(result.current.threadRestorePhase).toBe("ready");
+    });
     expect(result.current.currentThreadDeleted).toBe(true);
     expect(result.current.restoredThread).toBeNull();
     expect(result.current.threads.map(({ id }) => id)).toEqual([
@@ -633,7 +661,7 @@ describe("useServerThreads", () => {
     client.unarchiveResults.push(Promise.resolve({ thread: THREAD_ONE }));
     client.deleteResults.push(Promise.resolve({}));
     const { result } = renderHook(() => useServerThreads(client, null));
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => expect(result.current.threadListPhase).toBe("ready"));
 
     let archiveResult: Promise<boolean> | undefined;
     act(() => {
@@ -668,7 +696,7 @@ describe("useServerThreads", () => {
     const client = new FakeThreadClient();
     client.listResults.push(Promise.resolve({ data: [THREAD_ONE, THREAD_TWO] }));
     const { result } = renderHook(() => useServerThreads(client, null));
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => expect(result.current.threadListPhase).toBe("ready"));
 
     await act(async () => {
       client.archiveResults.push(Promise.reject(new Error("secret path")));
@@ -679,7 +707,7 @@ describe("useServerThreads", () => {
       THREAD_ONE.id,
       THREAD_TWO.id,
     ]);
-    expect(result.current.error).toBe("无法归档会话");
+    expect(result.current.threadListError).toBe("无法归档会话");
     expect(JSON.stringify(result.current)).not.toContain("secret");
   });
 
@@ -690,8 +718,8 @@ describe("useServerThreads", () => {
     );
     const { result } = renderHook(() => useServerThreads(client, null));
 
-    await waitFor(() => expect(result.current.phase).toBe("error"));
-    expect(result.current.error).toBe("无法加载最近会话");
+    await waitFor(() => expect(result.current.threadListPhase).toBe("error"));
+    expect(result.current.threadListError).toBe("无法加载最近会话");
     expect(JSON.stringify(result.current)).not.toContain("secret");
   });
 
@@ -704,7 +732,10 @@ describe("useServerThreads", () => {
       { initialProps: { activeClient: client as ServerThreadsClient | null } },
     );
 
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => {
+      expect(result.current.threadListPhase).toBe("ready");
+      expect(result.current.threadRestorePhase).toBe("ready");
+    });
     const syncedAt = result.current.lastSyncedAt;
     rerender({ activeClient: null });
 
@@ -720,7 +751,8 @@ describe("useServerThreads", () => {
       useServerThreads(null, THREAD_ONE.id, SERVER_ID),
     );
 
-    expect(result.current.phase).toBe("idle");
+    expect(result.current.threadListPhase).toBe("idle");
+    expect(result.current.threadRestorePhase).toBe("idle");
     expect(result.current.offline).toBe(false);
     expect(result.current.restoredThread).toBeNull();
   });
@@ -744,11 +776,15 @@ describe("useServerThreads", () => {
         },
       },
     );
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => {
+      expect(result.current.threadListPhase).toBe("ready");
+      expect(result.current.threadRestorePhase).toBe("ready");
+    });
 
     rerender({ activeClient: null, activeServerId: SERVER_ID });
     rerender({ activeClient: second, activeServerId: SERVER_ID });
-    expect(result.current.phase).toBe("loading");
+    expect(result.current.threadListPhase).toBe("loading");
+    expect(result.current.threadRestorePhase).toBe("loading");
     expect(result.current.offline).toBe(true);
     expect(result.current.restoredThread?.turns[0]?.id).toBe(TURN_ONE.id);
 
@@ -761,11 +797,12 @@ describe("useServerThreads", () => {
     expect(result.current.restoredThread?.turns[0]?.id).toBe(TURN_TWO.id);
 
     rerender({ activeClient: null, activeServerId: SERVER_TWO_ID });
-    expect(result.current.phase).toBe("idle");
+    expect(result.current.threadListPhase).toBe("idle");
+    expect(result.current.threadRestorePhase).toBe("idle");
     expect(result.current.restoredThread).toBeNull();
   });
 
-  it("重连对账失败时继续保留当前进程只读内容", async () => {
+  it("重连列表对账失败时保留列表并采用已恢复正文", async () => {
     const first = new FakeThreadClient();
     first.listResults.push(Promise.resolve({ data: [THREAD_ONE] }));
     first.resumeResults.push(Promise.resolve(resumeResponse([TURN_ONE], null)));
@@ -777,15 +814,20 @@ describe("useServerThreads", () => {
       ({ activeClient }) => useServerThreads(activeClient, THREAD_ONE.id, SERVER_ID),
       { initialProps: { activeClient: first as ServerThreadsClient | null } },
     );
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    await waitFor(() => {
+      expect(result.current.threadListPhase).toBe("ready");
+      expect(result.current.threadRestorePhase).toBe("ready");
+    });
 
     rerender({ activeClient: null });
     rerender({ activeClient: second });
     listResult.reject(new Error("unavailable"));
 
-    await waitFor(() => expect(result.current.error).toBe("无法加载最近会话"));
-    expect(result.current.phase).toBe("ready");
+    await waitFor(() =>
+      expect(result.current.threadListError).toBe("无法加载最近会话"),
+    );
+    expect(result.current.threadListPhase).toBe("ready");
     expect(result.current.offline).toBe(true);
-    expect(result.current.restoredThread?.turns[0]?.id).toBe(TURN_ONE.id);
+    expect(result.current.restoredThread?.turns[0]?.id).toBe(TURN_TWO.id);
   });
 });
