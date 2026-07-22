@@ -44,6 +44,7 @@ interface ConnectionShellProps {
   onRefreshThreads?: () => void;
   onSearchThreads?: () => void;
   onNewTask?: () => void;
+  onNewTaskInProject?: (cwd: string) => void;
   onOpenThread?: (threadId: string) => void;
   onOpenThreadInNewWindow?: (threadId: string) => void;
   onUndoArchive?: () => void;
@@ -233,6 +234,7 @@ export function ConnectionShell({
   onRefreshThreads,
   onSearchThreads,
   onNewTask,
+  onNewTaskInProject,
   onOpenThread,
   onOpenThreadInNewWindow,
   onUndoArchive,
@@ -512,6 +514,14 @@ export function ConnectionShell({
           {...(onLoadProjectThreads === undefined
             ? {}
             : { onLoadProjectThreads })}
+          {...(onNewTaskInProject === undefined
+            ? {}
+            : {
+                onNewTaskInProject: (cwd: string) => {
+                  onNewTaskInProject(cwd);
+                  setIsSidebarOpen(false);
+                },
+              })}
           onOpenThread={(threadId) => {
             onOpenThread?.(threadId);
             setIsSidebarOpen(false);

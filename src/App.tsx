@@ -1038,14 +1038,15 @@ export function App({
     }
   };
 
-  const openNewTask = async (): Promise<void> => {
+  const openNewTask = async (
+    targetCwd: string | null = restoredThread?.metadata.cwd ?? null,
+  ): Promise<void> => {
     if (windowState.status !== "ready") {
       return;
     }
     setWindowActionError(null);
-    const inheritedCwd = restoredThread?.metadata.cwd ?? null;
     const previousDraftCwd = draftCwd;
-    setDraftCwd(inheritedCwd);
+    setDraftCwd(targetCwd);
     try {
       await windowState.updateSession(null, `draft:${crypto.randomUUID()}`);
     } catch {
@@ -1395,6 +1396,7 @@ export function App({
         onLoadMoreThreads={() => void serverThreads.loadMoreThreads()}
         onLoadProjectThreads={serverThreads.loadProjectThreads}
         onNewTask={() => void openNewTask()}
+        onNewTaskInProject={(cwd) => void openNewTask(cwd)}
         onRefreshThreads={() => void serverThreads.refreshThreads()}
         onSearchThreads={() => setQuickSwitcherOpen(true)}
         onOpenThread={(threadId) => void openThread(threadId)}

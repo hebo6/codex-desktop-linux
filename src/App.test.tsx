@@ -291,7 +291,7 @@ describe("App", () => {
     ])).toEqual(["/workspace/alpha", "/workspace/beta"]);
   });
 
-  it("从已打开会话新建任务时继承其工作目录", async () => {
+  it("顶部新建继承当前目录并支持从项目组新建", async () => {
     const user = userEvent.setup();
     const thread = {
       cliVersion: "1.0.0",
@@ -308,10 +308,18 @@ describe("App", () => {
       turns: [],
       updatedAt: 200,
     } as const;
+    const otherThread = {
+      ...thread,
+      cwd: "/workspace/other",
+      id: "thread-other",
+      name: "其他项目会话",
+      sessionId: "session-other",
+      updatedAt: 100,
+    } as const;
     const requestSession = {
       sendRequest(request: { readonly method: string }) {
         const result = request.method === "thread/list"
-          ? { data: [thread], nextCursor: null }
+          ? { data: [thread, otherThread], nextCursor: null }
           : request.method === "thread/resume"
             ? {
                 initialTurnsPage: { data: [], nextCursor: null },
@@ -328,7 +336,7 @@ describe("App", () => {
     };
     const sessionUpdater = vi.fn(async (request: UpdateWindowSessionRequest) => ({
       windowId: "main",
-      version: 2,
+      version: request.expectedVersion + 1,
       serverId: SERVER_ID,
       ...(request.currentThreadId === null
         ? {}
@@ -381,6 +389,20 @@ describe("App", () => {
       expect(newTaskCwd).toBeEnabled();
       expect(newTaskCwd).toHaveAttribute("title", thread.cwd);
     });
+
+    await user.click(screen.getByRole("button", { name: "按项目分组" }));
+    await user.click(screen.getByRole("button", {
+      name: `在 ${otherThread.cwd} 中新建会话`,
+    }));
+
+    await waitFor(() => expect(sessionUpdater).toHaveBeenLastCalledWith({
+      expectedVersion: 2,
+      currentThreadId: null,
+      draftKey: expect.stringMatching(/^draft:/u),
+    }));
+    await waitFor(() => expect(
+      screen.getByRole("button", { name: "项目" }),
+    ).toHaveAttribute("title", otherThread.cwd));
   });
 
   it("新建线程首次发送直接采用创建响应", async () => {

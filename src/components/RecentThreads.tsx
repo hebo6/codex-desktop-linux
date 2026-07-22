@@ -37,6 +37,7 @@ export interface RecentThreadsProps {
     cwd: string,
     limit: number,
   ) => Promise<ProjectThreadPage>;
+  readonly onNewTaskInProject?: (cwd: string) => void;
   readonly onOpenThread: (threadId: string) => void;
   readonly onOpenThreadInNewWindow?: (threadId: string) => void;
   readonly onUndoArchive: () => void;
@@ -112,6 +113,7 @@ export function RecentThreads({
   onDeleteThread,
   onLoadMore,
   onLoadProjectThreads,
+  onNewTaskInProject,
   onOpenThread,
   onOpenThreadInNewWindow,
   onUndoArchive,
@@ -464,6 +466,9 @@ export function RecentThreads({
             >
               <GroupHeading
                 entry={stickyGroupEntry}
+                {...(onNewTaskInProject === undefined
+                  ? {}
+                  : { onNewTaskInProject })}
                 onToggle={() => toggleGroup(stickyGroupEntry.key)}
               />
             </div>
@@ -496,6 +501,9 @@ export function RecentThreads({
                   {entry.type === "group" ? (
                     <GroupHeading
                       entry={entry}
+                      {...(onNewTaskInProject === undefined
+                        ? {}
+                        : { onNewTaskInProject })}
                       onToggle={() => toggleGroup(entry.key)}
                       suppressed={stickyGroupHeading?.key === entry.key}
                     />
@@ -610,21 +618,26 @@ export function RecentThreads({
 
 function GroupHeading({
   entry,
+  onNewTaskInProject,
   onToggle,
   suppressed = false,
 }: {
   readonly entry: RecentThreadGroupEntry;
+  readonly onNewTaskInProject?: (cwd: string) => void;
   readonly onToggle: () => void;
   readonly suppressed?: boolean;
 }) {
+  const projectPath = entry.path;
   return (
     <h3
+      aria-label={entry.label}
       aria-hidden={suppressed || undefined}
       className={styles.groupHeading}
       inert={suppressed || undefined}
     >
       <button
         aria-expanded={!entry.collapsed}
+        className={styles.groupToggle}
         onClick={onToggle}
         title={entry.path ?? undefined}
         type="button"
@@ -632,6 +645,19 @@ function GroupHeading({
         <span aria-hidden="true" className={styles.groupArrow} />
         <span>{entry.label}</span>
       </button>
+      {projectPath === null || onNewTaskInProject === undefined ? null : (
+        <button
+          aria-label={`在 ${projectPath} 中新建会话`}
+          className={styles.groupNewTask}
+          onClick={() => onNewTaskInProject(projectPath)}
+          title="在此项目中新建会话"
+          type="button"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+      )}
     </h3>
   );
 }

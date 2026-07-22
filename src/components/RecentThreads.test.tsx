@@ -53,6 +53,7 @@ function renderThreads(
   const onOpenThreadInNewWindow = vi.fn();
   const onLoadMore = vi.fn();
   const onLoadProjectThreads = vi.fn(async () => ({ hasMore: false }));
+  const onNewTaskInProject = vi.fn();
   const onArchiveThread = vi.fn();
   const onDeleteThread = vi.fn();
   const onUndoArchive = vi.fn();
@@ -67,6 +68,7 @@ function renderThreads(
     onDeleteThread,
     onLoadMore,
     onLoadProjectThreads,
+    onNewTaskInProject,
     onOpenThread,
     onOpenThreadInNewWindow,
     onUndoArchive,
@@ -82,6 +84,7 @@ function renderThreads(
     onDeleteThread,
     onLoadMore,
     onLoadProjectThreads,
+    onNewTaskInProject,
     onOpenThread,
     onOpenThreadInNewWindow,
     onUndoArchive,
@@ -200,6 +203,34 @@ describe("RecentThreads", () => {
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "加载更早会话" }));
     expect(onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it("从项目组新建会话且不改变展开状态", () => {
+    const otherThread = {
+      ...THREAD_ONE,
+      cwd: "",
+      id: "thread-other",
+      name: "其他会话",
+      sessionId: "session-other",
+    } satisfies ThreadSummary;
+    const { onNewTaskInProject } = renderThreads({
+      grouped: true,
+      threads: [THREAD_ONE, otherThread],
+    });
+    const group = screen.getByRole("button", { name: "alpha" });
+    const newTask = screen.getByRole("button", {
+      name: `在 ${THREAD_ONE.cwd} 中新建会话`,
+    });
+
+    expect(newTask).toHaveAttribute("title", "在此项目中新建会话");
+    expect(group).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(newTask);
+    expect(onNewTaskInProject).toHaveBeenCalledWith(THREAD_ONE.cwd);
+    expect(group).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("heading", { name: "其他会话" })).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "在  中新建会话" }),
+    ).not.toBeInTheDocument();
   });
 
   it("每个项目初始显示三个会话并独立加载更多", () => {

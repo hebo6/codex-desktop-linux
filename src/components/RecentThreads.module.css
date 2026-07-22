@@ -119,7 +119,9 @@
 }
 
 .groupHeading {
+  display: flex;
   height: 32px;
+  align-items: stretch;
   overflow: hidden;
   margin: 0;
   font-size: 11px;
@@ -129,31 +131,54 @@
   background: var(--color-sidebar-bg);
 }
 
-.groupHeading button {
+.groupToggle,
+.groupNewTask {
   display: flex;
-  width: 100%;
   height: 32px;
   align-items: center;
-  gap: var(--space-1);
-  overflow: hidden;
-  padding: var(--space-2) var(--space-2) 0;
   border: 0;
   color: var(--color-text-tertiary);
   background: transparent;
   cursor: pointer;
   font: inherit;
   font-weight: 600;
+}
+
+.groupToggle {
+  min-width: 0;
+  flex: 1;
+  gap: var(--space-1);
+  overflow: hidden;
+  padding: var(--space-2) var(--space-1) 0 var(--space-2);
   text-align: left;
 }
 
-.groupHeading button span:last-child {
+.groupToggle span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.groupHeading button:hover {
+.groupToggle:hover,
+.groupNewTask:hover {
   color: var(--color-text-secondary);
+}
+
+.groupNewTask {
+  width: 28px;
+  flex: 0 0 28px;
+  justify-content: center;
+  padding: var(--space-2) 0 0;
+  border-radius: var(--radius-sm);
+}
+
+.groupNewTask svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.8;
 }
 
 .groupArrow {
@@ -166,7 +191,7 @@
   transition: transform 120ms ease;
 }
 
-.groupHeading button[aria-expanded="true"] .groupArrow {
+.groupToggle[aria-expanded="true"] .groupArrow {
   transform: rotate(90deg);
 }
 

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ThreadSummary } from "../app/useServerThreads";
 import { ConnectionShell } from "./ConnectionShell";
 
 describe("ConnectionShell", () => {
@@ -117,6 +118,43 @@ describe("ConnectionShell", () => {
 
     fireEvent.keyDown(window, { ctrlKey: true, key: "n" });
     expect(onNewTask).toHaveBeenCalledTimes(1);
+  });
+
+  it("从项目组新建任务后关闭覆盖式侧栏", () => {
+    const onNewTaskInProject = vi.fn();
+    const thread = {
+      cliVersion: "1.0.0",
+      createdAt: 100,
+      cwd: "/workspace/project",
+      ephemeral: false,
+      id: "thread-project",
+      modelProvider: "openai",
+      name: "项目会话",
+      preview: "继续项目",
+      sessionId: "session-project",
+      source: "appServer",
+      status: { type: "idle" },
+      turns: [],
+      updatedAt: 200,
+    } satisfies ThreadSummary;
+    render(
+      <ConnectionShell
+        onNewTaskInProject={onNewTaskInProject}
+        phase="ready"
+        threadListPhase="ready"
+        threads={[thread]}
+      />,
+    );
+
+    const menuButton = screen.getByLabelText("打开侧栏");
+    fireEvent.click(menuButton);
+    fireEvent.click(screen.getByRole("button", { name: "按项目分组" }));
+    fireEvent.click(screen.getByRole("button", {
+      name: `在 ${thread.cwd} 中新建会话`,
+    }));
+
+    expect(onNewTaskInProject).toHaveBeenCalledWith(thread.cwd);
+    expect(menuButton).toHaveAttribute("aria-expanded", "false");
   });
 
   it("支持键盘调整并提交侧栏宽度", () => {
