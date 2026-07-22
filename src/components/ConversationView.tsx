@@ -69,6 +69,7 @@ type ReasoningItem = Extract<ThreadItem, { type: "reasoning" }>;
 const PANEL_TRANSITION_MS = 210;
 const ANSWER_BOTTOM_INSET = 120;
 const FIRST_TURN_ROW_PADDING = 24;
+const MANUAL_SCROLL_SETTLE_MS = 300;
 
 function useCollapsibleContent(initiallyExpanded: boolean) {
   const [expanded, setExpanded] = useState(initiallyExpanded);
@@ -172,6 +173,7 @@ export function ConversationView({
   const conversationTailRef = useRef<HTMLDivElement>(null);
   const pageFollowingRef = useRef(false);
   const manualScrollRef = useRef(false);
+  const manualScrollTimerRef = useRef<number | null>(null);
   const pointerScrollRef = useRef(false);
   const pendingQuestionPositionRef = useRef<string | null>(null);
   const loadingAnchorRef = useRef(false);
@@ -211,6 +213,8 @@ export function ConversationView({
   const activeTurn = restoredThread.turns.findLast(
     ({ status }) => status === "inProgress",
   );
+  const activeTurnRef = useRef(activeTurn);
+  activeTurnRef.current = activeTurn;
   const previousActiveTurnIdRef = useRef(activeTurn?.id ?? null);
   const questionIndexByRow = useMemo(
     () => new Map(historyQuestions.map((question, index) => [question.rowIndex, index])),
@@ -350,29 +354,62 @@ export function ConversationView({
     }
   }, [setPageFollowingMode, updateConversationBottom]);
 
-  const startManualScroll = useCallback(() => {
+  const cancelManualScrollDelay = useCallback(() => {
+    if (manualScrollTimerRef.current !== null) {
+      window.clearTimeout(manualScrollTimerRef.current);
+      manualScrollTimerRef.current = null;
+    }
+    manualScrollRef.current = false;
+  }, []);
+
+  const restartManualScrollDelay = useCallback(() => {
+    if (manualScrollTimerRef.current !== null) {
+      window.clearTimeout(manualScrollTimerRef.current);
+    }
     manualScrollRef.current = true;
+    manualScrollTimerRef.current = window.setTimeout(() => {
+      manualScrollTimerRef.current = null;
+      if (pointerScrollRef.current) {
+        return;
+      }
+      manualScrollRef.current = false;
+      const scroller = scrollerRef.current;
+      if (scroller === null) {
+        return;
+      }
+      const atBottom = updateConversationBottom(scroller);
+      if (activeTurnRef.current !== undefined && atBottom) {
+        setPageFollowingMode(true);
+      }
+    }, MANUAL_SCROLL_SETTLE_MS);
+  }, [setPageFollowingMode, updateConversationBottom]);
+
+  const startManualScroll = useCallback(() => {
     stopPageFollowing();
-  }, [stopPageFollowing]);
+    restartManualScrollDelay();
+  }, [restartManualScrollDelay, stopPageFollowing]);
 
   const finishPointerScroll = useCallback(() => {
     pointerScrollRef.current = false;
-    const scroller = scrollerRef.current;
     if (
-      scroller !== null &&
-      activeTurn !== undefined &&
-      updateConversationBottom(scroller)
+      manualScrollRef.current &&
+      manualScrollTimerRef.current === null
     ) {
-      setPageFollowingMode(true);
+      restartManualScrollDelay();
     }
-    manualScrollRef.current = false;
-  }, [activeTurn, setPageFollowingMode, updateConversationBottom]);
+  }, [restartManualScrollDelay]);
 
   const handleActivityExpandedChange = useCallback((expanded: boolean) => {
     if (expanded) {
+      cancelManualScrollDelay();
       stopPageFollowing();
     }
-  }, [stopPageFollowing]);
+  }, [cancelManualScrollDelay, stopPageFollowing]);
+
+  useEffect(
+    () => () => cancelManualScrollDelay(),
+    [cancelManualScrollDelay],
+  );
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
@@ -428,6 +465,7 @@ export function ConversationView({
     if (observedQuestionIdRef.current !== latestQuestionId) {
       observedQuestionIdRef.current = latestQuestionId;
       pendingQuestionPositionRef.current = latestQuestionId;
+      cancelManualScrollDelay();
       setPreservePageEndSpace(true);
       setPageFollowingMode(true);
       setShowJumpToBottom(false);
@@ -445,6 +483,7 @@ export function ConversationView({
       }
     }
   }, [
+    cancelManualScrollDelay,
     latestQuestion,
     questionTop,
     restoredThread.metadata.id,
@@ -492,13 +531,19 @@ export function ConversationView({
     const previousActiveTurnId = previousActiveTurnIdRef.current;
     previousActiveTurnIdRef.current = activeTurn?.id ?? null;
     if (previousActiveTurnId !== null && activeTurn === undefined) {
+      cancelManualScrollDelay();
       setPageFollowingMode(false);
       const scroller = scrollerRef.current;
       if (scroller !== null) {
         updateConversationBottom(scroller);
       }
     }
-  }, [activeTurn, setPageFollowingMode, updateConversationBottom]);
+  }, [
+    activeTurn,
+    cancelManualScrollDelay,
+    setPageFollowingMode,
+    updateConversationBottom,
+  ]);
 
   useLayoutEffect(() => {
     initialBottomScrollRef.current = {
@@ -508,13 +553,13 @@ export function ConversationView({
     observedThreadIdRef.current = restoredThread.metadata.id;
     observedQuestionIdRef.current = latestQuestion?.itemId ?? null;
     pendingQuestionPositionRef.current = null;
-    manualScrollRef.current = false;
+    cancelManualScrollDelay();
     pointerScrollRef.current = false;
     setPreservePageEndSpace(activeTurn !== undefined);
     setPageFollowingMode(activeTurn !== undefined);
     setShowJumpToBottom(false);
     setStickyQuestionState(null);
-  }, [restoredThread.metadata.id]);
+  }, [cancelManualScrollDelay, restoredThread.metadata.id]);
 
   useLayoutEffect(() => {
     const scrollState = initialBottomScrollRef.current;
@@ -599,16 +644,9 @@ export function ConversationView({
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     const scroller = event.currentTarget;
     updateStickyQuestion(scroller);
-    const atBottom = updateConversationBottom(scroller);
-    if (
-      manualScrollRef.current &&
-      activeTurn !== undefined &&
-      atBottom
-    ) {
-      setPageFollowingMode(true);
-    }
-    if (!pointerScrollRef.current) {
-      manualScrollRef.current = false;
+    updateConversationBottom(scroller);
+    if (pointerScrollRef.current || manualScrollRef.current) {
+      startManualScroll();
     }
     if (scroller.scrollTop <= 48) {
       void loadOlder();
@@ -647,7 +685,6 @@ export function ConversationView({
         onPointerCancel={finishPointerScroll}
         onPointerDown={() => {
           pointerScrollRef.current = true;
-          startManualScroll();
         }}
         onPointerUp={finishPointerScroll}
         onScroll={handleScroll}
@@ -749,6 +786,7 @@ export function ConversationView({
       {historyQuestions.length >= 4 ? (
         <HistoryQuestionNavigation
           onSelect={(question) => {
+            cancelManualScrollDelay();
             stopPageFollowing();
             const scroller = scrollerRef.current;
             const top = questionTop(question);
@@ -767,6 +805,7 @@ export function ConversationView({
           onClick={() => {
             const scroller = scrollerRef.current;
             if (scroller !== null) {
+              cancelManualScrollDelay();
               const resumeFollowing = activeTurn !== undefined;
               setPageFollowingMode(resumeFollowing);
               if (!resumeFollowing && preservePageEndSpace) {

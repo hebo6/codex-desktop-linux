@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { RestoredThread, ThreadTurn } from "../app/useServerThreads";
@@ -49,6 +49,7 @@ function mockElementBottom(element: HTMLElement, bottom: () => number) {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   Object.defineProperty(globalThis, "ResizeObserver", {
     configurable: true,
@@ -864,7 +865,7 @@ describe("ConversationView", () => {
     boundingRect.mockRestore();
   });
 
-  it("新问题定位到顶部并在流式内容越界时离散翻页", () => {
+  it("新问题离散翻页并在手动滚动延时后重新判断跟随", () => {
     const firstTurn = {
       id: "turn-page-1",
       items: [
@@ -953,6 +954,7 @@ describe("ConversationView", () => {
 
     expect(scroller.scrollTop).toBe(680);
 
+    vi.useFakeTimers();
     scroller.scrollTop = 100;
     fireEvent.wheel(scroller);
     fireEvent.scroll(scroller);
@@ -982,7 +984,55 @@ describe("ConversationView", () => {
         restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
       />,
     );
-    expect(scroller.scrollTop).toBe(730);
+    expect(scroller.scrollTop).toBe(350);
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+
+    act(() => vi.advanceTimersByTime(300));
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
+      />,
+    );
+    expect(scroller.scrollTop).toBe(350);
+
+    scroller.scrollTop = 700;
+    fireEvent.wheel(scroller);
+    fireEvent.scroll(scroller);
+    act(() => vi.advanceTimersByTime(200));
+    fireEvent.wheel(scroller);
+    fireEvent.scroll(scroller);
+    act(() => vi.advanceTimersByTime(100));
+
+    tailDocumentBottom = 1_550;
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
+      />,
+    );
+    expect(scroller.scrollTop).toBe(700);
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+
+    scroller.scrollTop = 1_050;
+    fireEvent.wheel(scroller);
+    fireEvent.scroll(scroller);
+    act(() => vi.advanceTimersByTime(300));
+
+    tailDocumentBottom = 1_600;
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
+      />,
+    );
+    expect(scroller.scrollTop).toBe(1_100);
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
   });
