@@ -254,6 +254,72 @@ describe("useServerThreads", () => {
     });
   });
 
+  it("首条用户消息填充新线程预览且后续消息不覆盖", async () => {
+    const client = new FakeThreadClient();
+    client.listResults.push(Promise.resolve({ data: [THREAD_ONE] }));
+    const startedThread = {
+      ...THREAD_THREE,
+      preview: "",
+      updatedAt: 300,
+    };
+    const { result, rerender } = renderHook(
+      ({ threadId }) => useServerThreads(client, threadId),
+      { initialProps: { threadId: null as string | null } },
+    );
+    await waitFor(() => expect(result.current.phase).toBe("ready"));
+
+    act(() => {
+      result.current.prepareStartedThread(startResponse(startedThread));
+    });
+    rerender({ threadId: startedThread.id });
+    await waitFor(() =>
+      expect(result.current.restoredThread?.metadata.id).toBe(startedThread.id),
+    );
+
+    act(() => {
+      client.emit({
+        method: "item/started",
+        params: {
+          item: {
+            content: [
+              { name: "review", path: "/skills/review", type: "skill" },
+              { text: "检查会话标题\n并给出建议", type: "text" },
+              { path: "/tmp/reference.png", type: "localImage" },
+            ],
+            id: "user-message-1",
+            type: "userMessage",
+          },
+          startedAtMs: 1,
+          threadId: startedThread.id,
+          turnId: "turn-1",
+        },
+      });
+    });
+
+    const preview = "$review\n检查会话标题\n并给出建议\n[图片 reference.png]";
+    expect(result.current.threads[0]?.preview).toBe(preview);
+    expect(result.current.restoredThread?.metadata.preview).toBe(preview);
+
+    act(() => {
+      client.emit({
+        method: "item/started",
+        params: {
+          item: {
+            content: [{ text: "后续问题", type: "text" }],
+            id: "user-message-2",
+            type: "userMessage",
+          },
+          startedAtMs: 2,
+          threadId: startedThread.id,
+          turnId: "turn-2",
+        },
+      });
+    });
+
+    expect(result.current.threads[0]?.preview).toBe(preview);
+    expect(result.current.restoredThread?.metadata.preview).toBe(preview);
+  });
+
   it("窗口状态更新失败后撤销新建线程交接", async () => {
     const client = new FakeThreadClient();
     client.listResults.push(

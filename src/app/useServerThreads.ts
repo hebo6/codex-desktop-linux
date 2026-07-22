@@ -324,6 +324,23 @@ export function useServerThreads(
               ),
             );
             break;
+          case "item/started": {
+            const preview = userMessagePreview(notification.params.item);
+            if (preview === null) {
+              break;
+            }
+            setState((current) =>
+              updateThreadMetadata(
+                current,
+                notification.params.threadId,
+                (thread) =>
+                  thread.preview.trim().length === 0
+                    ? { ...thread, preview }
+                    : thread,
+              ),
+            );
+            break;
+          }
           case "thread/status/changed":
             setState((current) =>
               updateThreadMetadata(
@@ -803,6 +820,31 @@ function updateThreadMetadata(
     threads: changed ? Object.freeze(threads) : state.threads,
     restoredThread,
   };
+}
+
+function userMessagePreview(
+  item: Extract<ServerNotification, { method: "item/started" }>["params"]["item"],
+): string | null {
+  if (item.type !== "userMessage") {
+    return null;
+  }
+  const preview = item.content.map((input) => {
+    switch (input.type) {
+      case "text":
+        return input.text;
+      case "skill":
+        return `$${input.name}`;
+      case "mention":
+        return `@${input.name}`;
+      case "image":
+        return "[图片]";
+      case "localImage": {
+        const name = input.path.split(/[\\/]/u).at(-1) || "图片";
+        return `[图片 ${name}]`;
+      }
+    }
+  }).join("\n").trim();
+  return preview.length === 0 ? null : preview;
 }
 
 function addPendingThread(existing: readonly string[], threadId: string): readonly string[] {
