@@ -126,7 +126,7 @@ describe("AppServerThreadClient", () => {
     ]);
   });
 
-  it("恢复时原子加载最近 30 个完整 turn", () => {
+  it("恢复时原子加载最近 10 个完整 turn", () => {
     const session = new RecordingSession();
     const client = new AppServerThreadClient(session);
 

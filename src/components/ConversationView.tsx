@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import type { RestoredThread, ThreadTurn } from "../app/useServerThreads";
+import { recordConversationFirstCommit } from "../diagnostics/conversationLoadDiagnostics";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { useVirtualRows } from "./useVirtualRows";
 import styles from "./ConversationView.module.css";
@@ -69,6 +70,66 @@ const PANEL_TRANSITION_MS = 210;
 const ANSWER_BOTTOM_INSET = 120;
 const FIRST_TURN_ROW_PADDING = 24;
 
+function useCollapsibleContent(initiallyExpanded: boolean) {
+  const [expanded, setExpanded] = useState(initiallyExpanded);
+  const [targetExpanded, setTargetExpanded] = useState(initiallyExpanded);
+  const [contentMounted, setContentMounted] = useState(initiallyExpanded);
+  const [contentVisible, setContentVisible] = useState(initiallyExpanded);
+  const targetExpandedRef = useRef(initiallyExpanded);
+  const timerRef = useRef<number | null>(null);
+  const frameRef = useRef<number | null>(null);
+
+  const cancelTransition = useCallback(() => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (frameRef.current !== null) {
+      window.cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => cancelTransition(), [cancelTransition]);
+
+  const setOpen = useCallback((open: boolean) => {
+    cancelTransition();
+    targetExpandedRef.current = open;
+    setTargetExpanded(open);
+    if (open) {
+      setContentMounted(true);
+      frameRef.current = window.requestAnimationFrame(() => {
+        setExpanded(true);
+        frameRef.current = null;
+        timerRef.current = window.setTimeout(() => {
+          setContentVisible(true);
+          timerRef.current = null;
+        }, panelTransitionDuration());
+      });
+      return;
+    }
+
+    setContentVisible(false);
+    frameRef.current = window.requestAnimationFrame(() => {
+      setExpanded(false);
+      frameRef.current = null;
+      timerRef.current = window.setTimeout(() => {
+        setContentMounted(false);
+        timerRef.current = null;
+      }, panelTransitionDuration());
+    });
+  }, [cancelTransition]);
+
+  return {
+    contentMounted,
+    contentVisible,
+    expanded,
+    setOpen,
+    targetExpanded,
+    targetExpandedRef,
+  } as const;
+}
+
 interface HistoryQuestion {
   readonly answer: string | null;
   readonly item: UserMessageItem;
@@ -120,6 +181,9 @@ export function ConversationView({
     useState<StickyQuestionState | null>(null);
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
   const [loadingAnchorKey, setLoadingAnchorKey] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    recordConversationFirstCommit(restoredThread.metadata);
+  }, [restoredThread.metadata]);
   const itemCount = restoredThread.turns.reduce(
     (count, turn) => count + turn.items.length,
     0,
@@ -1044,9 +1108,7 @@ function ActivityGroup({
   const finalAnswerStarted = turn.items.some(isFinalAnswer);
   const running = turn.status === "inProgress" && !finalAnswerStarted;
   const initiallyExpanded = running;
-  const [expanded, setExpanded] = useState(initiallyExpanded);
-  const [contentVisible, setContentVisible] = useState(initiallyExpanded);
-  const hideTimerRef = useRef<number | null>(null);
+  const transition = useCollapsibleContent(initiallyExpanded);
   const previousRunningRef = useRef(running);
   const duration = useTurnDuration(turn, running);
   const visibleItems = items;
@@ -1055,72 +1117,35 @@ function ActivityGroup({
       item.type === "commandExecution" && item.status === "inProgress",
   );
 
-  useEffect(() => () => {
-    if (hideTimerRef.current !== null) {
-      window.clearTimeout(hideTimerRef.current);
-    }
-  }, []);
-
   useEffect(() => {
     const wasRunning = previousRunningRef.current;
     previousRunningRef.current = running;
     if (wasRunning === running) {
       return;
     }
-    if (hideTimerRef.current !== null) {
-      window.clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-    if (running) {
-      setExpanded(true);
-      hideTimerRef.current = window.setTimeout(() => {
-        setContentVisible(true);
-        hideTimerRef.current = null;
-      }, panelTransitionDuration());
-      return () => {
-        if (hideTimerRef.current !== null) {
-          window.clearTimeout(hideTimerRef.current);
-          hideTimerRef.current = null;
-        }
-      };
-    }
-    setContentVisible(false);
-    const frame = window.requestAnimationFrame(() => setExpanded(false));
-    return () => window.cancelAnimationFrame(frame);
-  }, [running]);
+    transition.setOpen(running);
+  }, [running, transition]);
 
   const toggle = () => {
-    if (hideTimerRef.current !== null) {
-      window.clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-    if (expanded) {
-      onExpandedChange(false);
-      setContentVisible(false);
-      requestAnimationFrame(() => setExpanded(false));
-      return;
-    }
-    onExpandedChange(true);
-    setExpanded(true);
-    hideTimerRef.current = window.setTimeout(() => {
-      setContentVisible(true);
-      hideTimerRef.current = null;
-    }, panelTransitionDuration());
+    const nextExpanded = !transition.targetExpandedRef.current;
+    onExpandedChange(nextExpanded);
+    transition.setOpen(nextExpanded);
   };
 
   return (
     <section
       className={styles.activityGroup}
-      data-expanded={expanded}
+      data-expanded={transition.expanded}
       data-status={turn.status}
     >
-      <button aria-expanded={expanded} className={styles.activityGroupHeader} onClick={toggle} type="button">
+      <button aria-expanded={transition.targetExpanded} className={styles.activityGroupHeader} onClick={toggle} type="button">
         <span>{activityGroupLabel(turn.status, duration, finalAnswerStarted)}</span>
         <span aria-hidden="true">›</span>
       </button>
-      <div className={styles.activityGroupSize}>
-        <div className={styles.activityGroupClip}>
-          <div className={styles.activityGroupContent} data-visible={contentVisible}>
+      {transition.contentMounted ? (
+        <div className={styles.activityGroupSize}>
+          <div className={styles.activityGroupClip}>
+            <div className={styles.activityGroupContent} data-visible={transition.contentVisible}>
             {visibleItems.map((item) => (
               isEmptyReasoning(item) ? (
                 <div className={styles.thinking} key={item.id} role="status">Thinking</div>
@@ -1142,9 +1167,10 @@ function ActivityGroup({
                   : ""}
               </div>
             )}
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
     </section>
   );
 }
@@ -1284,30 +1310,14 @@ function ActivityDisclosure({
   readonly onExpandedChange: (expanded: boolean) => void;
   readonly status: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [contentVisible, setContentVisible] = useState(false);
+  const transition = useCollapsibleContent(false);
   const [titleTruncated, setTitleTruncated] = useState(false);
-  const hideTimerRef = useRef<number | null>(null);
-  const frameRef = useRef<number | null>(null);
   const titleRef = useRef<HTMLSpanElement>(null);
   const hasDetails = Children.toArray(children).length > 0;
-  const expandable = expanded || hasDetails || titleTruncated;
-
-  const cancelTransition = useCallback(() => {
-    if (hideTimerRef.current !== null) {
-      window.clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-    if (frameRef.current !== null) {
-      window.cancelAnimationFrame(frameRef.current);
-      frameRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => () => cancelTransition(), [cancelTransition]);
+  const expandable = transition.targetExpanded || hasDetails || titleTruncated;
 
   const measureTitle = useCallback(() => {
-    if (expanded || titleRef.current === null) {
+    if (transition.expanded || titleRef.current === null) {
       return;
     }
     const lineElements = Array.from(
@@ -1320,14 +1330,14 @@ function ActivityDisclosure({
       (element) => element.scrollWidth > element.clientWidth,
     );
     setTitleTruncated((current) => current === truncated ? current : truncated);
-  }, [expanded]);
+  }, [transition.expanded]);
 
   useLayoutEffect(() => {
     measureTitle();
   });
 
   useEffect(() => {
-    if (expanded || titleRef.current === null) {
+    if (transition.expanded || titleRef.current === null) {
       return;
     }
     const title = titleRef.current;
@@ -1343,27 +1353,12 @@ function ActivityDisclosure({
       observer?.disconnect();
       window.removeEventListener("resize", measureTitle);
     };
-  }, [expandable, expanded, measureTitle]);
+  }, [expandable, measureTitle, transition.expanded]);
 
   const toggle = () => {
-    cancelTransition();
-    if (expanded) {
-      onExpandedChange(false);
-      setContentVisible(false);
-      frameRef.current = window.requestAnimationFrame(() => {
-        setExpanded(false);
-        frameRef.current = null;
-      });
-      return;
-    }
-    onExpandedChange(true);
-    setExpanded(true);
-    if (hasDetails) {
-      hideTimerRef.current = window.setTimeout(() => {
-        setContentVisible(true);
-        hideTimerRef.current = null;
-      }, panelTransitionDuration());
-    }
+    const nextExpanded = !transition.targetExpandedRef.current;
+    onExpandedChange(nextExpanded);
+    transition.setOpen(nextExpanded);
   };
 
   const title = (
@@ -1378,13 +1373,13 @@ function ActivityDisclosure({
   return (
     <section
       className={styles.activityDisclosure}
-      data-expanded={expanded}
+      data-expanded={transition.expanded}
       data-status={status}
     >
       {expandable ? (
         <button
           {...(ariaLabel === undefined ? {} : { "aria-label": ariaLabel })}
-          aria-expanded={expanded}
+          aria-expanded={transition.targetExpanded}
           className={styles.activityRowHeader}
           onClick={toggle}
           type="button"
@@ -1394,10 +1389,10 @@ function ActivityDisclosure({
       ) : (
         <div className={styles.activityRowHeader}>{title}</div>
       )}
-      {hasDetails ? (
+      {hasDetails && transition.contentMounted ? (
         <div className={styles.activityDetailSize}>
           <div className={styles.activityDetailClip}>
-            <div className={styles.activityDetail} data-activity-detail data-visible={contentVisible}>
+            <div className={styles.activityDetail} data-activity-detail data-visible={transition.contentVisible}>
               {children}
             </div>
           </div>

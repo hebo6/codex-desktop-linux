@@ -8,7 +8,6 @@ mod dialogs;
 mod drafts;
 mod header_policy;
 mod local_data;
-mod offline_cache;
 mod preferences;
 mod saved_prompts;
 mod sensitive;
@@ -87,12 +86,6 @@ pub fn run() {
             if !app.manage(configuration::ConfigurationRepository::new(pool.clone())) {
                 return Err(std::io::Error::other(
                     "configuration repository was already initialized",
-                )
-                .into());
-            }
-            if !app.manage(offline_cache::OfflineCacheRepository::new(pool.clone())) {
-                return Err(std::io::Error::other(
-                    "offline cache repository was already initialized",
                 )
                 .into());
             }
@@ -241,11 +234,8 @@ pub fn run() {
             drafts::load_draft,
             drafts::save_draft,
             drafts::delete_draft,
-            offline_cache::load_thread_cache,
-            offline_cache::save_thread_cache,
             preferences::load_preferences,
             preferences::save_preferences,
-            preferences::clear_thread_cache,
             preferences::clear_application_logs,
             preferences::clear_temporary_files,
             preferences::clear_all_local_data,

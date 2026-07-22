@@ -647,6 +647,41 @@ describe("RpcRouter 初始化状态机", () => {
 });
 
 describe("RpcRouter 请求生命周期", () => {
+  it("记录响应解析与校验耗时且诊断回调失败不影响结果", async () => {
+    const writer = new RecordingWriter();
+    const router = new RpcRouter({
+      boundary: new StrictBoundary(),
+      queueCapacity: 1,
+    });
+    const epoch = router.open(writer);
+    await establishConnection(router, writer, epoch);
+    const timings: unknown[] = [];
+    const request = router.sendRequest({
+      method: "model/read",
+      validateResult: stringResult,
+      onResponseTiming: (timing) => {
+        timings.push(timing);
+        throw new Error("diagnostic failure");
+      },
+    });
+
+    await router.handleIncoming(
+      epoch,
+      { id: request.id, result: "ready" },
+      { jsonCharacters: 128, jsonParseMs: 2 },
+    );
+
+    await expect(request.result).resolves.toBe("ready");
+    expect(timings).toEqual([
+      expect.objectContaining({
+        jsonCharacters: 128,
+        jsonParseMs: 2,
+        envelopeValidationMs: expect.any(Number),
+        resultValidationMs: expect.any(Number),
+      }),
+    ]);
+  });
+
   it("业务请求写失败只拒绝对应请求且诊断不含正文", async () => {
     const diagnostics: RpcDiagnostic[] = [];
     const writer = new ControlledWriter();

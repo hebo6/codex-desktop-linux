@@ -156,17 +156,33 @@ describe("ConnectionShell", () => {
     expect(shell).toHaveAttribute("data-sidebar-collapsed", "false");
   });
 
-  it("断线时保留离线主内容并提供只读提示", () => {
+  it("断线时保留当前进程主内容并提供只读提示", () => {
     render(
       <ConnectionShell
-        mainContent={<div>缓存消息</div>}
+        mainContent={<div>已加载消息</div>}
         offline
         offlineSyncedAt={1_000}
         phase="error"
       />,
     );
 
-    expect(screen.getByText("缓存消息")).toBeVisible();
-    expect(screen.getByText(/离线只读内容/u)).toBeVisible();
+    expect(screen.getByText("已加载消息")).toBeVisible();
+    expect(screen.getByText(/连接已中断 · 当前内容只读/u)).toBeVisible();
+  });
+
+  it("重连对账期间区分同步状态并保持内容只读", () => {
+    render(
+      <ConnectionShell
+        mainContent={<div>待对账消息</div>}
+        offline
+        onRetry={vi.fn()}
+        phase="ready"
+        threadListPhase="loading"
+      />,
+    );
+
+    expect(screen.getByText("待对账消息")).toBeVisible();
+    expect(screen.getByText("正在同步服务端内容 · 当前内容只读")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "立即重连" })).not.toBeInTheDocument();
   });
 });

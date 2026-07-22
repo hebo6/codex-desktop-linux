@@ -81,10 +81,6 @@ import {
 } from "./transport/windowState";
 import { openExternalUrl, pickLocalDirectory } from "./transport/systemDialog";
 import {
-  serverThreadCache,
-  type ServerThreadCache,
-} from "./transport/offlineCache";
-import {
   preferencesStore as defaultPreferencesStore,
   type AppPreferences,
   type PreferencesStore,
@@ -119,7 +115,6 @@ export interface AppProps {
   readonly windowStateOptions?: WindowStateControllerOptions;
   readonly windowOpener?: AppWindowOpener;
   readonly windowReferenceSubscriber?: WindowServerReferenceSubscriber;
-  readonly threadCache?: ServerThreadCache;
   readonly preferencesStore?: PreferencesStore;
   readonly notificationService?: DesktopNotificationService;
   readonly deepLinkSubscriber?: DeepLinkTargetSubscriber;
@@ -212,7 +207,6 @@ export function App({
   windowStateOptions,
   windowOpener = openAppWindow,
   windowReferenceSubscriber = subscribeWindowServerReferenceChanges,
-  threadCache = serverThreadCache,
   preferencesStore = defaultPreferencesStore,
   notificationService = desktopNotificationService,
   deepLinkSubscriber = subscribeDeepLinkTargets,
@@ -228,7 +222,6 @@ export function App({
   const serverThreads = useServerThreads(
     connection.threadClient,
     windowState.windowState?.currentThreadId ?? null,
-    threadCache,
     windowState.windowState?.serverId ?? null,
   );
   const conversation = useConversation({
@@ -489,26 +482,6 @@ export function App({
     windowId,
   ]);
 
-  useEffect(() => {
-    if (
-      connection.view.phase !== "ready" ||
-      boundServerId === null ||
-      displayedRestoredThread === null ||
-      serverThreads.offline
-    ) {
-      return;
-    }
-    const timeout = window.setTimeout(() => {
-      void threadCache.save({
-        serverId: boundServerId,
-        threads: serverThreads.threads,
-        nextThreadCursor: serverThreads.nextThreadCursor,
-        currentThreadId: displayedRestoredThread.metadata.id,
-        restoredThread: displayedRestoredThread,
-      }).catch(() => undefined);
-    }, 750);
-    return () => window.clearTimeout(timeout);
-  }, [boundServerId, connection.view.phase, displayedRestoredThread, serverThreads.nextThreadCursor, serverThreads.offline, serverThreads.threads, threadCache]);
   const contentTitle =
     serverThreads.currentThreadDeleted
       ? "会话已删除"

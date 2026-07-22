@@ -21,7 +21,9 @@ import type {
   RpcDiagnostic,
   RpcDiagnosticCode,
   RpcDiagnosticCounts,
+  RpcInboundTiming,
   RpcRequestId,
+  RpcResponseTiming,
   RpcRouterOptions,
   RpcWriter,
   SendRequestOptions,
@@ -54,6 +56,7 @@ interface RequestRecord {
   readonly params: unknown;
   stage: RequestStage;
   readonly validateResult: ResultValidator<unknown>;
+  readonly onResponseTiming: ((timing: RpcResponseTiming) => void) | undefined;
   readonly resolve: (value: unknown) => void;
   readonly reject: (reason: Error) => void;
 }
@@ -221,6 +224,7 @@ export class RpcRouter {
       "initialize",
       protectedParams,
       (value) => this.boundary.validateInitializeResponse(value),
+      undefined,
       "writing",
     );
 
@@ -254,6 +258,7 @@ export class RpcRouter {
       options.method,
       options.params,
       options.validateResult,
+      options.onResponseTiming,
       shouldQueue ? "queued" : "writing",
     );
 
@@ -324,7 +329,11 @@ export class RpcRouter {
     return { ...this.counts };
   }
 
-  async handleIncoming(epoch: number, value: unknown): Promise<void> {
+  async handleIncoming(
+    epoch: number,
+    value: unknown,
+    inboundTiming?: RpcInboundTiming,
+  ): Promise<void> {
     const connection = this.connection;
     if (connection === null || connection.epoch !== epoch) {
       this.emit({
@@ -335,7 +344,9 @@ export class RpcRouter {
       return;
     }
 
+    const envelopeValidationStartedAt = performance.now();
     const envelope = this.boundary.validateMessage(value);
+    const envelopeValidationMs = performance.now() - envelopeValidationStartedAt;
     if (!envelope.ok) {
       this.emit({
         code: "invalid_message",
@@ -366,7 +377,13 @@ export class RpcRouter {
     }
 
     if (hasOwn(record, "result")) {
-      await this.handleSuccessResponse(connection, record);
+      await this.handleSuccessResponse(
+        connection,
+        record,
+        inboundTiming === undefined
+          ? undefined
+          : { ...inboundTiming, envelopeValidationMs },
+      );
       return;
     }
 
@@ -396,6 +413,7 @@ export class RpcRouter {
     method: string,
     params: unknown,
     validateResult: ResultValidator<T>,
+    onResponseTiming: ((timing: RpcResponseTiming) => void) | undefined,
     initialStage: RequestStage,
   ): { readonly request: RequestRecord; readonly handle: RequestHandle<T> } {
     if (connection.nextRequestSequence >= Number.MAX_SAFE_INTEGER) {
@@ -423,6 +441,7 @@ export class RpcRouter {
         stage = value;
       },
       validateResult: (value) => validateResult(value),
+      onResponseTiming,
       resolve: (value) => resolvePromise(value as T),
       reject: rejectPromise,
     };
@@ -489,6 +508,7 @@ export class RpcRouter {
   private async handleSuccessResponse(
     connection: ActiveConnection,
     message: MessageRecord,
+    inboundTiming?: RpcInboundTiming & { readonly envelopeValidationMs: number },
   ): Promise<void> {
     const request = this.responseRequest(connection, message);
     if (request === null) {
@@ -511,7 +531,16 @@ export class RpcRouter {
       return;
     }
 
+    const resultValidationStartedAt = performance.now();
     const validation = request.validateResult(message.result);
+    const resultValidationMs = performance.now() - resultValidationStartedAt;
+    if (inboundTiming !== undefined && request.onResponseTiming !== undefined) {
+      try {
+        request.onResponseTiming({ ...inboundTiming, resultValidationMs });
+      } catch {
+        // 性能诊断旁路不得影响协议结果
+      }
+    }
     if (!validation.ok) {
       const error = new RpcInvalidResultError(request.method);
       this.emit({

@@ -14,7 +14,6 @@ describe("usePreferences", () => {
     const store: PreferencesStore = {
       load: vi.fn(async () => ({ ...DEFAULT_APP_PREFERENCES, theme: "dark" as const })),
       save,
-      clearThreadCache: vi.fn(async () => undefined),
       clearApplicationLogs: vi.fn(async () => undefined),
       clearTemporaryFiles: vi.fn(async () => undefined),
       clearAllLocalData: vi.fn(async () => undefined),
@@ -43,7 +42,6 @@ describe("usePreferences", () => {
     const store: PreferencesStore = {
       load: vi.fn(async () => DEFAULT_APP_PREFERENCES),
       save: vi.fn(async () => { throw new Error("unavailable"); }),
-      clearThreadCache: vi.fn(async () => undefined),
       clearApplicationLogs: vi.fn(async () => undefined),
       clearTemporaryFiles: vi.fn(async () => undefined),
       clearAllLocalData: vi.fn(async () => undefined),

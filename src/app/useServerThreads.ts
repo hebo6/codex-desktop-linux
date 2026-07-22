@@ -13,7 +13,7 @@ import type {
   ThreadDeleteResponse,
 } from "../protocol/generated";
 import type { ServerId } from "../configuration";
-import type { ServerThreadCache } from "../transport/offlineCache";
+import { recordConversationProjection } from "../diagnostics/conversationLoadDiagnostics";
 
 export type ServerThreadsPhase = "idle" | "loading" | "ready" | "error";
 export type ThreadSummary = ThreadListResponse["data"][number];
@@ -126,10 +126,14 @@ interface PreparedStartedThread {
   readonly restoredThread: RestoredThread;
 }
 
+interface RetainedSelection {
+  readonly serverId: ServerId | null;
+  readonly currentThreadId: string | null;
+}
+
 export function useServerThreads(
   client: ServerThreadsClient | null,
   currentThreadId: string | null,
-  cache: ServerThreadCache | null = null,
   serverId: ServerId | null = null,
 ): ServerThreadsControls {
   const [state, setState] = useState<ServerThreadsState>(IDLE_STATE);
@@ -138,6 +142,7 @@ export function useServerThreads(
   const refreshingThreadsRef = useRef<ActiveSource | null>(null);
   const loadingTurnsRef = useRef<ActiveSource | null>(null);
   const preparedStartedThreadRef = useRef<PreparedStartedThread | null>(null);
+  const retainedSelectionRef = useRef<RetainedSelection | null>(null);
 
   const prepareStartedThread = useCallback((response: ThreadStartResponse) => {
     if (client === null) {
@@ -165,48 +170,26 @@ export function useServerThreads(
     loadingTurnsRef.current = null;
     if (client === null) {
       sourceRef.current = null;
-      if (cache === null || serverId === null) {
-        setState(IDLE_STATE);
-        return;
-      }
-      let active = true;
-      setState({ ...IDLE_STATE, phase: "loading" });
-      void cache.load(serverId, currentThreadId).then(
-        (cached) => {
-          if (!active) return;
-          if (cached === null) {
-            setState(IDLE_STATE);
-            return;
-          }
-          const cachedRestoredThread = cached.restoredThread !== null && (
-            currentThreadId === null || cached.restoredThread.metadata.id === currentThreadId
-          ) ? cached.restoredThread : null;
-          const restoredThread = cachedRestoredThread === null ? null : Object.freeze({
-            ...cachedRestoredThread,
-            nextCursor: null,
-          });
-          setState({
+      const canRetain = matchesRetainedSelection(
+        retainedSelectionRef.current,
+        serverId,
+        currentThreadId,
+      );
+      setState((current) => canRetain
+        ? {
+            ...current,
             phase: "ready",
-            threads: cached.threads,
-            nextThreadCursor: null,
-            restoredThread,
             loadingMoreThreads: false,
             refreshingThreads: false,
             loadingOlderTurns: false,
             pendingThreadIds: Object.freeze([]),
             removingThreadIds: Object.freeze([]),
-            currentThreadDeleted: false,
             archivedThread: null,
             error: null,
             offline: true,
-            lastSyncedAt: cached.syncedAtMs,
-          });
-        },
-        () => {
-          if (active) setState(IDLE_STATE);
-        },
-      );
-      return () => { active = false; };
+          }
+        : IDLE_STATE);
+      return;
     }
 
     const source: ActiveSource = { client, currentThreadId };
@@ -384,6 +367,7 @@ export function useServerThreads(
       preparedStartedThread.restoredThread.metadata.id === currentThreadId
     ) {
       preparedStartedThreadRef.current = null;
+      retainedSelectionRef.current = { serverId, currentThreadId };
       setState((current) => ({
         ...current,
         phase: "ready",
@@ -404,7 +388,25 @@ export function useServerThreads(
       if (preparedStartedThread !== null) {
         preparedStartedThreadRef.current = null;
       }
-      setState({ ...IDLE_STATE, phase: "loading" });
+      const canRetain = matchesRetainedSelection(
+        retainedSelectionRef.current,
+        serverId,
+        currentThreadId,
+      );
+      setState((current) => canRetain
+        ? {
+            ...current,
+            phase: "loading",
+            loadingMoreThreads: false,
+            refreshingThreads: false,
+            loadingOlderTurns: false,
+            pendingThreadIds: Object.freeze([]),
+            removingThreadIds: Object.freeze([]),
+            archivedThread: null,
+            error: null,
+            offline: true,
+          }
+        : { ...IDLE_STATE, phase: "loading" });
       void loadInitialState(source).then(
         ({ list, restoredThread }) => {
           if (sourceRef.current !== source) {
@@ -416,6 +418,7 @@ export function useServerThreads(
           const listedThreads = list.data.filter(
             ({ id }) => !removedThreadIds.has(id),
           );
+          retainedSelectionRef.current = { serverId, currentThreadId };
           setState({
             phase: "ready",
             threads:
@@ -440,14 +443,20 @@ export function useServerThreads(
           if (sourceRef.current !== source) {
             return;
           }
-          setState({
-            ...IDLE_STATE,
-            phase: "error",
-            error:
-              failure.stage === "restore"
-                ? THREAD_RESTORE_FAILED
-                : THREAD_LIST_FAILED,
-          });
+          const error = failure.stage === "restore"
+            ? THREAD_RESTORE_FAILED
+            : THREAD_LIST_FAILED;
+          setState((current) => canRetain
+            ? {
+                ...current,
+                phase: "ready",
+                loadingMoreThreads: false,
+                refreshingThreads: false,
+                loadingOlderTurns: false,
+                error,
+                offline: true,
+              }
+            : { ...IDLE_STATE, phase: "error", error });
         },
       );
     }
@@ -464,35 +473,14 @@ export function useServerThreads(
         sourceRef.current = null;
       }
     };
-  }, [cache, client, currentThreadId, serverId]);
-
-  useEffect(() => {
-    if (
-      cache === null ||
-      client === null ||
-      serverId === null ||
-      state.phase !== "ready" ||
-      state.offline
-    ) {
-      return;
-    }
-    const timeout = window.setTimeout(() => {
-      void cache.save({
-        serverId,
-        threads: state.threads,
-        nextThreadCursor: state.nextThreadCursor,
-        currentThreadId: state.restoredThread?.metadata.id ?? null,
-        restoredThread: state.restoredThread,
-      }).catch(() => undefined);
-    }, 500);
-    return () => window.clearTimeout(timeout);
-  }, [cache, client, serverId, state.nextThreadCursor, state.offline, state.phase, state.restoredThread, state.threads]);
+  }, [client, currentThreadId, serverId]);
 
   const loadMoreThreads = useCallback(async (): Promise<void> => {
     const source = sourceRef.current;
     if (
       source === null ||
       state.phase !== "ready" ||
+      state.offline ||
       loadingThreadsRef.current !== null ||
       state.nextThreadCursor === null
     ) {
@@ -529,7 +517,7 @@ export function useServerThreads(
         loadingThreadsRef.current = null;
       }
     }
-  }, [state.nextThreadCursor, state.phase]);
+  }, [state.nextThreadCursor, state.offline, state.phase]);
 
   const loadProjectThreads = useCallback(async (
     cwd: string,
@@ -555,6 +543,7 @@ export function useServerThreads(
     if (
       source === null ||
       state.phase !== "ready" ||
+      state.offline ||
       refreshingThreadsRef.current !== null
     ) {
       return;
@@ -590,7 +579,7 @@ export function useServerThreads(
         refreshingThreadsRef.current = null;
       }
     }
-  }, [state.phase]);
+  }, [state.offline, state.phase]);
 
   const loadOlderTurns = useCallback(async (): Promise<void> => {
     const source = sourceRef.current;
@@ -598,6 +587,7 @@ export function useServerThreads(
     if (
       source === null ||
       state.phase !== "ready" ||
+      state.offline ||
       loadingTurnsRef.current !== null ||
       restored === null ||
       restored.nextCursor === null
@@ -645,7 +635,7 @@ export function useServerThreads(
         loadingTurnsRef.current = null;
       }
     }
-  }, [state.phase, state.restoredThread]);
+  }, [state.offline, state.phase, state.restoredThread]);
 
   const archiveThread = useCallback(
     async (threadId: string): Promise<boolean> => {
@@ -654,6 +644,7 @@ export function useServerThreads(
       if (
         source === null ||
         state.phase !== "ready" ||
+        state.offline ||
         threadIndex < 0 ||
         state.pendingThreadIds.includes(threadId)
       ) {
@@ -710,7 +701,7 @@ export function useServerThreads(
         return false;
       }
     },
-    [state.pendingThreadIds, state.phase, state.threads],
+    [state.offline, state.pendingThreadIds, state.phase, state.threads],
   );
 
   const undoArchive = useCallback(async (): Promise<boolean> => {
@@ -719,6 +710,7 @@ export function useServerThreads(
     if (
       source === null ||
       state.phase !== "ready" ||
+      state.offline ||
       thread === null ||
       state.pendingThreadIds.includes(thread.id)
     ) {
@@ -751,7 +743,7 @@ export function useServerThreads(
       }
       return false;
     }
-  }, [state.archivedThread, state.pendingThreadIds, state.phase]);
+  }, [state.archivedThread, state.offline, state.pendingThreadIds, state.phase]);
 
   const deleteThread = useCallback(
     async (threadId: string): Promise<boolean> => {
@@ -759,6 +751,7 @@ export function useServerThreads(
       if (
         source === null ||
         state.phase !== "ready" ||
+        state.offline ||
         !state.threads.some(({ id }) => id === threadId) ||
         state.pendingThreadIds.includes(threadId)
       ) {
@@ -812,7 +805,7 @@ export function useServerThreads(
         return false;
       }
     },
-    [state.pendingThreadIds, state.phase, state.threads],
+    [state.offline, state.pendingThreadIds, state.phase, state.threads],
   );
 
   return {
@@ -920,6 +913,16 @@ function unsubscribeSafely(client: ServerThreadsClient, threadId: string): void 
   }
 }
 
+function matchesRetainedSelection(
+  retained: RetainedSelection | null,
+  serverId: ServerId | null,
+  currentThreadId: string | null,
+): boolean {
+  return retained !== null &&
+    retained.serverId === serverId &&
+    retained.currentThreadId === currentThreadId;
+}
+
 interface InitialLoadFailure {
   readonly stage: "list" | "restore";
 }
@@ -960,15 +963,21 @@ async function loadInitialState(source: ActiveSource): Promise<{
 }
 
 function restoredThreadFrom(response: ThreadResumeResponse): RestoredThread {
+  const projectionStartedAt = performance.now();
   const initialPage = response.initialTurnsPage;
   if (initialPage === undefined || initialPage === null) {
     throw new TypeError("missing initial turns page");
   }
-  return Object.freeze({
+  const restoredThread = Object.freeze({
     metadata: response.thread,
     turns: Object.freeze([...initialPage.data].reverse()),
     nextCursor: initialPage.nextCursor ?? null,
   });
+  recordConversationProjection(
+    response.thread,
+    performance.now() - projectionStartedAt,
+  );
+  return restoredThread;
 }
 
 function mergeUniqueById<T extends { readonly id: string }>(

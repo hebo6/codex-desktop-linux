@@ -36,9 +36,10 @@ import {
   validateThreadForkResponse,
 } from "../protocol/validation";
 import type { AppServerSession } from "./session";
+import { beginConversationLoadMeasurement } from "../diagnostics/conversationLoadDiagnostics";
 
 export const RECENT_THREAD_PAGE_SIZE = 50;
-export const HISTORY_TURN_PAGE_SIZE = 30;
+export const HISTORY_TURN_PAGE_SIZE = 10;
 
 export interface RecentThreadPageOptions {
   readonly archived?: boolean;
@@ -102,11 +103,23 @@ export class AppServerThreadClient {
         sortDirection: "desc",
       },
     };
-    return this.session.sendRequest({
-      method: "thread/resume",
-      params,
-      validateResult: threadResumeResponseValidator,
-    });
+    const measurement = beginConversationLoadMeasurement();
+    try {
+      const request = this.session.sendRequest({
+        method: "thread/resume",
+        params,
+        validateResult: threadResumeResponseValidator,
+        onResponseTiming: measurement.recordResponseTiming,
+      });
+      void request.result.then(
+        measurement.recordResponse,
+        measurement.recordFailure,
+      );
+      return request;
+    } catch (error) {
+      measurement.recordFailure();
+      throw error;
+    }
   }
 
   listOlderTurns(

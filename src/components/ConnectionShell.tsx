@@ -659,8 +659,10 @@ export function ConnectionShell({
           <div className={styles.mainContent}>
             {offline ? (
               <div className={styles.offlineBanner} role="status">
-                <span>离线只读内容{offlineSyncedAt === null ? "" : ` · 上次同步 ${new Date(offlineSyncedAt).toLocaleString()}`}</span>
-                {onRetry ? <button onClick={onRetry} type="button">立即重连</button> : null}
+                <span>{threadListPhase === "loading"
+                  ? "正在同步服务端内容 · 当前内容只读"
+                  : `连接已中断 · 当前内容只读${offlineSyncedAt === null ? "" : ` · 上次同步 ${new Date(offlineSyncedAt).toLocaleString()}`}`}</span>
+                {threadListPhase !== "loading" && onRetry ? <button onClick={onRetry} type="button">立即重连</button> : null}
               </div>
             ) : null}
             {mainContent}

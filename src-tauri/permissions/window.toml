@@ -21,7 +21,6 @@ commands.allow = [
     "reorder_saved_prompts",
     "load_preferences",
     "save_preferences",
-    "clear_thread_cache",
     "clear_application_logs",
     "clear_temporary_files",
     "clear_all_local_data",

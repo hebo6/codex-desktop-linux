@@ -61,6 +61,17 @@ export interface SendRequestOptions<T> {
   readonly method: string;
   readonly params?: unknown;
   readonly validateResult: ResultValidator<T>;
+  readonly onResponseTiming?: (timing: RpcResponseTiming) => void;
+}
+
+export interface RpcInboundTiming {
+  readonly jsonCharacters: number;
+  readonly jsonParseMs: number;
+}
+
+export interface RpcResponseTiming extends RpcInboundTiming {
+  readonly envelopeValidationMs: number;
+  readonly resultValidationMs: number;
 }
 
 export type ServerRequestHandler = (

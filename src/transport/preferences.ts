@@ -33,7 +33,6 @@ export const DEFAULT_APP_PREFERENCES = Object.freeze({
 export interface PreferencesStore {
   load(): Promise<AppPreferences>;
   save(preferences: AppPreferences): Promise<AppPreferences>;
-  clearThreadCache(): Promise<void>;
   clearApplicationLogs(): Promise<void>;
   clearTemporaryFiles(): Promise<void>;
   clearAllLocalData(): Promise<void>;
@@ -51,9 +50,6 @@ export function createPreferencesStore(
       return parsePreferences(await ipc.invoke<unknown>("save_preferences", {
         request: { preferences },
       }));
-    },
-    async clearThreadCache() {
-      await ipc.invoke<unknown>("clear_thread_cache", {});
     },
     async clearApplicationLogs() {
       await ipc.invoke<unknown>("clear_application_logs", {});

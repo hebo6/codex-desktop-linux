@@ -16,7 +16,6 @@ import type {
 import { useServerThreads } from "./useServerThreads";
 import type { ServerThreadsClient } from "./useServerThreads";
 import type { ServerId } from "../configuration";
-import type { ServerThreadCache } from "../transport/offlineCache";
 
 const THREAD_ONE = {
   cliVersion: "1.0.0",
@@ -33,6 +32,7 @@ const THREAD_ONE = {
   updatedAt: 200,
 } satisfies ThreadListResponse["data"][number];
 const SERVER_ID = "11111111-1111-4111-8111-111111111111" as ServerId;
+const SERVER_TWO_ID = "22222222-2222-4222-8222-222222222222" as ServerId;
 
 const THREAD_TWO = {
   ...THREAD_ONE,
@@ -177,15 +177,18 @@ function startResponse(thread: ThreadListResponse["data"][number]): ThreadStartR
 
 interface Deferred<T> {
   readonly promise: Promise<T>;
+  readonly reject: (reason: unknown) => void;
   readonly resolve: (value: T) => void;
 }
 
 function deferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((resolvePromise) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
     resolve = resolvePromise;
+    reject = rejectPromise;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 }
 
 describe("useServerThreads", () => {
@@ -692,29 +695,97 @@ describe("useServerThreads", () => {
     expect(JSON.stringify(result.current)).not.toContain("secret");
   });
 
-  it("断线时恢复 SQLite 缓存并保持只读", async () => {
-    const cache = {
-      load: async () => ({
-        threads: [THREAD_ONE],
-        nextThreadCursor: "not-available-offline",
-        restoredThread: {
-          metadata: THREAD_ONE,
-          turns: [TURN_ONE],
-          nextCursor: "older",
-        },
-        syncedAtMs: 1234,
-      }),
-      save: async () => undefined,
-    } satisfies ServerThreadCache;
-    const { result } = renderHook(() =>
-      useServerThreads(null, THREAD_ONE.id, cache, SERVER_ID),
+  it("断线时保留当前进程已加载内容并保持只读", async () => {
+    const client = new FakeThreadClient();
+    client.listResults.push(Promise.resolve({ data: [THREAD_ONE] }));
+    client.resumeResults.push(Promise.resolve(resumeResponse([TURN_ONE], "older")));
+    const { result, rerender } = renderHook(
+      ({ activeClient }) => useServerThreads(activeClient, THREAD_ONE.id, SERVER_ID),
+      { initialProps: { activeClient: client as ServerThreadsClient | null } },
     );
 
     await waitFor(() => expect(result.current.phase).toBe("ready"));
+    const syncedAt = result.current.lastSyncedAt;
+    rerender({ activeClient: null });
+
     expect(result.current.offline).toBe(true);
-    expect(result.current.lastSyncedAt).toBe(1234);
+    expect(result.current.lastSyncedAt).toBe(syncedAt);
     expect(result.current.restoredThread?.turns[0]?.id).toBe(TURN_ONE.id);
-    expect(result.current.restoredThread?.nextCursor).toBeNull();
+    expect(result.current.restoredThread?.nextCursor).toBe("older");
     await expect(result.current.archiveThread(THREAD_ONE.id)).resolves.toBe(false);
+  });
+
+  it("冷启动断线时不恢复持久化会话内容", () => {
+    const { result } = renderHook(() =>
+      useServerThreads(null, THREAD_ONE.id, SERVER_ID),
+    );
+
+    expect(result.current.phase).toBe("idle");
+    expect(result.current.offline).toBe(false);
+    expect(result.current.restoredThread).toBeNull();
+  });
+
+  it("重连时保留只读内容并以服务端结果对账", async () => {
+    const first = new FakeThreadClient();
+    first.listResults.push(Promise.resolve({ data: [THREAD_ONE] }));
+    first.resumeResults.push(Promise.resolve(resumeResponse([TURN_ONE], null)));
+    const second = new FakeThreadClient();
+    const listResult = deferred<ThreadListResponse>();
+    const resumeResult = deferred<ThreadResumeResponse>();
+    second.listResults.push(listResult.promise);
+    second.resumeResults.push(resumeResult.promise);
+    const { result, rerender } = renderHook(
+      ({ activeClient, activeServerId }) =>
+        useServerThreads(activeClient, THREAD_ONE.id, activeServerId),
+      {
+        initialProps: {
+          activeClient: first as ServerThreadsClient | null,
+          activeServerId: SERVER_ID,
+        },
+      },
+    );
+    await waitFor(() => expect(result.current.phase).toBe("ready"));
+
+    rerender({ activeClient: null, activeServerId: SERVER_ID });
+    rerender({ activeClient: second, activeServerId: SERVER_ID });
+    expect(result.current.phase).toBe("loading");
+    expect(result.current.offline).toBe(true);
+    expect(result.current.restoredThread?.turns[0]?.id).toBe(TURN_ONE.id);
+
+    listResult.resolve({ data: [THREAD_TWO] });
+    resumeResult.resolve({
+      ...resumeResponse([TURN_TWO], null),
+      thread: { ...THREAD_ONE, turns: [TURN_TWO], updatedAt: 300 },
+    });
+    await waitFor(() => expect(result.current.offline).toBe(false));
+    expect(result.current.restoredThread?.turns[0]?.id).toBe(TURN_TWO.id);
+
+    rerender({ activeClient: null, activeServerId: SERVER_TWO_ID });
+    expect(result.current.phase).toBe("idle");
+    expect(result.current.restoredThread).toBeNull();
+  });
+
+  it("重连对账失败时继续保留当前进程只读内容", async () => {
+    const first = new FakeThreadClient();
+    first.listResults.push(Promise.resolve({ data: [THREAD_ONE] }));
+    first.resumeResults.push(Promise.resolve(resumeResponse([TURN_ONE], null)));
+    const second = new FakeThreadClient();
+    const listResult = deferred<ThreadListResponse>();
+    second.listResults.push(listResult.promise);
+    second.resumeResults.push(Promise.resolve(resumeResponse([TURN_TWO], null)));
+    const { result, rerender } = renderHook(
+      ({ activeClient }) => useServerThreads(activeClient, THREAD_ONE.id, SERVER_ID),
+      { initialProps: { activeClient: first as ServerThreadsClient | null } },
+    );
+    await waitFor(() => expect(result.current.phase).toBe("ready"));
+
+    rerender({ activeClient: null });
+    rerender({ activeClient: second });
+    listResult.reject(new Error("unavailable"));
+
+    await waitFor(() => expect(result.current.error).toBe("无法加载最近会话"));
+    expect(result.current.phase).toBe("ready");
+    expect(result.current.offline).toBe(true);
+    expect(result.current.restoredThread?.turns[0]?.id).toBe(TURN_ONE.id);
   });
 });

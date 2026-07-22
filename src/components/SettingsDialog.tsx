@@ -9,6 +9,10 @@ import type {
 } from "../transport/preferences";
 import type { ConnectionPhase } from "../store/connectionSlice";
 import type { DesktopNotificationPermission } from "../transport/desktopNotifications";
+import {
+  readConversationLoadDiagnostics,
+  type ConversationLoadDiagnostic,
+} from "../diagnostics/conversationLoadDiagnostics";
 import type { ServerConnectionView } from "./ServerSwitcher";
 import { useModalLayer } from "./modalStack";
 import styles from "./SettingsDialog.module.css";
@@ -59,7 +63,7 @@ export interface SettingsDialogProps {
   readonly onAllLocalDataCleared: () => void;
 }
 
-type CleanupKind = "cache" | "logs" | "temporary" | "all";
+type CleanupKind = "logs" | "temporary" | "all";
 type CleanupStatus = "confirm" | "clearing" | "cleared" | "error";
 
 export function SettingsDialog(props: SettingsDialogProps) {
@@ -166,15 +170,13 @@ function SettingsDialogContent({
     currentProxyType: currentProxyLabel(currentServer, proxies),
     recentConnectionError,
     serverCount: servers.length,
+    conversationLoads: readConversationLoadDiagnostics(),
   }), [connectionPhase, currentConnectionStage, currentServer, currentServerName, diagnostics, proxies, recentConnectionError, servers.length]);
 
   const clearData = async (kind: CleanupKind) => {
     setCleanupState({ kind, status: "clearing" });
     try {
       switch (kind) {
-        case "cache":
-          await preferencesStore.clearThreadCache();
-          break;
         case "logs":
           await preferencesStore.clearApplicationLogs();
           break;
@@ -267,10 +269,9 @@ function PermissionsSection({ profiles }: { readonly profiles: readonly Permissi
 
 function PrivacySection({ clearData, setState, state }: { readonly clearData: (kind: CleanupKind) => Promise<void>; readonly setState: (state: { readonly kind: CleanupKind; readonly status: CleanupStatus } | null) => void; readonly state: { readonly kind: CleanupKind; readonly status: CleanupStatus } | null }) {
   const rows = [
-    { kind: "cache", title: "清理会话缓存", description: "删除 SQLite 中的离线只读投影，不影响服务端会话" },
     { kind: "logs", title: "清理日志", description: "删除应用日志目录中的持久化诊断日志" },
     { kind: "temporary", title: "清理临时文件", description: "删除 /tmp/codex-desktop-linux 中的预览和保存中间文件" },
-    { kind: "all", title: "清理全部本地数据", description: "删除服务器、代理、窗口、偏好、缓存、草稿、常用提示词以及凭据存储中的凭据" },
+    { kind: "all", title: "清理全部本地数据", description: "删除服务器、代理、窗口、偏好、草稿、常用提示词以及凭据存储中的凭据" },
   ] as const;
   return <Section title="本地数据" description="清理只影响此客户端的本地数据，不会删除 app-server 上的会话或文件">{rows.map((row) => {
     const active = state?.kind === row.kind ? state.status : null;
@@ -316,7 +317,7 @@ function serverPhaseLabel(phase: ServerConnectionView["phase"]): string {
   }
 }
 
-function buildDiagnosticReport(input: { readonly diagnostics: SystemDiagnostics; readonly connectionPhase: ConnectionPhase; readonly currentConnectionStage: string | null; readonly currentServerName: string; readonly currentProxyType: string; readonly recentConnectionError: string | null; readonly serverCount: number }): string {
+function buildDiagnosticReport(input: { readonly diagnostics: SystemDiagnostics; readonly connectionPhase: ConnectionPhase; readonly currentConnectionStage: string | null; readonly currentServerName: string; readonly currentProxyType: string; readonly recentConnectionError: string | null; readonly serverCount: number; readonly conversationLoads: readonly ConversationLoadDiagnostic[] }): string {
   return [
     `Codex Desktop Linux ${input.diagnostics.clientVersion}`,
     `协议基线 ${input.diagnostics.protocolBaseline}`,
@@ -330,7 +331,40 @@ function buildDiagnosticReport(input: { readonly diagnostics: SystemDiagnostics;
     `当前阶段 ${input.currentConnectionStage ?? "无"}`,
     `最近错误 ${input.recentConnectionError ?? "无"}`,
     `已保存服务器 ${input.serverCount}`,
+    ...conversationLoadReport(input.conversationLoads),
   ].join("\n");
+}
+
+function conversationLoadReport(
+  samples: readonly ConversationLoadDiagnostic[],
+): readonly string[] {
+  if (samples.length === 0) {
+    return ["会话恢复耗时 当前进程暂无记录"];
+  }
+  return samples.slice(0, 5).map((sample, index) => [
+    `会话恢复 ${index + 1}`,
+    conversationLoadStatusLabel(sample.status),
+    `总耗时 ${durationLabel(sample.totalMs)}`,
+    `响应等待 ${durationLabel(sample.responseWaitMs)}`,
+    `JSON 解析 ${durationLabel(sample.jsonParseMs)}`,
+    `协议校验 ${durationLabel(sample.protocolValidationMs)}`,
+    `投影 ${durationLabel(sample.projectionMs)}`,
+    `首次提交 ${durationLabel(sample.renderCommitMs)}`,
+    `响应字符 ${sample.responseCharacters ?? "未记录"}`,
+    `回合/项目 ${sample.turnCount ?? "未记录"}/${sample.itemCount ?? "未记录"}`,
+  ].join(" · "));
+}
+
+function conversationLoadStatusLabel(status: ConversationLoadDiagnostic["status"]): string {
+  switch (status) {
+    case "pending": return "进行中";
+    case "succeeded": return "成功";
+    case "failed": return "失败";
+  }
+}
+
+function durationLabel(value: number | null): string {
+  return value === null ? "未记录" : `${value.toFixed(1)}ms`;
 }
 
 function currentProxyLabel(

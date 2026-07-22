@@ -147,18 +147,24 @@ describe("ConversationView", () => {
     expect(activityGroups).toHaveLength(1);
     expect(getComputedStyle(activityGroups[0]!).position).toBe("static");
     expect(screen.getByText("已经完成检查")).toBeVisible();
-    expect(screen.getByText("我会先检查关键路径")).not.toBeVisible();
+    expect(screen.queryByText("我会先检查关键路径")).not.toBeInTheDocument();
     for (const activityGroup of activityGroups) {
       expect(activityGroup).toHaveAttribute("aria-expanded", "false");
       fireEvent.click(activityGroup);
-      expect(getComputedStyle(activityGroup).position).toBe("sticky");
-      expect(getComputedStyle(activityGroup).top).toBe("0px");
     }
+    await waitFor(() => {
+      for (const activityGroup of activityGroups) {
+        expect(getComputedStyle(activityGroup).position).toBe("sticky");
+        expect(getComputedStyle(activityGroup).top).toBe("0px");
+      }
+    });
     await waitFor(() => expect(screen.getByText("Hook 提示")).toBeVisible());
     fireEvent.click(screen.getByRole("button", { name: "Ran pnpm test" }));
     const commandHeading = screen.getByRole("button", { name: "Ran pnpm test" });
-    expect(getComputedStyle(commandHeading).position).toBe("sticky");
-    expect(getComputedStyle(commandHeading).top).toBe("36px");
+    await waitFor(() => {
+      expect(getComputedStyle(commandHeading).position).toBe("sticky");
+      expect(getComputedStyle(commandHeading).top).toBe("36px");
+    });
     await waitFor(() => expect(screen.getByText("全部通过")).toBeVisible());
 
     await waitFor(() => {
@@ -193,7 +199,7 @@ describe("ConversationView", () => {
     await waitFor(() => expect(screen.getByText(/••••••/u)).toBeVisible());
   });
 
-  it("虚拟行使用 top 定位以支持原生粘性标题", () => {
+  it("虚拟行使用 top 定位以支持原生粘性标题", async () => {
     render(
       <ConversationView
         hasOlderTurns={false}
@@ -212,7 +218,7 @@ describe("ConversationView", () => {
     expect(virtualRow.style.transform).toBe("");
     fireEvent.click(groupHeading);
     expect(screen.getAllByRole("button", { name: /已运行/u })).toHaveLength(1);
-    expect(getComputedStyle(groupHeading).position).toBe("sticky");
+    await waitFor(() => expect(getComputedStyle(groupHeading).position).toBe("sticky"));
   });
 
   it("优先使用 commandActions 生成命令标题", async () => {
@@ -490,7 +496,9 @@ describe("ConversationView", () => {
       }
     });
     expect(screen.getByText("已经完成检查")).toBeVisible();
-    expect(screen.getByText("我会先检查关键路径")).not.toBeVisible();
+    await waitFor(() =>
+      expect(screen.queryByText("我会先检查关键路径")).not.toBeInTheDocument(),
+    );
   });
 
   it("在底部展开已完成活动组后不再因行高变化自动贴底", () => {
@@ -589,7 +597,7 @@ describe("ConversationView", () => {
 
     expect(screen.queryByText("Thinking")).not.toBeInTheDocument();
     expect(screen.getByText("正在运行命令 · 12 秒")).toBeVisible();
-    expect(screen.getByText("处理中")).not.toBeVisible();
+    expect(screen.queryByText("处理中")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Running pnpm test" }));
     await waitFor(() => expect(screen.getByText("处理中")).toBeVisible());
   });
@@ -621,7 +629,7 @@ describe("ConversationView", () => {
       "false",
     );
     expect(screen.getByText("计划已制定")).toBeVisible();
-    expect(screen.getByText("正在准备执行")).not.toBeVisible();
+    expect(screen.queryByText("正在准备执行")).not.toBeInTheDocument();
   });
 
   it("用户问题达到四个时显示预览并跳转到对应问题", () => {

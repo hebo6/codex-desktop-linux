@@ -407,15 +407,21 @@ export class AppServerSession {
         }
 
         let message: unknown;
+        let jsonParseMs: number;
         try {
+          const parseStartedAt = performance.now();
           message = JSON.parse(json) as unknown;
+          jsonParseMs = performance.now() - parseStartedAt;
         } catch {
           this.emitSessionDiagnostic("invalidTransportJson");
           this.fail("invalidTransportJson");
           return;
         }
 
-        await this.router.handleIncoming(epoch, message);
+        await this.router.handleIncoming(epoch, message, {
+          jsonCharacters: json.length,
+          jsonParseMs,
+        });
       } catch {
         this.emitSessionDiagnostic("inboundProcessingFailed");
         this.fail("inboundProcessingFailed");

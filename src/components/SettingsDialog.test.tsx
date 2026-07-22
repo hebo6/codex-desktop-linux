@@ -9,7 +9,6 @@ function renderSettings(overrides: Partial<Parameters<typeof SettingsDialog>[0]>
   const store: PreferencesStore = {
     load: vi.fn(async () => DEFAULT_APP_PREFERENCES),
     save: vi.fn(async (value) => value),
-    clearThreadCache: vi.fn(async () => undefined),
     clearApplicationLogs: vi.fn(async () => undefined),
     clearTemporaryFiles: vi.fn(async () => undefined),
     clearAllLocalData: vi.fn(async () => undefined),
@@ -64,15 +63,6 @@ describe("SettingsDialog", () => {
     expect(screen.getAllByRole("button", { name: /外观|通用|通知|服务器|代理|权限|数据与隐私|快捷键|诊断/u })).toHaveLength(9);
     fireEvent.click(screen.getByRole("radio", { name: "深色" }));
     expect(props.onUpdatePreferences).toHaveBeenCalledWith({ theme: "dark" });
-  });
-
-  it("清理缓存前要求明确确认", async () => {
-    const { store } = renderSettings({ initialSection: "privacy" });
-    fireEvent.click(screen.getByRole("button", { name: "清理会话缓存" }));
-    expect(store.clearThreadCache).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "确认清理会话缓存" }));
-    await waitFor(() => expect(store.clearThreadCache).toHaveBeenCalledTimes(1));
-    expect(screen.getByText("已清理")).toBeVisible();
   });
 
   it("分别清理日志、临时文件和包含草稿的全部本地数据", async () => {
@@ -185,5 +175,6 @@ describe("SettingsDialog", () => {
     expect(screen.getByText(/代理类型 SOCKS5/u)).toBeVisible();
     expect(screen.getByText(/当前阶段 建立隧道/u)).toBeVisible();
     expect(screen.getByText(/最近错误 代理认证失败/u)).toBeVisible();
+    expect(screen.getByText(/会话恢复耗时 当前进程暂无记录/u)).toBeVisible();
   });
 });

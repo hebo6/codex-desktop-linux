@@ -129,7 +129,6 @@ const THREADS = [
 const VISUAL_PREFERENCES_STORE: PreferencesStore = {
   load: async () => DEFAULT_APP_PREFERENCES,
   save: async (preferences) => preferences,
-  clearThreadCache: NOOP_ASYNC,
   clearApplicationLogs: NOOP_ASYNC,
   clearTemporaryFiles: NOOP_ASYNC,
   clearAllLocalData: NOOP_ASYNC,

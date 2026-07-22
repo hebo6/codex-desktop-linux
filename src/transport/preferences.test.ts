@@ -24,7 +24,6 @@ describe("preferences transport", () => {
     const store = createPreferencesStore({ invoke } as Pick<TauriIpc, "invoke">);
     await store.load();
     await store.save(DEFAULT_APP_PREFERENCES);
-    await store.clearThreadCache();
     await store.clearApplicationLogs();
     await store.clearTemporaryFiles();
     await store.clearAllLocalData();
@@ -32,7 +31,6 @@ describe("preferences transport", () => {
     expect(invoke.mock.calls.map(([command]) => command)).toEqual([
       "load_preferences",
       "save_preferences",
-      "clear_thread_cache",
       "clear_application_logs",
       "clear_temporary_files",
       "clear_all_local_data",

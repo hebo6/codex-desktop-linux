@@ -140,26 +140,6 @@ impl PreferencesRepository {
         Ok(preferences)
     }
 
-    async fn clear_thread_cache(&self) -> Result<(), PreferencesError> {
-        let mut transaction = self
-            .pool
-            .begin()
-            .await
-            .map_err(PreferencesError::Database)?;
-        sqlx::query("DELETE FROM thread_projection_caches")
-            .execute(&mut *transaction)
-            .await
-            .map_err(PreferencesError::Database)?;
-        sqlx::query("DELETE FROM thread_list_caches")
-            .execute(&mut *transaction)
-            .await
-            .map_err(PreferencesError::Database)?;
-        transaction
-            .commit()
-            .await
-            .map_err(PreferencesError::Database)
-    }
-
     async fn credential_bindings(
         &self,
     ) -> Result<Vec<(CredentialReference, CredentialDescriptor)>, PreferencesError> {
@@ -265,13 +245,6 @@ pub(crate) async fn save_preferences(
         .save(request.preferences)
         .await
         .map_err(Into::into)
-}
-
-#[tauri::command]
-pub(crate) async fn clear_thread_cache(
-    repository: State<'_, PreferencesRepository>,
-) -> Result<(), PreferencesCommandError> {
-    repository.clear_thread_cache().await.map_err(Into::into)
 }
 
 #[tauri::command]
@@ -396,7 +369,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn clears_configuration_windows_cache_and_preferences_together() {
+    async fn clears_configuration_windows_drafts_and_preferences_together() {
         let repository = repository().await;
         let server_id = Uuid::new_v4();
         let proxy_id = Uuid::new_v4();
