@@ -223,6 +223,7 @@ export function Composer({
   const fileSearchRef = useRef(0);
   const composingRef = useRef(false);
   const sendingRef = useRef(false);
+  const draftKeyRef = useRef(draftKey);
   const previousDraftKeyRef = useRef(draftKey);
   const loadedDraftKeyRef = useRef<string | null>(null);
   const reportedDraftPresenceRef = useRef<{
@@ -237,6 +238,7 @@ export function Composer({
     direction: "forward" | "backward" | "none";
   }>({ start: initialText.length, end: initialText.length, direction: "none" });
   const savedPrompts = useSavedPrompts(savedPromptStore);
+  draftKeyRef.current = draftKey;
   currentDraftRef.current = { text, tokens };
   const normalized = text.trim();
   const catalogDefaultModel = models.find(({ isDefault }) => isDefault) ?? null;
@@ -550,8 +552,9 @@ export function Composer({
   };
 
   const releaseDraftPreservationIfUnchanged = () => {
+    const sourceDraftKey = draftKey;
     window.setTimeout(() => {
-      if (previousDraftKeyRef.current === draftKey) {
+      if (draftKeyRef.current === sourceDraftKey) {
         preserveDraftForNextKeyRef.current = false;
       }
     }, 0);
