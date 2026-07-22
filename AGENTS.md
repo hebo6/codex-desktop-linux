@@ -1,7 +1,8 @@
 # 相关仓库
 
-- Codex 源码仓库通过 `CODEX_SOURCE_DIR` 指定，需要了解 `app-server` 协议细节时可参考该仓库源码
-- Codex 端及 `app-server` 协议仅供参考，禁止修改
+- Codex 源码仓库位于当前项目同级目录 `../codex`
+- 需要了解 Codex 或 `app-server` 的协议与实现细节时，优先参考该仓库源码
+- Codex 源码仓库仅供只读参考，禁止修改
 
 # 开发原则
 
