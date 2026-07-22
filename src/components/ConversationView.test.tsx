@@ -1040,6 +1040,111 @@ describe("ConversationView", () => {
     boundingRect.mockRestore();
   });
 
+  it("已有可读空白时首个流式回答不应将新问题滚动到顶部", () => {
+    const completedTurn = {
+      id: "turn-blank-space-1",
+      items: [
+        {
+          content: [{ text: "较短的历史问题", type: "text" as const }],
+          id: "user-blank-space-1",
+          type: "userMessage" as const,
+        },
+        {
+          id: "answer-blank-space-1",
+          phase: "final_answer" as const,
+          text: "较短的历史回答",
+          type: "agentMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "completed" as const,
+    } satisfies ThreadTurn;
+    const { rerender } = render(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...RESTORED, nextCursor: null, turns: [completedTurn] }}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    let scrollTop = 0;
+    let maximumScrollTop = 0;
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 800 },
+      scrollTop: {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = Math.min(value, maximumScrollTop);
+        },
+      },
+    });
+    const activeQuestion = {
+      id: "turn-blank-space-2",
+      items: [
+        {
+          content: [{ text: "新问题", type: "text" as const }],
+          id: "user-blank-space-2",
+          type: "userMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "inProgress" as const,
+    } satisfies ThreadTurn;
+
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{
+          ...RESTORED,
+          nextCursor: null,
+          turns: [completedTurn, activeQuestion],
+        }}
+      />,
+    );
+
+    expect(scroller.scrollTop).toBe(0);
+    const conversationTail = scroller.querySelector<HTMLElement>(
+      "[data-conversation-tail]",
+    );
+    if (conversationTail === null) {
+      throw new Error("缺少会话内容末尾标记");
+    }
+    mockElementBottom(conversationTail, () => 520 - scroller.scrollTop);
+    maximumScrollTop = 1_000;
+
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{
+          ...RESTORED,
+          nextCursor: null,
+          turns: [
+            completedTurn,
+            {
+              ...activeQuestion,
+              items: [
+                ...activeQuestion.items,
+                {
+                  id: "answer-blank-space-2",
+                  text: "开始流式回答",
+                  type: "agentMessage" as const,
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(scroller.scrollTop).toBe(0);
+  });
+
   it("新问题离散翻页并在手动滚动延时后重新判断跟随", () => {
     const firstTurn = {
       id: "turn-page-1",
@@ -1072,6 +1177,17 @@ describe("ConversationView", () => {
       clientHeight: { configurable: true, value: 500 },
       scrollHeight: { configurable: true, value: 1_720 },
     });
+    const conversationTail = scroller.querySelector<HTMLElement>(
+      "[data-conversation-tail]",
+    );
+    if (conversationTail === null) {
+      throw new Error("缺少会话内容末尾标记");
+    }
+    let tailDocumentBottom = 600;
+    mockElementBottom(
+      conversationTail,
+      () => tailDocumentBottom - scroller.scrollTop,
+    );
     const activeTurn = {
       id: "turn-page-2",
       items: [
@@ -1107,17 +1223,7 @@ describe("ConversationView", () => {
     expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
       .toHaveAttribute("data-sticky-question", "user-page-2");
 
-    const conversationTail = scroller.querySelector<HTMLElement>(
-      "[data-conversation-tail]",
-    );
-    if (conversationTail === null) {
-      throw new Error("缺少会话内容末尾标记");
-    }
-    let tailDocumentBottom = 850;
-    mockElementBottom(
-      conversationTail,
-      () => tailDocumentBottom - scroller.scrollTop,
-    );
+    tailDocumentBottom = 850;
     rerender(
       <ConversationView
         hasOlderTurns={false}
@@ -1253,6 +1359,16 @@ describe("ConversationView", () => {
       configurable: true,
       value: 500,
     });
+    const conversationTail = scroller.querySelector<HTMLElement>(
+      "[data-conversation-tail]",
+    );
+    if (conversationTail === null) {
+      throw new Error("缺少会话内容末尾标记");
+    }
+    mockElementBottom(
+      conversationTail,
+      () => 650 - scroller.scrollTop,
+    );
     const activeQuestion = {
       id: "turn-position-2",
       items: [

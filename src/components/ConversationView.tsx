@@ -506,9 +506,13 @@ export function ConversationView({
     if (latestQuestion === null) {
       return;
     }
+    const scroller = scrollerRef.current;
     if (observedQuestionIdRef.current !== latestQuestionId) {
       observedQuestionIdRef.current = latestQuestionId;
-      pendingQuestionPositionRef.current = latestQuestionId;
+      pendingQuestionPositionRef.current =
+        scroller !== null && !updateConversationBottom(scroller)
+          ? latestQuestionId
+          : null;
       cancelManualScrollDelay();
       setPreservePageEndSpace(true);
       setPageFollowingMode(true);
@@ -517,7 +521,6 @@ export function ConversationView({
     if (pendingQuestionPositionRef.current !== latestQuestionId) {
       return;
     }
-    const scroller = scrollerRef.current;
     const top = questionTop(latestQuestion);
     if (scroller !== null && top !== null) {
       scroller.scrollTop = top;
@@ -532,6 +535,7 @@ export function ConversationView({
     questionTop,
     restoredThread.metadata.id,
     setPageFollowingMode,
+    updateConversationBottom,
     updateStickyQuestion,
   ]);
 
