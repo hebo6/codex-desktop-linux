@@ -12,11 +12,6 @@ const VisualRegressionFixture = import.meta.env.DEV
       default: (await import("./visual/VisualRegressionFixture")).VisualRegressionFixture,
     }))
   : null;
-const ActivityScrollReproduction = import.meta.env.DEV
-  ? lazy(async () => ({
-      default: (await import("./visual/ActivityScrollReproduction")).ActivityScrollReproduction,
-    }))
-  : null;
 
 const rootElement = document.getElementById("root");
 
@@ -27,19 +22,14 @@ if (!rootElement) {
 const visualRegressionQuery = import.meta.env.DEV
   ? parseVisualRegressionQuery(window.location.search)
   : null;
-const activityScrollReproduction = import.meta.env.DEV &&
-  new URLSearchParams(window.location.search).get("testFixture") ===
-    "activity-scroll";
 
 createRoot(rootElement).render(
   <StrictMode>
     <Provider store={store}>
       <Suspense fallback={<StartupShell />}>
-        {activityScrollReproduction && ActivityScrollReproduction !== null
-          ? <ActivityScrollReproduction />
-          : visualRegressionQuery === null || VisualRegressionFixture === null
-            ? <App />
-            : <VisualRegressionFixture {...visualRegressionQuery} />}
+        {visualRegressionQuery === null || VisualRegressionFixture === null
+          ? <App />
+          : <VisualRegressionFixture {...visualRegressionQuery} />}
       </Suspense>
     </Provider>
   </StrictMode>,
