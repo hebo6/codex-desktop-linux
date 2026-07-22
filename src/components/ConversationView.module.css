@@ -135,7 +135,6 @@
   padding: 0 24px var(--space-3);
   margin: 0 auto;
   background: var(--color-content-bg);
-  box-shadow: 0 1px 0 var(--color-divider-subtle);
   pointer-events: none;
 }
 
