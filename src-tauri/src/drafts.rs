@@ -128,7 +128,7 @@ impl DraftRepository {
              ORDER BY updated_at_ms DESC",
         )
         .bind(&request.key_prefix)
-        .bind(request.key_prefix)
+        .bind(&request.key_prefix)
         .fetch_all(&self.pool)
         .await
         .map_err(DraftError::Database)
