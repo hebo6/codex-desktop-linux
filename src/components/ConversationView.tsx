@@ -172,6 +172,13 @@ export function ConversationView({
   const pageFollowingRef = useRef(false);
   const loadingAnchorRef = useRef(false);
   const observedThreadIdRef = useRef(restoredThread.metadata.id);
+  const initialBottomScrollRef = useRef<{
+    pending: boolean;
+    threadId: string | null;
+  }>({
+    pending: false,
+    threadId: null,
+  });
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [pageFollowing, setPageFollowing] = useState(false);
   const [preservePageEndSpace, setPreservePageEndSpace] = useState(false);
@@ -248,6 +255,13 @@ export function ConversationView({
     overscan: 720,
     threshold: 30,
   });
+  const lastRowKey = rows.at(-1)?.key ?? null;
+  const lastRowVisible = lastRowKey === null || virtual.rows.some(
+    ({ key }) => key === lastRowKey,
+  );
+  const visibleRowsMeasured =
+    !virtual.virtualized ||
+    virtual.rows.every(({ key }) => virtual.isMeasured(key));
   const setPageFollowingMode = useCallback((following: boolean) => {
     pageFollowingRef.current = following;
     setPageFollowing(following);
@@ -463,19 +477,64 @@ export function ConversationView({
     }
   }, [activeTurn, setPageFollowingMode, updateJumpToBottom]);
 
-  useEffect(() => {
-    const scroller = scrollerRef.current;
+  useLayoutEffect(() => {
+    initialBottomScrollRef.current = {
+      pending: true,
+      threadId: restoredThread.metadata.id,
+    };
     observedThreadIdRef.current = restoredThread.metadata.id;
     observedQuestionIdRef.current = latestQuestion?.itemId ?? null;
     setPreservePageEndSpace(activeTurn !== undefined);
     setPageFollowingMode(activeTurn !== undefined);
     setShowJumpToBottom(false);
     setStickyQuestionState(null);
-    if (scroller !== null && restoredThread.turns.length > 0) {
-      scroller.scrollTop = scroller.scrollHeight;
+  }, [restoredThread.metadata.id]);
+
+  useLayoutEffect(() => {
+    const scrollState = initialBottomScrollRef.current;
+    if (
+      !scrollState.pending ||
+      scrollState.threadId !== restoredThread.metadata.id
+    ) {
+      return;
+    }
+    virtual.scrollToBottom();
+    const scroller = scrollerRef.current;
+    if (scroller !== null) {
       updateStickyQuestion(scroller);
     }
-  }, [restoredThread.metadata.id]);
+    if (!virtual.virtualized) {
+      scrollState.pending = false;
+      return;
+    }
+    if (!lastRowVisible || !visibleRowsMeasured) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      if (
+        !scrollState.pending ||
+        scrollState.threadId !== restoredThread.metadata.id
+      ) {
+        return;
+      }
+      virtual.scrollToBottom();
+      const current = scrollerRef.current;
+      if (current !== null) {
+        updateStickyQuestion(current);
+      }
+      scrollState.pending = false;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    lastRowKey,
+    lastRowVisible,
+    restoredThread.metadata.id,
+    updateStickyQuestion,
+    virtual.scrollToBottom,
+    virtual.totalSize,
+    virtual.virtualized,
+    visibleRowsMeasured,
+  ]);
 
   const loadOlder = async () => {
     const scroller = scrollerRef.current;

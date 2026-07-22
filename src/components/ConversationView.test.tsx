@@ -1087,6 +1087,96 @@ describe("ConversationView", () => {
     expect(screen.getAllByText(/回答 \d+/u).length).toBeLessThan(100);
   });
 
+  it("从侧边栏加载长会话后定位到已测量内容的底部", async () => {
+    class FakeResizeObserver {
+      constructor(_callback: ResizeObserverCallback) {}
+      disconnect() {}
+      observe() {}
+      unobserve() {}
+    }
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      value: FakeResizeObserver,
+    });
+    const originalBoundingRect = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        return this.getAttribute("aria-label") === "会话消息" ? 240 : 0;
+      });
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.getAttribute("aria-label") !== "会话消息") {
+          return 0;
+        }
+        const list = this.querySelector<HTMLElement>("[data-conversation-list]");
+        return Number.parseFloat(list?.style.height ?? "0") + 148;
+      });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        if (!this.matches("[data-virtual-key]")) {
+          return originalBoundingRect.call(this);
+        }
+        const height = this.textContent?.includes("历史回答 19") ? 420 : 70;
+        return {
+          bottom: height,
+          height,
+          left: 0,
+          right: 0,
+          toJSON: () => ({}),
+          top: 0,
+          width: 0,
+          x: 0,
+          y: 0,
+        };
+      });
+    const turns = Array.from({ length: 20 }, (_, index) => ({
+      id: `turn-loaded-${index}`,
+      items: [
+        {
+          content: [{ text: `历史问题 ${index}`, type: "text" as const }],
+          id: `user-loaded-${index}`,
+          type: "userMessage" as const,
+        },
+        {
+          id: `answer-loaded-${index}`,
+          phase: "final_answer" as const,
+          text: `历史回答 ${index}`,
+          type: "agentMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "completed" as const,
+    })) satisfies ThreadTurn[];
+    const loadedThread = {
+      ...RESTORED,
+      metadata: { ...RESTORED.metadata, id: "thread-loaded", turns },
+      nextCursor: null,
+      turns,
+    } satisfies RestoredThread;
+    const { rerender } = render(<ConversationPlaceholder kind="loading" />);
+
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={loadedThread}
+      />,
+    );
+
+    const scroller = screen.getByLabelText("会话消息");
+    await waitFor(() =>
+      expect(scroller.querySelector(
+        '[data-virtual-key="turn-loaded-19:segment:answer-loaded-19"]',
+      )).not.toBeNull(),
+    );
+    await waitFor(() =>
+      expect(scroller.scrollTop).toBe(
+        scroller.scrollHeight - scroller.clientHeight,
+      ),
+    );
+  });
+
   it("区分空白、加载和错误主区状态", () => {
     const { rerender } = render(<ConversationPlaceholder kind="blank" />);
     expect(screen.getByRole("status")).toHaveTextContent("发送第一条消息时才会创建");

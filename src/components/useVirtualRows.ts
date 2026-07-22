@@ -28,7 +28,9 @@ interface VirtualRowsResult {
   readonly rows: readonly VirtualRow[];
   readonly totalSize: number;
   readonly virtualized: boolean;
+  readonly isMeasured: (key: string) => boolean;
   readonly measureElement: (key: string) => (element: HTMLElement | null) => void;
+  readonly scrollToBottom: () => void;
   readonly scrollToIndex: (index: number) => void;
   readonly keyAtOffset: (offset: number) => string | null;
   readonly indexAtOffset: (offset: number) => number | null;
@@ -162,6 +164,26 @@ export function useVirtualRows({
     [],
   );
 
+  const isMeasured = useCallback(
+    (key: string) => sizesRef.current.has(key),
+    [],
+  );
+
+  const scrollToBottom = useCallback(() => {
+    const scroller = scrollerRef.current;
+    if (scroller === null) {
+      return;
+    }
+    const height = Math.max(1, scroller.clientHeight);
+    const top = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    scroller.scrollTop = top;
+    setViewport((current) =>
+      current.height === height && current.top === top
+        ? current
+        : { height, top }
+    );
+  }, [scrollerRef]);
+
   const scrollToIndex = useCallback(
     (index: number) => {
       const scroller = scrollerRef.current;
@@ -203,7 +225,9 @@ export function useVirtualRows({
     rows,
     totalSize: layout.totalSize,
     virtualized,
+    isMeasured,
     measureElement,
+    scrollToBottom,
     scrollToIndex,
     keyAtOffset,
     indexAtOffset,
