@@ -71,6 +71,11 @@ describe("useComposerCapabilities", () => {
       listPermissionProfiles: () => completed({ data: [], nextCursor: null }),
       listPlugins: vi.fn(() => completed(plugins)),
       listSkills: () => completed({ data: [] }),
+      readConfig: () => completed({
+        config: { default_permissions: ":workspace" },
+        origins: {},
+      }),
+      readConfigRequirements: () => completed({ requirements: null }),
       searchFiles: () => completed({ files: [] }),
     } satisfies CapabilityClient;
     const { result } = renderHook(() => useComposerCapabilities(client, "/workspace"));
@@ -99,6 +104,39 @@ describe("useComposerCapabilities", () => {
     expect(listApps).toHaveBeenNthCalledWith(1, { limit: 100 });
     expect(listApps).toHaveBeenNthCalledWith(2, { cursor: "apps-page-2", limit: 100 });
     expect(client.listPlugins).toHaveBeenCalledWith({ cwds: ["/workspace"] });
+    expect(result.current.defaultPermission).toBe(":workspace");
     expect(result.current.mentionsError).toBeNull();
+  });
+
+  it("仅展示服务器明确且允许的默认权限", async () => {
+    const client = {
+      listApps: () => completed({ data: [], nextCursor: null }),
+      listModels: () => completed({ data: [], nextCursor: null }),
+      listPermissionProfiles: () => completed({
+        data: [{ allowed: true, id: "managed" }],
+        nextCursor: null,
+      }),
+      listPlugins: () => completed({ marketplaces: [] }),
+      listSkills: () => completed({ data: [] }),
+      readConfig: () => completed({
+        config: { default_permissions: ":danger-full-access" },
+        origins: {},
+      }),
+      readConfigRequirements: () => completed({
+        requirements: {
+          allowedPermissionProfiles: {
+            ":danger-full-access": false,
+            managed: true,
+          },
+          defaultPermissions: "managed",
+        },
+      }),
+      searchFiles: () => completed({ files: [] }),
+    } satisfies CapabilityClient;
+
+    const { result } = renderHook(() => useComposerCapabilities(client, "/workspace"));
+
+    await waitFor(() => expect(result.current.permissionsLoading).toBe(false));
+    expect(result.current.defaultPermission).toBe("managed");
   });
 });

@@ -1327,6 +1327,7 @@ export function App({
                   }
                   models={composerCapabilities.models}
                   modelsLoading={composerCapabilities.modelsLoading}
+                  defaultPermission={composerCapabilities.defaultPermission}
                   mentionReferences={composerCapabilities.mentionReferences}
                   mentionsError={composerCapabilities.mentionsError}
                   mentionsLoading={composerCapabilities.mentionsLoading}

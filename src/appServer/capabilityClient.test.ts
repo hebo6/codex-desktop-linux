@@ -18,7 +18,7 @@ class RecordingSession {
 }
 
 describe("AppServerCapabilityClient", () => {
-  it("映射模型、技能、文件、权限、应用和插件请求", () => {
+  it("映射模型、技能、文件、权限、配置、应用和插件请求", () => {
     const session = new RecordingSession();
     const client = new AppServerCapabilityClient(session);
 
@@ -26,6 +26,8 @@ describe("AppServerCapabilityClient", () => {
     client.listSkills({ cwds: ["/workspace"] });
     client.searchFiles({ query: "readme", roots: ["/workspace"], cancellationToken: "search-1" });
     client.listPermissionProfiles({ cwd: "/workspace" });
+    client.readConfig({ cwd: "/workspace", includeLayers: false });
+    client.readConfigRequirements();
     client.listApps({ limit: 100 });
     client.listPlugins({ cwds: ["/workspace"] });
 
@@ -37,6 +39,8 @@ describe("AppServerCapabilityClient", () => {
         params: { query: "readme", roots: ["/workspace"], cancellationToken: "search-1" },
       },
       { method: "permissionProfile/list", params: { cwd: "/workspace" } },
+      { method: "config/read", params: { cwd: "/workspace", includeLayers: false } },
+      { method: "configRequirements/read", params: undefined },
       { method: "app/list", params: { limit: 100 } },
       { method: "plugin/list", params: { cwds: ["/workspace"] } },
     ]);

@@ -147,6 +147,17 @@ const schemaDeclarations = [
     schemaPath: "v2/PermissionProfileListResponse.json",
     validatorName: "validatePermissionProfileListResponse",
   },
+  { typeName: "ConfigReadParams", schemaPath: "v2/ConfigReadParams.json" },
+  {
+    typeName: "ConfigReadResponse",
+    schemaPath: "v2/ConfigReadResponse.json",
+    validatorName: "validateConfigReadResponse",
+  },
+  {
+    typeName: "ConfigRequirementsReadResponse",
+    schemaPath: "v2/ConfigRequirementsReadResponse.json",
+    validatorName: "validateConfigRequirementsReadResponse",
+  },
   { typeName: "AppsListParams", schemaPath: "v2/AppsListParams.json" },
   {
     typeName: "AppsListResponse",

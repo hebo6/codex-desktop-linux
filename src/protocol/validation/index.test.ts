@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { ClientRequest } from "../generated";
 import {
   parseJsonRpcMessage,
+  validateConfigReadResponse,
+  validateConfigRequirementsReadResponse,
   validateInitializeResponse,
   validateJsonRpcMessage,
   validateServerNotification,
@@ -101,6 +103,23 @@ describe("协议运行时边界", () => {
         platformOs: "linux",
       }).ok,
     ).toBe(false);
+  });
+
+  it("校验配置和管理要求读取响应", () => {
+    expect(
+      validateConfigReadResponse({
+        config: { default_permissions: ":workspace" },
+        origins: {},
+      }).ok,
+    ).toBe(true);
+    expect(
+      validateConfigRequirementsReadResponse({
+        requirements: {
+          allowedPermissionProfiles: { ":workspace": true },
+          defaultPermissions: ":workspace",
+        },
+      }).ok,
+    ).toBe(true);
   });
 
   it("校验会话列表、读取、恢复和 turn 分页响应", () => {

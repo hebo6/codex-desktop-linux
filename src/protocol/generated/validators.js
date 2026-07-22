@@ -95190,22 +95190,5081 @@ validate455.errors = vErrors;
 return errors === 0;
 }
 
-export const validateAppsListResponse = validate456;
-const schema709 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"AppBranding":{"description":"EXPERIMENTAL - app metadata returned by app-list APIs.","properties":{"category":{"type":["string","null"]},"developer":{"type":["string","null"]},"isDiscoverableApp":{"type":"boolean"},"privacyPolicy":{"type":["string","null"]},"termsOfService":{"type":["string","null"]},"website":{"type":["string","null"]}},"required":["isDiscoverableApp"],"type":"object"},"AppInfo":{"description":"EXPERIMENTAL - app metadata returned by app-list APIs.","properties":{"appMetadata":{"anyOf":[{"$ref":"#/definitions/AppMetadata"},{"type":"null"}]},"branding":{"anyOf":[{"$ref":"#/definitions/AppBranding"},{"type":"null"}]},"description":{"type":["string","null"]},"distributionChannel":{"type":["string","null"]},"iconAssets":{"additionalProperties":{"type":"string"},"type":["object","null"]},"iconDarkAssets":{"additionalProperties":{"type":"string"},"type":["object","null"]},"id":{"type":"string"},"installUrl":{"type":["string","null"]},"isAccessible":{"default":false,"type":"boolean"},"isEnabled":{"default":true,"description":"Whether this app is enabled in config.toml. Example: ```toml [apps.bad_app] enabled = false ```","type":"boolean"},"labels":{"additionalProperties":{"type":"string"},"type":["object","null"]},"logoUrl":{"type":["string","null"]},"logoUrlDark":{"type":["string","null"]},"name":{"type":"string"},"pluginDisplayNames":{"default":[],"items":{"type":"string"},"type":"array"}},"required":["id","name"],"type":"object"},"AppMetadata":{"properties":{"categories":{"items":{"type":"string"},"type":["array","null"]},"developer":{"type":["string","null"]},"firstPartyRequiresInstall":{"type":["boolean","null"]},"firstPartyType":{"type":["string","null"]},"review":{"anyOf":[{"$ref":"#/definitions/AppReview"},{"type":"null"}]},"screenshots":{"items":{"$ref":"#/definitions/AppScreenshot"},"type":["array","null"]},"seoDescription":{"type":["string","null"]},"showInComposerWhenUnlinked":{"type":["boolean","null"]},"subCategories":{"items":{"type":"string"},"type":["array","null"]},"version":{"type":["string","null"]},"versionId":{"type":["string","null"]},"versionNotes":{"type":["string","null"]}},"type":"object"},"AppReview":{"properties":{"status":{"type":"string"}},"required":["status"],"type":"object"},"AppScreenshot":{"properties":{"fileId":{"type":["string","null"]},"url":{"type":["string","null"]},"userPrompt":{"type":"string"}},"required":["userPrompt"],"type":"object"}},"description":"EXPERIMENTAL - app list response.","properties":{"data":{"items":{"$ref":"#/definitions/AppInfo"},"type":"array"},"nextCursor":{"description":"Opaque cursor to pass to the next call to continue after the last item. If None, there are no more items to return.","type":["string","null"]}},"required":["data"],"title":"AppsListResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:AppsListResponse"};
-const schema710 = {"description":"EXPERIMENTAL - app metadata returned by app-list APIs.","properties":{"appMetadata":{"anyOf":[{"$ref":"#/definitions/AppMetadata"},{"type":"null"}]},"branding":{"anyOf":[{"$ref":"#/definitions/AppBranding"},{"type":"null"}]},"description":{"type":["string","null"]},"distributionChannel":{"type":["string","null"]},"iconAssets":{"additionalProperties":{"type":"string"},"type":["object","null"]},"iconDarkAssets":{"additionalProperties":{"type":"string"},"type":["object","null"]},"id":{"type":"string"},"installUrl":{"type":["string","null"]},"isAccessible":{"default":false,"type":"boolean"},"isEnabled":{"default":true,"description":"Whether this app is enabled in config.toml. Example: ```toml [apps.bad_app] enabled = false ```","type":"boolean"},"labels":{"additionalProperties":{"type":"string"},"type":["object","null"]},"logoUrl":{"type":["string","null"]},"logoUrlDark":{"type":["string","null"]},"name":{"type":"string"},"pluginDisplayNames":{"default":[],"items":{"type":"string"},"type":"array"}},"required":["id","name"],"type":"object"};
-const schema714 = {"description":"EXPERIMENTAL - app metadata returned by app-list APIs.","properties":{"category":{"type":["string","null"]},"developer":{"type":["string","null"]},"isDiscoverableApp":{"type":"boolean"},"privacyPolicy":{"type":["string","null"]},"termsOfService":{"type":["string","null"]},"website":{"type":["string","null"]}},"required":["isDiscoverableApp"],"type":"object"};
-const schema711 = {"properties":{"categories":{"items":{"type":"string"},"type":["array","null"]},"developer":{"type":["string","null"]},"firstPartyRequiresInstall":{"type":["boolean","null"]},"firstPartyType":{"type":["string","null"]},"review":{"anyOf":[{"$ref":"#/definitions/AppReview"},{"type":"null"}]},"screenshots":{"items":{"$ref":"#/definitions/AppScreenshot"},"type":["array","null"]},"seoDescription":{"type":["string","null"]},"showInComposerWhenUnlinked":{"type":["boolean","null"]},"subCategories":{"items":{"type":"string"},"type":["array","null"]},"version":{"type":["string","null"]},"versionId":{"type":["string","null"]},"versionNotes":{"type":["string","null"]}},"type":"object"};
-const schema712 = {"properties":{"status":{"type":"string"}},"required":["status"],"type":"object"};
-const schema713 = {"properties":{"fileId":{"type":["string","null"]},"url":{"type":["string","null"]},"userPrompt":{"type":"string"}},"required":["userPrompt"],"type":"object"};
+export const validateConfigReadResponse = validate456;
+const schema709 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"AbsolutePathBuf":{"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"},"AnalyticsConfig":{"additionalProperties":true,"properties":{"enabled":{"type":["boolean","null"]}},"type":"object"},"AppConfig":{"properties":{"approvals_reviewer":{"anyOf":[{"$ref":"#/definitions/ApprovalsReviewer"},{"type":"null"}]},"default_tools_approval_mode":{"anyOf":[{"$ref":"#/definitions/AppToolApproval"},{"type":"null"}]},"default_tools_enabled":{"type":["boolean","null"]},"destructive_enabled":{"type":["boolean","null"]},"enabled":{"default":true,"type":"boolean"},"open_world_enabled":{"type":["boolean","null"]},"tools":{"anyOf":[{"$ref":"#/definitions/AppToolsConfig"},{"type":"null"}]}},"type":"object"},"AppToolApproval":{"enum":["auto","prompt","writes","approve"],"type":"string"},"AppToolConfig":{"properties":{"approval_mode":{"anyOf":[{"$ref":"#/definitions/AppToolApproval"},{"type":"null"}]},"enabled":{"type":["boolean","null"]}},"type":"object"},"AppToolsConfig":{"type":"object"},"ApprovalsReviewer":{"description":"Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `auto_review` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request. The legacy value `guardian_subagent` is accepted for compatibility.","enum":["user","auto_review","guardian_subagent"],"type":"string"},"AppsConfig":{"properties":{"_default":{"anyOf":[{"$ref":"#/definitions/AppsDefaultConfig"},{"type":"null"}],"default":null}},"type":"object"},"AppsDefaultConfig":{"properties":{"approvals_reviewer":{"anyOf":[{"$ref":"#/definitions/ApprovalsReviewer"},{"type":"null"}]},"default_tools_approval_mode":{"anyOf":[{"$ref":"#/definitions/AppToolApproval"},{"type":"null"}]},"destructive_enabled":{"default":true,"type":"boolean"},"enabled":{"default":true,"type":"boolean"},"open_world_enabled":{"default":true,"type":"boolean"}},"type":"object"},"AskForApproval":{"oneOf":[{"enum":["untrusted","on-request","never"],"type":"string"},{"additionalProperties":false,"properties":{"granular":{"properties":{"mcp_elicitations":{"type":"boolean"},"request_permissions":{"default":false,"type":"boolean"},"rules":{"type":"boolean"},"sandbox_approval":{"type":"boolean"},"skill_approval":{"default":false,"type":"boolean"}},"required":["mcp_elicitations","rules","sandbox_approval"],"type":"object"}},"required":["granular"],"title":"GranularAskForApproval","type":"object"}]},"AutoCompactTokenLimitScope":{"description":"Selects which part of the active context is charged against `model_auto_compact_token_limit`.","oneOf":[{"description":"Count the full active context against the limit.","enum":["total"],"type":"string"},{"description":"Count sampled output and later growth after the carried window prefix.","enum":["body_after_prefix"],"type":"string"}]},"Config":{"additionalProperties":true,"properties":{"analytics":{"anyOf":[{"$ref":"#/definitions/AnalyticsConfig"},{"type":"null"}]},"approval_policy":{"anyOf":[{"$ref":"#/definitions/AskForApproval"},{"type":"null"}]},"approvals_reviewer":{"anyOf":[{"$ref":"#/definitions/ApprovalsReviewer"},{"type":"null"}],"description":"[UNSTABLE] Optional default for where approval requests are routed for review."},"apps":{"anyOf":[{"$ref":"#/definitions/AppsConfig"},{"type":"null"}],"default":null},"compact_prompt":{"type":["string","null"]},"desktop":{"additionalProperties":true,"type":["object","null"]},"developer_instructions":{"type":["string","null"]},"forced_chatgpt_workspace_id":{"anyOf":[{"$ref":"#/definitions/ForcedChatgptWorkspaceIds"},{"type":"null"}]},"forced_login_method":{"anyOf":[{"$ref":"#/definitions/ForcedLoginMethod"},{"type":"null"}]},"instructions":{"type":["string","null"]},"model":{"type":["string","null"]},"model_auto_compact_token_limit":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"model_auto_compact_token_limit_scope":{"anyOf":[{"$ref":"#/definitions/AutoCompactTokenLimitScope"},{"type":"null"}]},"model_context_window":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"model_provider":{"type":["string","null"]},"model_reasoning_effort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}]},"model_reasoning_summary":{"anyOf":[{"$ref":"#/definitions/ReasoningSummary"},{"type":"null"}]},"model_verbosity":{"anyOf":[{"$ref":"#/definitions/Verbosity"},{"type":"null"}]},"review_model":{"type":["string","null"]},"sandbox_mode":{"anyOf":[{"$ref":"#/definitions/SandboxMode"},{"type":"null"}]},"sandbox_workspace_write":{"anyOf":[{"$ref":"#/definitions/SandboxWorkspaceWrite"},{"type":"null"}]},"service_tier":{"type":["string","null"]},"tools":{"anyOf":[{"$ref":"#/definitions/ToolsV2"},{"type":"null"}]},"web_search":{"anyOf":[{"$ref":"#/definitions/WebSearchMode"},{"type":"null"}]}},"type":"object"},"ConfigLayer":{"properties":{"config":true,"disabledReason":{"type":["string","null"]},"name":{"$ref":"#/definitions/ConfigLayerSource"},"version":{"type":"string"}},"required":["config","name","version"],"type":"object"},"ConfigLayerMetadata":{"properties":{"name":{"$ref":"#/definitions/ConfigLayerSource"},"version":{"type":"string"}},"required":["name","version"],"type":"object"},"ConfigLayerSource":{"oneOf":[{"description":"Managed preferences layer delivered by MDM (macOS only).","properties":{"domain":{"type":"string"},"key":{"type":"string"},"type":{"enum":["mdm"],"title":"MdmConfigLayerSourceType","type":"string"}},"required":["domain","key","type"],"title":"MdmConfigLayerSource","type":"object"},{"description":"Managed config layer from a file (usually `managed_config.toml`).","properties":{"file":{"allOf":[{"$ref":"#/definitions/AbsolutePathBuf"}],"description":"This is the path to the system config.toml file, though it is not guaranteed to exist."},"type":{"enum":["system"],"title":"SystemConfigLayerSourceType","type":"string"}},"required":["file","type"],"title":"SystemConfigLayerSource","type":"object"},{"description":"Enterprise-managed config layer delivered by the cloud config bundle.","properties":{"id":{"description":"Stable identifier for the delivered layer.","type":"string"},"name":{"description":"Admin-facing name for the delivered layer. This is surfaced in diagnostics so users know which cloud layer needs administrator attention.","type":"string"},"type":{"enum":["enterpriseManaged"],"title":"EnterpriseManagedConfigLayerSourceType","type":"string"}},"required":["id","name","type"],"title":"EnterpriseManagedConfigLayerSource","type":"object"},{"description":"User config layer from $CODEX_HOME/config.toml. This layer is special in that it is expected to be: - writable by the user - generally outside the workspace directory","properties":{"file":{"allOf":[{"$ref":"#/definitions/AbsolutePathBuf"}],"description":"This is the path to the user's config.toml file, though it is not guaranteed to exist."},"profile":{"description":"Name of the selected profile-v2 config layered on top of the base user config, when this layer represents one.","type":["string","null"]},"type":{"enum":["user"],"title":"UserConfigLayerSourceType","type":"string"}},"required":["file","type"],"title":"UserConfigLayerSource","type":"object"},{"description":"Path to a .codex/ folder within a project. There could be multiple of these between `cwd` and the project/repo root.","properties":{"dotCodexFolder":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["project"],"title":"ProjectConfigLayerSourceType","type":"string"}},"required":["dotCodexFolder","type"],"title":"ProjectConfigLayerSource","type":"object"},{"description":"Session-layer overrides supplied via `-c`/`--config`.","properties":{"type":{"enum":["sessionFlags"],"title":"SessionFlagsConfigLayerSourceType","type":"string"}},"required":["type"],"title":"SessionFlagsConfigLayerSource","type":"object"},{"description":"`managed_config.toml` was designed to be a config that was loaded as the last layer on top of everything else. This scheme did not quite work out as intended, but we keep this variant as a \"best effort\" while we phase out `managed_config.toml` in favor of `requirements.toml`.","properties":{"file":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["legacyManagedConfigTomlFromFile"],"title":"LegacyManagedConfigTomlFromFileConfigLayerSourceType","type":"string"}},"required":["file","type"],"title":"LegacyManagedConfigTomlFromFileConfigLayerSource","type":"object"},{"properties":{"type":{"enum":["legacyManagedConfigTomlFromMdm"],"title":"LegacyManagedConfigTomlFromMdmConfigLayerSourceType","type":"string"}},"required":["type"],"title":"LegacyManagedConfigTomlFromMdmConfigLayerSource","type":"object"}]},"ForcedChatgptWorkspaceIds":{"anyOf":[{"type":"string"},{"items":{"type":"string"},"type":"array"}],"description":"Backward-compatible API shape for ChatGPT workspace login restrictions."},"ForcedLoginMethod":{"enum":["chatgpt","api"],"type":"string"},"ReasoningEffort":{"description":"A non-empty reasoning effort value advertised by the model.","minLength":1,"type":"string"},"ReasoningSummary":{"description":"A summary of the reasoning performed by the model. This can be useful for debugging and understanding the model's reasoning process. See https://platform.openai.com/docs/guides/reasoning?api-mode=responses#reasoning-summaries","oneOf":[{"enum":["auto","concise","detailed"],"type":"string"},{"description":"Option to disable reasoning summaries.","enum":["none"],"type":"string"}]},"SandboxMode":{"enum":["read-only","workspace-write","danger-full-access"],"type":"string"},"SandboxWorkspaceWrite":{"properties":{"exclude_slash_tmp":{"default":false,"type":"boolean"},"exclude_tmpdir_env_var":{"default":false,"type":"boolean"},"network_access":{"default":false,"type":"boolean"},"writable_roots":{"default":[],"items":{"type":"string"},"type":"array"}},"type":"object"},"ToolsV2":{"properties":{"web_search":{"anyOf":[{"$ref":"#/definitions/WebSearchToolConfig"},{"type":"null"}]}},"type":"object"},"Verbosity":{"description":"Controls output length/detail on GPT-5 models via the Responses API. Serialized with lowercase values to match the OpenAI API.","enum":["low","medium","high"],"type":"string"},"WebSearchContextSize":{"enum":["low","medium","high"],"type":"string"},"WebSearchLocation":{"additionalProperties":false,"properties":{"city":{"type":["string","null"]},"country":{"type":["string","null"]},"region":{"type":["string","null"]},"timezone":{"type":["string","null"]}},"type":"object"},"WebSearchMode":{"enum":["disabled","cached","indexed","live"],"type":"string"},"WebSearchToolConfig":{"additionalProperties":false,"properties":{"allowed_domains":{"items":{"type":"string"},"type":["array","null"]},"context_size":{"anyOf":[{"$ref":"#/definitions/WebSearchContextSize"},{"type":"null"}]},"location":{"anyOf":[{"$ref":"#/definitions/WebSearchLocation"},{"type":"null"}]}},"type":"object"}},"properties":{"config":{"$ref":"#/definitions/Config"},"layers":{"items":{"$ref":"#/definitions/ConfigLayer"},"type":["array","null"]},"origins":{"additionalProperties":{"$ref":"#/definitions/ConfigLayerMetadata"},"type":"object"}},"required":["config","origins"],"title":"ConfigReadResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ConfigReadResponse"};
+const schema710 = {"additionalProperties":true,"properties":{"analytics":{"anyOf":[{"$ref":"#/definitions/AnalyticsConfig"},{"type":"null"}]},"approval_policy":{"anyOf":[{"$ref":"#/definitions/AskForApproval"},{"type":"null"}]},"approvals_reviewer":{"anyOf":[{"$ref":"#/definitions/ApprovalsReviewer"},{"type":"null"}],"description":"[UNSTABLE] Optional default for where approval requests are routed for review."},"apps":{"anyOf":[{"$ref":"#/definitions/AppsConfig"},{"type":"null"}],"default":null},"compact_prompt":{"type":["string","null"]},"desktop":{"additionalProperties":true,"type":["object","null"]},"developer_instructions":{"type":["string","null"]},"forced_chatgpt_workspace_id":{"anyOf":[{"$ref":"#/definitions/ForcedChatgptWorkspaceIds"},{"type":"null"}]},"forced_login_method":{"anyOf":[{"$ref":"#/definitions/ForcedLoginMethod"},{"type":"null"}]},"instructions":{"type":["string","null"]},"model":{"type":["string","null"]},"model_auto_compact_token_limit":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"model_auto_compact_token_limit_scope":{"anyOf":[{"$ref":"#/definitions/AutoCompactTokenLimitScope"},{"type":"null"}]},"model_context_window":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"model_provider":{"type":["string","null"]},"model_reasoning_effort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}]},"model_reasoning_summary":{"anyOf":[{"$ref":"#/definitions/ReasoningSummary"},{"type":"null"}]},"model_verbosity":{"anyOf":[{"$ref":"#/definitions/Verbosity"},{"type":"null"}]},"review_model":{"type":["string","null"]},"sandbox_mode":{"anyOf":[{"$ref":"#/definitions/SandboxMode"},{"type":"null"}]},"sandbox_workspace_write":{"anyOf":[{"$ref":"#/definitions/SandboxWorkspaceWrite"},{"type":"null"}]},"service_tier":{"type":["string","null"]},"tools":{"anyOf":[{"$ref":"#/definitions/ToolsV2"},{"type":"null"}]},"web_search":{"anyOf":[{"$ref":"#/definitions/WebSearchMode"},{"type":"null"}]}},"type":"object"};
+const schema711 = {"additionalProperties":true,"properties":{"enabled":{"type":["boolean","null"]}},"type":"object"};
+const schema712 = {"oneOf":[{"enum":["untrusted","on-request","never"],"type":"string"},{"additionalProperties":false,"properties":{"granular":{"properties":{"mcp_elicitations":{"type":"boolean"},"request_permissions":{"default":false,"type":"boolean"},"rules":{"type":"boolean"},"sandbox_approval":{"type":"boolean"},"skill_approval":{"default":false,"type":"boolean"}},"required":["mcp_elicitations","rules","sandbox_approval"],"type":"object"}},"required":["granular"],"title":"GranularAskForApproval","type":"object"}]};
+const schema713 = {"description":"Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `auto_review` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request. The legacy value `guardian_subagent` is accepted for compatibility.","enum":["user","auto_review","guardian_subagent"],"type":"string"};
+const schema718 = {"anyOf":[{"type":"string"},{"items":{"type":"string"},"type":"array"}],"description":"Backward-compatible API shape for ChatGPT workspace login restrictions."};
+const schema719 = {"enum":["chatgpt","api"],"type":"string"};
+const schema720 = {"description":"Selects which part of the active context is charged against `model_auto_compact_token_limit`.","oneOf":[{"description":"Count the full active context against the limit.","enum":["total"],"type":"string"},{"description":"Count sampled output and later growth after the carried window prefix.","enum":["body_after_prefix"],"type":"string"}]};
+const schema721 = {"description":"A non-empty reasoning effort value advertised by the model.","minLength":1,"type":"string"};
+const schema722 = {"description":"A summary of the reasoning performed by the model. This can be useful for debugging and understanding the model's reasoning process. See https://platform.openai.com/docs/guides/reasoning?api-mode=responses#reasoning-summaries","oneOf":[{"enum":["auto","concise","detailed"],"type":"string"},{"description":"Option to disable reasoning summaries.","enum":["none"],"type":"string"}]};
+const schema723 = {"description":"Controls output length/detail on GPT-5 models via the Responses API. Serialized with lowercase values to match the OpenAI API.","enum":["low","medium","high"],"type":"string"};
+const schema724 = {"enum":["read-only","workspace-write","danger-full-access"],"type":"string"};
+const schema725 = {"properties":{"exclude_slash_tmp":{"default":false,"type":"boolean"},"exclude_tmpdir_env_var":{"default":false,"type":"boolean"},"network_access":{"default":false,"type":"boolean"},"writable_roots":{"default":[],"items":{"type":"string"},"type":"array"}},"type":"object"};
+const schema730 = {"enum":["disabled","cached","indexed","live"],"type":"string"};
+const schema714 = {"properties":{"_default":{"anyOf":[{"$ref":"#/definitions/AppsDefaultConfig"},{"type":"null"}],"default":null}},"type":"object"};
+const schema715 = {"properties":{"approvals_reviewer":{"anyOf":[{"$ref":"#/definitions/ApprovalsReviewer"},{"type":"null"}]},"default_tools_approval_mode":{"anyOf":[{"$ref":"#/definitions/AppToolApproval"},{"type":"null"}]},"destructive_enabled":{"default":true,"type":"boolean"},"enabled":{"default":true,"type":"boolean"},"open_world_enabled":{"default":true,"type":"boolean"}},"type":"object"};
+const schema717 = {"enum":["auto","prompt","writes","approve"],"type":"string"};
+
+function validate459(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.approvals_reviewer !== undefined){
+let data0 = data.approvals_reviewer;
+const _errs2 = errors;
+let valid1 = false;
+const _errs3 = errors;
+if(typeof data0 !== "string"){
+const err0 = {instancePath:instancePath+"/approvals_reviewer",schemaPath:"#/definitions/ApprovalsReviewer/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(!(((data0 === "user") || (data0 === "auto_review")) || (data0 === "guardian_subagent"))){
+const err1 = {instancePath:instancePath+"/approvals_reviewer",schemaPath:"#/definitions/ApprovalsReviewer/enum",keyword:"enum",params:{allowedValues: schema713.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+var _valid0 = _errs3 === errors;
+valid1 = valid1 || _valid0;
+if(!valid1){
+const _errs6 = errors;
+if(data0 !== null){
+const err2 = {instancePath:instancePath+"/approvals_reviewer",schemaPath:"#/properties/approvals_reviewer/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+var _valid0 = _errs6 === errors;
+valid1 = valid1 || _valid0;
+}
+if(!valid1){
+const err3 = {instancePath:instancePath+"/approvals_reviewer",schemaPath:"#/properties/approvals_reviewer/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+else {
+errors = _errs2;
+if(vErrors !== null){
+if(_errs2){
+vErrors.length = _errs2;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.default_tools_approval_mode !== undefined){
+let data1 = data.default_tools_approval_mode;
+const _errs9 = errors;
+let valid3 = false;
+const _errs10 = errors;
+if(typeof data1 !== "string"){
+const err4 = {instancePath:instancePath+"/default_tools_approval_mode",schemaPath:"#/definitions/AppToolApproval/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+if(!((((data1 === "auto") || (data1 === "prompt")) || (data1 === "writes")) || (data1 === "approve"))){
+const err5 = {instancePath:instancePath+"/default_tools_approval_mode",schemaPath:"#/definitions/AppToolApproval/enum",keyword:"enum",params:{allowedValues: schema717.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+var _valid1 = _errs10 === errors;
+valid3 = valid3 || _valid1;
+if(!valid3){
+const _errs13 = errors;
+if(data1 !== null){
+const err6 = {instancePath:instancePath+"/default_tools_approval_mode",schemaPath:"#/properties/default_tools_approval_mode/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+var _valid1 = _errs13 === errors;
+valid3 = valid3 || _valid1;
+}
+if(!valid3){
+const err7 = {instancePath:instancePath+"/default_tools_approval_mode",schemaPath:"#/properties/default_tools_approval_mode/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+else {
+errors = _errs9;
+if(vErrors !== null){
+if(_errs9){
+vErrors.length = _errs9;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.destructive_enabled !== undefined){
+if(typeof data.destructive_enabled !== "boolean"){
+const err8 = {instancePath:instancePath+"/destructive_enabled",schemaPath:"#/properties/destructive_enabled/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+}
+if(data.enabled !== undefined){
+if(typeof data.enabled !== "boolean"){
+const err9 = {instancePath:instancePath+"/enabled",schemaPath:"#/properties/enabled/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+}
+if(data.open_world_enabled !== undefined){
+if(typeof data.open_world_enabled !== "boolean"){
+const err10 = {instancePath:instancePath+"/open_world_enabled",schemaPath:"#/properties/open_world_enabled/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+}
+}
+else {
+const err11 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+validate459.errors = vErrors;
+return errors === 0;
+}
+
 
 function validate458(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data._default !== undefined){
+let data0 = data._default;
+const _errs2 = errors;
+let valid1 = false;
+const _errs3 = errors;
+if(!(validate459(data0, {instancePath:instancePath+"/_default",parentData:data,parentDataProperty:"_default",rootData}))){
+vErrors = vErrors === null ? validate459.errors : vErrors.concat(validate459.errors);
+errors = vErrors.length;
+}
+var _valid0 = _errs3 === errors;
+valid1 = valid1 || _valid0;
+if(!valid1){
+const _errs4 = errors;
+if(data0 !== null){
+const err0 = {instancePath:instancePath+"/_default",schemaPath:"#/properties/_default/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+var _valid0 = _errs4 === errors;
+valid1 = valid1 || _valid0;
+}
+if(!valid1){
+const err1 = {instancePath:instancePath+"/_default",schemaPath:"#/properties/_default/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+else {
+errors = _errs2;
+if(vErrors !== null){
+if(_errs2){
+vErrors.length = _errs2;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+}
+else {
+const err2 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+validate458.errors = vErrors;
+return errors === 0;
+}
+
+const schema726 = {"properties":{"web_search":{"anyOf":[{"$ref":"#/definitions/WebSearchToolConfig"},{"type":"null"}]}},"type":"object"};
+const schema727 = {"additionalProperties":false,"properties":{"allowed_domains":{"items":{"type":"string"},"type":["array","null"]},"context_size":{"anyOf":[{"$ref":"#/definitions/WebSearchContextSize"},{"type":"null"}]},"location":{"anyOf":[{"$ref":"#/definitions/WebSearchLocation"},{"type":"null"}]}},"type":"object"};
+const schema728 = {"enum":["low","medium","high"],"type":"string"};
+const schema729 = {"additionalProperties":false,"properties":{"city":{"type":["string","null"]},"country":{"type":["string","null"]},"region":{"type":["string","null"]},"timezone":{"type":["string","null"]}},"type":"object"};
+
+function validate463(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+for(const key0 in data){
+if(!(((key0 === "allowed_domains") || (key0 === "context_size")) || (key0 === "location"))){
+const err0 = {instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+}
+if(data.allowed_domains !== undefined){
+let data0 = data.allowed_domains;
+if((!(Array.isArray(data0))) && (data0 !== null)){
+const err1 = {instancePath:instancePath+"/allowed_domains",schemaPath:"#/properties/allowed_domains/type",keyword:"type",params:{type: schema727.properties.allowed_domains.type},message:"must be array,null"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+if(Array.isArray(data0)){
+const len0 = data0.length;
+for(let i0=0; i0<len0; i0++){
+if(typeof data0[i0] !== "string"){
+const err2 = {instancePath:instancePath+"/allowed_domains/" + i0,schemaPath:"#/properties/allowed_domains/items/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+}
+}
+}
+if(data.context_size !== undefined){
+let data2 = data.context_size;
+const _errs7 = errors;
+let valid3 = false;
+const _errs8 = errors;
+if(typeof data2 !== "string"){
+const err3 = {instancePath:instancePath+"/context_size",schemaPath:"#/definitions/WebSearchContextSize/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+if(!(((data2 === "low") || (data2 === "medium")) || (data2 === "high"))){
+const err4 = {instancePath:instancePath+"/context_size",schemaPath:"#/definitions/WebSearchContextSize/enum",keyword:"enum",params:{allowedValues: schema728.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+var _valid0 = _errs8 === errors;
+valid3 = valid3 || _valid0;
+if(!valid3){
+const _errs11 = errors;
+if(data2 !== null){
+const err5 = {instancePath:instancePath+"/context_size",schemaPath:"#/properties/context_size/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+var _valid0 = _errs11 === errors;
+valid3 = valid3 || _valid0;
+}
+if(!valid3){
+const err6 = {instancePath:instancePath+"/context_size",schemaPath:"#/properties/context_size/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+else {
+errors = _errs7;
+if(vErrors !== null){
+if(_errs7){
+vErrors.length = _errs7;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.location !== undefined){
+let data3 = data.location;
+const _errs14 = errors;
+let valid5 = false;
+const _errs15 = errors;
+if(data3 && typeof data3 == "object" && !Array.isArray(data3)){
+for(const key1 in data3){
+if(!((((key1 === "city") || (key1 === "country")) || (key1 === "region")) || (key1 === "timezone"))){
+const err7 = {instancePath:instancePath+"/location",schemaPath:"#/definitions/WebSearchLocation/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key1},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+}
+if(data3.city !== undefined){
+let data4 = data3.city;
+if((typeof data4 !== "string") && (data4 !== null)){
+const err8 = {instancePath:instancePath+"/location/city",schemaPath:"#/definitions/WebSearchLocation/properties/city/type",keyword:"type",params:{type: schema729.properties.city.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+}
+if(data3.country !== undefined){
+let data5 = data3.country;
+if((typeof data5 !== "string") && (data5 !== null)){
+const err9 = {instancePath:instancePath+"/location/country",schemaPath:"#/definitions/WebSearchLocation/properties/country/type",keyword:"type",params:{type: schema729.properties.country.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+}
+if(data3.region !== undefined){
+let data6 = data3.region;
+if((typeof data6 !== "string") && (data6 !== null)){
+const err10 = {instancePath:instancePath+"/location/region",schemaPath:"#/definitions/WebSearchLocation/properties/region/type",keyword:"type",params:{type: schema729.properties.region.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+}
+if(data3.timezone !== undefined){
+let data7 = data3.timezone;
+if((typeof data7 !== "string") && (data7 !== null)){
+const err11 = {instancePath:instancePath+"/location/timezone",schemaPath:"#/definitions/WebSearchLocation/properties/timezone/type",keyword:"type",params:{type: schema729.properties.timezone.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+}
+}
+else {
+const err12 = {instancePath:instancePath+"/location",schemaPath:"#/definitions/WebSearchLocation/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err12];
+}
+else {
+vErrors.push(err12);
+}
+errors++;
+}
+var _valid1 = _errs15 === errors;
+valid5 = valid5 || _valid1;
+if(!valid5){
+const _errs27 = errors;
+if(data3 !== null){
+const err13 = {instancePath:instancePath+"/location",schemaPath:"#/properties/location/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err13];
+}
+else {
+vErrors.push(err13);
+}
+errors++;
+}
+var _valid1 = _errs27 === errors;
+valid5 = valid5 || _valid1;
+}
+if(!valid5){
+const err14 = {instancePath:instancePath+"/location",schemaPath:"#/properties/location/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err14];
+}
+else {
+vErrors.push(err14);
+}
+errors++;
+}
+else {
+errors = _errs14;
+if(vErrors !== null){
+if(_errs14){
+vErrors.length = _errs14;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+}
+else {
+const err15 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err15];
+}
+else {
+vErrors.push(err15);
+}
+errors++;
+}
+validate463.errors = vErrors;
+return errors === 0;
+}
+
+
+function validate462(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.web_search !== undefined){
+let data0 = data.web_search;
+const _errs2 = errors;
+let valid1 = false;
+const _errs3 = errors;
+if(!(validate463(data0, {instancePath:instancePath+"/web_search",parentData:data,parentDataProperty:"web_search",rootData}))){
+vErrors = vErrors === null ? validate463.errors : vErrors.concat(validate463.errors);
+errors = vErrors.length;
+}
+var _valid0 = _errs3 === errors;
+valid1 = valid1 || _valid0;
+if(!valid1){
+const _errs4 = errors;
+if(data0 !== null){
+const err0 = {instancePath:instancePath+"/web_search",schemaPath:"#/properties/web_search/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+var _valid0 = _errs4 === errors;
+valid1 = valid1 || _valid0;
+}
+if(!valid1){
+const err1 = {instancePath:instancePath+"/web_search",schemaPath:"#/properties/web_search/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+else {
+errors = _errs2;
+if(vErrors !== null){
+if(_errs2){
+vErrors.length = _errs2;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+}
+else {
+const err2 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+validate462.errors = vErrors;
+return errors === 0;
+}
+
+
+function validate457(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.analytics !== undefined){
+let data0 = data.analytics;
+const _errs3 = errors;
+let valid1 = false;
+const _errs4 = errors;
+if(data0 && typeof data0 == "object" && !Array.isArray(data0)){
+if(data0.enabled !== undefined){
+let data1 = data0.enabled;
+if((typeof data1 !== "boolean") && (data1 !== null)){
+const err0 = {instancePath:instancePath+"/analytics/enabled",schemaPath:"#/definitions/AnalyticsConfig/properties/enabled/type",keyword:"type",params:{type: schema711.properties.enabled.type},message:"must be boolean,null"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+}
+}
+else {
+const err1 = {instancePath:instancePath+"/analytics",schemaPath:"#/definitions/AnalyticsConfig/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+var _valid0 = _errs4 === errors;
+valid1 = valid1 || _valid0;
+if(!valid1){
+const _errs10 = errors;
+if(data0 !== null){
+const err2 = {instancePath:instancePath+"/analytics",schemaPath:"#/properties/analytics/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+var _valid0 = _errs10 === errors;
+valid1 = valid1 || _valid0;
+}
+if(!valid1){
+const err3 = {instancePath:instancePath+"/analytics",schemaPath:"#/properties/analytics/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+else {
+errors = _errs3;
+if(vErrors !== null){
+if(_errs3){
+vErrors.length = _errs3;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.approval_policy !== undefined){
+let data2 = data.approval_policy;
+const _errs13 = errors;
+let valid4 = false;
+const _errs14 = errors;
+const _errs16 = errors;
+let valid6 = false;
+let passing0 = null;
+const _errs17 = errors;
+if(typeof data2 !== "string"){
+const err4 = {instancePath:instancePath+"/approval_policy",schemaPath:"#/definitions/AskForApproval/oneOf/0/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+if(!(((data2 === "untrusted") || (data2 === "on-request")) || (data2 === "never"))){
+const err5 = {instancePath:instancePath+"/approval_policy",schemaPath:"#/definitions/AskForApproval/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema712.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+var _valid2 = _errs17 === errors;
+if(_valid2){
+valid6 = true;
+passing0 = 0;
+}
+const _errs19 = errors;
+if(data2 && typeof data2 == "object" && !Array.isArray(data2)){
+if(data2.granular === undefined){
+const err6 = {instancePath:instancePath+"/approval_policy",schemaPath:"#/definitions/AskForApproval/oneOf/1/required",keyword:"required",params:{missingProperty: "granular"},message:"must have required property '"+"granular"+"'"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+for(const key0 in data2){
+if(!(key0 === "granular")){
+const err7 = {instancePath:instancePath+"/approval_policy",schemaPath:"#/definitions/AskForApproval/oneOf/1/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+}
+if(data2.granular !== undefined){
+let data3 = data2.granular;
+if(data3 && typeof data3 == "object" && !Array.isArray(data3)){
+if(data3.mcp_elicitations === undefined){
+const err8 = {instancePath:instancePath+"/approval_policy/granular",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/required",keyword:"required",params:{missingProperty: "mcp_elicitations"},message:"must have required property '"+"mcp_elicitations"+"'"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+if(data3.rules === undefined){
+const err9 = {instancePath:instancePath+"/approval_policy/granular",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/required",keyword:"required",params:{missingProperty: "rules"},message:"must have required property '"+"rules"+"'"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+if(data3.sandbox_approval === undefined){
+const err10 = {instancePath:instancePath+"/approval_policy/granular",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/required",keyword:"required",params:{missingProperty: "sandbox_approval"},message:"must have required property '"+"sandbox_approval"+"'"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+if(data3.mcp_elicitations !== undefined){
+if(typeof data3.mcp_elicitations !== "boolean"){
+const err11 = {instancePath:instancePath+"/approval_policy/granular/mcp_elicitations",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/properties/mcp_elicitations/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+}
+if(data3.request_permissions !== undefined){
+if(typeof data3.request_permissions !== "boolean"){
+const err12 = {instancePath:instancePath+"/approval_policy/granular/request_permissions",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/properties/request_permissions/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err12];
+}
+else {
+vErrors.push(err12);
+}
+errors++;
+}
+}
+if(data3.rules !== undefined){
+if(typeof data3.rules !== "boolean"){
+const err13 = {instancePath:instancePath+"/approval_policy/granular/rules",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/properties/rules/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err13];
+}
+else {
+vErrors.push(err13);
+}
+errors++;
+}
+}
+if(data3.sandbox_approval !== undefined){
+if(typeof data3.sandbox_approval !== "boolean"){
+const err14 = {instancePath:instancePath+"/approval_policy/granular/sandbox_approval",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/properties/sandbox_approval/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err14];
+}
+else {
+vErrors.push(err14);
+}
+errors++;
+}
+}
+if(data3.skill_approval !== undefined){
+if(typeof data3.skill_approval !== "boolean"){
+const err15 = {instancePath:instancePath+"/approval_policy/granular/skill_approval",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/properties/skill_approval/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err15];
+}
+else {
+vErrors.push(err15);
+}
+errors++;
+}
+}
+}
+else {
+const err16 = {instancePath:instancePath+"/approval_policy/granular",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err16];
+}
+else {
+vErrors.push(err16);
+}
+errors++;
+}
+}
+}
+else {
+const err17 = {instancePath:instancePath+"/approval_policy",schemaPath:"#/definitions/AskForApproval/oneOf/1/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err17];
+}
+else {
+vErrors.push(err17);
+}
+errors++;
+}
+var _valid2 = _errs19 === errors;
+if(_valid2 && valid6){
+valid6 = false;
+passing0 = [passing0, 1];
+}
+else {
+if(_valid2){
+valid6 = true;
+passing0 = 1;
+}
+}
+if(!valid6){
+const err18 = {instancePath:instancePath+"/approval_policy",schemaPath:"#/definitions/AskForApproval/oneOf",keyword:"oneOf",params:{passingSchemas: passing0},message:"must match exactly one schema in oneOf"};
+if(vErrors === null){
+vErrors = [err18];
+}
+else {
+vErrors.push(err18);
+}
+errors++;
+}
+else {
+errors = _errs16;
+if(vErrors !== null){
+if(_errs16){
+vErrors.length = _errs16;
+}
+else {
+vErrors = null;
+}
+}
+}
+var _valid1 = _errs14 === errors;
+valid4 = valid4 || _valid1;
+if(!valid4){
+const _errs34 = errors;
+if(data2 !== null){
+const err19 = {instancePath:instancePath+"/approval_policy",schemaPath:"#/properties/approval_policy/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err19];
+}
+else {
+vErrors.push(err19);
+}
+errors++;
+}
+var _valid1 = _errs34 === errors;
+valid4 = valid4 || _valid1;
+}
+if(!valid4){
+const err20 = {instancePath:instancePath+"/approval_policy",schemaPath:"#/properties/approval_policy/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err20];
+}
+else {
+vErrors.push(err20);
+}
+errors++;
+}
+else {
+errors = _errs13;
+if(vErrors !== null){
+if(_errs13){
+vErrors.length = _errs13;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.approvals_reviewer !== undefined){
+let data9 = data.approvals_reviewer;
+const _errs37 = errors;
+let valid9 = false;
+const _errs38 = errors;
+if(typeof data9 !== "string"){
+const err21 = {instancePath:instancePath+"/approvals_reviewer",schemaPath:"#/definitions/ApprovalsReviewer/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err21];
+}
+else {
+vErrors.push(err21);
+}
+errors++;
+}
+if(!(((data9 === "user") || (data9 === "auto_review")) || (data9 === "guardian_subagent"))){
+const err22 = {instancePath:instancePath+"/approvals_reviewer",schemaPath:"#/definitions/ApprovalsReviewer/enum",keyword:"enum",params:{allowedValues: schema713.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err22];
+}
+else {
+vErrors.push(err22);
+}
+errors++;
+}
+var _valid3 = _errs38 === errors;
+valid9 = valid9 || _valid3;
+if(!valid9){
+const _errs41 = errors;
+if(data9 !== null){
+const err23 = {instancePath:instancePath+"/approvals_reviewer",schemaPath:"#/properties/approvals_reviewer/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err23];
+}
+else {
+vErrors.push(err23);
+}
+errors++;
+}
+var _valid3 = _errs41 === errors;
+valid9 = valid9 || _valid3;
+}
+if(!valid9){
+const err24 = {instancePath:instancePath+"/approvals_reviewer",schemaPath:"#/properties/approvals_reviewer/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err24];
+}
+else {
+vErrors.push(err24);
+}
+errors++;
+}
+else {
+errors = _errs37;
+if(vErrors !== null){
+if(_errs37){
+vErrors.length = _errs37;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.apps !== undefined){
+let data10 = data.apps;
+const _errs44 = errors;
+let valid11 = false;
+const _errs45 = errors;
+if(!(validate458(data10, {instancePath:instancePath+"/apps",parentData:data,parentDataProperty:"apps",rootData}))){
+vErrors = vErrors === null ? validate458.errors : vErrors.concat(validate458.errors);
+errors = vErrors.length;
+}
+var _valid4 = _errs45 === errors;
+valid11 = valid11 || _valid4;
+if(!valid11){
+const _errs46 = errors;
+if(data10 !== null){
+const err25 = {instancePath:instancePath+"/apps",schemaPath:"#/properties/apps/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err25];
+}
+else {
+vErrors.push(err25);
+}
+errors++;
+}
+var _valid4 = _errs46 === errors;
+valid11 = valid11 || _valid4;
+}
+if(!valid11){
+const err26 = {instancePath:instancePath+"/apps",schemaPath:"#/properties/apps/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err26];
+}
+else {
+vErrors.push(err26);
+}
+errors++;
+}
+else {
+errors = _errs44;
+if(vErrors !== null){
+if(_errs44){
+vErrors.length = _errs44;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.compact_prompt !== undefined){
+let data11 = data.compact_prompt;
+if((typeof data11 !== "string") && (data11 !== null)){
+const err27 = {instancePath:instancePath+"/compact_prompt",schemaPath:"#/properties/compact_prompt/type",keyword:"type",params:{type: schema710.properties.compact_prompt.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err27];
+}
+else {
+vErrors.push(err27);
+}
+errors++;
+}
+}
+if(data.desktop !== undefined){
+let data12 = data.desktop;
+if((!(data12 && typeof data12 == "object" && !Array.isArray(data12))) && (data12 !== null)){
+const err28 = {instancePath:instancePath+"/desktop",schemaPath:"#/properties/desktop/type",keyword:"type",params:{type: schema710.properties.desktop.type},message:"must be object,null"};
+if(vErrors === null){
+vErrors = [err28];
+}
+else {
+vErrors.push(err28);
+}
+errors++;
+}
+}
+if(data.developer_instructions !== undefined){
+let data13 = data.developer_instructions;
+if((typeof data13 !== "string") && (data13 !== null)){
+const err29 = {instancePath:instancePath+"/developer_instructions",schemaPath:"#/properties/developer_instructions/type",keyword:"type",params:{type: schema710.properties.developer_instructions.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err29];
+}
+else {
+vErrors.push(err29);
+}
+errors++;
+}
+}
+if(data.forced_chatgpt_workspace_id !== undefined){
+let data14 = data.forced_chatgpt_workspace_id;
+const _errs56 = errors;
+let valid12 = false;
+const _errs57 = errors;
+const _errs59 = errors;
+let valid14 = false;
+const _errs60 = errors;
+if(typeof data14 !== "string"){
+const err30 = {instancePath:instancePath+"/forced_chatgpt_workspace_id",schemaPath:"#/definitions/ForcedChatgptWorkspaceIds/anyOf/0/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err30];
+}
+else {
+vErrors.push(err30);
+}
+errors++;
+}
+var _valid6 = _errs60 === errors;
+valid14 = valid14 || _valid6;
+if(!valid14){
+const _errs62 = errors;
+if(Array.isArray(data14)){
+const len0 = data14.length;
+for(let i0=0; i0<len0; i0++){
+if(typeof data14[i0] !== "string"){
+const err31 = {instancePath:instancePath+"/forced_chatgpt_workspace_id/" + i0,schemaPath:"#/definitions/ForcedChatgptWorkspaceIds/anyOf/1/items/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err31];
+}
+else {
+vErrors.push(err31);
+}
+errors++;
+}
+}
+}
+else {
+const err32 = {instancePath:instancePath+"/forced_chatgpt_workspace_id",schemaPath:"#/definitions/ForcedChatgptWorkspaceIds/anyOf/1/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err32];
+}
+else {
+vErrors.push(err32);
+}
+errors++;
+}
+var _valid6 = _errs62 === errors;
+valid14 = valid14 || _valid6;
+}
+if(!valid14){
+const err33 = {instancePath:instancePath+"/forced_chatgpt_workspace_id",schemaPath:"#/definitions/ForcedChatgptWorkspaceIds/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err33];
+}
+else {
+vErrors.push(err33);
+}
+errors++;
+}
+else {
+errors = _errs59;
+if(vErrors !== null){
+if(_errs59){
+vErrors.length = _errs59;
+}
+else {
+vErrors = null;
+}
+}
+}
+var _valid5 = _errs57 === errors;
+valid12 = valid12 || _valid5;
+if(!valid12){
+const _errs66 = errors;
+if(data14 !== null){
+const err34 = {instancePath:instancePath+"/forced_chatgpt_workspace_id",schemaPath:"#/properties/forced_chatgpt_workspace_id/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err34];
+}
+else {
+vErrors.push(err34);
+}
+errors++;
+}
+var _valid5 = _errs66 === errors;
+valid12 = valid12 || _valid5;
+}
+if(!valid12){
+const err35 = {instancePath:instancePath+"/forced_chatgpt_workspace_id",schemaPath:"#/properties/forced_chatgpt_workspace_id/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err35];
+}
+else {
+vErrors.push(err35);
+}
+errors++;
+}
+else {
+errors = _errs56;
+if(vErrors !== null){
+if(_errs56){
+vErrors.length = _errs56;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.forced_login_method !== undefined){
+let data16 = data.forced_login_method;
+const _errs69 = errors;
+let valid17 = false;
+const _errs70 = errors;
+if(typeof data16 !== "string"){
+const err36 = {instancePath:instancePath+"/forced_login_method",schemaPath:"#/definitions/ForcedLoginMethod/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err36];
+}
+else {
+vErrors.push(err36);
+}
+errors++;
+}
+if(!((data16 === "chatgpt") || (data16 === "api"))){
+const err37 = {instancePath:instancePath+"/forced_login_method",schemaPath:"#/definitions/ForcedLoginMethod/enum",keyword:"enum",params:{allowedValues: schema719.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err37];
+}
+else {
+vErrors.push(err37);
+}
+errors++;
+}
+var _valid7 = _errs70 === errors;
+valid17 = valid17 || _valid7;
+if(!valid17){
+const _errs73 = errors;
+if(data16 !== null){
+const err38 = {instancePath:instancePath+"/forced_login_method",schemaPath:"#/properties/forced_login_method/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err38];
+}
+else {
+vErrors.push(err38);
+}
+errors++;
+}
+var _valid7 = _errs73 === errors;
+valid17 = valid17 || _valid7;
+}
+if(!valid17){
+const err39 = {instancePath:instancePath+"/forced_login_method",schemaPath:"#/properties/forced_login_method/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err39];
+}
+else {
+vErrors.push(err39);
+}
+errors++;
+}
+else {
+errors = _errs69;
+if(vErrors !== null){
+if(_errs69){
+vErrors.length = _errs69;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.instructions !== undefined){
+let data17 = data.instructions;
+if((typeof data17 !== "string") && (data17 !== null)){
+const err40 = {instancePath:instancePath+"/instructions",schemaPath:"#/properties/instructions/type",keyword:"type",params:{type: schema710.properties.instructions.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err40];
+}
+else {
+vErrors.push(err40);
+}
+errors++;
+}
+}
+if(data.model !== undefined){
+let data18 = data.model;
+if((typeof data18 !== "string") && (data18 !== null)){
+const err41 = {instancePath:instancePath+"/model",schemaPath:"#/properties/model/type",keyword:"type",params:{type: schema710.properties.model.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err41];
+}
+else {
+vErrors.push(err41);
+}
+errors++;
+}
+}
+if(data.model_auto_compact_token_limit !== undefined){
+let data19 = data.model_auto_compact_token_limit;
+if((!(((typeof data19 == "number") && (!(data19 % 1) && !isNaN(data19))) && (isFinite(data19)))) && (data19 !== null)){
+const err42 = {instancePath:instancePath+"/model_auto_compact_token_limit",schemaPath:"#/properties/model_auto_compact_token_limit/type",keyword:"type",params:{type: schema710.properties.model_auto_compact_token_limit.type},message:"must be integer,null"};
+if(vErrors === null){
+vErrors = [err42];
+}
+else {
+vErrors.push(err42);
+}
+errors++;
+}
+if((typeof data19 == "number") && (isFinite(data19))){
+if(data19 > 9007199254740991 || isNaN(data19)){
+const err43 = {instancePath:instancePath+"/model_auto_compact_token_limit",schemaPath:"#/properties/model_auto_compact_token_limit/maximum",keyword:"maximum",params:{comparison: "<=", limit: 9007199254740991},message:"must be <= 9007199254740991"};
+if(vErrors === null){
+vErrors = [err43];
+}
+else {
+vErrors.push(err43);
+}
+errors++;
+}
+if(data19 < -9007199254740991 || isNaN(data19)){
+const err44 = {instancePath:instancePath+"/model_auto_compact_token_limit",schemaPath:"#/properties/model_auto_compact_token_limit/minimum",keyword:"minimum",params:{comparison: ">=", limit: -9007199254740991},message:"must be >= -9007199254740991"};
+if(vErrors === null){
+vErrors = [err44];
+}
+else {
+vErrors.push(err44);
+}
+errors++;
+}
+}
+}
+if(data.model_auto_compact_token_limit_scope !== undefined){
+let data20 = data.model_auto_compact_token_limit_scope;
+const _errs82 = errors;
+let valid19 = false;
+const _errs83 = errors;
+const _errs85 = errors;
+let valid21 = false;
+let passing1 = null;
+const _errs86 = errors;
+if(typeof data20 !== "string"){
+const err45 = {instancePath:instancePath+"/model_auto_compact_token_limit_scope",schemaPath:"#/definitions/AutoCompactTokenLimitScope/oneOf/0/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err45];
+}
+else {
+vErrors.push(err45);
+}
+errors++;
+}
+if(!(data20 === "total")){
+const err46 = {instancePath:instancePath+"/model_auto_compact_token_limit_scope",schemaPath:"#/definitions/AutoCompactTokenLimitScope/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema720.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err46];
+}
+else {
+vErrors.push(err46);
+}
+errors++;
+}
+var _valid9 = _errs86 === errors;
+if(_valid9){
+valid21 = true;
+passing1 = 0;
+}
+const _errs88 = errors;
+if(typeof data20 !== "string"){
+const err47 = {instancePath:instancePath+"/model_auto_compact_token_limit_scope",schemaPath:"#/definitions/AutoCompactTokenLimitScope/oneOf/1/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err47];
+}
+else {
+vErrors.push(err47);
+}
+errors++;
+}
+if(!(data20 === "body_after_prefix")){
+const err48 = {instancePath:instancePath+"/model_auto_compact_token_limit_scope",schemaPath:"#/definitions/AutoCompactTokenLimitScope/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema720.oneOf[1].enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err48];
+}
+else {
+vErrors.push(err48);
+}
+errors++;
+}
+var _valid9 = _errs88 === errors;
+if(_valid9 && valid21){
+valid21 = false;
+passing1 = [passing1, 1];
+}
+else {
+if(_valid9){
+valid21 = true;
+passing1 = 1;
+}
+}
+if(!valid21){
+const err49 = {instancePath:instancePath+"/model_auto_compact_token_limit_scope",schemaPath:"#/definitions/AutoCompactTokenLimitScope/oneOf",keyword:"oneOf",params:{passingSchemas: passing1},message:"must match exactly one schema in oneOf"};
+if(vErrors === null){
+vErrors = [err49];
+}
+else {
+vErrors.push(err49);
+}
+errors++;
+}
+else {
+errors = _errs85;
+if(vErrors !== null){
+if(_errs85){
+vErrors.length = _errs85;
+}
+else {
+vErrors = null;
+}
+}
+}
+var _valid8 = _errs83 === errors;
+valid19 = valid19 || _valid8;
+if(!valid19){
+const _errs90 = errors;
+if(data20 !== null){
+const err50 = {instancePath:instancePath+"/model_auto_compact_token_limit_scope",schemaPath:"#/properties/model_auto_compact_token_limit_scope/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err50];
+}
+else {
+vErrors.push(err50);
+}
+errors++;
+}
+var _valid8 = _errs90 === errors;
+valid19 = valid19 || _valid8;
+}
+if(!valid19){
+const err51 = {instancePath:instancePath+"/model_auto_compact_token_limit_scope",schemaPath:"#/properties/model_auto_compact_token_limit_scope/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err51];
+}
+else {
+vErrors.push(err51);
+}
+errors++;
+}
+else {
+errors = _errs82;
+if(vErrors !== null){
+if(_errs82){
+vErrors.length = _errs82;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.model_context_window !== undefined){
+let data21 = data.model_context_window;
+if((!(((typeof data21 == "number") && (!(data21 % 1) && !isNaN(data21))) && (isFinite(data21)))) && (data21 !== null)){
+const err52 = {instancePath:instancePath+"/model_context_window",schemaPath:"#/properties/model_context_window/type",keyword:"type",params:{type: schema710.properties.model_context_window.type},message:"must be integer,null"};
+if(vErrors === null){
+vErrors = [err52];
+}
+else {
+vErrors.push(err52);
+}
+errors++;
+}
+if((typeof data21 == "number") && (isFinite(data21))){
+if(data21 > 9007199254740991 || isNaN(data21)){
+const err53 = {instancePath:instancePath+"/model_context_window",schemaPath:"#/properties/model_context_window/maximum",keyword:"maximum",params:{comparison: "<=", limit: 9007199254740991},message:"must be <= 9007199254740991"};
+if(vErrors === null){
+vErrors = [err53];
+}
+else {
+vErrors.push(err53);
+}
+errors++;
+}
+if(data21 < -9007199254740991 || isNaN(data21)){
+const err54 = {instancePath:instancePath+"/model_context_window",schemaPath:"#/properties/model_context_window/minimum",keyword:"minimum",params:{comparison: ">=", limit: -9007199254740991},message:"must be >= -9007199254740991"};
+if(vErrors === null){
+vErrors = [err54];
+}
+else {
+vErrors.push(err54);
+}
+errors++;
+}
+}
+}
+if(data.model_provider !== undefined){
+let data22 = data.model_provider;
+if((typeof data22 !== "string") && (data22 !== null)){
+const err55 = {instancePath:instancePath+"/model_provider",schemaPath:"#/properties/model_provider/type",keyword:"type",params:{type: schema710.properties.model_provider.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err55];
+}
+else {
+vErrors.push(err55);
+}
+errors++;
+}
+}
+if(data.model_reasoning_effort !== undefined){
+let data23 = data.model_reasoning_effort;
+const _errs97 = errors;
+let valid22 = false;
+const _errs98 = errors;
+if(typeof data23 === "string"){
+if(func2(data23) < 1){
+const err56 = {instancePath:instancePath+"/model_reasoning_effort",schemaPath:"#/definitions/ReasoningEffort/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+if(vErrors === null){
+vErrors = [err56];
+}
+else {
+vErrors.push(err56);
+}
+errors++;
+}
+}
+else {
+const err57 = {instancePath:instancePath+"/model_reasoning_effort",schemaPath:"#/definitions/ReasoningEffort/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err57];
+}
+else {
+vErrors.push(err57);
+}
+errors++;
+}
+var _valid10 = _errs98 === errors;
+valid22 = valid22 || _valid10;
+if(!valid22){
+const _errs101 = errors;
+if(data23 !== null){
+const err58 = {instancePath:instancePath+"/model_reasoning_effort",schemaPath:"#/properties/model_reasoning_effort/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err58];
+}
+else {
+vErrors.push(err58);
+}
+errors++;
+}
+var _valid10 = _errs101 === errors;
+valid22 = valid22 || _valid10;
+}
+if(!valid22){
+const err59 = {instancePath:instancePath+"/model_reasoning_effort",schemaPath:"#/properties/model_reasoning_effort/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err59];
+}
+else {
+vErrors.push(err59);
+}
+errors++;
+}
+else {
+errors = _errs97;
+if(vErrors !== null){
+if(_errs97){
+vErrors.length = _errs97;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.model_reasoning_summary !== undefined){
+let data24 = data.model_reasoning_summary;
+const _errs104 = errors;
+let valid24 = false;
+const _errs105 = errors;
+const _errs107 = errors;
+let valid26 = false;
+let passing2 = null;
+const _errs108 = errors;
+if(typeof data24 !== "string"){
+const err60 = {instancePath:instancePath+"/model_reasoning_summary",schemaPath:"#/definitions/ReasoningSummary/oneOf/0/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err60];
+}
+else {
+vErrors.push(err60);
+}
+errors++;
+}
+if(!(((data24 === "auto") || (data24 === "concise")) || (data24 === "detailed"))){
+const err61 = {instancePath:instancePath+"/model_reasoning_summary",schemaPath:"#/definitions/ReasoningSummary/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema722.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err61];
+}
+else {
+vErrors.push(err61);
+}
+errors++;
+}
+var _valid12 = _errs108 === errors;
+if(_valid12){
+valid26 = true;
+passing2 = 0;
+}
+const _errs110 = errors;
+if(typeof data24 !== "string"){
+const err62 = {instancePath:instancePath+"/model_reasoning_summary",schemaPath:"#/definitions/ReasoningSummary/oneOf/1/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err62];
+}
+else {
+vErrors.push(err62);
+}
+errors++;
+}
+if(!(data24 === "none")){
+const err63 = {instancePath:instancePath+"/model_reasoning_summary",schemaPath:"#/definitions/ReasoningSummary/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema722.oneOf[1].enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err63];
+}
+else {
+vErrors.push(err63);
+}
+errors++;
+}
+var _valid12 = _errs110 === errors;
+if(_valid12 && valid26){
+valid26 = false;
+passing2 = [passing2, 1];
+}
+else {
+if(_valid12){
+valid26 = true;
+passing2 = 1;
+}
+}
+if(!valid26){
+const err64 = {instancePath:instancePath+"/model_reasoning_summary",schemaPath:"#/definitions/ReasoningSummary/oneOf",keyword:"oneOf",params:{passingSchemas: passing2},message:"must match exactly one schema in oneOf"};
+if(vErrors === null){
+vErrors = [err64];
+}
+else {
+vErrors.push(err64);
+}
+errors++;
+}
+else {
+errors = _errs107;
+if(vErrors !== null){
+if(_errs107){
+vErrors.length = _errs107;
+}
+else {
+vErrors = null;
+}
+}
+}
+var _valid11 = _errs105 === errors;
+valid24 = valid24 || _valid11;
+if(!valid24){
+const _errs112 = errors;
+if(data24 !== null){
+const err65 = {instancePath:instancePath+"/model_reasoning_summary",schemaPath:"#/properties/model_reasoning_summary/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err65];
+}
+else {
+vErrors.push(err65);
+}
+errors++;
+}
+var _valid11 = _errs112 === errors;
+valid24 = valid24 || _valid11;
+}
+if(!valid24){
+const err66 = {instancePath:instancePath+"/model_reasoning_summary",schemaPath:"#/properties/model_reasoning_summary/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err66];
+}
+else {
+vErrors.push(err66);
+}
+errors++;
+}
+else {
+errors = _errs104;
+if(vErrors !== null){
+if(_errs104){
+vErrors.length = _errs104;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.model_verbosity !== undefined){
+let data25 = data.model_verbosity;
+const _errs115 = errors;
+let valid27 = false;
+const _errs116 = errors;
+if(typeof data25 !== "string"){
+const err67 = {instancePath:instancePath+"/model_verbosity",schemaPath:"#/definitions/Verbosity/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err67];
+}
+else {
+vErrors.push(err67);
+}
+errors++;
+}
+if(!(((data25 === "low") || (data25 === "medium")) || (data25 === "high"))){
+const err68 = {instancePath:instancePath+"/model_verbosity",schemaPath:"#/definitions/Verbosity/enum",keyword:"enum",params:{allowedValues: schema723.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err68];
+}
+else {
+vErrors.push(err68);
+}
+errors++;
+}
+var _valid13 = _errs116 === errors;
+valid27 = valid27 || _valid13;
+if(!valid27){
+const _errs119 = errors;
+if(data25 !== null){
+const err69 = {instancePath:instancePath+"/model_verbosity",schemaPath:"#/properties/model_verbosity/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err69];
+}
+else {
+vErrors.push(err69);
+}
+errors++;
+}
+var _valid13 = _errs119 === errors;
+valid27 = valid27 || _valid13;
+}
+if(!valid27){
+const err70 = {instancePath:instancePath+"/model_verbosity",schemaPath:"#/properties/model_verbosity/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err70];
+}
+else {
+vErrors.push(err70);
+}
+errors++;
+}
+else {
+errors = _errs115;
+if(vErrors !== null){
+if(_errs115){
+vErrors.length = _errs115;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.review_model !== undefined){
+let data26 = data.review_model;
+if((typeof data26 !== "string") && (data26 !== null)){
+const err71 = {instancePath:instancePath+"/review_model",schemaPath:"#/properties/review_model/type",keyword:"type",params:{type: schema710.properties.review_model.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err71];
+}
+else {
+vErrors.push(err71);
+}
+errors++;
+}
+}
+if(data.sandbox_mode !== undefined){
+let data27 = data.sandbox_mode;
+const _errs124 = errors;
+let valid29 = false;
+const _errs125 = errors;
+if(typeof data27 !== "string"){
+const err72 = {instancePath:instancePath+"/sandbox_mode",schemaPath:"#/definitions/SandboxMode/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err72];
+}
+else {
+vErrors.push(err72);
+}
+errors++;
+}
+if(!(((data27 === "read-only") || (data27 === "workspace-write")) || (data27 === "danger-full-access"))){
+const err73 = {instancePath:instancePath+"/sandbox_mode",schemaPath:"#/definitions/SandboxMode/enum",keyword:"enum",params:{allowedValues: schema724.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err73];
+}
+else {
+vErrors.push(err73);
+}
+errors++;
+}
+var _valid14 = _errs125 === errors;
+valid29 = valid29 || _valid14;
+if(!valid29){
+const _errs128 = errors;
+if(data27 !== null){
+const err74 = {instancePath:instancePath+"/sandbox_mode",schemaPath:"#/properties/sandbox_mode/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err74];
+}
+else {
+vErrors.push(err74);
+}
+errors++;
+}
+var _valid14 = _errs128 === errors;
+valid29 = valid29 || _valid14;
+}
+if(!valid29){
+const err75 = {instancePath:instancePath+"/sandbox_mode",schemaPath:"#/properties/sandbox_mode/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err75];
+}
+else {
+vErrors.push(err75);
+}
+errors++;
+}
+else {
+errors = _errs124;
+if(vErrors !== null){
+if(_errs124){
+vErrors.length = _errs124;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.sandbox_workspace_write !== undefined){
+let data28 = data.sandbox_workspace_write;
+const _errs131 = errors;
+let valid31 = false;
+const _errs132 = errors;
+if(data28 && typeof data28 == "object" && !Array.isArray(data28)){
+if(data28.exclude_slash_tmp !== undefined){
+if(typeof data28.exclude_slash_tmp !== "boolean"){
+const err76 = {instancePath:instancePath+"/sandbox_workspace_write/exclude_slash_tmp",schemaPath:"#/definitions/SandboxWorkspaceWrite/properties/exclude_slash_tmp/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err76];
+}
+else {
+vErrors.push(err76);
+}
+errors++;
+}
+}
+if(data28.exclude_tmpdir_env_var !== undefined){
+if(typeof data28.exclude_tmpdir_env_var !== "boolean"){
+const err77 = {instancePath:instancePath+"/sandbox_workspace_write/exclude_tmpdir_env_var",schemaPath:"#/definitions/SandboxWorkspaceWrite/properties/exclude_tmpdir_env_var/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err77];
+}
+else {
+vErrors.push(err77);
+}
+errors++;
+}
+}
+if(data28.network_access !== undefined){
+if(typeof data28.network_access !== "boolean"){
+const err78 = {instancePath:instancePath+"/sandbox_workspace_write/network_access",schemaPath:"#/definitions/SandboxWorkspaceWrite/properties/network_access/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err78];
+}
+else {
+vErrors.push(err78);
+}
+errors++;
+}
+}
+if(data28.writable_roots !== undefined){
+let data32 = data28.writable_roots;
+if(Array.isArray(data32)){
+const len1 = data32.length;
+for(let i1=0; i1<len1; i1++){
+if(typeof data32[i1] !== "string"){
+const err79 = {instancePath:instancePath+"/sandbox_workspace_write/writable_roots/" + i1,schemaPath:"#/definitions/SandboxWorkspaceWrite/properties/writable_roots/items/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err79];
+}
+else {
+vErrors.push(err79);
+}
+errors++;
+}
+}
+}
+else {
+const err80 = {instancePath:instancePath+"/sandbox_workspace_write/writable_roots",schemaPath:"#/definitions/SandboxWorkspaceWrite/properties/writable_roots/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err80];
+}
+else {
+vErrors.push(err80);
+}
+errors++;
+}
+}
+}
+else {
+const err81 = {instancePath:instancePath+"/sandbox_workspace_write",schemaPath:"#/definitions/SandboxWorkspaceWrite/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err81];
+}
+else {
+vErrors.push(err81);
+}
+errors++;
+}
+var _valid15 = _errs132 === errors;
+valid31 = valid31 || _valid15;
+if(!valid31){
+const _errs145 = errors;
+if(data28 !== null){
+const err82 = {instancePath:instancePath+"/sandbox_workspace_write",schemaPath:"#/properties/sandbox_workspace_write/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err82];
+}
+else {
+vErrors.push(err82);
+}
+errors++;
+}
+var _valid15 = _errs145 === errors;
+valid31 = valid31 || _valid15;
+}
+if(!valid31){
+const err83 = {instancePath:instancePath+"/sandbox_workspace_write",schemaPath:"#/properties/sandbox_workspace_write/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err83];
+}
+else {
+vErrors.push(err83);
+}
+errors++;
+}
+else {
+errors = _errs131;
+if(vErrors !== null){
+if(_errs131){
+vErrors.length = _errs131;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.service_tier !== undefined){
+let data34 = data.service_tier;
+if((typeof data34 !== "string") && (data34 !== null)){
+const err84 = {instancePath:instancePath+"/service_tier",schemaPath:"#/properties/service_tier/type",keyword:"type",params:{type: schema710.properties.service_tier.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err84];
+}
+else {
+vErrors.push(err84);
+}
+errors++;
+}
+}
+if(data.tools !== undefined){
+let data35 = data.tools;
+const _errs150 = errors;
+let valid36 = false;
+const _errs151 = errors;
+if(!(validate462(data35, {instancePath:instancePath+"/tools",parentData:data,parentDataProperty:"tools",rootData}))){
+vErrors = vErrors === null ? validate462.errors : vErrors.concat(validate462.errors);
+errors = vErrors.length;
+}
+var _valid16 = _errs151 === errors;
+valid36 = valid36 || _valid16;
+if(!valid36){
+const _errs152 = errors;
+if(data35 !== null){
+const err85 = {instancePath:instancePath+"/tools",schemaPath:"#/properties/tools/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err85];
+}
+else {
+vErrors.push(err85);
+}
+errors++;
+}
+var _valid16 = _errs152 === errors;
+valid36 = valid36 || _valid16;
+}
+if(!valid36){
+const err86 = {instancePath:instancePath+"/tools",schemaPath:"#/properties/tools/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err86];
+}
+else {
+vErrors.push(err86);
+}
+errors++;
+}
+else {
+errors = _errs150;
+if(vErrors !== null){
+if(_errs150){
+vErrors.length = _errs150;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.web_search !== undefined){
+let data36 = data.web_search;
+const _errs155 = errors;
+let valid37 = false;
+const _errs156 = errors;
+if(typeof data36 !== "string"){
+const err87 = {instancePath:instancePath+"/web_search",schemaPath:"#/definitions/WebSearchMode/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err87];
+}
+else {
+vErrors.push(err87);
+}
+errors++;
+}
+if(!((((data36 === "disabled") || (data36 === "cached")) || (data36 === "indexed")) || (data36 === "live"))){
+const err88 = {instancePath:instancePath+"/web_search",schemaPath:"#/definitions/WebSearchMode/enum",keyword:"enum",params:{allowedValues: schema730.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err88];
+}
+else {
+vErrors.push(err88);
+}
+errors++;
+}
+var _valid17 = _errs156 === errors;
+valid37 = valid37 || _valid17;
+if(!valid37){
+const _errs159 = errors;
+if(data36 !== null){
+const err89 = {instancePath:instancePath+"/web_search",schemaPath:"#/properties/web_search/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err89];
+}
+else {
+vErrors.push(err89);
+}
+errors++;
+}
+var _valid17 = _errs159 === errors;
+valid37 = valid37 || _valid17;
+}
+if(!valid37){
+const err90 = {instancePath:instancePath+"/web_search",schemaPath:"#/properties/web_search/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err90];
+}
+else {
+vErrors.push(err90);
+}
+errors++;
+}
+else {
+errors = _errs155;
+if(vErrors !== null){
+if(_errs155){
+vErrors.length = _errs155;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+}
+else {
+const err91 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err91];
+}
+else {
+vErrors.push(err91);
+}
+errors++;
+}
+validate457.errors = vErrors;
+return errors === 0;
+}
+
+const schema731 = {"properties":{"config":true,"disabledReason":{"type":["string","null"]},"name":{"$ref":"#/definitions/ConfigLayerSource"},"version":{"type":"string"}},"required":["config","name","version"],"type":"object"};
+const schema732 = {"oneOf":[{"description":"Managed preferences layer delivered by MDM (macOS only).","properties":{"domain":{"type":"string"},"key":{"type":"string"},"type":{"enum":["mdm"],"title":"MdmConfigLayerSourceType","type":"string"}},"required":["domain","key","type"],"title":"MdmConfigLayerSource","type":"object"},{"description":"Managed config layer from a file (usually `managed_config.toml`).","properties":{"file":{"allOf":[{"$ref":"#/definitions/AbsolutePathBuf"}],"description":"This is the path to the system config.toml file, though it is not guaranteed to exist."},"type":{"enum":["system"],"title":"SystemConfigLayerSourceType","type":"string"}},"required":["file","type"],"title":"SystemConfigLayerSource","type":"object"},{"description":"Enterprise-managed config layer delivered by the cloud config bundle.","properties":{"id":{"description":"Stable identifier for the delivered layer.","type":"string"},"name":{"description":"Admin-facing name for the delivered layer. This is surfaced in diagnostics so users know which cloud layer needs administrator attention.","type":"string"},"type":{"enum":["enterpriseManaged"],"title":"EnterpriseManagedConfigLayerSourceType","type":"string"}},"required":["id","name","type"],"title":"EnterpriseManagedConfigLayerSource","type":"object"},{"description":"User config layer from $CODEX_HOME/config.toml. This layer is special in that it is expected to be: - writable by the user - generally outside the workspace directory","properties":{"file":{"allOf":[{"$ref":"#/definitions/AbsolutePathBuf"}],"description":"This is the path to the user's config.toml file, though it is not guaranteed to exist."},"profile":{"description":"Name of the selected profile-v2 config layered on top of the base user config, when this layer represents one.","type":["string","null"]},"type":{"enum":["user"],"title":"UserConfigLayerSourceType","type":"string"}},"required":["file","type"],"title":"UserConfigLayerSource","type":"object"},{"description":"Path to a .codex/ folder within a project. There could be multiple of these between `cwd` and the project/repo root.","properties":{"dotCodexFolder":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["project"],"title":"ProjectConfigLayerSourceType","type":"string"}},"required":["dotCodexFolder","type"],"title":"ProjectConfigLayerSource","type":"object"},{"description":"Session-layer overrides supplied via `-c`/`--config`.","properties":{"type":{"enum":["sessionFlags"],"title":"SessionFlagsConfigLayerSourceType","type":"string"}},"required":["type"],"title":"SessionFlagsConfigLayerSource","type":"object"},{"description":"`managed_config.toml` was designed to be a config that was loaded as the last layer on top of everything else. This scheme did not quite work out as intended, but we keep this variant as a \"best effort\" while we phase out `managed_config.toml` in favor of `requirements.toml`.","properties":{"file":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["legacyManagedConfigTomlFromFile"],"title":"LegacyManagedConfigTomlFromFileConfigLayerSourceType","type":"string"}},"required":["file","type"],"title":"LegacyManagedConfigTomlFromFileConfigLayerSource","type":"object"},{"properties":{"type":{"enum":["legacyManagedConfigTomlFromMdm"],"title":"LegacyManagedConfigTomlFromMdmConfigLayerSourceType","type":"string"}},"required":["type"],"title":"LegacyManagedConfigTomlFromMdmConfigLayerSource","type":"object"}]};
+const schema733 = {"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"};
+
+function validate468(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+const _errs0 = errors;
+let valid0 = false;
+let passing0 = null;
+const _errs1 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.domain === undefined){
+const err0 = {instancePath,schemaPath:"#/oneOf/0/required",keyword:"required",params:{missingProperty: "domain"},message:"must have required property '"+"domain"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.key === undefined){
+const err1 = {instancePath,schemaPath:"#/oneOf/0/required",keyword:"required",params:{missingProperty: "key"},message:"must have required property '"+"key"+"'"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+if(data.type === undefined){
+const err2 = {instancePath,schemaPath:"#/oneOf/0/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+if(data.domain !== undefined){
+if(typeof data.domain !== "string"){
+const err3 = {instancePath:instancePath+"/domain",schemaPath:"#/oneOf/0/properties/domain/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+}
+if(data.key !== undefined){
+if(typeof data.key !== "string"){
+const err4 = {instancePath:instancePath+"/key",schemaPath:"#/oneOf/0/properties/key/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+}
+if(data.type !== undefined){
+let data2 = data.type;
+if(typeof data2 !== "string"){
+const err5 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+if(!(data2 === "mdm")){
+const err6 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema732.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+}
+}
+else {
+const err7 = {instancePath,schemaPath:"#/oneOf/0/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+var _valid0 = _errs1 === errors;
+if(_valid0){
+valid0 = true;
+passing0 = 0;
+}
+const _errs9 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.file === undefined){
+const err8 = {instancePath,schemaPath:"#/oneOf/1/required",keyword:"required",params:{missingProperty: "file"},message:"must have required property '"+"file"+"'"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+if(data.type === undefined){
+const err9 = {instancePath,schemaPath:"#/oneOf/1/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+if(data.file !== undefined){
+if(typeof data.file !== "string"){
+const err10 = {instancePath:instancePath+"/file",schemaPath:"#/definitions/AbsolutePathBuf/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+}
+if(data.type !== undefined){
+let data4 = data.type;
+if(typeof data4 !== "string"){
+const err11 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+if(!(data4 === "system")){
+const err12 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema732.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err12];
+}
+else {
+vErrors.push(err12);
+}
+errors++;
+}
+}
+}
+else {
+const err13 = {instancePath,schemaPath:"#/oneOf/1/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err13];
+}
+else {
+vErrors.push(err13);
+}
+errors++;
+}
+var _valid0 = _errs9 === errors;
+if(_valid0 && valid0){
+valid0 = false;
+passing0 = [passing0, 1];
+}
+else {
+if(_valid0){
+valid0 = true;
+passing0 = 1;
+}
+const _errs17 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.id === undefined){
+const err14 = {instancePath,schemaPath:"#/oneOf/2/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'"};
+if(vErrors === null){
+vErrors = [err14];
+}
+else {
+vErrors.push(err14);
+}
+errors++;
+}
+if(data.name === undefined){
+const err15 = {instancePath,schemaPath:"#/oneOf/2/required",keyword:"required",params:{missingProperty: "name"},message:"must have required property '"+"name"+"'"};
+if(vErrors === null){
+vErrors = [err15];
+}
+else {
+vErrors.push(err15);
+}
+errors++;
+}
+if(data.type === undefined){
+const err16 = {instancePath,schemaPath:"#/oneOf/2/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'"};
+if(vErrors === null){
+vErrors = [err16];
+}
+else {
+vErrors.push(err16);
+}
+errors++;
+}
+if(data.id !== undefined){
+if(typeof data.id !== "string"){
+const err17 = {instancePath:instancePath+"/id",schemaPath:"#/oneOf/2/properties/id/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err17];
+}
+else {
+vErrors.push(err17);
+}
+errors++;
+}
+}
+if(data.name !== undefined){
+if(typeof data.name !== "string"){
+const err18 = {instancePath:instancePath+"/name",schemaPath:"#/oneOf/2/properties/name/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err18];
+}
+else {
+vErrors.push(err18);
+}
+errors++;
+}
+}
+if(data.type !== undefined){
+let data7 = data.type;
+if(typeof data7 !== "string"){
+const err19 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err19];
+}
+else {
+vErrors.push(err19);
+}
+errors++;
+}
+if(!(data7 === "enterpriseManaged")){
+const err20 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema732.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err20];
+}
+else {
+vErrors.push(err20);
+}
+errors++;
+}
+}
+}
+else {
+const err21 = {instancePath,schemaPath:"#/oneOf/2/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err21];
+}
+else {
+vErrors.push(err21);
+}
+errors++;
+}
+var _valid0 = _errs17 === errors;
+if(_valid0 && valid0){
+valid0 = false;
+passing0 = [passing0, 2];
+}
+else {
+if(_valid0){
+valid0 = true;
+passing0 = 2;
+}
+const _errs25 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.file === undefined){
+const err22 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "file"},message:"must have required property '"+"file"+"'"};
+if(vErrors === null){
+vErrors = [err22];
+}
+else {
+vErrors.push(err22);
+}
+errors++;
+}
+if(data.type === undefined){
+const err23 = {instancePath,schemaPath:"#/oneOf/3/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'"};
+if(vErrors === null){
+vErrors = [err23];
+}
+else {
+vErrors.push(err23);
+}
+errors++;
+}
+if(data.file !== undefined){
+if(typeof data.file !== "string"){
+const err24 = {instancePath:instancePath+"/file",schemaPath:"#/definitions/AbsolutePathBuf/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err24];
+}
+else {
+vErrors.push(err24);
+}
+errors++;
+}
+}
+if(data.profile !== undefined){
+let data9 = data.profile;
+if((typeof data9 !== "string") && (data9 !== null)){
+const err25 = {instancePath:instancePath+"/profile",schemaPath:"#/oneOf/3/properties/profile/type",keyword:"type",params:{type: schema732.oneOf[3].properties.profile.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err25];
+}
+else {
+vErrors.push(err25);
+}
+errors++;
+}
+}
+if(data.type !== undefined){
+let data10 = data.type;
+if(typeof data10 !== "string"){
+const err26 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err26];
+}
+else {
+vErrors.push(err26);
+}
+errors++;
+}
+if(!(data10 === "user")){
+const err27 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema732.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err27];
+}
+else {
+vErrors.push(err27);
+}
+errors++;
+}
+}
+}
+else {
+const err28 = {instancePath,schemaPath:"#/oneOf/3/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err28];
+}
+else {
+vErrors.push(err28);
+}
+errors++;
+}
+var _valid0 = _errs25 === errors;
+if(_valid0 && valid0){
+valid0 = false;
+passing0 = [passing0, 3];
+}
+else {
+if(_valid0){
+valid0 = true;
+passing0 = 3;
+}
+const _errs35 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.dotCodexFolder === undefined){
+const err29 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "dotCodexFolder"},message:"must have required property '"+"dotCodexFolder"+"'"};
+if(vErrors === null){
+vErrors = [err29];
+}
+else {
+vErrors.push(err29);
+}
+errors++;
+}
+if(data.type === undefined){
+const err30 = {instancePath,schemaPath:"#/oneOf/4/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'"};
+if(vErrors === null){
+vErrors = [err30];
+}
+else {
+vErrors.push(err30);
+}
+errors++;
+}
+if(data.dotCodexFolder !== undefined){
+if(typeof data.dotCodexFolder !== "string"){
+const err31 = {instancePath:instancePath+"/dotCodexFolder",schemaPath:"#/definitions/AbsolutePathBuf/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err31];
+}
+else {
+vErrors.push(err31);
+}
+errors++;
+}
+}
+if(data.type !== undefined){
+let data12 = data.type;
+if(typeof data12 !== "string"){
+const err32 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err32];
+}
+else {
+vErrors.push(err32);
+}
+errors++;
+}
+if(!(data12 === "project")){
+const err33 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/enum",keyword:"enum",params:{allowedValues: schema732.oneOf[4].properties.type.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err33];
+}
+else {
+vErrors.push(err33);
+}
+errors++;
+}
+}
+}
+else {
+const err34 = {instancePath,schemaPath:"#/oneOf/4/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err34];
+}
+else {
+vErrors.push(err34);
+}
+errors++;
+}
+var _valid0 = _errs35 === errors;
+if(_valid0 && valid0){
+valid0 = false;
+passing0 = [passing0, 4];
+}
+else {
+if(_valid0){
+valid0 = true;
+passing0 = 4;
+}
+const _errs42 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.type === undefined){
+const err35 = {instancePath,schemaPath:"#/oneOf/5/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'"};
+if(vErrors === null){
+vErrors = [err35];
+}
+else {
+vErrors.push(err35);
+}
+errors++;
+}
+if(data.type !== undefined){
+let data13 = data.type;
+if(typeof data13 !== "string"){
+const err36 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/5/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err36];
+}
+else {
+vErrors.push(err36);
+}
+errors++;
+}
+if(!(data13 === "sessionFlags")){
+const err37 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/5/properties/type/enum",keyword:"enum",params:{allowedValues: schema732.oneOf[5].properties.type.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err37];
+}
+else {
+vErrors.push(err37);
+}
+errors++;
+}
+}
+}
+else {
+const err38 = {instancePath,schemaPath:"#/oneOf/5/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err38];
+}
+else {
+vErrors.push(err38);
+}
+errors++;
+}
+var _valid0 = _errs42 === errors;
+if(_valid0 && valid0){
+valid0 = false;
+passing0 = [passing0, 5];
+}
+else {
+if(_valid0){
+valid0 = true;
+passing0 = 5;
+}
+const _errs46 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.file === undefined){
+const err39 = {instancePath,schemaPath:"#/oneOf/6/required",keyword:"required",params:{missingProperty: "file"},message:"must have required property '"+"file"+"'"};
+if(vErrors === null){
+vErrors = [err39];
+}
+else {
+vErrors.push(err39);
+}
+errors++;
+}
+if(data.type === undefined){
+const err40 = {instancePath,schemaPath:"#/oneOf/6/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'"};
+if(vErrors === null){
+vErrors = [err40];
+}
+else {
+vErrors.push(err40);
+}
+errors++;
+}
+if(data.file !== undefined){
+if(typeof data.file !== "string"){
+const err41 = {instancePath:instancePath+"/file",schemaPath:"#/definitions/AbsolutePathBuf/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err41];
+}
+else {
+vErrors.push(err41);
+}
+errors++;
+}
+}
+if(data.type !== undefined){
+let data15 = data.type;
+if(typeof data15 !== "string"){
+const err42 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/6/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err42];
+}
+else {
+vErrors.push(err42);
+}
+errors++;
+}
+if(!(data15 === "legacyManagedConfigTomlFromFile")){
+const err43 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/6/properties/type/enum",keyword:"enum",params:{allowedValues: schema732.oneOf[6].properties.type.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err43];
+}
+else {
+vErrors.push(err43);
+}
+errors++;
+}
+}
+}
+else {
+const err44 = {instancePath,schemaPath:"#/oneOf/6/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err44];
+}
+else {
+vErrors.push(err44);
+}
+errors++;
+}
+var _valid0 = _errs46 === errors;
+if(_valid0 && valid0){
+valid0 = false;
+passing0 = [passing0, 6];
+}
+else {
+if(_valid0){
+valid0 = true;
+passing0 = 6;
+}
+const _errs53 = errors;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.type === undefined){
+const err45 = {instancePath,schemaPath:"#/oneOf/7/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'"};
+if(vErrors === null){
+vErrors = [err45];
+}
+else {
+vErrors.push(err45);
+}
+errors++;
+}
+if(data.type !== undefined){
+let data16 = data.type;
+if(typeof data16 !== "string"){
+const err46 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/7/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err46];
+}
+else {
+vErrors.push(err46);
+}
+errors++;
+}
+if(!(data16 === "legacyManagedConfigTomlFromMdm")){
+const err47 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/7/properties/type/enum",keyword:"enum",params:{allowedValues: schema732.oneOf[7].properties.type.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err47];
+}
+else {
+vErrors.push(err47);
+}
+errors++;
+}
+}
+}
+else {
+const err48 = {instancePath,schemaPath:"#/oneOf/7/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err48];
+}
+else {
+vErrors.push(err48);
+}
+errors++;
+}
+var _valid0 = _errs53 === errors;
+if(_valid0 && valid0){
+valid0 = false;
+passing0 = [passing0, 7];
+}
+else {
+if(_valid0){
+valid0 = true;
+passing0 = 7;
+}
+}
+}
+}
+}
+}
+}
+}
+if(!valid0){
+const err49 = {instancePath,schemaPath:"#/oneOf",keyword:"oneOf",params:{passingSchemas: passing0},message:"must match exactly one schema in oneOf"};
+if(vErrors === null){
+vErrors = [err49];
+}
+else {
+vErrors.push(err49);
+}
+errors++;
+}
+else {
+errors = _errs0;
+if(vErrors !== null){
+if(_errs0){
+vErrors.length = _errs0;
+}
+else {
+vErrors = null;
+}
+}
+}
+validate468.errors = vErrors;
+return errors === 0;
+}
+
+
+function validate467(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.config === undefined){
+const err0 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "config"},message:"must have required property '"+"config"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.name === undefined){
+const err1 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "name"},message:"must have required property '"+"name"+"'"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+if(data.version === undefined){
+const err2 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "version"},message:"must have required property '"+"version"+"'"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+if(data.disabledReason !== undefined){
+let data0 = data.disabledReason;
+if((typeof data0 !== "string") && (data0 !== null)){
+const err3 = {instancePath:instancePath+"/disabledReason",schemaPath:"#/properties/disabledReason/type",keyword:"type",params:{type: schema731.properties.disabledReason.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+}
+if(data.name !== undefined){
+if(!(validate468(data.name, {instancePath:instancePath+"/name",parentData:data,parentDataProperty:"name",rootData}))){
+vErrors = vErrors === null ? validate468.errors : vErrors.concat(validate468.errors);
+errors = vErrors.length;
+}
+}
+if(data.version !== undefined){
+if(typeof data.version !== "string"){
+const err4 = {instancePath:instancePath+"/version",schemaPath:"#/properties/version/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+}
+}
+else {
+const err5 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+validate467.errors = vErrors;
+return errors === 0;
+}
+
+const schema737 = {"properties":{"name":{"$ref":"#/definitions/ConfigLayerSource"},"version":{"type":"string"}},"required":["name","version"],"type":"object"};
+
+function validate471(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.name === undefined){
+const err0 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "name"},message:"must have required property '"+"name"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.version === undefined){
+const err1 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "version"},message:"must have required property '"+"version"+"'"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+if(data.name !== undefined){
+if(!(validate468(data.name, {instancePath:instancePath+"/name",parentData:data,parentDataProperty:"name",rootData}))){
+vErrors = vErrors === null ? validate468.errors : vErrors.concat(validate468.errors);
+errors = vErrors.length;
+}
+}
+if(data.version !== undefined){
+if(typeof data.version !== "string"){
+const err2 = {instancePath:instancePath+"/version",schemaPath:"#/properties/version/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+}
+}
+else {
+const err3 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+validate471.errors = vErrors;
+return errors === 0;
+}
+
+
+function validate456(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+/*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ConfigReadResponse" */;
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.config === undefined){
+const err0 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "config"},message:"must have required property '"+"config"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.origins === undefined){
+const err1 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "origins"},message:"must have required property '"+"origins"+"'"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+if(data.config !== undefined){
+if(!(validate457(data.config, {instancePath:instancePath+"/config",parentData:data,parentDataProperty:"config",rootData}))){
+vErrors = vErrors === null ? validate457.errors : vErrors.concat(validate457.errors);
+errors = vErrors.length;
+}
+}
+if(data.layers !== undefined){
+let data1 = data.layers;
+if((!(Array.isArray(data1))) && (data1 !== null)){
+const err2 = {instancePath:instancePath+"/layers",schemaPath:"#/properties/layers/type",keyword:"type",params:{type: schema709.properties.layers.type},message:"must be array,null"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+if(Array.isArray(data1)){
+const len0 = data1.length;
+for(let i0=0; i0<len0; i0++){
+if(!(validate467(data1[i0], {instancePath:instancePath+"/layers/" + i0,parentData:data1,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate467.errors : vErrors.concat(validate467.errors);
+errors = vErrors.length;
+}
+}
+}
+}
+if(data.origins !== undefined){
+let data3 = data.origins;
+if(data3 && typeof data3 == "object" && !Array.isArray(data3)){
+for(const key0 in data3){
+if(!(validate471(data3[key0], {instancePath:instancePath+"/origins/" + key0.replace(/~/g, "~0").replace(/\//g, "~1"),parentData:data3,parentDataProperty:key0,rootData}))){
+vErrors = vErrors === null ? validate471.errors : vErrors.concat(validate471.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err3 = {instancePath:instancePath+"/origins",schemaPath:"#/properties/origins/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+}
+}
+else {
+const err4 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+validate456.errors = vErrors;
+return errors === 0;
+}
+
+export const validateConfigRequirementsReadResponse = validate474;
+const schema738 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"ApprovalsReviewer":{"description":"Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `auto_review` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request. The legacy value `guardian_subagent` is accepted for compatibility.","enum":["user","auto_review","guardian_subagent"],"type":"string"},"AskForApproval":{"oneOf":[{"enum":["untrusted","on-request","never"],"type":"string"},{"additionalProperties":false,"properties":{"granular":{"properties":{"mcp_elicitations":{"type":"boolean"},"request_permissions":{"default":false,"type":"boolean"},"rules":{"type":"boolean"},"sandbox_approval":{"type":"boolean"},"skill_approval":{"default":false,"type":"boolean"}},"required":["mcp_elicitations","rules","sandbox_approval"],"type":"object"}},"required":["granular"],"title":"GranularAskForApproval","type":"object"}]},"ComputerUseRequirements":{"properties":{"allowLockedComputerUse":{"type":["boolean","null"]}},"type":"object"},"ConfigRequirements":{"properties":{"allowAppshots":{"type":["boolean","null"]},"allowManagedHooksOnly":{"type":["boolean","null"]},"allowRemoteControl":{"type":["boolean","null"]},"allowedApprovalPolicies":{"items":{"$ref":"#/definitions/AskForApproval"},"type":["array","null"]},"allowedApprovalsReviewers":{"items":{"$ref":"#/definitions/ApprovalsReviewer"},"type":["array","null"]},"allowedPermissionProfiles":{"additionalProperties":{"type":"boolean"},"type":["object","null"]},"allowedSandboxModes":{"items":{"$ref":"#/definitions/SandboxMode"},"type":["array","null"]},"allowedWebSearchModes":{"items":{"$ref":"#/definitions/WebSearchMode"},"type":["array","null"]},"allowedWindowsSandboxImplementations":{"items":{"$ref":"#/definitions/WindowsSandboxSetupMode"},"type":["array","null"]},"computerUse":{"anyOf":[{"$ref":"#/definitions/ComputerUseRequirements"},{"type":"null"}]},"defaultPermissions":{"type":["string","null"]},"enforceResidency":{"anyOf":[{"$ref":"#/definitions/ResidencyRequirement"},{"type":"null"}]},"featureRequirements":{"additionalProperties":{"type":"boolean"},"type":["object","null"]},"hooks":{"anyOf":[{"$ref":"#/definitions/ManagedHooksRequirements"},{"type":"null"}]},"models":{"anyOf":[{"$ref":"#/definitions/ModelsRequirements"},{"type":"null"}]},"network":{"anyOf":[{"$ref":"#/definitions/NetworkRequirements"},{"type":"null"}]}},"type":"object"},"ConfiguredHookHandler":{"oneOf":[{"properties":{"async":{"type":"boolean"},"command":{"type":"string"},"commandWindows":{"type":["string","null"]},"statusMessage":{"type":["string","null"]},"timeoutSec":{"minimum":0,"type":["integer","null"],"maximum":9007199254740991},"type":{"enum":["command"],"title":"CommandConfiguredHookHandlerType","type":"string"}},"required":["async","command","type"],"title":"CommandConfiguredHookHandler","type":"object"},{"properties":{"type":{"enum":["prompt"],"title":"PromptConfiguredHookHandlerType","type":"string"}},"required":["type"],"title":"PromptConfiguredHookHandler","type":"object"},{"properties":{"type":{"enum":["agent"],"title":"AgentConfiguredHookHandlerType","type":"string"}},"required":["type"],"title":"AgentConfiguredHookHandler","type":"object"}]},"ConfiguredHookMatcherGroup":{"properties":{"hooks":{"items":{"$ref":"#/definitions/ConfiguredHookHandler"},"type":"array"},"matcher":{"type":["string","null"]}},"required":["hooks"],"type":"object"},"ManagedHooksRequirements":{"properties":{"PermissionRequest":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"PostCompact":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"PostToolUse":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"PreCompact":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"PreToolUse":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"SessionStart":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"Stop":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"SubagentStart":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"SubagentStop":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"UserPromptSubmit":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"managedDir":{"type":["string","null"]},"windowsManagedDir":{"type":["string","null"]}},"required":["PermissionRequest","PostCompact","PostToolUse","PreCompact","PreToolUse","SessionStart","Stop","SubagentStart","SubagentStop","UserPromptSubmit"],"type":"object"},"ModelsRequirements":{"properties":{"newThread":{"anyOf":[{"$ref":"#/definitions/NewThreadModelDefaults"},{"type":"null"}]}},"type":"object"},"NetworkDomainPermission":{"enum":["allow","deny"],"type":"string"},"NetworkRequirements":{"properties":{"allowLocalBinding":{"type":["boolean","null"]},"allowUnixSockets":{"description":"Legacy compatibility view derived from `unix_sockets`.","items":{"type":"string"},"type":["array","null"]},"allowUpstreamProxy":{"type":["boolean","null"]},"allowedDomains":{"description":"Legacy compatibility view derived from `domains`.","items":{"type":"string"},"type":["array","null"]},"dangerouslyAllowAllUnixSockets":{"type":["boolean","null"]},"dangerouslyAllowNonLoopbackProxy":{"type":["boolean","null"]},"deniedDomains":{"description":"Legacy compatibility view derived from `domains`.","items":{"type":"string"},"type":["array","null"]},"domains":{"additionalProperties":{"$ref":"#/definitions/NetworkDomainPermission"},"description":"Canonical network permission map for `experimental_network`.","type":["object","null"]},"enabled":{"type":["boolean","null"]},"httpPort":{"minimum":0,"type":["integer","null"],"maximum":65535},"managedAllowedDomainsOnly":{"description":"When true, only managed allowlist entries are respected while managed network enforcement is active.","type":["boolean","null"]},"socksPort":{"minimum":0,"type":["integer","null"],"maximum":65535},"unixSockets":{"additionalProperties":{"$ref":"#/definitions/NetworkUnixSocketPermission"},"description":"Canonical unix socket permission map for `experimental_network`.","type":["object","null"]}},"type":"object"},"NetworkUnixSocketPermission":{"enum":["allow","deny"],"type":"string"},"NewThreadModelDefaults":{"properties":{"model":{"type":["string","null"]},"modelReasoningEffort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}]},"serviceTier":{"type":["string","null"]}},"type":"object"},"ReasoningEffort":{"description":"A non-empty reasoning effort value advertised by the model.","minLength":1,"type":"string"},"ResidencyRequirement":{"enum":["us"],"type":"string"},"SandboxMode":{"enum":["read-only","workspace-write","danger-full-access"],"type":"string"},"WebSearchMode":{"enum":["disabled","cached","indexed","live"],"type":"string"},"WindowsSandboxSetupMode":{"enum":["elevated","unelevated"],"type":"string"}},"properties":{"requirements":{"anyOf":[{"$ref":"#/definitions/ConfigRequirements"},{"type":"null"}],"description":"Null if no requirements are configured (e.g. no requirements.toml/MDM entries)."}},"title":"ConfigRequirementsReadResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ConfigRequirementsReadResponse"};
+const schema739 = {"properties":{"allowAppshots":{"type":["boolean","null"]},"allowManagedHooksOnly":{"type":["boolean","null"]},"allowRemoteControl":{"type":["boolean","null"]},"allowedApprovalPolicies":{"items":{"$ref":"#/definitions/AskForApproval"},"type":["array","null"]},"allowedApprovalsReviewers":{"items":{"$ref":"#/definitions/ApprovalsReviewer"},"type":["array","null"]},"allowedPermissionProfiles":{"additionalProperties":{"type":"boolean"},"type":["object","null"]},"allowedSandboxModes":{"items":{"$ref":"#/definitions/SandboxMode"},"type":["array","null"]},"allowedWebSearchModes":{"items":{"$ref":"#/definitions/WebSearchMode"},"type":["array","null"]},"allowedWindowsSandboxImplementations":{"items":{"$ref":"#/definitions/WindowsSandboxSetupMode"},"type":["array","null"]},"computerUse":{"anyOf":[{"$ref":"#/definitions/ComputerUseRequirements"},{"type":"null"}]},"defaultPermissions":{"type":["string","null"]},"enforceResidency":{"anyOf":[{"$ref":"#/definitions/ResidencyRequirement"},{"type":"null"}]},"featureRequirements":{"additionalProperties":{"type":"boolean"},"type":["object","null"]},"hooks":{"anyOf":[{"$ref":"#/definitions/ManagedHooksRequirements"},{"type":"null"}]},"models":{"anyOf":[{"$ref":"#/definitions/ModelsRequirements"},{"type":"null"}]},"network":{"anyOf":[{"$ref":"#/definitions/NetworkRequirements"},{"type":"null"}]}},"type":"object"};
+const schema740 = {"oneOf":[{"enum":["untrusted","on-request","never"],"type":"string"},{"additionalProperties":false,"properties":{"granular":{"properties":{"mcp_elicitations":{"type":"boolean"},"request_permissions":{"default":false,"type":"boolean"},"rules":{"type":"boolean"},"sandbox_approval":{"type":"boolean"},"skill_approval":{"default":false,"type":"boolean"}},"required":["mcp_elicitations","rules","sandbox_approval"],"type":"object"}},"required":["granular"],"title":"GranularAskForApproval","type":"object"}]};
+const schema741 = {"description":"Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `auto_review` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request. The legacy value `guardian_subagent` is accepted for compatibility.","enum":["user","auto_review","guardian_subagent"],"type":"string"};
+const schema742 = {"enum":["read-only","workspace-write","danger-full-access"],"type":"string"};
+const schema743 = {"enum":["disabled","cached","indexed","live"],"type":"string"};
+const schema744 = {"enum":["elevated","unelevated"],"type":"string"};
+const schema745 = {"properties":{"allowLockedComputerUse":{"type":["boolean","null"]}},"type":"object"};
+const schema746 = {"enum":["us"],"type":"string"};
+const schema747 = {"properties":{"PermissionRequest":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"PostCompact":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"PostToolUse":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"PreCompact":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"PreToolUse":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"SessionStart":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"Stop":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"SubagentStart":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"SubagentStop":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"UserPromptSubmit":{"items":{"$ref":"#/definitions/ConfiguredHookMatcherGroup"},"type":"array"},"managedDir":{"type":["string","null"]},"windowsManagedDir":{"type":["string","null"]}},"required":["PermissionRequest","PostCompact","PostToolUse","PreCompact","PreToolUse","SessionStart","Stop","SubagentStart","SubagentStop","UserPromptSubmit"],"type":"object"};
+const schema748 = {"properties":{"hooks":{"items":{"$ref":"#/definitions/ConfiguredHookHandler"},"type":"array"},"matcher":{"type":["string","null"]}},"required":["hooks"],"type":"object"};
+const schema749 = {"oneOf":[{"properties":{"async":{"type":"boolean"},"command":{"type":"string"},"commandWindows":{"type":["string","null"]},"statusMessage":{"type":["string","null"]},"timeoutSec":{"minimum":0,"type":["integer","null"],"maximum":9007199254740991},"type":{"enum":["command"],"title":"CommandConfiguredHookHandlerType","type":"string"}},"required":["async","command","type"],"title":"CommandConfiguredHookHandler","type":"object"},{"properties":{"type":{"enum":["prompt"],"title":"PromptConfiguredHookHandlerType","type":"string"}},"required":["type"],"title":"PromptConfiguredHookHandler","type":"object"},{"properties":{"type":{"enum":["agent"],"title":"AgentConfiguredHookHandlerType","type":"string"}},"required":["type"],"title":"AgentConfiguredHookHandler","type":"object"}]};
+
+function validate477(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.hooks === undefined){
+const err0 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "hooks"},message:"must have required property '"+"hooks"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.hooks !== undefined){
+let data0 = data.hooks;
+if(Array.isArray(data0)){
+const len0 = data0.length;
+for(let i0=0; i0<len0; i0++){
+let data1 = data0[i0];
+const _errs5 = errors;
+let valid4 = false;
+let passing0 = null;
+const _errs6 = errors;
+if(data1 && typeof data1 == "object" && !Array.isArray(data1)){
+if(data1.async === undefined){
+const err1 = {instancePath:instancePath+"/hooks/" + i0,schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/0/required",keyword:"required",params:{missingProperty: "async"},message:"must have required property '"+"async"+"'"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+if(data1.command === undefined){
+const err2 = {instancePath:instancePath+"/hooks/" + i0,schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/0/required",keyword:"required",params:{missingProperty: "command"},message:"must have required property '"+"command"+"'"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+if(data1.type === undefined){
+const err3 = {instancePath:instancePath+"/hooks/" + i0,schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/0/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+if(data1.async !== undefined){
+if(typeof data1.async !== "boolean"){
+const err4 = {instancePath:instancePath+"/hooks/" + i0+"/async",schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/0/properties/async/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+}
+if(data1.command !== undefined){
+if(typeof data1.command !== "string"){
+const err5 = {instancePath:instancePath+"/hooks/" + i0+"/command",schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/0/properties/command/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+}
+if(data1.commandWindows !== undefined){
+let data4 = data1.commandWindows;
+if((typeof data4 !== "string") && (data4 !== null)){
+const err6 = {instancePath:instancePath+"/hooks/" + i0+"/commandWindows",schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/0/properties/commandWindows/type",keyword:"type",params:{type: schema749.oneOf[0].properties.commandWindows.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+}
+if(data1.statusMessage !== undefined){
+let data5 = data1.statusMessage;
+if((typeof data5 !== "string") && (data5 !== null)){
+const err7 = {instancePath:instancePath+"/hooks/" + i0+"/statusMessage",schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/0/properties/statusMessage/type",keyword:"type",params:{type: schema749.oneOf[0].properties.statusMessage.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+}
+if(data1.timeoutSec !== undefined){
+let data6 = data1.timeoutSec;
+if((!(((typeof data6 == "number") && (!(data6 % 1) && !isNaN(data6))) && (isFinite(data6)))) && (data6 !== null)){
+const err8 = {instancePath:instancePath+"/hooks/" + i0+"/timeoutSec",schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/0/properties/timeoutSec/type",keyword:"type",params:{type: schema749.oneOf[0].properties.timeoutSec.type},message:"must be integer,null"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+if((typeof data6 == "number") && (isFinite(data6))){
+if(data6 > 9007199254740991 || isNaN(data6)){
+const err9 = {instancePath:instancePath+"/hooks/" + i0+"/timeoutSec",schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/0/properties/timeoutSec/maximum",keyword:"maximum",params:{comparison: "<=", limit: 9007199254740991},message:"must be <= 9007199254740991"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+if(data6 < 0 || isNaN(data6)){
+const err10 = {instancePath:instancePath+"/hooks/" + i0+"/timeoutSec",schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/0/properties/timeoutSec/minimum",keyword:"minimum",params:{comparison: ">=", limit: 0},message:"must be >= 0"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+}
+}
+if(data1.type !== undefined){
+let data7 = data1.type;
+if(typeof data7 !== "string"){
+const err11 = {instancePath:instancePath+"/hooks/" + i0+"/type",schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/0/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+if(!(data7 === "command")){
+const err12 = {instancePath:instancePath+"/hooks/" + i0+"/type",schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema749.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err12];
+}
+else {
+vErrors.push(err12);
+}
+errors++;
+}
+}
+}
+else {
+const err13 = {instancePath:instancePath+"/hooks/" + i0,schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/0/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err13];
+}
+else {
+vErrors.push(err13);
+}
+errors++;
+}
+var _valid0 = _errs6 === errors;
+if(_valid0){
+valid4 = true;
+passing0 = 0;
+}
+const _errs20 = errors;
+if(data1 && typeof data1 == "object" && !Array.isArray(data1)){
+if(data1.type === undefined){
+const err14 = {instancePath:instancePath+"/hooks/" + i0,schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/1/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'"};
+if(vErrors === null){
+vErrors = [err14];
+}
+else {
+vErrors.push(err14);
+}
+errors++;
+}
+if(data1.type !== undefined){
+let data8 = data1.type;
+if(typeof data8 !== "string"){
+const err15 = {instancePath:instancePath+"/hooks/" + i0+"/type",schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/1/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err15];
+}
+else {
+vErrors.push(err15);
+}
+errors++;
+}
+if(!(data8 === "prompt")){
+const err16 = {instancePath:instancePath+"/hooks/" + i0+"/type",schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema749.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err16];
+}
+else {
+vErrors.push(err16);
+}
+errors++;
+}
+}
+}
+else {
+const err17 = {instancePath:instancePath+"/hooks/" + i0,schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/1/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err17];
+}
+else {
+vErrors.push(err17);
+}
+errors++;
+}
+var _valid0 = _errs20 === errors;
+if(_valid0 && valid4){
+valid4 = false;
+passing0 = [passing0, 1];
+}
+else {
+if(_valid0){
+valid4 = true;
+passing0 = 1;
+}
+const _errs24 = errors;
+if(data1 && typeof data1 == "object" && !Array.isArray(data1)){
+if(data1.type === undefined){
+const err18 = {instancePath:instancePath+"/hooks/" + i0,schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/2/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'"};
+if(vErrors === null){
+vErrors = [err18];
+}
+else {
+vErrors.push(err18);
+}
+errors++;
+}
+if(data1.type !== undefined){
+let data9 = data1.type;
+if(typeof data9 !== "string"){
+const err19 = {instancePath:instancePath+"/hooks/" + i0+"/type",schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/2/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err19];
+}
+else {
+vErrors.push(err19);
+}
+errors++;
+}
+if(!(data9 === "agent")){
+const err20 = {instancePath:instancePath+"/hooks/" + i0+"/type",schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema749.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err20];
+}
+else {
+vErrors.push(err20);
+}
+errors++;
+}
+}
+}
+else {
+const err21 = {instancePath:instancePath+"/hooks/" + i0,schemaPath:"#/definitions/ConfiguredHookHandler/oneOf/2/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err21];
+}
+else {
+vErrors.push(err21);
+}
+errors++;
+}
+var _valid0 = _errs24 === errors;
+if(_valid0 && valid4){
+valid4 = false;
+passing0 = [passing0, 2];
+}
+else {
+if(_valid0){
+valid4 = true;
+passing0 = 2;
+}
+}
+}
+if(!valid4){
+const err22 = {instancePath:instancePath+"/hooks/" + i0,schemaPath:"#/definitions/ConfiguredHookHandler/oneOf",keyword:"oneOf",params:{passingSchemas: passing0},message:"must match exactly one schema in oneOf"};
+if(vErrors === null){
+vErrors = [err22];
+}
+else {
+vErrors.push(err22);
+}
+errors++;
+}
+else {
+errors = _errs5;
+if(vErrors !== null){
+if(_errs5){
+vErrors.length = _errs5;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+}
+else {
+const err23 = {instancePath:instancePath+"/hooks",schemaPath:"#/properties/hooks/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err23];
+}
+else {
+vErrors.push(err23);
+}
+errors++;
+}
+}
+if(data.matcher !== undefined){
+let data10 = data.matcher;
+if((typeof data10 !== "string") && (data10 !== null)){
+const err24 = {instancePath:instancePath+"/matcher",schemaPath:"#/properties/matcher/type",keyword:"type",params:{type: schema748.properties.matcher.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err24];
+}
+else {
+vErrors.push(err24);
+}
+errors++;
+}
+}
+}
+else {
+const err25 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err25];
+}
+else {
+vErrors.push(err25);
+}
+errors++;
+}
+validate477.errors = vErrors;
+return errors === 0;
+}
+
+
+function validate476(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.PermissionRequest === undefined){
+const err0 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "PermissionRequest"},message:"must have required property '"+"PermissionRequest"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.PostCompact === undefined){
+const err1 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "PostCompact"},message:"must have required property '"+"PostCompact"+"'"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+if(data.PostToolUse === undefined){
+const err2 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "PostToolUse"},message:"must have required property '"+"PostToolUse"+"'"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+if(data.PreCompact === undefined){
+const err3 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "PreCompact"},message:"must have required property '"+"PreCompact"+"'"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+if(data.PreToolUse === undefined){
+const err4 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "PreToolUse"},message:"must have required property '"+"PreToolUse"+"'"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+if(data.SessionStart === undefined){
+const err5 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "SessionStart"},message:"must have required property '"+"SessionStart"+"'"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+if(data.Stop === undefined){
+const err6 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "Stop"},message:"must have required property '"+"Stop"+"'"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+if(data.SubagentStart === undefined){
+const err7 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "SubagentStart"},message:"must have required property '"+"SubagentStart"+"'"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+if(data.SubagentStop === undefined){
+const err8 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "SubagentStop"},message:"must have required property '"+"SubagentStop"+"'"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+if(data.UserPromptSubmit === undefined){
+const err9 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "UserPromptSubmit"},message:"must have required property '"+"UserPromptSubmit"+"'"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+if(data.PermissionRequest !== undefined){
+let data0 = data.PermissionRequest;
+if(Array.isArray(data0)){
+const len0 = data0.length;
+for(let i0=0; i0<len0; i0++){
+if(!(validate477(data0[i0], {instancePath:instancePath+"/PermissionRequest/" + i0,parentData:data0,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate477.errors : vErrors.concat(validate477.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err10 = {instancePath:instancePath+"/PermissionRequest",schemaPath:"#/properties/PermissionRequest/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+}
+if(data.PostCompact !== undefined){
+let data2 = data.PostCompact;
+if(Array.isArray(data2)){
+const len1 = data2.length;
+for(let i1=0; i1<len1; i1++){
+if(!(validate477(data2[i1], {instancePath:instancePath+"/PostCompact/" + i1,parentData:data2,parentDataProperty:i1,rootData}))){
+vErrors = vErrors === null ? validate477.errors : vErrors.concat(validate477.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err11 = {instancePath:instancePath+"/PostCompact",schemaPath:"#/properties/PostCompact/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+}
+if(data.PostToolUse !== undefined){
+let data4 = data.PostToolUse;
+if(Array.isArray(data4)){
+const len2 = data4.length;
+for(let i2=0; i2<len2; i2++){
+if(!(validate477(data4[i2], {instancePath:instancePath+"/PostToolUse/" + i2,parentData:data4,parentDataProperty:i2,rootData}))){
+vErrors = vErrors === null ? validate477.errors : vErrors.concat(validate477.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err12 = {instancePath:instancePath+"/PostToolUse",schemaPath:"#/properties/PostToolUse/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err12];
+}
+else {
+vErrors.push(err12);
+}
+errors++;
+}
+}
+if(data.PreCompact !== undefined){
+let data6 = data.PreCompact;
+if(Array.isArray(data6)){
+const len3 = data6.length;
+for(let i3=0; i3<len3; i3++){
+if(!(validate477(data6[i3], {instancePath:instancePath+"/PreCompact/" + i3,parentData:data6,parentDataProperty:i3,rootData}))){
+vErrors = vErrors === null ? validate477.errors : vErrors.concat(validate477.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err13 = {instancePath:instancePath+"/PreCompact",schemaPath:"#/properties/PreCompact/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err13];
+}
+else {
+vErrors.push(err13);
+}
+errors++;
+}
+}
+if(data.PreToolUse !== undefined){
+let data8 = data.PreToolUse;
+if(Array.isArray(data8)){
+const len4 = data8.length;
+for(let i4=0; i4<len4; i4++){
+if(!(validate477(data8[i4], {instancePath:instancePath+"/PreToolUse/" + i4,parentData:data8,parentDataProperty:i4,rootData}))){
+vErrors = vErrors === null ? validate477.errors : vErrors.concat(validate477.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err14 = {instancePath:instancePath+"/PreToolUse",schemaPath:"#/properties/PreToolUse/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err14];
+}
+else {
+vErrors.push(err14);
+}
+errors++;
+}
+}
+if(data.SessionStart !== undefined){
+let data10 = data.SessionStart;
+if(Array.isArray(data10)){
+const len5 = data10.length;
+for(let i5=0; i5<len5; i5++){
+if(!(validate477(data10[i5], {instancePath:instancePath+"/SessionStart/" + i5,parentData:data10,parentDataProperty:i5,rootData}))){
+vErrors = vErrors === null ? validate477.errors : vErrors.concat(validate477.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err15 = {instancePath:instancePath+"/SessionStart",schemaPath:"#/properties/SessionStart/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err15];
+}
+else {
+vErrors.push(err15);
+}
+errors++;
+}
+}
+if(data.Stop !== undefined){
+let data12 = data.Stop;
+if(Array.isArray(data12)){
+const len6 = data12.length;
+for(let i6=0; i6<len6; i6++){
+if(!(validate477(data12[i6], {instancePath:instancePath+"/Stop/" + i6,parentData:data12,parentDataProperty:i6,rootData}))){
+vErrors = vErrors === null ? validate477.errors : vErrors.concat(validate477.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err16 = {instancePath:instancePath+"/Stop",schemaPath:"#/properties/Stop/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err16];
+}
+else {
+vErrors.push(err16);
+}
+errors++;
+}
+}
+if(data.SubagentStart !== undefined){
+let data14 = data.SubagentStart;
+if(Array.isArray(data14)){
+const len7 = data14.length;
+for(let i7=0; i7<len7; i7++){
+if(!(validate477(data14[i7], {instancePath:instancePath+"/SubagentStart/" + i7,parentData:data14,parentDataProperty:i7,rootData}))){
+vErrors = vErrors === null ? validate477.errors : vErrors.concat(validate477.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err17 = {instancePath:instancePath+"/SubagentStart",schemaPath:"#/properties/SubagentStart/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err17];
+}
+else {
+vErrors.push(err17);
+}
+errors++;
+}
+}
+if(data.SubagentStop !== undefined){
+let data16 = data.SubagentStop;
+if(Array.isArray(data16)){
+const len8 = data16.length;
+for(let i8=0; i8<len8; i8++){
+if(!(validate477(data16[i8], {instancePath:instancePath+"/SubagentStop/" + i8,parentData:data16,parentDataProperty:i8,rootData}))){
+vErrors = vErrors === null ? validate477.errors : vErrors.concat(validate477.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err18 = {instancePath:instancePath+"/SubagentStop",schemaPath:"#/properties/SubagentStop/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err18];
+}
+else {
+vErrors.push(err18);
+}
+errors++;
+}
+}
+if(data.UserPromptSubmit !== undefined){
+let data18 = data.UserPromptSubmit;
+if(Array.isArray(data18)){
+const len9 = data18.length;
+for(let i9=0; i9<len9; i9++){
+if(!(validate477(data18[i9], {instancePath:instancePath+"/UserPromptSubmit/" + i9,parentData:data18,parentDataProperty:i9,rootData}))){
+vErrors = vErrors === null ? validate477.errors : vErrors.concat(validate477.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err19 = {instancePath:instancePath+"/UserPromptSubmit",schemaPath:"#/properties/UserPromptSubmit/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err19];
+}
+else {
+vErrors.push(err19);
+}
+errors++;
+}
+}
+if(data.managedDir !== undefined){
+let data20 = data.managedDir;
+if((typeof data20 !== "string") && (data20 !== null)){
+const err20 = {instancePath:instancePath+"/managedDir",schemaPath:"#/properties/managedDir/type",keyword:"type",params:{type: schema747.properties.managedDir.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err20];
+}
+else {
+vErrors.push(err20);
+}
+errors++;
+}
+}
+if(data.windowsManagedDir !== undefined){
+let data21 = data.windowsManagedDir;
+if((typeof data21 !== "string") && (data21 !== null)){
+const err21 = {instancePath:instancePath+"/windowsManagedDir",schemaPath:"#/properties/windowsManagedDir/type",keyword:"type",params:{type: schema747.properties.windowsManagedDir.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err21];
+}
+else {
+vErrors.push(err21);
+}
+errors++;
+}
+}
+}
+else {
+const err22 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err22];
+}
+else {
+vErrors.push(err22);
+}
+errors++;
+}
+validate476.errors = vErrors;
+return errors === 0;
+}
+
+const schema750 = {"properties":{"newThread":{"anyOf":[{"$ref":"#/definitions/NewThreadModelDefaults"},{"type":"null"}]}},"type":"object"};
+const schema751 = {"properties":{"model":{"type":["string","null"]},"modelReasoningEffort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}]},"serviceTier":{"type":["string","null"]}},"type":"object"};
+const schema752 = {"description":"A non-empty reasoning effort value advertised by the model.","minLength":1,"type":"string"};
+
+function validate490(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.model !== undefined){
+let data0 = data.model;
+if((typeof data0 !== "string") && (data0 !== null)){
+const err0 = {instancePath:instancePath+"/model",schemaPath:"#/properties/model/type",keyword:"type",params:{type: schema751.properties.model.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+}
+if(data.modelReasoningEffort !== undefined){
+let data1 = data.modelReasoningEffort;
+const _errs4 = errors;
+let valid1 = false;
+const _errs5 = errors;
+if(typeof data1 === "string"){
+if(func2(data1) < 1){
+const err1 = {instancePath:instancePath+"/modelReasoningEffort",schemaPath:"#/definitions/ReasoningEffort/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+}
+else {
+const err2 = {instancePath:instancePath+"/modelReasoningEffort",schemaPath:"#/definitions/ReasoningEffort/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+var _valid0 = _errs5 === errors;
+valid1 = valid1 || _valid0;
+if(!valid1){
+const _errs8 = errors;
+if(data1 !== null){
+const err3 = {instancePath:instancePath+"/modelReasoningEffort",schemaPath:"#/properties/modelReasoningEffort/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+var _valid0 = _errs8 === errors;
+valid1 = valid1 || _valid0;
+}
+if(!valid1){
+const err4 = {instancePath:instancePath+"/modelReasoningEffort",schemaPath:"#/properties/modelReasoningEffort/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+else {
+errors = _errs4;
+if(vErrors !== null){
+if(_errs4){
+vErrors.length = _errs4;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.serviceTier !== undefined){
+let data2 = data.serviceTier;
+if((typeof data2 !== "string") && (data2 !== null)){
+const err5 = {instancePath:instancePath+"/serviceTier",schemaPath:"#/properties/serviceTier/type",keyword:"type",params:{type: schema751.properties.serviceTier.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+}
+}
+else {
+const err6 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+validate490.errors = vErrors;
+return errors === 0;
+}
+
+
+function validate489(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.newThread !== undefined){
+let data0 = data.newThread;
+const _errs2 = errors;
+let valid1 = false;
+const _errs3 = errors;
+if(!(validate490(data0, {instancePath:instancePath+"/newThread",parentData:data,parentDataProperty:"newThread",rootData}))){
+vErrors = vErrors === null ? validate490.errors : vErrors.concat(validate490.errors);
+errors = vErrors.length;
+}
+var _valid0 = _errs3 === errors;
+valid1 = valid1 || _valid0;
+if(!valid1){
+const _errs4 = errors;
+if(data0 !== null){
+const err0 = {instancePath:instancePath+"/newThread",schemaPath:"#/properties/newThread/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+var _valid0 = _errs4 === errors;
+valid1 = valid1 || _valid0;
+}
+if(!valid1){
+const err1 = {instancePath:instancePath+"/newThread",schemaPath:"#/properties/newThread/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+else {
+errors = _errs2;
+if(vErrors !== null){
+if(_errs2){
+vErrors.length = _errs2;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+}
+else {
+const err2 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+validate489.errors = vErrors;
+return errors === 0;
+}
+
+const schema753 = {"properties":{"allowLocalBinding":{"type":["boolean","null"]},"allowUnixSockets":{"description":"Legacy compatibility view derived from `unix_sockets`.","items":{"type":"string"},"type":["array","null"]},"allowUpstreamProxy":{"type":["boolean","null"]},"allowedDomains":{"description":"Legacy compatibility view derived from `domains`.","items":{"type":"string"},"type":["array","null"]},"dangerouslyAllowAllUnixSockets":{"type":["boolean","null"]},"dangerouslyAllowNonLoopbackProxy":{"type":["boolean","null"]},"deniedDomains":{"description":"Legacy compatibility view derived from `domains`.","items":{"type":"string"},"type":["array","null"]},"domains":{"additionalProperties":{"$ref":"#/definitions/NetworkDomainPermission"},"description":"Canonical network permission map for `experimental_network`.","type":["object","null"]},"enabled":{"type":["boolean","null"]},"httpPort":{"minimum":0,"type":["integer","null"],"maximum":65535},"managedAllowedDomainsOnly":{"description":"When true, only managed allowlist entries are respected while managed network enforcement is active.","type":["boolean","null"]},"socksPort":{"minimum":0,"type":["integer","null"],"maximum":65535},"unixSockets":{"additionalProperties":{"$ref":"#/definitions/NetworkUnixSocketPermission"},"description":"Canonical unix socket permission map for `experimental_network`.","type":["object","null"]}},"type":"object"};
+const schema754 = {"enum":["allow","deny"],"type":"string"};
+const schema755 = {"enum":["allow","deny"],"type":"string"};
+
+function validate493(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.allowLocalBinding !== undefined){
+let data0 = data.allowLocalBinding;
+if((typeof data0 !== "boolean") && (data0 !== null)){
+const err0 = {instancePath:instancePath+"/allowLocalBinding",schemaPath:"#/properties/allowLocalBinding/type",keyword:"type",params:{type: schema753.properties.allowLocalBinding.type},message:"must be boolean,null"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+}
+if(data.allowUnixSockets !== undefined){
+let data1 = data.allowUnixSockets;
+if((!(Array.isArray(data1))) && (data1 !== null)){
+const err1 = {instancePath:instancePath+"/allowUnixSockets",schemaPath:"#/properties/allowUnixSockets/type",keyword:"type",params:{type: schema753.properties.allowUnixSockets.type},message:"must be array,null"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+if(Array.isArray(data1)){
+const len0 = data1.length;
+for(let i0=0; i0<len0; i0++){
+if(typeof data1[i0] !== "string"){
+const err2 = {instancePath:instancePath+"/allowUnixSockets/" + i0,schemaPath:"#/properties/allowUnixSockets/items/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+}
+}
+}
+if(data.allowUpstreamProxy !== undefined){
+let data3 = data.allowUpstreamProxy;
+if((typeof data3 !== "boolean") && (data3 !== null)){
+const err3 = {instancePath:instancePath+"/allowUpstreamProxy",schemaPath:"#/properties/allowUpstreamProxy/type",keyword:"type",params:{type: schema753.properties.allowUpstreamProxy.type},message:"must be boolean,null"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+}
+if(data.allowedDomains !== undefined){
+let data4 = data.allowedDomains;
+if((!(Array.isArray(data4))) && (data4 !== null)){
+const err4 = {instancePath:instancePath+"/allowedDomains",schemaPath:"#/properties/allowedDomains/type",keyword:"type",params:{type: schema753.properties.allowedDomains.type},message:"must be array,null"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+if(Array.isArray(data4)){
+const len1 = data4.length;
+for(let i1=0; i1<len1; i1++){
+if(typeof data4[i1] !== "string"){
+const err5 = {instancePath:instancePath+"/allowedDomains/" + i1,schemaPath:"#/properties/allowedDomains/items/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+}
+}
+}
+if(data.dangerouslyAllowAllUnixSockets !== undefined){
+let data6 = data.dangerouslyAllowAllUnixSockets;
+if((typeof data6 !== "boolean") && (data6 !== null)){
+const err6 = {instancePath:instancePath+"/dangerouslyAllowAllUnixSockets",schemaPath:"#/properties/dangerouslyAllowAllUnixSockets/type",keyword:"type",params:{type: schema753.properties.dangerouslyAllowAllUnixSockets.type},message:"must be boolean,null"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+}
+if(data.dangerouslyAllowNonLoopbackProxy !== undefined){
+let data7 = data.dangerouslyAllowNonLoopbackProxy;
+if((typeof data7 !== "boolean") && (data7 !== null)){
+const err7 = {instancePath:instancePath+"/dangerouslyAllowNonLoopbackProxy",schemaPath:"#/properties/dangerouslyAllowNonLoopbackProxy/type",keyword:"type",params:{type: schema753.properties.dangerouslyAllowNonLoopbackProxy.type},message:"must be boolean,null"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+}
+if(data.deniedDomains !== undefined){
+let data8 = data.deniedDomains;
+if((!(Array.isArray(data8))) && (data8 !== null)){
+const err8 = {instancePath:instancePath+"/deniedDomains",schemaPath:"#/properties/deniedDomains/type",keyword:"type",params:{type: schema753.properties.deniedDomains.type},message:"must be array,null"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+if(Array.isArray(data8)){
+const len2 = data8.length;
+for(let i2=0; i2<len2; i2++){
+if(typeof data8[i2] !== "string"){
+const err9 = {instancePath:instancePath+"/deniedDomains/" + i2,schemaPath:"#/properties/deniedDomains/items/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+}
+}
+}
+if(data.domains !== undefined){
+let data10 = data.domains;
+if((!(data10 && typeof data10 == "object" && !Array.isArray(data10))) && (data10 !== null)){
+const err10 = {instancePath:instancePath+"/domains",schemaPath:"#/properties/domains/type",keyword:"type",params:{type: schema753.properties.domains.type},message:"must be object,null"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+if(data10 && typeof data10 == "object" && !Array.isArray(data10)){
+for(const key0 in data10){
+let data11 = data10[key0];
+if(typeof data11 !== "string"){
+const err11 = {instancePath:instancePath+"/domains/" + key0.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/definitions/NetworkDomainPermission/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+if(!((data11 === "allow") || (data11 === "deny"))){
+const err12 = {instancePath:instancePath+"/domains/" + key0.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/definitions/NetworkDomainPermission/enum",keyword:"enum",params:{allowedValues: schema754.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err12];
+}
+else {
+vErrors.push(err12);
+}
+errors++;
+}
+}
+}
+}
+if(data.enabled !== undefined){
+let data12 = data.enabled;
+if((typeof data12 !== "boolean") && (data12 !== null)){
+const err13 = {instancePath:instancePath+"/enabled",schemaPath:"#/properties/enabled/type",keyword:"type",params:{type: schema753.properties.enabled.type},message:"must be boolean,null"};
+if(vErrors === null){
+vErrors = [err13];
+}
+else {
+vErrors.push(err13);
+}
+errors++;
+}
+}
+if(data.httpPort !== undefined){
+let data13 = data.httpPort;
+if((!(((typeof data13 == "number") && (!(data13 % 1) && !isNaN(data13))) && (isFinite(data13)))) && (data13 !== null)){
+const err14 = {instancePath:instancePath+"/httpPort",schemaPath:"#/properties/httpPort/type",keyword:"type",params:{type: schema753.properties.httpPort.type},message:"must be integer,null"};
+if(vErrors === null){
+vErrors = [err14];
+}
+else {
+vErrors.push(err14);
+}
+errors++;
+}
+if((typeof data13 == "number") && (isFinite(data13))){
+if(data13 > 65535 || isNaN(data13)){
+const err15 = {instancePath:instancePath+"/httpPort",schemaPath:"#/properties/httpPort/maximum",keyword:"maximum",params:{comparison: "<=", limit: 65535},message:"must be <= 65535"};
+if(vErrors === null){
+vErrors = [err15];
+}
+else {
+vErrors.push(err15);
+}
+errors++;
+}
+if(data13 < 0 || isNaN(data13)){
+const err16 = {instancePath:instancePath+"/httpPort",schemaPath:"#/properties/httpPort/minimum",keyword:"minimum",params:{comparison: ">=", limit: 0},message:"must be >= 0"};
+if(vErrors === null){
+vErrors = [err16];
+}
+else {
+vErrors.push(err16);
+}
+errors++;
+}
+}
+}
+if(data.managedAllowedDomainsOnly !== undefined){
+let data14 = data.managedAllowedDomainsOnly;
+if((typeof data14 !== "boolean") && (data14 !== null)){
+const err17 = {instancePath:instancePath+"/managedAllowedDomainsOnly",schemaPath:"#/properties/managedAllowedDomainsOnly/type",keyword:"type",params:{type: schema753.properties.managedAllowedDomainsOnly.type},message:"must be boolean,null"};
+if(vErrors === null){
+vErrors = [err17];
+}
+else {
+vErrors.push(err17);
+}
+errors++;
+}
+}
+if(data.socksPort !== undefined){
+let data15 = data.socksPort;
+if((!(((typeof data15 == "number") && (!(data15 % 1) && !isNaN(data15))) && (isFinite(data15)))) && (data15 !== null)){
+const err18 = {instancePath:instancePath+"/socksPort",schemaPath:"#/properties/socksPort/type",keyword:"type",params:{type: schema753.properties.socksPort.type},message:"must be integer,null"};
+if(vErrors === null){
+vErrors = [err18];
+}
+else {
+vErrors.push(err18);
+}
+errors++;
+}
+if((typeof data15 == "number") && (isFinite(data15))){
+if(data15 > 65535 || isNaN(data15)){
+const err19 = {instancePath:instancePath+"/socksPort",schemaPath:"#/properties/socksPort/maximum",keyword:"maximum",params:{comparison: "<=", limit: 65535},message:"must be <= 65535"};
+if(vErrors === null){
+vErrors = [err19];
+}
+else {
+vErrors.push(err19);
+}
+errors++;
+}
+if(data15 < 0 || isNaN(data15)){
+const err20 = {instancePath:instancePath+"/socksPort",schemaPath:"#/properties/socksPort/minimum",keyword:"minimum",params:{comparison: ">=", limit: 0},message:"must be >= 0"};
+if(vErrors === null){
+vErrors = [err20];
+}
+else {
+vErrors.push(err20);
+}
+errors++;
+}
+}
+}
+if(data.unixSockets !== undefined){
+let data16 = data.unixSockets;
+if((!(data16 && typeof data16 == "object" && !Array.isArray(data16))) && (data16 !== null)){
+const err21 = {instancePath:instancePath+"/unixSockets",schemaPath:"#/properties/unixSockets/type",keyword:"type",params:{type: schema753.properties.unixSockets.type},message:"must be object,null"};
+if(vErrors === null){
+vErrors = [err21];
+}
+else {
+vErrors.push(err21);
+}
+errors++;
+}
+if(data16 && typeof data16 == "object" && !Array.isArray(data16)){
+for(const key1 in data16){
+let data17 = data16[key1];
+if(typeof data17 !== "string"){
+const err22 = {instancePath:instancePath+"/unixSockets/" + key1.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/definitions/NetworkUnixSocketPermission/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err22];
+}
+else {
+vErrors.push(err22);
+}
+errors++;
+}
+if(!((data17 === "allow") || (data17 === "deny"))){
+const err23 = {instancePath:instancePath+"/unixSockets/" + key1.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/definitions/NetworkUnixSocketPermission/enum",keyword:"enum",params:{allowedValues: schema755.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err23];
+}
+else {
+vErrors.push(err23);
+}
+errors++;
+}
+}
+}
+}
+}
+else {
+const err24 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err24];
+}
+else {
+vErrors.push(err24);
+}
+errors++;
+}
+validate493.errors = vErrors;
+return errors === 0;
+}
+
+
+function validate475(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.allowAppshots !== undefined){
+let data0 = data.allowAppshots;
+if((typeof data0 !== "boolean") && (data0 !== null)){
+const err0 = {instancePath:instancePath+"/allowAppshots",schemaPath:"#/properties/allowAppshots/type",keyword:"type",params:{type: schema739.properties.allowAppshots.type},message:"must be boolean,null"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+}
+if(data.allowManagedHooksOnly !== undefined){
+let data1 = data.allowManagedHooksOnly;
+if((typeof data1 !== "boolean") && (data1 !== null)){
+const err1 = {instancePath:instancePath+"/allowManagedHooksOnly",schemaPath:"#/properties/allowManagedHooksOnly/type",keyword:"type",params:{type: schema739.properties.allowManagedHooksOnly.type},message:"must be boolean,null"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+}
+if(data.allowRemoteControl !== undefined){
+let data2 = data.allowRemoteControl;
+if((typeof data2 !== "boolean") && (data2 !== null)){
+const err2 = {instancePath:instancePath+"/allowRemoteControl",schemaPath:"#/properties/allowRemoteControl/type",keyword:"type",params:{type: schema739.properties.allowRemoteControl.type},message:"must be boolean,null"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+}
+if(data.allowedApprovalPolicies !== undefined){
+let data3 = data.allowedApprovalPolicies;
+if((!(Array.isArray(data3))) && (data3 !== null)){
+const err3 = {instancePath:instancePath+"/allowedApprovalPolicies",schemaPath:"#/properties/allowedApprovalPolicies/type",keyword:"type",params:{type: schema739.properties.allowedApprovalPolicies.type},message:"must be array,null"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+if(Array.isArray(data3)){
+const len0 = data3.length;
+for(let i0=0; i0<len0; i0++){
+let data4 = data3[i0];
+const _errs11 = errors;
+let valid4 = false;
+let passing0 = null;
+const _errs12 = errors;
+if(typeof data4 !== "string"){
+const err4 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0,schemaPath:"#/definitions/AskForApproval/oneOf/0/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+if(!(((data4 === "untrusted") || (data4 === "on-request")) || (data4 === "never"))){
+const err5 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0,schemaPath:"#/definitions/AskForApproval/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema740.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+var _valid0 = _errs12 === errors;
+if(_valid0){
+valid4 = true;
+passing0 = 0;
+}
+const _errs14 = errors;
+if(data4 && typeof data4 == "object" && !Array.isArray(data4)){
+if(data4.granular === undefined){
+const err6 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0,schemaPath:"#/definitions/AskForApproval/oneOf/1/required",keyword:"required",params:{missingProperty: "granular"},message:"must have required property '"+"granular"+"'"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+for(const key0 in data4){
+if(!(key0 === "granular")){
+const err7 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0,schemaPath:"#/definitions/AskForApproval/oneOf/1/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+}
+if(data4.granular !== undefined){
+let data5 = data4.granular;
+if(data5 && typeof data5 == "object" && !Array.isArray(data5)){
+if(data5.mcp_elicitations === undefined){
+const err8 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0+"/granular",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/required",keyword:"required",params:{missingProperty: "mcp_elicitations"},message:"must have required property '"+"mcp_elicitations"+"'"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+if(data5.rules === undefined){
+const err9 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0+"/granular",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/required",keyword:"required",params:{missingProperty: "rules"},message:"must have required property '"+"rules"+"'"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+if(data5.sandbox_approval === undefined){
+const err10 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0+"/granular",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/required",keyword:"required",params:{missingProperty: "sandbox_approval"},message:"must have required property '"+"sandbox_approval"+"'"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+if(data5.mcp_elicitations !== undefined){
+if(typeof data5.mcp_elicitations !== "boolean"){
+const err11 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0+"/granular/mcp_elicitations",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/properties/mcp_elicitations/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+}
+if(data5.request_permissions !== undefined){
+if(typeof data5.request_permissions !== "boolean"){
+const err12 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0+"/granular/request_permissions",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/properties/request_permissions/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err12];
+}
+else {
+vErrors.push(err12);
+}
+errors++;
+}
+}
+if(data5.rules !== undefined){
+if(typeof data5.rules !== "boolean"){
+const err13 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0+"/granular/rules",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/properties/rules/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err13];
+}
+else {
+vErrors.push(err13);
+}
+errors++;
+}
+}
+if(data5.sandbox_approval !== undefined){
+if(typeof data5.sandbox_approval !== "boolean"){
+const err14 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0+"/granular/sandbox_approval",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/properties/sandbox_approval/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err14];
+}
+else {
+vErrors.push(err14);
+}
+errors++;
+}
+}
+if(data5.skill_approval !== undefined){
+if(typeof data5.skill_approval !== "boolean"){
+const err15 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0+"/granular/skill_approval",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/properties/skill_approval/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err15];
+}
+else {
+vErrors.push(err15);
+}
+errors++;
+}
+}
+}
+else {
+const err16 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0+"/granular",schemaPath:"#/definitions/AskForApproval/oneOf/1/properties/granular/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err16];
+}
+else {
+vErrors.push(err16);
+}
+errors++;
+}
+}
+}
+else {
+const err17 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0,schemaPath:"#/definitions/AskForApproval/oneOf/1/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err17];
+}
+else {
+vErrors.push(err17);
+}
+errors++;
+}
+var _valid0 = _errs14 === errors;
+if(_valid0 && valid4){
+valid4 = false;
+passing0 = [passing0, 1];
+}
+else {
+if(_valid0){
+valid4 = true;
+passing0 = 1;
+}
+}
+if(!valid4){
+const err18 = {instancePath:instancePath+"/allowedApprovalPolicies/" + i0,schemaPath:"#/definitions/AskForApproval/oneOf",keyword:"oneOf",params:{passingSchemas: passing0},message:"must match exactly one schema in oneOf"};
+if(vErrors === null){
+vErrors = [err18];
+}
+else {
+vErrors.push(err18);
+}
+errors++;
+}
+else {
+errors = _errs11;
+if(vErrors !== null){
+if(_errs11){
+vErrors.length = _errs11;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+}
+}
+if(data.allowedApprovalsReviewers !== undefined){
+let data11 = data.allowedApprovalsReviewers;
+if((!(Array.isArray(data11))) && (data11 !== null)){
+const err19 = {instancePath:instancePath+"/allowedApprovalsReviewers",schemaPath:"#/properties/allowedApprovalsReviewers/type",keyword:"type",params:{type: schema739.properties.allowedApprovalsReviewers.type},message:"must be array,null"};
+if(vErrors === null){
+vErrors = [err19];
+}
+else {
+vErrors.push(err19);
+}
+errors++;
+}
+if(Array.isArray(data11)){
+const len1 = data11.length;
+for(let i1=0; i1<len1; i1++){
+let data12 = data11[i1];
+if(typeof data12 !== "string"){
+const err20 = {instancePath:instancePath+"/allowedApprovalsReviewers/" + i1,schemaPath:"#/definitions/ApprovalsReviewer/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err20];
+}
+else {
+vErrors.push(err20);
+}
+errors++;
+}
+if(!(((data12 === "user") || (data12 === "auto_review")) || (data12 === "guardian_subagent"))){
+const err21 = {instancePath:instancePath+"/allowedApprovalsReviewers/" + i1,schemaPath:"#/definitions/ApprovalsReviewer/enum",keyword:"enum",params:{allowedValues: schema741.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err21];
+}
+else {
+vErrors.push(err21);
+}
+errors++;
+}
+}
+}
+}
+if(data.allowedPermissionProfiles !== undefined){
+let data13 = data.allowedPermissionProfiles;
+if((!(data13 && typeof data13 == "object" && !Array.isArray(data13))) && (data13 !== null)){
+const err22 = {instancePath:instancePath+"/allowedPermissionProfiles",schemaPath:"#/properties/allowedPermissionProfiles/type",keyword:"type",params:{type: schema739.properties.allowedPermissionProfiles.type},message:"must be object,null"};
+if(vErrors === null){
+vErrors = [err22];
+}
+else {
+vErrors.push(err22);
+}
+errors++;
+}
+if(data13 && typeof data13 == "object" && !Array.isArray(data13)){
+for(const key1 in data13){
+if(typeof data13[key1] !== "boolean"){
+const err23 = {instancePath:instancePath+"/allowedPermissionProfiles/" + key1.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/allowedPermissionProfiles/additionalProperties/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err23];
+}
+else {
+vErrors.push(err23);
+}
+errors++;
+}
+}
+}
+}
+if(data.allowedSandboxModes !== undefined){
+let data15 = data.allowedSandboxModes;
+if((!(Array.isArray(data15))) && (data15 !== null)){
+const err24 = {instancePath:instancePath+"/allowedSandboxModes",schemaPath:"#/properties/allowedSandboxModes/type",keyword:"type",params:{type: schema739.properties.allowedSandboxModes.type},message:"must be array,null"};
+if(vErrors === null){
+vErrors = [err24];
+}
+else {
+vErrors.push(err24);
+}
+errors++;
+}
+if(Array.isArray(data15)){
+const len2 = data15.length;
+for(let i2=0; i2<len2; i2++){
+let data16 = data15[i2];
+if(typeof data16 !== "string"){
+const err25 = {instancePath:instancePath+"/allowedSandboxModes/" + i2,schemaPath:"#/definitions/SandboxMode/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err25];
+}
+else {
+vErrors.push(err25);
+}
+errors++;
+}
+if(!(((data16 === "read-only") || (data16 === "workspace-write")) || (data16 === "danger-full-access"))){
+const err26 = {instancePath:instancePath+"/allowedSandboxModes/" + i2,schemaPath:"#/definitions/SandboxMode/enum",keyword:"enum",params:{allowedValues: schema742.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err26];
+}
+else {
+vErrors.push(err26);
+}
+errors++;
+}
+}
+}
+}
+if(data.allowedWebSearchModes !== undefined){
+let data17 = data.allowedWebSearchModes;
+if((!(Array.isArray(data17))) && (data17 !== null)){
+const err27 = {instancePath:instancePath+"/allowedWebSearchModes",schemaPath:"#/properties/allowedWebSearchModes/type",keyword:"type",params:{type: schema739.properties.allowedWebSearchModes.type},message:"must be array,null"};
+if(vErrors === null){
+vErrors = [err27];
+}
+else {
+vErrors.push(err27);
+}
+errors++;
+}
+if(Array.isArray(data17)){
+const len3 = data17.length;
+for(let i3=0; i3<len3; i3++){
+let data18 = data17[i3];
+if(typeof data18 !== "string"){
+const err28 = {instancePath:instancePath+"/allowedWebSearchModes/" + i3,schemaPath:"#/definitions/WebSearchMode/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err28];
+}
+else {
+vErrors.push(err28);
+}
+errors++;
+}
+if(!((((data18 === "disabled") || (data18 === "cached")) || (data18 === "indexed")) || (data18 === "live"))){
+const err29 = {instancePath:instancePath+"/allowedWebSearchModes/" + i3,schemaPath:"#/definitions/WebSearchMode/enum",keyword:"enum",params:{allowedValues: schema743.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err29];
+}
+else {
+vErrors.push(err29);
+}
+errors++;
+}
+}
+}
+}
+if(data.allowedWindowsSandboxImplementations !== undefined){
+let data19 = data.allowedWindowsSandboxImplementations;
+if((!(Array.isArray(data19))) && (data19 !== null)){
+const err30 = {instancePath:instancePath+"/allowedWindowsSandboxImplementations",schemaPath:"#/properties/allowedWindowsSandboxImplementations/type",keyword:"type",params:{type: schema739.properties.allowedWindowsSandboxImplementations.type},message:"must be array,null"};
+if(vErrors === null){
+vErrors = [err30];
+}
+else {
+vErrors.push(err30);
+}
+errors++;
+}
+if(Array.isArray(data19)){
+const len4 = data19.length;
+for(let i4=0; i4<len4; i4++){
+let data20 = data19[i4];
+if(typeof data20 !== "string"){
+const err31 = {instancePath:instancePath+"/allowedWindowsSandboxImplementations/" + i4,schemaPath:"#/definitions/WindowsSandboxSetupMode/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err31];
+}
+else {
+vErrors.push(err31);
+}
+errors++;
+}
+if(!((data20 === "elevated") || (data20 === "unelevated"))){
+const err32 = {instancePath:instancePath+"/allowedWindowsSandboxImplementations/" + i4,schemaPath:"#/definitions/WindowsSandboxSetupMode/enum",keyword:"enum",params:{allowedValues: schema744.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err32];
+}
+else {
+vErrors.push(err32);
+}
+errors++;
+}
+}
+}
+}
+if(data.computerUse !== undefined){
+let data21 = data.computerUse;
+const _errs55 = errors;
+let valid20 = false;
+const _errs56 = errors;
+if(data21 && typeof data21 == "object" && !Array.isArray(data21)){
+if(data21.allowLockedComputerUse !== undefined){
+let data22 = data21.allowLockedComputerUse;
+if((typeof data22 !== "boolean") && (data22 !== null)){
+const err33 = {instancePath:instancePath+"/computerUse/allowLockedComputerUse",schemaPath:"#/definitions/ComputerUseRequirements/properties/allowLockedComputerUse/type",keyword:"type",params:{type: schema745.properties.allowLockedComputerUse.type},message:"must be boolean,null"};
+if(vErrors === null){
+vErrors = [err33];
+}
+else {
+vErrors.push(err33);
+}
+errors++;
+}
+}
+}
+else {
+const err34 = {instancePath:instancePath+"/computerUse",schemaPath:"#/definitions/ComputerUseRequirements/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err34];
+}
+else {
+vErrors.push(err34);
+}
+errors++;
+}
+var _valid1 = _errs56 === errors;
+valid20 = valid20 || _valid1;
+if(!valid20){
+const _errs61 = errors;
+if(data21 !== null){
+const err35 = {instancePath:instancePath+"/computerUse",schemaPath:"#/properties/computerUse/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err35];
+}
+else {
+vErrors.push(err35);
+}
+errors++;
+}
+var _valid1 = _errs61 === errors;
+valid20 = valid20 || _valid1;
+}
+if(!valid20){
+const err36 = {instancePath:instancePath+"/computerUse",schemaPath:"#/properties/computerUse/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err36];
+}
+else {
+vErrors.push(err36);
+}
+errors++;
+}
+else {
+errors = _errs55;
+if(vErrors !== null){
+if(_errs55){
+vErrors.length = _errs55;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.defaultPermissions !== undefined){
+let data23 = data.defaultPermissions;
+if((typeof data23 !== "string") && (data23 !== null)){
+const err37 = {instancePath:instancePath+"/defaultPermissions",schemaPath:"#/properties/defaultPermissions/type",keyword:"type",params:{type: schema739.properties.defaultPermissions.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err37];
+}
+else {
+vErrors.push(err37);
+}
+errors++;
+}
+}
+if(data.enforceResidency !== undefined){
+let data24 = data.enforceResidency;
+const _errs66 = errors;
+let valid23 = false;
+const _errs67 = errors;
+if(typeof data24 !== "string"){
+const err38 = {instancePath:instancePath+"/enforceResidency",schemaPath:"#/definitions/ResidencyRequirement/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err38];
+}
+else {
+vErrors.push(err38);
+}
+errors++;
+}
+if(!(data24 === "us")){
+const err39 = {instancePath:instancePath+"/enforceResidency",schemaPath:"#/definitions/ResidencyRequirement/enum",keyword:"enum",params:{allowedValues: schema746.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err39];
+}
+else {
+vErrors.push(err39);
+}
+errors++;
+}
+var _valid2 = _errs67 === errors;
+valid23 = valid23 || _valid2;
+if(!valid23){
+const _errs70 = errors;
+if(data24 !== null){
+const err40 = {instancePath:instancePath+"/enforceResidency",schemaPath:"#/properties/enforceResidency/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err40];
+}
+else {
+vErrors.push(err40);
+}
+errors++;
+}
+var _valid2 = _errs70 === errors;
+valid23 = valid23 || _valid2;
+}
+if(!valid23){
+const err41 = {instancePath:instancePath+"/enforceResidency",schemaPath:"#/properties/enforceResidency/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err41];
+}
+else {
+vErrors.push(err41);
+}
+errors++;
+}
+else {
+errors = _errs66;
+if(vErrors !== null){
+if(_errs66){
+vErrors.length = _errs66;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.featureRequirements !== undefined){
+let data25 = data.featureRequirements;
+if((!(data25 && typeof data25 == "object" && !Array.isArray(data25))) && (data25 !== null)){
+const err42 = {instancePath:instancePath+"/featureRequirements",schemaPath:"#/properties/featureRequirements/type",keyword:"type",params:{type: schema739.properties.featureRequirements.type},message:"must be object,null"};
+if(vErrors === null){
+vErrors = [err42];
+}
+else {
+vErrors.push(err42);
+}
+errors++;
+}
+if(data25 && typeof data25 == "object" && !Array.isArray(data25)){
+for(const key2 in data25){
+if(typeof data25[key2] !== "boolean"){
+const err43 = {instancePath:instancePath+"/featureRequirements/" + key2.replace(/~/g, "~0").replace(/\//g, "~1"),schemaPath:"#/properties/featureRequirements/additionalProperties/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err43];
+}
+else {
+vErrors.push(err43);
+}
+errors++;
+}
+}
+}
+}
+if(data.hooks !== undefined){
+let data27 = data.hooks;
+const _errs78 = errors;
+let valid26 = false;
+const _errs79 = errors;
+if(!(validate476(data27, {instancePath:instancePath+"/hooks",parentData:data,parentDataProperty:"hooks",rootData}))){
+vErrors = vErrors === null ? validate476.errors : vErrors.concat(validate476.errors);
+errors = vErrors.length;
+}
+var _valid3 = _errs79 === errors;
+valid26 = valid26 || _valid3;
+if(!valid26){
+const _errs80 = errors;
+if(data27 !== null){
+const err44 = {instancePath:instancePath+"/hooks",schemaPath:"#/properties/hooks/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err44];
+}
+else {
+vErrors.push(err44);
+}
+errors++;
+}
+var _valid3 = _errs80 === errors;
+valid26 = valid26 || _valid3;
+}
+if(!valid26){
+const err45 = {instancePath:instancePath+"/hooks",schemaPath:"#/properties/hooks/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err45];
+}
+else {
+vErrors.push(err45);
+}
+errors++;
+}
+else {
+errors = _errs78;
+if(vErrors !== null){
+if(_errs78){
+vErrors.length = _errs78;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.models !== undefined){
+let data28 = data.models;
+const _errs83 = errors;
+let valid27 = false;
+const _errs84 = errors;
+if(!(validate489(data28, {instancePath:instancePath+"/models",parentData:data,parentDataProperty:"models",rootData}))){
+vErrors = vErrors === null ? validate489.errors : vErrors.concat(validate489.errors);
+errors = vErrors.length;
+}
+var _valid4 = _errs84 === errors;
+valid27 = valid27 || _valid4;
+if(!valid27){
+const _errs85 = errors;
+if(data28 !== null){
+const err46 = {instancePath:instancePath+"/models",schemaPath:"#/properties/models/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err46];
+}
+else {
+vErrors.push(err46);
+}
+errors++;
+}
+var _valid4 = _errs85 === errors;
+valid27 = valid27 || _valid4;
+}
+if(!valid27){
+const err47 = {instancePath:instancePath+"/models",schemaPath:"#/properties/models/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err47];
+}
+else {
+vErrors.push(err47);
+}
+errors++;
+}
+else {
+errors = _errs83;
+if(vErrors !== null){
+if(_errs83){
+vErrors.length = _errs83;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+if(data.network !== undefined){
+let data29 = data.network;
+const _errs88 = errors;
+let valid28 = false;
+const _errs89 = errors;
+if(!(validate493(data29, {instancePath:instancePath+"/network",parentData:data,parentDataProperty:"network",rootData}))){
+vErrors = vErrors === null ? validate493.errors : vErrors.concat(validate493.errors);
+errors = vErrors.length;
+}
+var _valid5 = _errs89 === errors;
+valid28 = valid28 || _valid5;
+if(!valid28){
+const _errs90 = errors;
+if(data29 !== null){
+const err48 = {instancePath:instancePath+"/network",schemaPath:"#/properties/network/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err48];
+}
+else {
+vErrors.push(err48);
+}
+errors++;
+}
+var _valid5 = _errs90 === errors;
+valid28 = valid28 || _valid5;
+}
+if(!valid28){
+const err49 = {instancePath:instancePath+"/network",schemaPath:"#/properties/network/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err49];
+}
+else {
+vErrors.push(err49);
+}
+errors++;
+}
+else {
+errors = _errs88;
+if(vErrors !== null){
+if(_errs88){
+vErrors.length = _errs88;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+}
+else {
+const err50 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err50];
+}
+else {
+vErrors.push(err50);
+}
+errors++;
+}
+validate475.errors = vErrors;
+return errors === 0;
+}
+
+
+function validate474(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+/*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ConfigRequirementsReadResponse" */;
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.requirements !== undefined){
+let data0 = data.requirements;
+const _errs2 = errors;
+let valid1 = false;
+const _errs3 = errors;
+if(!(validate475(data0, {instancePath:instancePath+"/requirements",parentData:data,parentDataProperty:"requirements",rootData}))){
+vErrors = vErrors === null ? validate475.errors : vErrors.concat(validate475.errors);
+errors = vErrors.length;
+}
+var _valid0 = _errs3 === errors;
+valid1 = valid1 || _valid0;
+if(!valid1){
+const _errs4 = errors;
+if(data0 !== null){
+const err0 = {instancePath:instancePath+"/requirements",schemaPath:"#/properties/requirements/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+var _valid0 = _errs4 === errors;
+valid1 = valid1 || _valid0;
+}
+if(!valid1){
+const err1 = {instancePath:instancePath+"/requirements",schemaPath:"#/properties/requirements/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+else {
+errors = _errs2;
+if(vErrors !== null){
+if(_errs2){
+vErrors.length = _errs2;
+}
+else {
+vErrors = null;
+}
+}
+}
+}
+}
+else {
+const err2 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+validate474.errors = vErrors;
+return errors === 0;
+}
+
+export const validateAppsListResponse = validate496;
+const schema756 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"AppBranding":{"description":"EXPERIMENTAL - app metadata returned by app-list APIs.","properties":{"category":{"type":["string","null"]},"developer":{"type":["string","null"]},"isDiscoverableApp":{"type":"boolean"},"privacyPolicy":{"type":["string","null"]},"termsOfService":{"type":["string","null"]},"website":{"type":["string","null"]}},"required":["isDiscoverableApp"],"type":"object"},"AppInfo":{"description":"EXPERIMENTAL - app metadata returned by app-list APIs.","properties":{"appMetadata":{"anyOf":[{"$ref":"#/definitions/AppMetadata"},{"type":"null"}]},"branding":{"anyOf":[{"$ref":"#/definitions/AppBranding"},{"type":"null"}]},"description":{"type":["string","null"]},"distributionChannel":{"type":["string","null"]},"iconAssets":{"additionalProperties":{"type":"string"},"type":["object","null"]},"iconDarkAssets":{"additionalProperties":{"type":"string"},"type":["object","null"]},"id":{"type":"string"},"installUrl":{"type":["string","null"]},"isAccessible":{"default":false,"type":"boolean"},"isEnabled":{"default":true,"description":"Whether this app is enabled in config.toml. Example: ```toml [apps.bad_app] enabled = false ```","type":"boolean"},"labels":{"additionalProperties":{"type":"string"},"type":["object","null"]},"logoUrl":{"type":["string","null"]},"logoUrlDark":{"type":["string","null"]},"name":{"type":"string"},"pluginDisplayNames":{"default":[],"items":{"type":"string"},"type":"array"}},"required":["id","name"],"type":"object"},"AppMetadata":{"properties":{"categories":{"items":{"type":"string"},"type":["array","null"]},"developer":{"type":["string","null"]},"firstPartyRequiresInstall":{"type":["boolean","null"]},"firstPartyType":{"type":["string","null"]},"review":{"anyOf":[{"$ref":"#/definitions/AppReview"},{"type":"null"}]},"screenshots":{"items":{"$ref":"#/definitions/AppScreenshot"},"type":["array","null"]},"seoDescription":{"type":["string","null"]},"showInComposerWhenUnlinked":{"type":["boolean","null"]},"subCategories":{"items":{"type":"string"},"type":["array","null"]},"version":{"type":["string","null"]},"versionId":{"type":["string","null"]},"versionNotes":{"type":["string","null"]}},"type":"object"},"AppReview":{"properties":{"status":{"type":"string"}},"required":["status"],"type":"object"},"AppScreenshot":{"properties":{"fileId":{"type":["string","null"]},"url":{"type":["string","null"]},"userPrompt":{"type":"string"}},"required":["userPrompt"],"type":"object"}},"description":"EXPERIMENTAL - app list response.","properties":{"data":{"items":{"$ref":"#/definitions/AppInfo"},"type":"array"},"nextCursor":{"description":"Opaque cursor to pass to the next call to continue after the last item. If None, there are no more items to return.","type":["string","null"]}},"required":["data"],"title":"AppsListResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:AppsListResponse"};
+const schema757 = {"description":"EXPERIMENTAL - app metadata returned by app-list APIs.","properties":{"appMetadata":{"anyOf":[{"$ref":"#/definitions/AppMetadata"},{"type":"null"}]},"branding":{"anyOf":[{"$ref":"#/definitions/AppBranding"},{"type":"null"}]},"description":{"type":["string","null"]},"distributionChannel":{"type":["string","null"]},"iconAssets":{"additionalProperties":{"type":"string"},"type":["object","null"]},"iconDarkAssets":{"additionalProperties":{"type":"string"},"type":["object","null"]},"id":{"type":"string"},"installUrl":{"type":["string","null"]},"isAccessible":{"default":false,"type":"boolean"},"isEnabled":{"default":true,"description":"Whether this app is enabled in config.toml. Example: ```toml [apps.bad_app] enabled = false ```","type":"boolean"},"labels":{"additionalProperties":{"type":"string"},"type":["object","null"]},"logoUrl":{"type":["string","null"]},"logoUrlDark":{"type":["string","null"]},"name":{"type":"string"},"pluginDisplayNames":{"default":[],"items":{"type":"string"},"type":"array"}},"required":["id","name"],"type":"object"};
+const schema761 = {"description":"EXPERIMENTAL - app metadata returned by app-list APIs.","properties":{"category":{"type":["string","null"]},"developer":{"type":["string","null"]},"isDiscoverableApp":{"type":"boolean"},"privacyPolicy":{"type":["string","null"]},"termsOfService":{"type":["string","null"]},"website":{"type":["string","null"]}},"required":["isDiscoverableApp"],"type":"object"};
+const schema758 = {"properties":{"categories":{"items":{"type":"string"},"type":["array","null"]},"developer":{"type":["string","null"]},"firstPartyRequiresInstall":{"type":["boolean","null"]},"firstPartyType":{"type":["string","null"]},"review":{"anyOf":[{"$ref":"#/definitions/AppReview"},{"type":"null"}]},"screenshots":{"items":{"$ref":"#/definitions/AppScreenshot"},"type":["array","null"]},"seoDescription":{"type":["string","null"]},"showInComposerWhenUnlinked":{"type":["boolean","null"]},"subCategories":{"items":{"type":"string"},"type":["array","null"]},"version":{"type":["string","null"]},"versionId":{"type":["string","null"]},"versionNotes":{"type":["string","null"]}},"type":"object"};
+const schema759 = {"properties":{"status":{"type":"string"}},"required":["status"],"type":"object"};
+const schema760 = {"properties":{"fileId":{"type":["string","null"]},"url":{"type":["string","null"]},"userPrompt":{"type":"string"}},"required":["userPrompt"],"type":"object"};
+
+function validate498(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
 if(data.categories !== undefined){
 let data0 = data.categories;
 if((!(Array.isArray(data0))) && (data0 !== null)){
-const err0 = {instancePath:instancePath+"/categories",schemaPath:"#/properties/categories/type",keyword:"type",params:{type: schema711.properties.categories.type},message:"must be array,null"};
+const err0 = {instancePath:instancePath+"/categories",schemaPath:"#/properties/categories/type",keyword:"type",params:{type: schema758.properties.categories.type},message:"must be array,null"};
 if(vErrors === null){
 vErrors = [err0];
 }
@@ -95233,7 +100292,7 @@ errors++;
 if(data.developer !== undefined){
 let data2 = data.developer;
 if((typeof data2 !== "string") && (data2 !== null)){
-const err2 = {instancePath:instancePath+"/developer",schemaPath:"#/properties/developer/type",keyword:"type",params:{type: schema711.properties.developer.type},message:"must be string,null"};
+const err2 = {instancePath:instancePath+"/developer",schemaPath:"#/properties/developer/type",keyword:"type",params:{type: schema758.properties.developer.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err2];
 }
@@ -95246,7 +100305,7 @@ errors++;
 if(data.firstPartyRequiresInstall !== undefined){
 let data3 = data.firstPartyRequiresInstall;
 if((typeof data3 !== "boolean") && (data3 !== null)){
-const err3 = {instancePath:instancePath+"/firstPartyRequiresInstall",schemaPath:"#/properties/firstPartyRequiresInstall/type",keyword:"type",params:{type: schema711.properties.firstPartyRequiresInstall.type},message:"must be boolean,null"};
+const err3 = {instancePath:instancePath+"/firstPartyRequiresInstall",schemaPath:"#/properties/firstPartyRequiresInstall/type",keyword:"type",params:{type: schema758.properties.firstPartyRequiresInstall.type},message:"must be boolean,null"};
 if(vErrors === null){
 vErrors = [err3];
 }
@@ -95259,7 +100318,7 @@ errors++;
 if(data.firstPartyType !== undefined){
 let data4 = data.firstPartyType;
 if((typeof data4 !== "string") && (data4 !== null)){
-const err4 = {instancePath:instancePath+"/firstPartyType",schemaPath:"#/properties/firstPartyType/type",keyword:"type",params:{type: schema711.properties.firstPartyType.type},message:"must be string,null"};
+const err4 = {instancePath:instancePath+"/firstPartyType",schemaPath:"#/properties/firstPartyType/type",keyword:"type",params:{type: schema758.properties.firstPartyType.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -95350,7 +100409,7 @@ vErrors = null;
 if(data.screenshots !== undefined){
 let data7 = data.screenshots;
 if((!(Array.isArray(data7))) && (data7 !== null)){
-const err10 = {instancePath:instancePath+"/screenshots",schemaPath:"#/properties/screenshots/type",keyword:"type",params:{type: schema711.properties.screenshots.type},message:"must be array,null"};
+const err10 = {instancePath:instancePath+"/screenshots",schemaPath:"#/properties/screenshots/type",keyword:"type",params:{type: schema758.properties.screenshots.type},message:"must be array,null"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -95377,7 +100436,7 @@ errors++;
 if(data8.fileId !== undefined){
 let data9 = data8.fileId;
 if((typeof data9 !== "string") && (data9 !== null)){
-const err12 = {instancePath:instancePath+"/screenshots/" + i1+"/fileId",schemaPath:"#/definitions/AppScreenshot/properties/fileId/type",keyword:"type",params:{type: schema713.properties.fileId.type},message:"must be string,null"};
+const err12 = {instancePath:instancePath+"/screenshots/" + i1+"/fileId",schemaPath:"#/definitions/AppScreenshot/properties/fileId/type",keyword:"type",params:{type: schema760.properties.fileId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err12];
 }
@@ -95390,7 +100449,7 @@ errors++;
 if(data8.url !== undefined){
 let data10 = data8.url;
 if((typeof data10 !== "string") && (data10 !== null)){
-const err13 = {instancePath:instancePath+"/screenshots/" + i1+"/url",schemaPath:"#/definitions/AppScreenshot/properties/url/type",keyword:"type",params:{type: schema713.properties.url.type},message:"must be string,null"};
+const err13 = {instancePath:instancePath+"/screenshots/" + i1+"/url",schemaPath:"#/definitions/AppScreenshot/properties/url/type",keyword:"type",params:{type: schema760.properties.url.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -95429,7 +100488,7 @@ errors++;
 if(data.seoDescription !== undefined){
 let data12 = data.seoDescription;
 if((typeof data12 !== "string") && (data12 !== null)){
-const err16 = {instancePath:instancePath+"/seoDescription",schemaPath:"#/properties/seoDescription/type",keyword:"type",params:{type: schema711.properties.seoDescription.type},message:"must be string,null"};
+const err16 = {instancePath:instancePath+"/seoDescription",schemaPath:"#/properties/seoDescription/type",keyword:"type",params:{type: schema758.properties.seoDescription.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err16];
 }
@@ -95442,7 +100501,7 @@ errors++;
 if(data.showInComposerWhenUnlinked !== undefined){
 let data13 = data.showInComposerWhenUnlinked;
 if((typeof data13 !== "boolean") && (data13 !== null)){
-const err17 = {instancePath:instancePath+"/showInComposerWhenUnlinked",schemaPath:"#/properties/showInComposerWhenUnlinked/type",keyword:"type",params:{type: schema711.properties.showInComposerWhenUnlinked.type},message:"must be boolean,null"};
+const err17 = {instancePath:instancePath+"/showInComposerWhenUnlinked",schemaPath:"#/properties/showInComposerWhenUnlinked/type",keyword:"type",params:{type: schema758.properties.showInComposerWhenUnlinked.type},message:"must be boolean,null"};
 if(vErrors === null){
 vErrors = [err17];
 }
@@ -95455,7 +100514,7 @@ errors++;
 if(data.subCategories !== undefined){
 let data14 = data.subCategories;
 if((!(Array.isArray(data14))) && (data14 !== null)){
-const err18 = {instancePath:instancePath+"/subCategories",schemaPath:"#/properties/subCategories/type",keyword:"type",params:{type: schema711.properties.subCategories.type},message:"must be array,null"};
+const err18 = {instancePath:instancePath+"/subCategories",schemaPath:"#/properties/subCategories/type",keyword:"type",params:{type: schema758.properties.subCategories.type},message:"must be array,null"};
 if(vErrors === null){
 vErrors = [err18];
 }
@@ -95483,7 +100542,7 @@ errors++;
 if(data.version !== undefined){
 let data16 = data.version;
 if((typeof data16 !== "string") && (data16 !== null)){
-const err20 = {instancePath:instancePath+"/version",schemaPath:"#/properties/version/type",keyword:"type",params:{type: schema711.properties.version.type},message:"must be string,null"};
+const err20 = {instancePath:instancePath+"/version",schemaPath:"#/properties/version/type",keyword:"type",params:{type: schema758.properties.version.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -95496,7 +100555,7 @@ errors++;
 if(data.versionId !== undefined){
 let data17 = data.versionId;
 if((typeof data17 !== "string") && (data17 !== null)){
-const err21 = {instancePath:instancePath+"/versionId",schemaPath:"#/properties/versionId/type",keyword:"type",params:{type: schema711.properties.versionId.type},message:"must be string,null"};
+const err21 = {instancePath:instancePath+"/versionId",schemaPath:"#/properties/versionId/type",keyword:"type",params:{type: schema758.properties.versionId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err21];
 }
@@ -95509,7 +100568,7 @@ errors++;
 if(data.versionNotes !== undefined){
 let data18 = data.versionNotes;
 if((typeof data18 !== "string") && (data18 !== null)){
-const err22 = {instancePath:instancePath+"/versionNotes",schemaPath:"#/properties/versionNotes/type",keyword:"type",params:{type: schema711.properties.versionNotes.type},message:"must be string,null"};
+const err22 = {instancePath:instancePath+"/versionNotes",schemaPath:"#/properties/versionNotes/type",keyword:"type",params:{type: schema758.properties.versionNotes.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err22];
 }
@@ -95530,12 +100589,12 @@ vErrors.push(err23);
 }
 errors++;
 }
-validate458.errors = vErrors;
+validate498.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate457(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate497(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -95564,8 +100623,8 @@ let data0 = data.appMetadata;
 const _errs2 = errors;
 let valid1 = false;
 const _errs3 = errors;
-if(!(validate458(data0, {instancePath:instancePath+"/appMetadata",parentData:data,parentDataProperty:"appMetadata",rootData}))){
-vErrors = vErrors === null ? validate458.errors : vErrors.concat(validate458.errors);
+if(!(validate498(data0, {instancePath:instancePath+"/appMetadata",parentData:data,parentDataProperty:"appMetadata",rootData}))){
+vErrors = vErrors === null ? validate498.errors : vErrors.concat(validate498.errors);
 errors = vErrors.length;
 }
 var _valid0 = _errs3 === errors;
@@ -95626,7 +100685,7 @@ errors++;
 if(data1.category !== undefined){
 let data2 = data1.category;
 if((typeof data2 !== "string") && (data2 !== null)){
-const err5 = {instancePath:instancePath+"/branding/category",schemaPath:"#/definitions/AppBranding/properties/category/type",keyword:"type",params:{type: schema714.properties.category.type},message:"must be string,null"};
+const err5 = {instancePath:instancePath+"/branding/category",schemaPath:"#/definitions/AppBranding/properties/category/type",keyword:"type",params:{type: schema761.properties.category.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err5];
 }
@@ -95639,7 +100698,7 @@ errors++;
 if(data1.developer !== undefined){
 let data3 = data1.developer;
 if((typeof data3 !== "string") && (data3 !== null)){
-const err6 = {instancePath:instancePath+"/branding/developer",schemaPath:"#/definitions/AppBranding/properties/developer/type",keyword:"type",params:{type: schema714.properties.developer.type},message:"must be string,null"};
+const err6 = {instancePath:instancePath+"/branding/developer",schemaPath:"#/definitions/AppBranding/properties/developer/type",keyword:"type",params:{type: schema761.properties.developer.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err6];
 }
@@ -95664,7 +100723,7 @@ errors++;
 if(data1.privacyPolicy !== undefined){
 let data5 = data1.privacyPolicy;
 if((typeof data5 !== "string") && (data5 !== null)){
-const err8 = {instancePath:instancePath+"/branding/privacyPolicy",schemaPath:"#/definitions/AppBranding/properties/privacyPolicy/type",keyword:"type",params:{type: schema714.properties.privacyPolicy.type},message:"must be string,null"};
+const err8 = {instancePath:instancePath+"/branding/privacyPolicy",schemaPath:"#/definitions/AppBranding/properties/privacyPolicy/type",keyword:"type",params:{type: schema761.properties.privacyPolicy.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err8];
 }
@@ -95677,7 +100736,7 @@ errors++;
 if(data1.termsOfService !== undefined){
 let data6 = data1.termsOfService;
 if((typeof data6 !== "string") && (data6 !== null)){
-const err9 = {instancePath:instancePath+"/branding/termsOfService",schemaPath:"#/definitions/AppBranding/properties/termsOfService/type",keyword:"type",params:{type: schema714.properties.termsOfService.type},message:"must be string,null"};
+const err9 = {instancePath:instancePath+"/branding/termsOfService",schemaPath:"#/definitions/AppBranding/properties/termsOfService/type",keyword:"type",params:{type: schema761.properties.termsOfService.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err9];
 }
@@ -95690,7 +100749,7 @@ errors++;
 if(data1.website !== undefined){
 let data7 = data1.website;
 if((typeof data7 !== "string") && (data7 !== null)){
-const err10 = {instancePath:instancePath+"/branding/website",schemaPath:"#/definitions/AppBranding/properties/website/type",keyword:"type",params:{type: schema714.properties.website.type},message:"must be string,null"};
+const err10 = {instancePath:instancePath+"/branding/website",schemaPath:"#/definitions/AppBranding/properties/website/type",keyword:"type",params:{type: schema761.properties.website.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -95753,7 +100812,7 @@ vErrors = null;
 if(data.description !== undefined){
 let data8 = data.description;
 if((typeof data8 !== "string") && (data8 !== null)){
-const err14 = {instancePath:instancePath+"/description",schemaPath:"#/properties/description/type",keyword:"type",params:{type: schema710.properties.description.type},message:"must be string,null"};
+const err14 = {instancePath:instancePath+"/description",schemaPath:"#/properties/description/type",keyword:"type",params:{type: schema757.properties.description.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err14];
 }
@@ -95766,7 +100825,7 @@ errors++;
 if(data.distributionChannel !== undefined){
 let data9 = data.distributionChannel;
 if((typeof data9 !== "string") && (data9 !== null)){
-const err15 = {instancePath:instancePath+"/distributionChannel",schemaPath:"#/properties/distributionChannel/type",keyword:"type",params:{type: schema710.properties.distributionChannel.type},message:"must be string,null"};
+const err15 = {instancePath:instancePath+"/distributionChannel",schemaPath:"#/properties/distributionChannel/type",keyword:"type",params:{type: schema757.properties.distributionChannel.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err15];
 }
@@ -95779,7 +100838,7 @@ errors++;
 if(data.iconAssets !== undefined){
 let data10 = data.iconAssets;
 if((!(data10 && typeof data10 == "object" && !Array.isArray(data10))) && (data10 !== null)){
-const err16 = {instancePath:instancePath+"/iconAssets",schemaPath:"#/properties/iconAssets/type",keyword:"type",params:{type: schema710.properties.iconAssets.type},message:"must be object,null"};
+const err16 = {instancePath:instancePath+"/iconAssets",schemaPath:"#/properties/iconAssets/type",keyword:"type",params:{type: schema757.properties.iconAssets.type},message:"must be object,null"};
 if(vErrors === null){
 vErrors = [err16];
 }
@@ -95806,7 +100865,7 @@ errors++;
 if(data.iconDarkAssets !== undefined){
 let data12 = data.iconDarkAssets;
 if((!(data12 && typeof data12 == "object" && !Array.isArray(data12))) && (data12 !== null)){
-const err18 = {instancePath:instancePath+"/iconDarkAssets",schemaPath:"#/properties/iconDarkAssets/type",keyword:"type",params:{type: schema710.properties.iconDarkAssets.type},message:"must be object,null"};
+const err18 = {instancePath:instancePath+"/iconDarkAssets",schemaPath:"#/properties/iconDarkAssets/type",keyword:"type",params:{type: schema757.properties.iconDarkAssets.type},message:"must be object,null"};
 if(vErrors === null){
 vErrors = [err18];
 }
@@ -95845,7 +100904,7 @@ errors++;
 if(data.installUrl !== undefined){
 let data15 = data.installUrl;
 if((typeof data15 !== "string") && (data15 !== null)){
-const err21 = {instancePath:instancePath+"/installUrl",schemaPath:"#/properties/installUrl/type",keyword:"type",params:{type: schema710.properties.installUrl.type},message:"must be string,null"};
+const err21 = {instancePath:instancePath+"/installUrl",schemaPath:"#/properties/installUrl/type",keyword:"type",params:{type: schema757.properties.installUrl.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err21];
 }
@@ -95882,7 +100941,7 @@ errors++;
 if(data.labels !== undefined){
 let data18 = data.labels;
 if((!(data18 && typeof data18 == "object" && !Array.isArray(data18))) && (data18 !== null)){
-const err24 = {instancePath:instancePath+"/labels",schemaPath:"#/properties/labels/type",keyword:"type",params:{type: schema710.properties.labels.type},message:"must be object,null"};
+const err24 = {instancePath:instancePath+"/labels",schemaPath:"#/properties/labels/type",keyword:"type",params:{type: schema757.properties.labels.type},message:"must be object,null"};
 if(vErrors === null){
 vErrors = [err24];
 }
@@ -95909,7 +100968,7 @@ errors++;
 if(data.logoUrl !== undefined){
 let data20 = data.logoUrl;
 if((typeof data20 !== "string") && (data20 !== null)){
-const err26 = {instancePath:instancePath+"/logoUrl",schemaPath:"#/properties/logoUrl/type",keyword:"type",params:{type: schema710.properties.logoUrl.type},message:"must be string,null"};
+const err26 = {instancePath:instancePath+"/logoUrl",schemaPath:"#/properties/logoUrl/type",keyword:"type",params:{type: schema757.properties.logoUrl.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err26];
 }
@@ -95922,7 +100981,7 @@ errors++;
 if(data.logoUrlDark !== undefined){
 let data21 = data.logoUrlDark;
 if((typeof data21 !== "string") && (data21 !== null)){
-const err27 = {instancePath:instancePath+"/logoUrlDark",schemaPath:"#/properties/logoUrlDark/type",keyword:"type",params:{type: schema710.properties.logoUrlDark.type},message:"must be string,null"};
+const err27 = {instancePath:instancePath+"/logoUrlDark",schemaPath:"#/properties/logoUrlDark/type",keyword:"type",params:{type: schema757.properties.logoUrlDark.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err27];
 }
@@ -95983,12 +101042,12 @@ vErrors.push(err31);
 }
 errors++;
 }
-validate457.errors = vErrors;
+validate497.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate456(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate496(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 /*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:AppsListResponse" */;
 let vErrors = null;
 let errors = 0;
@@ -96008,8 +101067,8 @@ let data0 = data.data;
 if(Array.isArray(data0)){
 const len0 = data0.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate457(data0[i0], {instancePath:instancePath+"/data/" + i0,parentData:data0,parentDataProperty:i0,rootData}))){
-vErrors = vErrors === null ? validate457.errors : vErrors.concat(validate457.errors);
+if(!(validate497(data0[i0], {instancePath:instancePath+"/data/" + i0,parentData:data0,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate497.errors : vErrors.concat(validate497.errors);
 errors = vErrors.length;
 }
 }
@@ -96028,7 +101087,7 @@ errors++;
 if(data.nextCursor !== undefined){
 let data2 = data.nextCursor;
 if((typeof data2 !== "string") && (data2 !== null)){
-const err2 = {instancePath:instancePath+"/nextCursor",schemaPath:"#/properties/nextCursor/type",keyword:"type",params:{type: schema709.properties.nextCursor.type},message:"must be string,null"};
+const err2 = {instancePath:instancePath+"/nextCursor",schemaPath:"#/properties/nextCursor/type",keyword:"type",params:{type: schema756.properties.nextCursor.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err2];
 }
@@ -96049,16 +101108,16 @@ vErrors.push(err3);
 }
 errors++;
 }
-validate456.errors = vErrors;
+validate496.errors = vErrors;
 return errors === 0;
 }
 
-export const validatePluginListResponse = validate461;
-const schema715 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"AbsolutePathBuf":{"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"},"MarketplaceInterface":{"properties":{"displayName":{"type":["string","null"]}},"type":"object"},"MarketplaceLoadErrorInfo":{"properties":{"marketplacePath":{"$ref":"#/definitions/AbsolutePathBuf"},"message":{"type":"string"}},"required":["marketplacePath","message"],"type":"object"},"PluginAuthPolicy":{"enum":["ON_INSTALL","ON_USE"],"type":"string"},"PluginAvailability":{"oneOf":[{"enum":["DISABLED_BY_ADMIN"],"type":"string"},{"description":"Plugin-service currently sends `\"ENABLED\"` for available remote plugins. Codex app-server exposes `\"AVAILABLE\"` in its API; the alias keeps decoding compatible with that upstream response.","enum":["AVAILABLE"],"type":"string"}]},"PluginInstallPolicy":{"enum":["NOT_AVAILABLE","AVAILABLE","INSTALLED_BY_DEFAULT"],"type":"string"},"PluginInstallPolicySource":{"enum":["WORKSPACE_SETTING","IMPLICIT_CANONICAL_APP"],"type":"string"},"PluginInterface":{"properties":{"brandColor":{"type":["string","null"]},"capabilities":{"items":{"type":"string"},"type":"array"},"category":{"type":["string","null"]},"composerIcon":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local composer icon path, resolved from the installed plugin package."},"composerIconUrl":{"description":"Remote composer icon URL from the plugin catalog.","type":["string","null"]},"defaultPrompt":{"description":"Starter prompts for the plugin. Capped at 3 entries with a maximum of 128 characters per entry.","items":{"type":"string"},"type":["array","null"]},"developerName":{"type":["string","null"]},"displayName":{"type":["string","null"]},"logo":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local logo path, resolved from the installed plugin package."},"logoDark":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local dark-mode logo path, resolved from the installed plugin package."},"logoUrl":{"description":"Remote logo URL from the plugin catalog.","type":["string","null"]},"logoUrlDark":{"description":"Remote dark-mode logo URL from the plugin catalog.","type":["string","null"]},"longDescription":{"type":["string","null"]},"privacyPolicyUrl":{"type":["string","null"]},"screenshotUrls":{"description":"Remote screenshot URLs from the plugin catalog.","items":{"type":"string"},"type":"array"},"screenshots":{"description":"Local screenshot paths, resolved from the installed plugin package.","items":{"$ref":"#/definitions/AbsolutePathBuf"},"type":"array"},"shortDescription":{"type":["string","null"]},"termsOfServiceUrl":{"type":["string","null"]},"websiteUrl":{"type":["string","null"]}},"required":["capabilities","screenshotUrls","screenshots"],"type":"object"},"PluginMarketplaceEntry":{"properties":{"interface":{"anyOf":[{"$ref":"#/definitions/MarketplaceInterface"},{"type":"null"}]},"name":{"type":"string"},"path":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local marketplace file path when the marketplace is backed by a local file. Remote-only catalog marketplaces do not have a local path."},"plugins":{"items":{"$ref":"#/definitions/PluginSummary"},"type":"array"}},"required":["name","plugins"],"type":"object"},"PluginShareContext":{"properties":{"creatorAccountUserId":{"type":["string","null"]},"creatorName":{"type":["string","null"]},"discoverability":{"anyOf":[{"$ref":"#/definitions/PluginShareDiscoverability"},{"type":"null"}]},"remotePluginId":{"type":"string"},"remoteVersion":{"default":null,"description":"Version of the remote shared plugin release when available.","type":["string","null"]},"sharePrincipals":{"items":{"$ref":"#/definitions/PluginSharePrincipal"},"type":["array","null"]},"shareUrl":{"type":["string","null"]}},"required":["remotePluginId"],"type":"object"},"PluginShareDiscoverability":{"enum":["LISTED","UNLISTED","PRIVATE"],"type":"string"},"PluginSharePrincipal":{"properties":{"name":{"type":"string"},"principalId":{"type":"string"},"principalType":{"$ref":"#/definitions/PluginSharePrincipalType"},"role":{"$ref":"#/definitions/PluginSharePrincipalRole"}},"required":["name","principalId","principalType","role"],"type":"object"},"PluginSharePrincipalRole":{"enum":["reader","editor","owner"],"type":"string"},"PluginSharePrincipalType":{"enum":["user","group","workspace"],"type":"string"},"PluginSource":{"oneOf":[{"properties":{"path":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["local"],"title":"LocalPluginSourceType","type":"string"}},"required":["path","type"],"title":"LocalPluginSource","type":"object"},{"properties":{"path":{"type":["string","null"]},"refName":{"type":["string","null"]},"sha":{"type":["string","null"]},"type":{"enum":["git"],"title":"GitPluginSourceType","type":"string"},"url":{"type":"string"}},"required":["type","url"],"title":"GitPluginSource","type":"object"},{"properties":{"package":{"type":"string"},"registry":{"description":"Optional HTTPS registry URL. Authentication stays in the user's npm config.","type":["string","null"]},"type":{"enum":["npm"],"title":"NpmPluginSourceType","type":"string"},"version":{"description":"Optional npm version or version range.","type":["string","null"]}},"required":["package","type"],"title":"NpmPluginSource","type":"object"},{"description":"The plugin is available in the remote catalog. Download metadata is kept server-side and is not exposed through the app-server API.","properties":{"type":{"enum":["remote"],"title":"RemotePluginSourceType","type":"string"}},"required":["type"],"title":"RemotePluginSource","type":"object"}]},"PluginSummary":{"properties":{"authPolicy":{"$ref":"#/definitions/PluginAuthPolicy"},"availability":{"allOf":[{"$ref":"#/definitions/PluginAvailability"}],"default":"AVAILABLE","description":"Availability state for installing and using the plugin."},"enabled":{"type":"boolean"},"id":{"type":"string"},"installPolicy":{"$ref":"#/definitions/PluginInstallPolicy"},"installPolicySource":{"anyOf":[{"$ref":"#/definitions/PluginInstallPolicySource"},{"type":"null"}]},"installed":{"type":"boolean"},"interface":{"anyOf":[{"$ref":"#/definitions/PluginInterface"},{"type":"null"}]},"keywords":{"default":[],"items":{"type":"string"},"type":"array"},"localVersion":{"default":null,"description":"Version of the locally materialized plugin package when available.","type":["string","null"]},"name":{"type":"string"},"remotePluginId":{"description":"Backend remote plugin identifier when available.","type":["string","null"]},"shareContext":{"anyOf":[{"$ref":"#/definitions/PluginShareContext"},{"type":"null"}],"description":"Remote sharing context associated with this plugin when available."},"source":{"$ref":"#/definitions/PluginSource"},"version":{"default":null,"description":"Version advertised by the remote marketplace backend when available.","type":["string","null"]}},"required":["authPolicy","enabled","id","installPolicy","installed","name","source"],"type":"object"}},"properties":{"featuredPluginIds":{"default":[],"items":{"type":"string"},"type":"array"},"marketplaceLoadErrors":{"default":[],"items":{"$ref":"#/definitions/MarketplaceLoadErrorInfo"},"type":"array"},"marketplaces":{"items":{"$ref":"#/definitions/PluginMarketplaceEntry"},"type":"array"}},"required":["marketplaces"],"title":"PluginListResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:PluginListResponse"};
-const schema716 = {"properties":{"marketplacePath":{"$ref":"#/definitions/AbsolutePathBuf"},"message":{"type":"string"}},"required":["marketplacePath","message"],"type":"object"};
-const schema717 = {"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"};
+export const validatePluginListResponse = validate501;
+const schema762 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"AbsolutePathBuf":{"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"},"MarketplaceInterface":{"properties":{"displayName":{"type":["string","null"]}},"type":"object"},"MarketplaceLoadErrorInfo":{"properties":{"marketplacePath":{"$ref":"#/definitions/AbsolutePathBuf"},"message":{"type":"string"}},"required":["marketplacePath","message"],"type":"object"},"PluginAuthPolicy":{"enum":["ON_INSTALL","ON_USE"],"type":"string"},"PluginAvailability":{"oneOf":[{"enum":["DISABLED_BY_ADMIN"],"type":"string"},{"description":"Plugin-service currently sends `\"ENABLED\"` for available remote plugins. Codex app-server exposes `\"AVAILABLE\"` in its API; the alias keeps decoding compatible with that upstream response.","enum":["AVAILABLE"],"type":"string"}]},"PluginInstallPolicy":{"enum":["NOT_AVAILABLE","AVAILABLE","INSTALLED_BY_DEFAULT"],"type":"string"},"PluginInstallPolicySource":{"enum":["WORKSPACE_SETTING","IMPLICIT_CANONICAL_APP"],"type":"string"},"PluginInterface":{"properties":{"brandColor":{"type":["string","null"]},"capabilities":{"items":{"type":"string"},"type":"array"},"category":{"type":["string","null"]},"composerIcon":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local composer icon path, resolved from the installed plugin package."},"composerIconUrl":{"description":"Remote composer icon URL from the plugin catalog.","type":["string","null"]},"defaultPrompt":{"description":"Starter prompts for the plugin. Capped at 3 entries with a maximum of 128 characters per entry.","items":{"type":"string"},"type":["array","null"]},"developerName":{"type":["string","null"]},"displayName":{"type":["string","null"]},"logo":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local logo path, resolved from the installed plugin package."},"logoDark":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local dark-mode logo path, resolved from the installed plugin package."},"logoUrl":{"description":"Remote logo URL from the plugin catalog.","type":["string","null"]},"logoUrlDark":{"description":"Remote dark-mode logo URL from the plugin catalog.","type":["string","null"]},"longDescription":{"type":["string","null"]},"privacyPolicyUrl":{"type":["string","null"]},"screenshotUrls":{"description":"Remote screenshot URLs from the plugin catalog.","items":{"type":"string"},"type":"array"},"screenshots":{"description":"Local screenshot paths, resolved from the installed plugin package.","items":{"$ref":"#/definitions/AbsolutePathBuf"},"type":"array"},"shortDescription":{"type":["string","null"]},"termsOfServiceUrl":{"type":["string","null"]},"websiteUrl":{"type":["string","null"]}},"required":["capabilities","screenshotUrls","screenshots"],"type":"object"},"PluginMarketplaceEntry":{"properties":{"interface":{"anyOf":[{"$ref":"#/definitions/MarketplaceInterface"},{"type":"null"}]},"name":{"type":"string"},"path":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local marketplace file path when the marketplace is backed by a local file. Remote-only catalog marketplaces do not have a local path."},"plugins":{"items":{"$ref":"#/definitions/PluginSummary"},"type":"array"}},"required":["name","plugins"],"type":"object"},"PluginShareContext":{"properties":{"creatorAccountUserId":{"type":["string","null"]},"creatorName":{"type":["string","null"]},"discoverability":{"anyOf":[{"$ref":"#/definitions/PluginShareDiscoverability"},{"type":"null"}]},"remotePluginId":{"type":"string"},"remoteVersion":{"default":null,"description":"Version of the remote shared plugin release when available.","type":["string","null"]},"sharePrincipals":{"items":{"$ref":"#/definitions/PluginSharePrincipal"},"type":["array","null"]},"shareUrl":{"type":["string","null"]}},"required":["remotePluginId"],"type":"object"},"PluginShareDiscoverability":{"enum":["LISTED","UNLISTED","PRIVATE"],"type":"string"},"PluginSharePrincipal":{"properties":{"name":{"type":"string"},"principalId":{"type":"string"},"principalType":{"$ref":"#/definitions/PluginSharePrincipalType"},"role":{"$ref":"#/definitions/PluginSharePrincipalRole"}},"required":["name","principalId","principalType","role"],"type":"object"},"PluginSharePrincipalRole":{"enum":["reader","editor","owner"],"type":"string"},"PluginSharePrincipalType":{"enum":["user","group","workspace"],"type":"string"},"PluginSource":{"oneOf":[{"properties":{"path":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["local"],"title":"LocalPluginSourceType","type":"string"}},"required":["path","type"],"title":"LocalPluginSource","type":"object"},{"properties":{"path":{"type":["string","null"]},"refName":{"type":["string","null"]},"sha":{"type":["string","null"]},"type":{"enum":["git"],"title":"GitPluginSourceType","type":"string"},"url":{"type":"string"}},"required":["type","url"],"title":"GitPluginSource","type":"object"},{"properties":{"package":{"type":"string"},"registry":{"description":"Optional HTTPS registry URL. Authentication stays in the user's npm config.","type":["string","null"]},"type":{"enum":["npm"],"title":"NpmPluginSourceType","type":"string"},"version":{"description":"Optional npm version or version range.","type":["string","null"]}},"required":["package","type"],"title":"NpmPluginSource","type":"object"},{"description":"The plugin is available in the remote catalog. Download metadata is kept server-side and is not exposed through the app-server API.","properties":{"type":{"enum":["remote"],"title":"RemotePluginSourceType","type":"string"}},"required":["type"],"title":"RemotePluginSource","type":"object"}]},"PluginSummary":{"properties":{"authPolicy":{"$ref":"#/definitions/PluginAuthPolicy"},"availability":{"allOf":[{"$ref":"#/definitions/PluginAvailability"}],"default":"AVAILABLE","description":"Availability state for installing and using the plugin."},"enabled":{"type":"boolean"},"id":{"type":"string"},"installPolicy":{"$ref":"#/definitions/PluginInstallPolicy"},"installPolicySource":{"anyOf":[{"$ref":"#/definitions/PluginInstallPolicySource"},{"type":"null"}]},"installed":{"type":"boolean"},"interface":{"anyOf":[{"$ref":"#/definitions/PluginInterface"},{"type":"null"}]},"keywords":{"default":[],"items":{"type":"string"},"type":"array"},"localVersion":{"default":null,"description":"Version of the locally materialized plugin package when available.","type":["string","null"]},"name":{"type":"string"},"remotePluginId":{"description":"Backend remote plugin identifier when available.","type":["string","null"]},"shareContext":{"anyOf":[{"$ref":"#/definitions/PluginShareContext"},{"type":"null"}],"description":"Remote sharing context associated with this plugin when available."},"source":{"$ref":"#/definitions/PluginSource"},"version":{"default":null,"description":"Version advertised by the remote marketplace backend when available.","type":["string","null"]}},"required":["authPolicy","enabled","id","installPolicy","installed","name","source"],"type":"object"}},"properties":{"featuredPluginIds":{"default":[],"items":{"type":"string"},"type":"array"},"marketplaceLoadErrors":{"default":[],"items":{"$ref":"#/definitions/MarketplaceLoadErrorInfo"},"type":"array"},"marketplaces":{"items":{"$ref":"#/definitions/PluginMarketplaceEntry"},"type":"array"}},"required":["marketplaces"],"title":"PluginListResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:PluginListResponse"};
+const schema763 = {"properties":{"marketplacePath":{"$ref":"#/definitions/AbsolutePathBuf"},"message":{"type":"string"}},"required":["marketplacePath","message"],"type":"object"};
+const schema764 = {"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"};
 
-function validate462(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate502(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -96117,20 +101176,20 @@ vErrors.push(err4);
 }
 errors++;
 }
-validate462.errors = vErrors;
+validate502.errors = vErrors;
 return errors === 0;
 }
 
-const schema718 = {"properties":{"interface":{"anyOf":[{"$ref":"#/definitions/MarketplaceInterface"},{"type":"null"}]},"name":{"type":"string"},"path":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local marketplace file path when the marketplace is backed by a local file. Remote-only catalog marketplaces do not have a local path."},"plugins":{"items":{"$ref":"#/definitions/PluginSummary"},"type":"array"}},"required":["name","plugins"],"type":"object"};
-const schema719 = {"properties":{"displayName":{"type":["string","null"]}},"type":"object"};
-const schema721 = {"properties":{"authPolicy":{"$ref":"#/definitions/PluginAuthPolicy"},"availability":{"allOf":[{"$ref":"#/definitions/PluginAvailability"}],"default":"AVAILABLE","description":"Availability state for installing and using the plugin."},"enabled":{"type":"boolean"},"id":{"type":"string"},"installPolicy":{"$ref":"#/definitions/PluginInstallPolicy"},"installPolicySource":{"anyOf":[{"$ref":"#/definitions/PluginInstallPolicySource"},{"type":"null"}]},"installed":{"type":"boolean"},"interface":{"anyOf":[{"$ref":"#/definitions/PluginInterface"},{"type":"null"}]},"keywords":{"default":[],"items":{"type":"string"},"type":"array"},"localVersion":{"default":null,"description":"Version of the locally materialized plugin package when available.","type":["string","null"]},"name":{"type":"string"},"remotePluginId":{"description":"Backend remote plugin identifier when available.","type":["string","null"]},"shareContext":{"anyOf":[{"$ref":"#/definitions/PluginShareContext"},{"type":"null"}],"description":"Remote sharing context associated with this plugin when available."},"source":{"$ref":"#/definitions/PluginSource"},"version":{"default":null,"description":"Version advertised by the remote marketplace backend when available.","type":["string","null"]}},"required":["authPolicy","enabled","id","installPolicy","installed","name","source"],"type":"object"};
-const schema722 = {"enum":["ON_INSTALL","ON_USE"],"type":"string"};
-const schema723 = {"oneOf":[{"enum":["DISABLED_BY_ADMIN"],"type":"string"},{"description":"Plugin-service currently sends `\"ENABLED\"` for available remote plugins. Codex app-server exposes `\"AVAILABLE\"` in its API; the alias keeps decoding compatible with that upstream response.","enum":["AVAILABLE"],"type":"string"}]};
-const schema724 = {"enum":["NOT_AVAILABLE","AVAILABLE","INSTALLED_BY_DEFAULT"],"type":"string"};
-const schema725 = {"enum":["WORKSPACE_SETTING","IMPLICIT_CANONICAL_APP"],"type":"string"};
-const schema726 = {"properties":{"brandColor":{"type":["string","null"]},"capabilities":{"items":{"type":"string"},"type":"array"},"category":{"type":["string","null"]},"composerIcon":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local composer icon path, resolved from the installed plugin package."},"composerIconUrl":{"description":"Remote composer icon URL from the plugin catalog.","type":["string","null"]},"defaultPrompt":{"description":"Starter prompts for the plugin. Capped at 3 entries with a maximum of 128 characters per entry.","items":{"type":"string"},"type":["array","null"]},"developerName":{"type":["string","null"]},"displayName":{"type":["string","null"]},"logo":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local logo path, resolved from the installed plugin package."},"logoDark":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local dark-mode logo path, resolved from the installed plugin package."},"logoUrl":{"description":"Remote logo URL from the plugin catalog.","type":["string","null"]},"logoUrlDark":{"description":"Remote dark-mode logo URL from the plugin catalog.","type":["string","null"]},"longDescription":{"type":["string","null"]},"privacyPolicyUrl":{"type":["string","null"]},"screenshotUrls":{"description":"Remote screenshot URLs from the plugin catalog.","items":{"type":"string"},"type":"array"},"screenshots":{"description":"Local screenshot paths, resolved from the installed plugin package.","items":{"$ref":"#/definitions/AbsolutePathBuf"},"type":"array"},"shortDescription":{"type":["string","null"]},"termsOfServiceUrl":{"type":["string","null"]},"websiteUrl":{"type":["string","null"]}},"required":["capabilities","screenshotUrls","screenshots"],"type":"object"};
+const schema765 = {"properties":{"interface":{"anyOf":[{"$ref":"#/definitions/MarketplaceInterface"},{"type":"null"}]},"name":{"type":"string"},"path":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local marketplace file path when the marketplace is backed by a local file. Remote-only catalog marketplaces do not have a local path."},"plugins":{"items":{"$ref":"#/definitions/PluginSummary"},"type":"array"}},"required":["name","plugins"],"type":"object"};
+const schema766 = {"properties":{"displayName":{"type":["string","null"]}},"type":"object"};
+const schema768 = {"properties":{"authPolicy":{"$ref":"#/definitions/PluginAuthPolicy"},"availability":{"allOf":[{"$ref":"#/definitions/PluginAvailability"}],"default":"AVAILABLE","description":"Availability state for installing and using the plugin."},"enabled":{"type":"boolean"},"id":{"type":"string"},"installPolicy":{"$ref":"#/definitions/PluginInstallPolicy"},"installPolicySource":{"anyOf":[{"$ref":"#/definitions/PluginInstallPolicySource"},{"type":"null"}]},"installed":{"type":"boolean"},"interface":{"anyOf":[{"$ref":"#/definitions/PluginInterface"},{"type":"null"}]},"keywords":{"default":[],"items":{"type":"string"},"type":"array"},"localVersion":{"default":null,"description":"Version of the locally materialized plugin package when available.","type":["string","null"]},"name":{"type":"string"},"remotePluginId":{"description":"Backend remote plugin identifier when available.","type":["string","null"]},"shareContext":{"anyOf":[{"$ref":"#/definitions/PluginShareContext"},{"type":"null"}],"description":"Remote sharing context associated with this plugin when available."},"source":{"$ref":"#/definitions/PluginSource"},"version":{"default":null,"description":"Version advertised by the remote marketplace backend when available.","type":["string","null"]}},"required":["authPolicy","enabled","id","installPolicy","installed","name","source"],"type":"object"};
+const schema769 = {"enum":["ON_INSTALL","ON_USE"],"type":"string"};
+const schema770 = {"oneOf":[{"enum":["DISABLED_BY_ADMIN"],"type":"string"},{"description":"Plugin-service currently sends `\"ENABLED\"` for available remote plugins. Codex app-server exposes `\"AVAILABLE\"` in its API; the alias keeps decoding compatible with that upstream response.","enum":["AVAILABLE"],"type":"string"}]};
+const schema771 = {"enum":["NOT_AVAILABLE","AVAILABLE","INSTALLED_BY_DEFAULT"],"type":"string"};
+const schema772 = {"enum":["WORKSPACE_SETTING","IMPLICIT_CANONICAL_APP"],"type":"string"};
+const schema773 = {"properties":{"brandColor":{"type":["string","null"]},"capabilities":{"items":{"type":"string"},"type":"array"},"category":{"type":["string","null"]},"composerIcon":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local composer icon path, resolved from the installed plugin package."},"composerIconUrl":{"description":"Remote composer icon URL from the plugin catalog.","type":["string","null"]},"defaultPrompt":{"description":"Starter prompts for the plugin. Capped at 3 entries with a maximum of 128 characters per entry.","items":{"type":"string"},"type":["array","null"]},"developerName":{"type":["string","null"]},"displayName":{"type":["string","null"]},"logo":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local logo path, resolved from the installed plugin package."},"logoDark":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}],"description":"Local dark-mode logo path, resolved from the installed plugin package."},"logoUrl":{"description":"Remote logo URL from the plugin catalog.","type":["string","null"]},"logoUrlDark":{"description":"Remote dark-mode logo URL from the plugin catalog.","type":["string","null"]},"longDescription":{"type":["string","null"]},"privacyPolicyUrl":{"type":["string","null"]},"screenshotUrls":{"description":"Remote screenshot URLs from the plugin catalog.","items":{"type":"string"},"type":"array"},"screenshots":{"description":"Local screenshot paths, resolved from the installed plugin package.","items":{"$ref":"#/definitions/AbsolutePathBuf"},"type":"array"},"shortDescription":{"type":["string","null"]},"termsOfServiceUrl":{"type":["string","null"]},"websiteUrl":{"type":["string","null"]}},"required":["capabilities","screenshotUrls","screenshots"],"type":"object"};
 
-function validate466(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate506(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -96167,7 +101226,7 @@ errors++;
 if(data.brandColor !== undefined){
 let data0 = data.brandColor;
 if((typeof data0 !== "string") && (data0 !== null)){
-const err3 = {instancePath:instancePath+"/brandColor",schemaPath:"#/properties/brandColor/type",keyword:"type",params:{type: schema726.properties.brandColor.type},message:"must be string,null"};
+const err3 = {instancePath:instancePath+"/brandColor",schemaPath:"#/properties/brandColor/type",keyword:"type",params:{type: schema773.properties.brandColor.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err3];
 }
@@ -96208,7 +101267,7 @@ errors++;
 if(data.category !== undefined){
 let data3 = data.category;
 if((typeof data3 !== "string") && (data3 !== null)){
-const err6 = {instancePath:instancePath+"/category",schemaPath:"#/properties/category/type",keyword:"type",params:{type: schema726.properties.category.type},message:"must be string,null"};
+const err6 = {instancePath:instancePath+"/category",schemaPath:"#/properties/category/type",keyword:"type",params:{type: schema773.properties.category.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err6];
 }
@@ -96275,7 +101334,7 @@ vErrors = null;
 if(data.composerIconUrl !== undefined){
 let data5 = data.composerIconUrl;
 if((typeof data5 !== "string") && (data5 !== null)){
-const err10 = {instancePath:instancePath+"/composerIconUrl",schemaPath:"#/properties/composerIconUrl/type",keyword:"type",params:{type: schema726.properties.composerIconUrl.type},message:"must be string,null"};
+const err10 = {instancePath:instancePath+"/composerIconUrl",schemaPath:"#/properties/composerIconUrl/type",keyword:"type",params:{type: schema773.properties.composerIconUrl.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -96288,7 +101347,7 @@ errors++;
 if(data.defaultPrompt !== undefined){
 let data6 = data.defaultPrompt;
 if((!(Array.isArray(data6))) && (data6 !== null)){
-const err11 = {instancePath:instancePath+"/defaultPrompt",schemaPath:"#/properties/defaultPrompt/type",keyword:"type",params:{type: schema726.properties.defaultPrompt.type},message:"must be array,null"};
+const err11 = {instancePath:instancePath+"/defaultPrompt",schemaPath:"#/properties/defaultPrompt/type",keyword:"type",params:{type: schema773.properties.defaultPrompt.type},message:"must be array,null"};
 if(vErrors === null){
 vErrors = [err11];
 }
@@ -96316,7 +101375,7 @@ errors++;
 if(data.developerName !== undefined){
 let data8 = data.developerName;
 if((typeof data8 !== "string") && (data8 !== null)){
-const err13 = {instancePath:instancePath+"/developerName",schemaPath:"#/properties/developerName/type",keyword:"type",params:{type: schema726.properties.developerName.type},message:"must be string,null"};
+const err13 = {instancePath:instancePath+"/developerName",schemaPath:"#/properties/developerName/type",keyword:"type",params:{type: schema773.properties.developerName.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -96329,7 +101388,7 @@ errors++;
 if(data.displayName !== undefined){
 let data9 = data.displayName;
 if((typeof data9 !== "string") && (data9 !== null)){
-const err14 = {instancePath:instancePath+"/displayName",schemaPath:"#/properties/displayName/type",keyword:"type",params:{type: schema726.properties.displayName.type},message:"must be string,null"};
+const err14 = {instancePath:instancePath+"/displayName",schemaPath:"#/properties/displayName/type",keyword:"type",params:{type: schema773.properties.displayName.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err14];
 }
@@ -96450,7 +101509,7 @@ vErrors = null;
 if(data.logoUrl !== undefined){
 let data12 = data.logoUrl;
 if((typeof data12 !== "string") && (data12 !== null)){
-const err21 = {instancePath:instancePath+"/logoUrl",schemaPath:"#/properties/logoUrl/type",keyword:"type",params:{type: schema726.properties.logoUrl.type},message:"must be string,null"};
+const err21 = {instancePath:instancePath+"/logoUrl",schemaPath:"#/properties/logoUrl/type",keyword:"type",params:{type: schema773.properties.logoUrl.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err21];
 }
@@ -96463,7 +101522,7 @@ errors++;
 if(data.logoUrlDark !== undefined){
 let data13 = data.logoUrlDark;
 if((typeof data13 !== "string") && (data13 !== null)){
-const err22 = {instancePath:instancePath+"/logoUrlDark",schemaPath:"#/properties/logoUrlDark/type",keyword:"type",params:{type: schema726.properties.logoUrlDark.type},message:"must be string,null"};
+const err22 = {instancePath:instancePath+"/logoUrlDark",schemaPath:"#/properties/logoUrlDark/type",keyword:"type",params:{type: schema773.properties.logoUrlDark.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err22];
 }
@@ -96476,7 +101535,7 @@ errors++;
 if(data.longDescription !== undefined){
 let data14 = data.longDescription;
 if((typeof data14 !== "string") && (data14 !== null)){
-const err23 = {instancePath:instancePath+"/longDescription",schemaPath:"#/properties/longDescription/type",keyword:"type",params:{type: schema726.properties.longDescription.type},message:"must be string,null"};
+const err23 = {instancePath:instancePath+"/longDescription",schemaPath:"#/properties/longDescription/type",keyword:"type",params:{type: schema773.properties.longDescription.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err23];
 }
@@ -96489,7 +101548,7 @@ errors++;
 if(data.privacyPolicyUrl !== undefined){
 let data15 = data.privacyPolicyUrl;
 if((typeof data15 !== "string") && (data15 !== null)){
-const err24 = {instancePath:instancePath+"/privacyPolicyUrl",schemaPath:"#/properties/privacyPolicyUrl/type",keyword:"type",params:{type: schema726.properties.privacyPolicyUrl.type},message:"must be string,null"};
+const err24 = {instancePath:instancePath+"/privacyPolicyUrl",schemaPath:"#/properties/privacyPolicyUrl/type",keyword:"type",params:{type: schema773.properties.privacyPolicyUrl.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err24];
 }
@@ -96558,7 +101617,7 @@ errors++;
 if(data.shortDescription !== undefined){
 let data20 = data.shortDescription;
 if((typeof data20 !== "string") && (data20 !== null)){
-const err29 = {instancePath:instancePath+"/shortDescription",schemaPath:"#/properties/shortDescription/type",keyword:"type",params:{type: schema726.properties.shortDescription.type},message:"must be string,null"};
+const err29 = {instancePath:instancePath+"/shortDescription",schemaPath:"#/properties/shortDescription/type",keyword:"type",params:{type: schema773.properties.shortDescription.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err29];
 }
@@ -96571,7 +101630,7 @@ errors++;
 if(data.termsOfServiceUrl !== undefined){
 let data21 = data.termsOfServiceUrl;
 if((typeof data21 !== "string") && (data21 !== null)){
-const err30 = {instancePath:instancePath+"/termsOfServiceUrl",schemaPath:"#/properties/termsOfServiceUrl/type",keyword:"type",params:{type: schema726.properties.termsOfServiceUrl.type},message:"must be string,null"};
+const err30 = {instancePath:instancePath+"/termsOfServiceUrl",schemaPath:"#/properties/termsOfServiceUrl/type",keyword:"type",params:{type: schema773.properties.termsOfServiceUrl.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err30];
 }
@@ -96584,7 +101643,7 @@ errors++;
 if(data.websiteUrl !== undefined){
 let data22 = data.websiteUrl;
 if((typeof data22 !== "string") && (data22 !== null)){
-const err31 = {instancePath:instancePath+"/websiteUrl",schemaPath:"#/properties/websiteUrl/type",keyword:"type",params:{type: schema726.properties.websiteUrl.type},message:"must be string,null"};
+const err31 = {instancePath:instancePath+"/websiteUrl",schemaPath:"#/properties/websiteUrl/type",keyword:"type",params:{type: schema773.properties.websiteUrl.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err31];
 }
@@ -96605,17 +101664,17 @@ vErrors.push(err32);
 }
 errors++;
 }
-validate466.errors = vErrors;
+validate506.errors = vErrors;
 return errors === 0;
 }
 
-const schema731 = {"properties":{"creatorAccountUserId":{"type":["string","null"]},"creatorName":{"type":["string","null"]},"discoverability":{"anyOf":[{"$ref":"#/definitions/PluginShareDiscoverability"},{"type":"null"}]},"remotePluginId":{"type":"string"},"remoteVersion":{"default":null,"description":"Version of the remote shared plugin release when available.","type":["string","null"]},"sharePrincipals":{"items":{"$ref":"#/definitions/PluginSharePrincipal"},"type":["array","null"]},"shareUrl":{"type":["string","null"]}},"required":["remotePluginId"],"type":"object"};
-const schema732 = {"enum":["LISTED","UNLISTED","PRIVATE"],"type":"string"};
-const schema733 = {"properties":{"name":{"type":"string"},"principalId":{"type":"string"},"principalType":{"$ref":"#/definitions/PluginSharePrincipalType"},"role":{"$ref":"#/definitions/PluginSharePrincipalRole"}},"required":["name","principalId","principalType","role"],"type":"object"};
-const schema734 = {"enum":["user","group","workspace"],"type":"string"};
-const schema735 = {"enum":["reader","editor","owner"],"type":"string"};
+const schema778 = {"properties":{"creatorAccountUserId":{"type":["string","null"]},"creatorName":{"type":["string","null"]},"discoverability":{"anyOf":[{"$ref":"#/definitions/PluginShareDiscoverability"},{"type":"null"}]},"remotePluginId":{"type":"string"},"remoteVersion":{"default":null,"description":"Version of the remote shared plugin release when available.","type":["string","null"]},"sharePrincipals":{"items":{"$ref":"#/definitions/PluginSharePrincipal"},"type":["array","null"]},"shareUrl":{"type":["string","null"]}},"required":["remotePluginId"],"type":"object"};
+const schema779 = {"enum":["LISTED","UNLISTED","PRIVATE"],"type":"string"};
+const schema780 = {"properties":{"name":{"type":"string"},"principalId":{"type":"string"},"principalType":{"$ref":"#/definitions/PluginSharePrincipalType"},"role":{"$ref":"#/definitions/PluginSharePrincipalRole"}},"required":["name","principalId","principalType","role"],"type":"object"};
+const schema781 = {"enum":["user","group","workspace"],"type":"string"};
+const schema782 = {"enum":["reader","editor","owner"],"type":"string"};
 
-function validate469(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate509(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -96696,7 +101755,7 @@ vErrors.push(err6);
 errors++;
 }
 if(!(((data2 === "user") || (data2 === "group")) || (data2 === "workspace"))){
-const err7 = {instancePath:instancePath+"/principalType",schemaPath:"#/definitions/PluginSharePrincipalType/enum",keyword:"enum",params:{allowedValues: schema734.enum},message:"must be equal to one of the allowed values"};
+const err7 = {instancePath:instancePath+"/principalType",schemaPath:"#/definitions/PluginSharePrincipalType/enum",keyword:"enum",params:{allowedValues: schema781.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err7];
 }
@@ -96719,7 +101778,7 @@ vErrors.push(err8);
 errors++;
 }
 if(!(((data3 === "reader") || (data3 === "editor")) || (data3 === "owner"))){
-const err9 = {instancePath:instancePath+"/role",schemaPath:"#/definitions/PluginSharePrincipalRole/enum",keyword:"enum",params:{allowedValues: schema735.enum},message:"must be equal to one of the allowed values"};
+const err9 = {instancePath:instancePath+"/role",schemaPath:"#/definitions/PluginSharePrincipalRole/enum",keyword:"enum",params:{allowedValues: schema782.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err9];
 }
@@ -96740,12 +101799,12 @@ vErrors.push(err10);
 }
 errors++;
 }
-validate469.errors = vErrors;
+validate509.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate468(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate508(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -96762,7 +101821,7 @@ errors++;
 if(data.creatorAccountUserId !== undefined){
 let data0 = data.creatorAccountUserId;
 if((typeof data0 !== "string") && (data0 !== null)){
-const err1 = {instancePath:instancePath+"/creatorAccountUserId",schemaPath:"#/properties/creatorAccountUserId/type",keyword:"type",params:{type: schema731.properties.creatorAccountUserId.type},message:"must be string,null"};
+const err1 = {instancePath:instancePath+"/creatorAccountUserId",schemaPath:"#/properties/creatorAccountUserId/type",keyword:"type",params:{type: schema778.properties.creatorAccountUserId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err1];
 }
@@ -96775,7 +101834,7 @@ errors++;
 if(data.creatorName !== undefined){
 let data1 = data.creatorName;
 if((typeof data1 !== "string") && (data1 !== null)){
-const err2 = {instancePath:instancePath+"/creatorName",schemaPath:"#/properties/creatorName/type",keyword:"type",params:{type: schema731.properties.creatorName.type},message:"must be string,null"};
+const err2 = {instancePath:instancePath+"/creatorName",schemaPath:"#/properties/creatorName/type",keyword:"type",params:{type: schema778.properties.creatorName.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err2];
 }
@@ -96801,7 +101860,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(((data2 === "LISTED") || (data2 === "UNLISTED")) || (data2 === "PRIVATE"))){
-const err4 = {instancePath:instancePath+"/discoverability",schemaPath:"#/definitions/PluginShareDiscoverability/enum",keyword:"enum",params:{allowedValues: schema732.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/discoverability",schemaPath:"#/definitions/PluginShareDiscoverability/enum",keyword:"enum",params:{allowedValues: schema779.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -96864,7 +101923,7 @@ errors++;
 if(data.remoteVersion !== undefined){
 let data4 = data.remoteVersion;
 if((typeof data4 !== "string") && (data4 !== null)){
-const err8 = {instancePath:instancePath+"/remoteVersion",schemaPath:"#/properties/remoteVersion/type",keyword:"type",params:{type: schema731.properties.remoteVersion.type},message:"must be string,null"};
+const err8 = {instancePath:instancePath+"/remoteVersion",schemaPath:"#/properties/remoteVersion/type",keyword:"type",params:{type: schema778.properties.remoteVersion.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err8];
 }
@@ -96877,7 +101936,7 @@ errors++;
 if(data.sharePrincipals !== undefined){
 let data5 = data.sharePrincipals;
 if((!(Array.isArray(data5))) && (data5 !== null)){
-const err9 = {instancePath:instancePath+"/sharePrincipals",schemaPath:"#/properties/sharePrincipals/type",keyword:"type",params:{type: schema731.properties.sharePrincipals.type},message:"must be array,null"};
+const err9 = {instancePath:instancePath+"/sharePrincipals",schemaPath:"#/properties/sharePrincipals/type",keyword:"type",params:{type: schema778.properties.sharePrincipals.type},message:"must be array,null"};
 if(vErrors === null){
 vErrors = [err9];
 }
@@ -96889,8 +101948,8 @@ errors++;
 if(Array.isArray(data5)){
 const len0 = data5.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate469(data5[i0], {instancePath:instancePath+"/sharePrincipals/" + i0,parentData:data5,parentDataProperty:i0,rootData}))){
-vErrors = vErrors === null ? validate469.errors : vErrors.concat(validate469.errors);
+if(!(validate509(data5[i0], {instancePath:instancePath+"/sharePrincipals/" + i0,parentData:data5,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate509.errors : vErrors.concat(validate509.errors);
 errors = vErrors.length;
 }
 }
@@ -96899,7 +101958,7 @@ errors = vErrors.length;
 if(data.shareUrl !== undefined){
 let data7 = data.shareUrl;
 if((typeof data7 !== "string") && (data7 !== null)){
-const err10 = {instancePath:instancePath+"/shareUrl",schemaPath:"#/properties/shareUrl/type",keyword:"type",params:{type: schema731.properties.shareUrl.type},message:"must be string,null"};
+const err10 = {instancePath:instancePath+"/shareUrl",schemaPath:"#/properties/shareUrl/type",keyword:"type",params:{type: schema778.properties.shareUrl.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -96920,13 +101979,13 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate468.errors = vErrors;
+validate508.errors = vErrors;
 return errors === 0;
 }
 
-const schema736 = {"oneOf":[{"properties":{"path":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["local"],"title":"LocalPluginSourceType","type":"string"}},"required":["path","type"],"title":"LocalPluginSource","type":"object"},{"properties":{"path":{"type":["string","null"]},"refName":{"type":["string","null"]},"sha":{"type":["string","null"]},"type":{"enum":["git"],"title":"GitPluginSourceType","type":"string"},"url":{"type":"string"}},"required":["type","url"],"title":"GitPluginSource","type":"object"},{"properties":{"package":{"type":"string"},"registry":{"description":"Optional HTTPS registry URL. Authentication stays in the user's npm config.","type":["string","null"]},"type":{"enum":["npm"],"title":"NpmPluginSourceType","type":"string"},"version":{"description":"Optional npm version or version range.","type":["string","null"]}},"required":["package","type"],"title":"NpmPluginSource","type":"object"},{"description":"The plugin is available in the remote catalog. Download metadata is kept server-side and is not exposed through the app-server API.","properties":{"type":{"enum":["remote"],"title":"RemotePluginSourceType","type":"string"}},"required":["type"],"title":"RemotePluginSource","type":"object"}]};
+const schema783 = {"oneOf":[{"properties":{"path":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["local"],"title":"LocalPluginSourceType","type":"string"}},"required":["path","type"],"title":"LocalPluginSource","type":"object"},{"properties":{"path":{"type":["string","null"]},"refName":{"type":["string","null"]},"sha":{"type":["string","null"]},"type":{"enum":["git"],"title":"GitPluginSourceType","type":"string"},"url":{"type":"string"}},"required":["type","url"],"title":"GitPluginSource","type":"object"},{"properties":{"package":{"type":"string"},"registry":{"description":"Optional HTTPS registry URL. Authentication stays in the user's npm config.","type":["string","null"]},"type":{"enum":["npm"],"title":"NpmPluginSourceType","type":"string"},"version":{"description":"Optional npm version or version range.","type":["string","null"]}},"required":["package","type"],"title":"NpmPluginSource","type":"object"},{"description":"The plugin is available in the remote catalog. Download metadata is kept server-side and is not exposed through the app-server API.","properties":{"type":{"enum":["remote"],"title":"RemotePluginSourceType","type":"string"}},"required":["type"],"title":"RemotePluginSource","type":"object"}]};
 
-function validate472(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate512(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 const _errs0 = errors;
@@ -96979,7 +102038,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(data1 === "local")){
-const err4 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema736.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema783.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -97030,7 +102089,7 @@ errors++;
 if(data.path !== undefined){
 let data2 = data.path;
 if((typeof data2 !== "string") && (data2 !== null)){
-const err8 = {instancePath:instancePath+"/path",schemaPath:"#/oneOf/1/properties/path/type",keyword:"type",params:{type: schema736.oneOf[1].properties.path.type},message:"must be string,null"};
+const err8 = {instancePath:instancePath+"/path",schemaPath:"#/oneOf/1/properties/path/type",keyword:"type",params:{type: schema783.oneOf[1].properties.path.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err8];
 }
@@ -97043,7 +102102,7 @@ errors++;
 if(data.refName !== undefined){
 let data3 = data.refName;
 if((typeof data3 !== "string") && (data3 !== null)){
-const err9 = {instancePath:instancePath+"/refName",schemaPath:"#/oneOf/1/properties/refName/type",keyword:"type",params:{type: schema736.oneOf[1].properties.refName.type},message:"must be string,null"};
+const err9 = {instancePath:instancePath+"/refName",schemaPath:"#/oneOf/1/properties/refName/type",keyword:"type",params:{type: schema783.oneOf[1].properties.refName.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err9];
 }
@@ -97056,7 +102115,7 @@ errors++;
 if(data.sha !== undefined){
 let data4 = data.sha;
 if((typeof data4 !== "string") && (data4 !== null)){
-const err10 = {instancePath:instancePath+"/sha",schemaPath:"#/oneOf/1/properties/sha/type",keyword:"type",params:{type: schema736.oneOf[1].properties.sha.type},message:"must be string,null"};
+const err10 = {instancePath:instancePath+"/sha",schemaPath:"#/oneOf/1/properties/sha/type",keyword:"type",params:{type: schema783.oneOf[1].properties.sha.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -97079,7 +102138,7 @@ vErrors.push(err11);
 errors++;
 }
 if(!(data5 === "git")){
-const err12 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema736.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err12 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema783.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err12];
 }
@@ -97159,7 +102218,7 @@ errors++;
 if(data.registry !== undefined){
 let data8 = data.registry;
 if((typeof data8 !== "string") && (data8 !== null)){
-const err18 = {instancePath:instancePath+"/registry",schemaPath:"#/oneOf/2/properties/registry/type",keyword:"type",params:{type: schema736.oneOf[2].properties.registry.type},message:"must be string,null"};
+const err18 = {instancePath:instancePath+"/registry",schemaPath:"#/oneOf/2/properties/registry/type",keyword:"type",params:{type: schema783.oneOf[2].properties.registry.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err18];
 }
@@ -97182,7 +102241,7 @@ vErrors.push(err19);
 errors++;
 }
 if(!(data9 === "npm")){
-const err20 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema736.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err20 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema783.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -97195,7 +102254,7 @@ errors++;
 if(data.version !== undefined){
 let data10 = data.version;
 if((typeof data10 !== "string") && (data10 !== null)){
-const err21 = {instancePath:instancePath+"/version",schemaPath:"#/oneOf/2/properties/version/type",keyword:"type",params:{type: schema736.oneOf[2].properties.version.type},message:"must be string,null"};
+const err21 = {instancePath:instancePath+"/version",schemaPath:"#/oneOf/2/properties/version/type",keyword:"type",params:{type: schema783.oneOf[2].properties.version.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err21];
 }
@@ -97251,7 +102310,7 @@ vErrors.push(err24);
 errors++;
 }
 if(!(data11 === "remote")){
-const err25 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema736.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err25 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema783.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err25];
 }
@@ -97306,12 +102365,12 @@ vErrors = null;
 }
 }
 }
-validate472.errors = vErrors;
+validate512.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate465(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate505(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -97398,7 +102457,7 @@ vErrors.push(err7);
 errors++;
 }
 if(!((data0 === "ON_INSTALL") || (data0 === "ON_USE"))){
-const err8 = {instancePath:instancePath+"/authPolicy",schemaPath:"#/definitions/PluginAuthPolicy/enum",keyword:"enum",params:{allowedValues: schema722.enum},message:"must be equal to one of the allowed values"};
+const err8 = {instancePath:instancePath+"/authPolicy",schemaPath:"#/definitions/PluginAuthPolicy/enum",keyword:"enum",params:{allowedValues: schema769.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err8];
 }
@@ -97425,7 +102484,7 @@ vErrors.push(err9);
 errors++;
 }
 if(!(data1 === "DISABLED_BY_ADMIN")){
-const err10 = {instancePath:instancePath+"/availability",schemaPath:"#/definitions/PluginAvailability/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema723.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+const err10 = {instancePath:instancePath+"/availability",schemaPath:"#/definitions/PluginAvailability/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema770.oneOf[0].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -97451,7 +102510,7 @@ vErrors.push(err11);
 errors++;
 }
 if(!(data1 === "AVAILABLE")){
-const err12 = {instancePath:instancePath+"/availability",schemaPath:"#/definitions/PluginAvailability/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema723.oneOf[1].enum},message:"must be equal to one of the allowed values"};
+const err12 = {instancePath:instancePath+"/availability",schemaPath:"#/definitions/PluginAvailability/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema770.oneOf[1].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err12];
 }
@@ -97530,7 +102589,7 @@ vErrors.push(err16);
 errors++;
 }
 if(!(((data4 === "NOT_AVAILABLE") || (data4 === "AVAILABLE")) || (data4 === "INSTALLED_BY_DEFAULT"))){
-const err17 = {instancePath:instancePath+"/installPolicy",schemaPath:"#/definitions/PluginInstallPolicy/enum",keyword:"enum",params:{allowedValues: schema724.enum},message:"must be equal to one of the allowed values"};
+const err17 = {instancePath:instancePath+"/installPolicy",schemaPath:"#/definitions/PluginInstallPolicy/enum",keyword:"enum",params:{allowedValues: schema771.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err17];
 }
@@ -97556,7 +102615,7 @@ vErrors.push(err18);
 errors++;
 }
 if(!((data5 === "WORKSPACE_SETTING") || (data5 === "IMPLICIT_CANONICAL_APP"))){
-const err19 = {instancePath:instancePath+"/installPolicySource",schemaPath:"#/definitions/PluginInstallPolicySource/enum",keyword:"enum",params:{allowedValues: schema725.enum},message:"must be equal to one of the allowed values"};
+const err19 = {instancePath:instancePath+"/installPolicySource",schemaPath:"#/definitions/PluginInstallPolicySource/enum",keyword:"enum",params:{allowedValues: schema772.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err19];
 }
@@ -97621,8 +102680,8 @@ let data7 = data.interface;
 const _errs29 = errors;
 let valid8 = false;
 const _errs30 = errors;
-if(!(validate466(data7, {instancePath:instancePath+"/interface",parentData:data,parentDataProperty:"interface",rootData}))){
-vErrors = vErrors === null ? validate466.errors : vErrors.concat(validate466.errors);
+if(!(validate506(data7, {instancePath:instancePath+"/interface",parentData:data,parentDataProperty:"interface",rootData}))){
+vErrors = vErrors === null ? validate506.errors : vErrors.concat(validate506.errors);
 errors = vErrors.length;
 }
 var _valid2 = _errs30 === errors;
@@ -97695,7 +102754,7 @@ errors++;
 if(data.localVersion !== undefined){
 let data10 = data.localVersion;
 if((typeof data10 !== "string") && (data10 !== null)){
-const err27 = {instancePath:instancePath+"/localVersion",schemaPath:"#/properties/localVersion/type",keyword:"type",params:{type: schema721.properties.localVersion.type},message:"must be string,null"};
+const err27 = {instancePath:instancePath+"/localVersion",schemaPath:"#/properties/localVersion/type",keyword:"type",params:{type: schema768.properties.localVersion.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err27];
 }
@@ -97720,7 +102779,7 @@ errors++;
 if(data.remotePluginId !== undefined){
 let data12 = data.remotePluginId;
 if((typeof data12 !== "string") && (data12 !== null)){
-const err29 = {instancePath:instancePath+"/remotePluginId",schemaPath:"#/properties/remotePluginId/type",keyword:"type",params:{type: schema721.properties.remotePluginId.type},message:"must be string,null"};
+const err29 = {instancePath:instancePath+"/remotePluginId",schemaPath:"#/properties/remotePluginId/type",keyword:"type",params:{type: schema768.properties.remotePluginId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err29];
 }
@@ -97735,8 +102794,8 @@ let data13 = data.shareContext;
 const _errs44 = errors;
 let valid11 = false;
 const _errs45 = errors;
-if(!(validate468(data13, {instancePath:instancePath+"/shareContext",parentData:data,parentDataProperty:"shareContext",rootData}))){
-vErrors = vErrors === null ? validate468.errors : vErrors.concat(validate468.errors);
+if(!(validate508(data13, {instancePath:instancePath+"/shareContext",parentData:data,parentDataProperty:"shareContext",rootData}))){
+vErrors = vErrors === null ? validate508.errors : vErrors.concat(validate508.errors);
 errors = vErrors.length;
 }
 var _valid3 = _errs45 === errors;
@@ -97779,15 +102838,15 @@ vErrors = null;
 }
 }
 if(data.source !== undefined){
-if(!(validate472(data.source, {instancePath:instancePath+"/source",parentData:data,parentDataProperty:"source",rootData}))){
-vErrors = vErrors === null ? validate472.errors : vErrors.concat(validate472.errors);
+if(!(validate512(data.source, {instancePath:instancePath+"/source",parentData:data,parentDataProperty:"source",rootData}))){
+vErrors = vErrors === null ? validate512.errors : vErrors.concat(validate512.errors);
 errors = vErrors.length;
 }
 }
 if(data.version !== undefined){
 let data15 = data.version;
 if((typeof data15 !== "string") && (data15 !== null)){
-const err32 = {instancePath:instancePath+"/version",schemaPath:"#/properties/version/type",keyword:"type",params:{type: schema721.properties.version.type},message:"must be string,null"};
+const err32 = {instancePath:instancePath+"/version",schemaPath:"#/properties/version/type",keyword:"type",params:{type: schema768.properties.version.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err32];
 }
@@ -97808,12 +102867,12 @@ vErrors.push(err33);
 }
 errors++;
 }
-validate465.errors = vErrors;
+validate505.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate464(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate504(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -97846,7 +102905,7 @@ if(data0 && typeof data0 == "object" && !Array.isArray(data0)){
 if(data0.displayName !== undefined){
 let data1 = data0.displayName;
 if((typeof data1 !== "string") && (data1 !== null)){
-const err2 = {instancePath:instancePath+"/interface/displayName",schemaPath:"#/definitions/MarketplaceInterface/properties/displayName/type",keyword:"type",params:{type: schema719.properties.displayName.type},message:"must be string,null"};
+const err2 = {instancePath:instancePath+"/interface/displayName",schemaPath:"#/definitions/MarketplaceInterface/properties/displayName/type",keyword:"type",params:{type: schema766.properties.displayName.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err2];
 }
@@ -97977,8 +103036,8 @@ let data4 = data.plugins;
 if(Array.isArray(data4)){
 const len0 = data4.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate465(data4[i0], {instancePath:instancePath+"/plugins/" + i0,parentData:data4,parentDataProperty:i0,rootData}))){
-vErrors = vErrors === null ? validate465.errors : vErrors.concat(validate465.errors);
+if(!(validate505(data4[i0], {instancePath:instancePath+"/plugins/" + i0,parentData:data4,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate505.errors : vErrors.concat(validate505.errors);
 errors = vErrors.length;
 }
 }
@@ -98005,12 +103064,12 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate464.errors = vErrors;
+validate504.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate461(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate501(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 /*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:PluginListResponse" */;
 let vErrors = null;
 let errors = 0;
@@ -98058,8 +103117,8 @@ let data2 = data.marketplaceLoadErrors;
 if(Array.isArray(data2)){
 const len1 = data2.length;
 for(let i1=0; i1<len1; i1++){
-if(!(validate462(data2[i1], {instancePath:instancePath+"/marketplaceLoadErrors/" + i1,parentData:data2,parentDataProperty:i1,rootData}))){
-vErrors = vErrors === null ? validate462.errors : vErrors.concat(validate462.errors);
+if(!(validate502(data2[i1], {instancePath:instancePath+"/marketplaceLoadErrors/" + i1,parentData:data2,parentDataProperty:i1,rootData}))){
+vErrors = vErrors === null ? validate502.errors : vErrors.concat(validate502.errors);
 errors = vErrors.length;
 }
 }
@@ -98080,8 +103139,8 @@ let data4 = data.marketplaces;
 if(Array.isArray(data4)){
 const len2 = data4.length;
 for(let i2=0; i2<len2; i2++){
-if(!(validate464(data4[i2], {instancePath:instancePath+"/marketplaces/" + i2,parentData:data4,parentDataProperty:i2,rootData}))){
-vErrors = vErrors === null ? validate464.errors : vErrors.concat(validate464.errors);
+if(!(validate504(data4[i2], {instancePath:instancePath+"/marketplaces/" + i2,parentData:data4,parentDataProperty:i2,rootData}))){
+vErrors = vErrors === null ? validate504.errors : vErrors.concat(validate504.errors);
 errors = vErrors.length;
 }
 }
@@ -98108,14 +103167,14 @@ vErrors.push(err5);
 }
 errors++;
 }
-validate461.errors = vErrors;
+validate501.errors = vErrors;
 return errors === 0;
 }
 
-export const validateThreadCompactStartResponse = validate476;
-const schema738 = {"$schema":"http://json-schema.org/draft-07/schema#","title":"ThreadCompactStartResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ThreadCompactStartResponse"};
+export const validateThreadCompactStartResponse = validate516;
+const schema785 = {"$schema":"http://json-schema.org/draft-07/schema#","title":"ThreadCompactStartResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ThreadCompactStartResponse"};
 
-function validate476(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate516(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 /*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ThreadCompactStartResponse" */;
 let vErrors = null;
 let errors = 0;
@@ -98129,20 +103188,20 @@ vErrors.push(err0);
 }
 errors++;
 }
-validate476.errors = vErrors;
+validate516.errors = vErrors;
 return errors === 0;
 }
 
-export const validateReviewStartResponse = validate477;
-const schema739 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"AbsolutePathBuf":{"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"},"ByteRange":{"properties":{"end":{"minimum":0,"type":"integer","maximum":9007199254740991},"start":{"minimum":0,"type":"integer","maximum":9007199254740991}},"required":["end","start"],"type":"object"},"CodexErrorInfo":{"description":"This translation layer make sure that we expose codex error code in camel case.\n\nWhen an upstream HTTP status is available (for example, from the Responses API or a provider), it is forwarded in `httpStatusCode` on the relevant `codexErrorInfo` variant.","oneOf":[{"enum":["contextWindowExceeded","sessionBudgetExceeded","usageLimitExceeded","serverOverloaded","cyberPolicy","internalServerError","unauthorized","badRequest","threadRollbackFailed","sandboxError","other"],"type":"string"},{"additionalProperties":false,"properties":{"httpConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["httpConnectionFailed"],"title":"HttpConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Failed to connect to the response SSE stream.","properties":{"responseStreamConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamConnectionFailed"],"title":"ResponseStreamConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"The response SSE stream disconnected in the middle of a turn before completion.","properties":{"responseStreamDisconnected":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamDisconnected"],"title":"ResponseStreamDisconnectedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Reached the retry limit for responses.","properties":{"responseTooManyFailedAttempts":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseTooManyFailedAttempts"],"title":"ResponseTooManyFailedAttemptsCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Returned when `turn/start` or `turn/steer` is submitted while the current active turn cannot accept same-turn steering, for example `/review` or manual `/compact`.","properties":{"activeTurnNotSteerable":{"properties":{"turnKind":{"$ref":"#/definitions/NonSteerableTurnKind"}},"required":["turnKind"],"type":"object"}},"required":["activeTurnNotSteerable"],"title":"ActiveTurnNotSteerableCodexErrorInfo","type":"object"}]},"CollabAgentState":{"properties":{"message":{"type":["string","null"]},"status":{"$ref":"#/definitions/CollabAgentStatus"}},"required":["status"],"type":"object"},"CollabAgentStatus":{"enum":["pendingInit","running","interrupted","completed","errored","shutdown","notFound"],"type":"string"},"CollabAgentTool":{"enum":["spawnAgent","sendInput","resumeAgent","wait","closeAgent"],"type":"string"},"CollabAgentToolCallStatus":{"enum":["inProgress","completed","failed"],"type":"string"},"CommandAction":{"oneOf":[{"properties":{"command":{"type":"string"},"name":{"type":"string"},"path":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["read"],"title":"ReadCommandActionType","type":"string"}},"required":["command","name","path","type"],"title":"ReadCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"type":{"enum":["listFiles"],"title":"ListFilesCommandActionType","type":"string"}},"required":["command","type"],"title":"ListFilesCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchCommandActionType","type":"string"}},"required":["command","type"],"title":"SearchCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"type":{"enum":["unknown"],"title":"UnknownCommandActionType","type":"string"}},"required":["command","type"],"title":"UnknownCommandAction","type":"object"}]},"CommandExecutionSource":{"enum":["agent","userShell","unifiedExecStartup","unifiedExecInteraction"],"type":"string"},"CommandExecutionStatus":{"enum":["inProgress","completed","failed","declined"],"type":"string"},"DynamicToolCallOutputContentItem":{"oneOf":[{"properties":{"text":{"type":"string"},"type":{"enum":["inputText"],"title":"InputTextDynamicToolCallOutputContentItemType","type":"string"}},"required":["text","type"],"title":"InputTextDynamicToolCallOutputContentItem","type":"object"},{"properties":{"imageUrl":{"type":"string"},"type":{"enum":["inputImage"],"title":"InputImageDynamicToolCallOutputContentItemType","type":"string"}},"required":["imageUrl","type"],"title":"InputImageDynamicToolCallOutputContentItem","type":"object"}]},"DynamicToolCallStatus":{"enum":["inProgress","completed","failed"],"type":"string"},"FileUpdateChange":{"properties":{"diff":{"type":"string"},"kind":{"$ref":"#/definitions/PatchChangeKind"},"path":{"type":"string"}},"required":["diff","kind","path"],"type":"object"},"HookPromptFragment":{"properties":{"hookRunId":{"type":"string"},"text":{"type":"string"}},"required":["hookRunId","text"],"type":"object"},"ImageDetail":{"enum":["auto","low","high","original"],"type":"string"},"LegacyAppPathString":{"type":"string"},"McpToolCallAppContext":{"properties":{"actionName":{"type":["string","null"]},"appName":{"type":["string","null"]},"connectorId":{"type":"string"},"linkId":{"type":["string","null"]},"resourceUri":{"type":["string","null"]},"templateId":{"type":["string","null"]}},"required":["connectorId"],"type":"object"},"McpToolCallError":{"properties":{"message":{"type":"string"}},"required":["message"],"type":"object"},"McpToolCallResult":{"properties":{"_meta":true,"content":{"items":true,"type":"array"},"structuredContent":true},"required":["content"],"type":"object"},"McpToolCallStatus":{"enum":["inProgress","completed","failed"],"type":"string"},"MemoryCitation":{"properties":{"entries":{"items":{"$ref":"#/definitions/MemoryCitationEntry"},"type":"array"},"threadIds":{"items":{"type":"string"},"type":"array"}},"required":["entries","threadIds"],"type":"object"},"MemoryCitationEntry":{"properties":{"lineEnd":{"minimum":0,"type":"integer","maximum":4294967295},"lineStart":{"minimum":0,"type":"integer","maximum":4294967295},"note":{"type":"string"},"path":{"type":"string"}},"required":["lineEnd","lineStart","note","path"],"type":"object"},"MessagePhase":{"description":"Classifies an assistant message as interim commentary or final answer text.\n\nProviders do not emit this consistently, so callers must treat `None` as \"phase unknown\" and keep compatibility behavior for legacy models.","oneOf":[{"description":"Mid-turn assistant text (for example preamble/progress narration).\n\nAdditional tool calls or assistant output may follow before turn completion.","enum":["commentary"],"type":"string"},{"description":"The assistant's terminal answer text for the current turn.","enum":["final_answer"],"type":"string"}]},"NonSteerableTurnKind":{"enum":["review","compact"],"type":"string"},"PatchApplyStatus":{"enum":["inProgress","completed","failed","declined"],"type":"string"},"PatchChangeKind":{"oneOf":[{"properties":{"type":{"enum":["add"],"title":"AddPatchChangeKindType","type":"string"}},"required":["type"],"title":"AddPatchChangeKind","type":"object"},{"properties":{"type":{"enum":["delete"],"title":"DeletePatchChangeKindType","type":"string"}},"required":["type"],"title":"DeletePatchChangeKind","type":"object"},{"properties":{"move_path":{"type":["string","null"]},"type":{"enum":["update"],"title":"UpdatePatchChangeKindType","type":"string"}},"required":["type"],"title":"UpdatePatchChangeKind","type":"object"}]},"ReasoningEffort":{"description":"A non-empty reasoning effort value advertised by the model.","minLength":1,"type":"string"},"SubAgentActivityKind":{"enum":["started","interacted","interrupted"],"type":"string"},"TextElement":{"properties":{"byteRange":{"allOf":[{"$ref":"#/definitions/ByteRange"}],"description":"Byte range in the parent `text` buffer that this element occupies."},"placeholder":{"description":"Optional human-readable placeholder for the element, displayed in the UI.","type":["string","null"]}},"required":["byteRange"],"type":"object"},"ThreadItem":{"oneOf":[{"properties":{"clientId":{"type":["string","null"]},"content":{"items":{"$ref":"#/definitions/UserInput"},"type":"array"},"id":{"type":"string"},"type":{"enum":["userMessage"],"title":"UserMessageThreadItemType","type":"string"}},"required":["content","id","type"],"title":"UserMessageThreadItem","type":"object"},{"properties":{"fragments":{"items":{"$ref":"#/definitions/HookPromptFragment"},"type":"array"},"id":{"type":"string"},"type":{"enum":["hookPrompt"],"title":"HookPromptThreadItemType","type":"string"}},"required":["fragments","id","type"],"title":"HookPromptThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"memoryCitation":{"anyOf":[{"$ref":"#/definitions/MemoryCitation"},{"type":"null"}],"default":null},"phase":{"anyOf":[{"$ref":"#/definitions/MessagePhase"},{"type":"null"}],"default":null},"text":{"type":"string"},"type":{"enum":["agentMessage"],"title":"AgentMessageThreadItemType","type":"string"}},"required":["id","text","type"],"title":"AgentMessageThreadItem","type":"object"},{"description":"EXPERIMENTAL - proposed plan item content. The completed plan item is authoritative and may not match the concatenation of `PlanDelta` text.","properties":{"id":{"type":"string"},"text":{"type":"string"},"type":{"enum":["plan"],"title":"PlanThreadItemType","type":"string"}},"required":["id","text","type"],"title":"PlanThreadItem","type":"object"},{"properties":{"content":{"default":[],"items":{"type":"string"},"type":"array"},"id":{"type":"string"},"summary":{"default":[],"items":{"type":"string"},"type":"array"},"type":{"enum":["reasoning"],"title":"ReasoningThreadItemType","type":"string"}},"required":["id","type"],"title":"ReasoningThreadItem","type":"object"},{"properties":{"aggregatedOutput":{"description":"The command's output, aggregated from stdout and stderr.","type":["string","null"]},"command":{"description":"The command to be executed.","type":"string"},"commandActions":{"description":"A best-effort parsing of the command to understand the action(s) it will perform. This returns a list of CommandAction objects because a single shell command may be composed of many commands piped together.","items":{"$ref":"#/definitions/CommandAction"},"type":"array"},"cwd":{"allOf":[{"$ref":"#/definitions/LegacyAppPathString"}],"description":"The command's working directory."},"durationMs":{"description":"The duration of the command execution in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"exitCode":{"description":"The command's exit code.","type":["integer","null"],"minimum":-2147483648,"maximum":2147483647},"id":{"type":"string"},"processId":{"description":"Identifier for the underlying PTY process (when available).","type":["string","null"]},"source":{"allOf":[{"$ref":"#/definitions/CommandExecutionSource"}],"default":"agent"},"status":{"$ref":"#/definitions/CommandExecutionStatus"},"type":{"enum":["commandExecution"],"title":"CommandExecutionThreadItemType","type":"string"}},"required":["command","commandActions","cwd","id","status","type"],"title":"CommandExecutionThreadItem","type":"object"},{"properties":{"changes":{"items":{"$ref":"#/definitions/FileUpdateChange"},"type":"array"},"id":{"type":"string"},"status":{"$ref":"#/definitions/PatchApplyStatus"},"type":{"enum":["fileChange"],"title":"FileChangeThreadItemType","type":"string"}},"required":["changes","id","status","type"],"title":"FileChangeThreadItem","type":"object"},{"properties":{"appContext":{"anyOf":[{"$ref":"#/definitions/McpToolCallAppContext"},{"type":"null"}]},"arguments":true,"durationMs":{"description":"The duration of the MCP tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/McpToolCallError"},{"type":"null"}]},"id":{"type":"string"},"mcpAppResourceUri":{"description":"Deprecated: use `appContext.resourceUri` instead.","type":["string","null"]},"pluginId":{"type":["string","null"]},"result":{"anyOf":[{"$ref":"#/definitions/McpToolCallResult"},{"type":"null"}]},"server":{"type":"string"},"status":{"$ref":"#/definitions/McpToolCallStatus"},"tool":{"type":"string"},"type":{"enum":["mcpToolCall"],"title":"McpToolCallThreadItemType","type":"string"}},"required":["arguments","id","server","status","tool","type"],"title":"McpToolCallThreadItem","type":"object"},{"properties":{"arguments":true,"contentItems":{"items":{"$ref":"#/definitions/DynamicToolCallOutputContentItem"},"type":["array","null"]},"durationMs":{"description":"The duration of the dynamic tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"id":{"type":"string"},"namespace":{"type":["string","null"]},"status":{"$ref":"#/definitions/DynamicToolCallStatus"},"success":{"type":["boolean","null"]},"tool":{"type":"string"},"type":{"enum":["dynamicToolCall"],"title":"DynamicToolCallThreadItemType","type":"string"}},"required":["arguments","id","status","tool","type"],"title":"DynamicToolCallThreadItem","type":"object"},{"properties":{"agentsStates":{"additionalProperties":{"$ref":"#/definitions/CollabAgentState"},"description":"Last known status of the target agents, when available.","type":"object"},"id":{"description":"Unique identifier for this collab tool call.","type":"string"},"model":{"description":"Model requested for the spawned agent, when applicable.","type":["string","null"]},"prompt":{"description":"Prompt text sent as part of the collab tool call, when available.","type":["string","null"]},"reasoningEffort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}],"description":"Reasoning effort requested for the spawned agent, when applicable."},"receiverThreadIds":{"description":"Thread ID of the receiving agent, when applicable. In case of spawn operation, this corresponds to the newly spawned agent.","items":{"type":"string"},"type":"array"},"senderThreadId":{"description":"Thread ID of the agent issuing the collab request.","type":"string"},"status":{"allOf":[{"$ref":"#/definitions/CollabAgentToolCallStatus"}],"description":"Current status of the collab tool call."},"tool":{"allOf":[{"$ref":"#/definitions/CollabAgentTool"}],"description":"Name of the collab tool that was invoked."},"type":{"enum":["collabAgentToolCall"],"title":"CollabAgentToolCallThreadItemType","type":"string"}},"required":["agentsStates","id","receiverThreadIds","senderThreadId","status","tool","type"],"title":"CollabAgentToolCallThreadItem","type":"object"},{"properties":{"agentPath":{"type":"string"},"agentThreadId":{"type":"string"},"id":{"type":"string"},"kind":{"$ref":"#/definitions/SubAgentActivityKind"},"type":{"enum":["subAgentActivity"],"title":"SubAgentActivityThreadItemType","type":"string"}},"required":["agentPath","agentThreadId","id","kind","type"],"title":"SubAgentActivityThreadItem","type":"object"},{"properties":{"action":{"anyOf":[{"$ref":"#/definitions/WebSearchAction"},{"type":"null"}]},"id":{"type":"string"},"query":{"type":"string"},"type":{"enum":["webSearch"],"title":"WebSearchThreadItemType","type":"string"}},"required":["id","query","type"],"title":"WebSearchThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"path":{"$ref":"#/definitions/LegacyAppPathString"},"type":{"enum":["imageView"],"title":"ImageViewThreadItemType","type":"string"}},"required":["id","path","type"],"title":"ImageViewThreadItem","type":"object"},{"properties":{"durationMs":{"minimum":0,"type":"integer","maximum":9007199254740991},"id":{"type":"string"},"type":{"enum":["sleep"],"title":"SleepThreadItemType","type":"string"}},"required":["durationMs","id","type"],"title":"SleepThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"result":{"type":"string"},"revisedPrompt":{"type":["string","null"]},"savedPath":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}]},"status":{"type":"string"},"type":{"enum":["imageGeneration"],"title":"ImageGenerationThreadItemType","type":"string"}},"required":["id","result","status","type"],"title":"ImageGenerationThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["enteredReviewMode"],"title":"EnteredReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"EnteredReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["exitedReviewMode"],"title":"ExitedReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"ExitedReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"type":{"enum":["contextCompaction"],"title":"ContextCompactionThreadItemType","type":"string"}},"required":["id","type"],"title":"ContextCompactionThreadItem","type":"object"}]},"Turn":{"properties":{"completedAt":{"description":"Unix timestamp (in seconds) when the turn completed.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"durationMs":{"description":"Duration between turn start and completion in milliseconds, if known.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/TurnError"},{"type":"null"}],"description":"Only populated when the Turn's status is failed."},"id":{"description":"Identifier for this turn. Codex-generated turn IDs are UUIDv7.","type":"string"},"items":{"description":"Thread items currently included in this turn payload.","items":{"$ref":"#/definitions/ThreadItem"},"type":"array"},"itemsView":{"allOf":[{"$ref":"#/definitions/TurnItemsView"}],"default":"full","description":"Describes how much of `items` has been loaded for this turn."},"startedAt":{"description":"Unix timestamp (in seconds) when the turn started.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"status":{"$ref":"#/definitions/TurnStatus"}},"required":["id","items","status"],"type":"object"},"TurnError":{"properties":{"additionalDetails":{"default":null,"type":["string","null"]},"codexErrorInfo":{"anyOf":[{"$ref":"#/definitions/CodexErrorInfo"},{"type":"null"}]},"message":{"type":"string"}},"required":["message"],"type":"object"},"TurnItemsView":{"oneOf":[{"description":"`items` was not loaded for this turn. The field is intentionally empty.","enum":["notLoaded"],"type":"string"},{"description":"`items` contains only a display summary for this turn.","enum":["summary"],"type":"string"},{"description":"`items` contains every ThreadItem available from persisted app-server history for this turn.","enum":["full"],"type":"string"}]},"TurnStatus":{"enum":["completed","interrupted","failed","inProgress"],"type":"string"},"UserInput":{"oneOf":[{"properties":{"text":{"type":"string"},"text_elements":{"default":[],"description":"UI-defined spans within `text` used to render or persist special elements.","items":{"$ref":"#/definitions/TextElement"},"type":"array"},"type":{"enum":["text"],"title":"TextUserInputType","type":"string"}},"required":["text","type"],"title":"TextUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"type":{"enum":["image"],"title":"ImageUserInputType","type":"string"},"url":{"type":"string"}},"required":["type","url"],"title":"ImageUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"path":{"type":"string"},"type":{"enum":["localImage"],"title":"LocalImageUserInputType","type":"string"}},"required":["path","type"],"title":"LocalImageUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["skill"],"title":"SkillUserInputType","type":"string"}},"required":["name","path","type"],"title":"SkillUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["mention"],"title":"MentionUserInputType","type":"string"}},"required":["name","path","type"],"title":"MentionUserInput","type":"object"}]},"WebSearchAction":{"oneOf":[{"properties":{"queries":{"items":{"type":"string"},"type":["array","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchWebSearchActionType","type":"string"}},"required":["type"],"title":"SearchWebSearchAction","type":"object"},{"properties":{"type":{"enum":["openPage"],"title":"OpenPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"OpenPageWebSearchAction","type":"object"},{"properties":{"pattern":{"type":["string","null"]},"type":{"enum":["findInPage"],"title":"FindInPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"FindInPageWebSearchAction","type":"object"},{"properties":{"type":{"enum":["other"],"title":"OtherWebSearchActionType","type":"string"}},"required":["type"],"title":"OtherWebSearchAction","type":"object"}]}},"properties":{"reviewThreadId":{"description":"Identifies the thread where the review runs.\n\nFor inline reviews, this is the original thread id. For detached reviews, this is the id of the new review thread.","type":"string"},"turn":{"$ref":"#/definitions/Turn"}},"required":["reviewThreadId","turn"],"title":"ReviewStartResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ReviewStartResponse"};
-const schema740 = {"properties":{"completedAt":{"description":"Unix timestamp (in seconds) when the turn completed.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"durationMs":{"description":"Duration between turn start and completion in milliseconds, if known.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/TurnError"},{"type":"null"}],"description":"Only populated when the Turn's status is failed."},"id":{"description":"Identifier for this turn. Codex-generated turn IDs are UUIDv7.","type":"string"},"items":{"description":"Thread items currently included in this turn payload.","items":{"$ref":"#/definitions/ThreadItem"},"type":"array"},"itemsView":{"allOf":[{"$ref":"#/definitions/TurnItemsView"}],"default":"full","description":"Describes how much of `items` has been loaded for this turn."},"startedAt":{"description":"Unix timestamp (in seconds) when the turn started.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"status":{"$ref":"#/definitions/TurnStatus"}},"required":["id","items","status"],"type":"object"};
-const schema777 = {"oneOf":[{"description":"`items` was not loaded for this turn. The field is intentionally empty.","enum":["notLoaded"],"type":"string"},{"description":"`items` contains only a display summary for this turn.","enum":["summary"],"type":"string"},{"description":"`items` contains every ThreadItem available from persisted app-server history for this turn.","enum":["full"],"type":"string"}]};
-const schema778 = {"enum":["completed","interrupted","failed","inProgress"],"type":"string"};
-const schema741 = {"properties":{"additionalDetails":{"default":null,"type":["string","null"]},"codexErrorInfo":{"anyOf":[{"$ref":"#/definitions/CodexErrorInfo"},{"type":"null"}]},"message":{"type":"string"}},"required":["message"],"type":"object"};
-const schema742 = {"description":"This translation layer make sure that we expose codex error code in camel case.\n\nWhen an upstream HTTP status is available (for example, from the Responses API or a provider), it is forwarded in `httpStatusCode` on the relevant `codexErrorInfo` variant.","oneOf":[{"enum":["contextWindowExceeded","sessionBudgetExceeded","usageLimitExceeded","serverOverloaded","cyberPolicy","internalServerError","unauthorized","badRequest","threadRollbackFailed","sandboxError","other"],"type":"string"},{"additionalProperties":false,"properties":{"httpConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["httpConnectionFailed"],"title":"HttpConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Failed to connect to the response SSE stream.","properties":{"responseStreamConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamConnectionFailed"],"title":"ResponseStreamConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"The response SSE stream disconnected in the middle of a turn before completion.","properties":{"responseStreamDisconnected":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamDisconnected"],"title":"ResponseStreamDisconnectedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Reached the retry limit for responses.","properties":{"responseTooManyFailedAttempts":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseTooManyFailedAttempts"],"title":"ResponseTooManyFailedAttemptsCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Returned when `turn/start` or `turn/steer` is submitted while the current active turn cannot accept same-turn steering, for example `/review` or manual `/compact`.","properties":{"activeTurnNotSteerable":{"properties":{"turnKind":{"$ref":"#/definitions/NonSteerableTurnKind"}},"required":["turnKind"],"type":"object"}},"required":["activeTurnNotSteerable"],"title":"ActiveTurnNotSteerableCodexErrorInfo","type":"object"}]};
-const schema743 = {"enum":["review","compact"],"type":"string"};
+export const validateReviewStartResponse = validate517;
+const schema786 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"AbsolutePathBuf":{"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"},"ByteRange":{"properties":{"end":{"minimum":0,"type":"integer","maximum":9007199254740991},"start":{"minimum":0,"type":"integer","maximum":9007199254740991}},"required":["end","start"],"type":"object"},"CodexErrorInfo":{"description":"This translation layer make sure that we expose codex error code in camel case.\n\nWhen an upstream HTTP status is available (for example, from the Responses API or a provider), it is forwarded in `httpStatusCode` on the relevant `codexErrorInfo` variant.","oneOf":[{"enum":["contextWindowExceeded","sessionBudgetExceeded","usageLimitExceeded","serverOverloaded","cyberPolicy","internalServerError","unauthorized","badRequest","threadRollbackFailed","sandboxError","other"],"type":"string"},{"additionalProperties":false,"properties":{"httpConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["httpConnectionFailed"],"title":"HttpConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Failed to connect to the response SSE stream.","properties":{"responseStreamConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamConnectionFailed"],"title":"ResponseStreamConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"The response SSE stream disconnected in the middle of a turn before completion.","properties":{"responseStreamDisconnected":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamDisconnected"],"title":"ResponseStreamDisconnectedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Reached the retry limit for responses.","properties":{"responseTooManyFailedAttempts":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseTooManyFailedAttempts"],"title":"ResponseTooManyFailedAttemptsCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Returned when `turn/start` or `turn/steer` is submitted while the current active turn cannot accept same-turn steering, for example `/review` or manual `/compact`.","properties":{"activeTurnNotSteerable":{"properties":{"turnKind":{"$ref":"#/definitions/NonSteerableTurnKind"}},"required":["turnKind"],"type":"object"}},"required":["activeTurnNotSteerable"],"title":"ActiveTurnNotSteerableCodexErrorInfo","type":"object"}]},"CollabAgentState":{"properties":{"message":{"type":["string","null"]},"status":{"$ref":"#/definitions/CollabAgentStatus"}},"required":["status"],"type":"object"},"CollabAgentStatus":{"enum":["pendingInit","running","interrupted","completed","errored","shutdown","notFound"],"type":"string"},"CollabAgentTool":{"enum":["spawnAgent","sendInput","resumeAgent","wait","closeAgent"],"type":"string"},"CollabAgentToolCallStatus":{"enum":["inProgress","completed","failed"],"type":"string"},"CommandAction":{"oneOf":[{"properties":{"command":{"type":"string"},"name":{"type":"string"},"path":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["read"],"title":"ReadCommandActionType","type":"string"}},"required":["command","name","path","type"],"title":"ReadCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"type":{"enum":["listFiles"],"title":"ListFilesCommandActionType","type":"string"}},"required":["command","type"],"title":"ListFilesCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchCommandActionType","type":"string"}},"required":["command","type"],"title":"SearchCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"type":{"enum":["unknown"],"title":"UnknownCommandActionType","type":"string"}},"required":["command","type"],"title":"UnknownCommandAction","type":"object"}]},"CommandExecutionSource":{"enum":["agent","userShell","unifiedExecStartup","unifiedExecInteraction"],"type":"string"},"CommandExecutionStatus":{"enum":["inProgress","completed","failed","declined"],"type":"string"},"DynamicToolCallOutputContentItem":{"oneOf":[{"properties":{"text":{"type":"string"},"type":{"enum":["inputText"],"title":"InputTextDynamicToolCallOutputContentItemType","type":"string"}},"required":["text","type"],"title":"InputTextDynamicToolCallOutputContentItem","type":"object"},{"properties":{"imageUrl":{"type":"string"},"type":{"enum":["inputImage"],"title":"InputImageDynamicToolCallOutputContentItemType","type":"string"}},"required":["imageUrl","type"],"title":"InputImageDynamicToolCallOutputContentItem","type":"object"}]},"DynamicToolCallStatus":{"enum":["inProgress","completed","failed"],"type":"string"},"FileUpdateChange":{"properties":{"diff":{"type":"string"},"kind":{"$ref":"#/definitions/PatchChangeKind"},"path":{"type":"string"}},"required":["diff","kind","path"],"type":"object"},"HookPromptFragment":{"properties":{"hookRunId":{"type":"string"},"text":{"type":"string"}},"required":["hookRunId","text"],"type":"object"},"ImageDetail":{"enum":["auto","low","high","original"],"type":"string"},"LegacyAppPathString":{"type":"string"},"McpToolCallAppContext":{"properties":{"actionName":{"type":["string","null"]},"appName":{"type":["string","null"]},"connectorId":{"type":"string"},"linkId":{"type":["string","null"]},"resourceUri":{"type":["string","null"]},"templateId":{"type":["string","null"]}},"required":["connectorId"],"type":"object"},"McpToolCallError":{"properties":{"message":{"type":"string"}},"required":["message"],"type":"object"},"McpToolCallResult":{"properties":{"_meta":true,"content":{"items":true,"type":"array"},"structuredContent":true},"required":["content"],"type":"object"},"McpToolCallStatus":{"enum":["inProgress","completed","failed"],"type":"string"},"MemoryCitation":{"properties":{"entries":{"items":{"$ref":"#/definitions/MemoryCitationEntry"},"type":"array"},"threadIds":{"items":{"type":"string"},"type":"array"}},"required":["entries","threadIds"],"type":"object"},"MemoryCitationEntry":{"properties":{"lineEnd":{"minimum":0,"type":"integer","maximum":4294967295},"lineStart":{"minimum":0,"type":"integer","maximum":4294967295},"note":{"type":"string"},"path":{"type":"string"}},"required":["lineEnd","lineStart","note","path"],"type":"object"},"MessagePhase":{"description":"Classifies an assistant message as interim commentary or final answer text.\n\nProviders do not emit this consistently, so callers must treat `None` as \"phase unknown\" and keep compatibility behavior for legacy models.","oneOf":[{"description":"Mid-turn assistant text (for example preamble/progress narration).\n\nAdditional tool calls or assistant output may follow before turn completion.","enum":["commentary"],"type":"string"},{"description":"The assistant's terminal answer text for the current turn.","enum":["final_answer"],"type":"string"}]},"NonSteerableTurnKind":{"enum":["review","compact"],"type":"string"},"PatchApplyStatus":{"enum":["inProgress","completed","failed","declined"],"type":"string"},"PatchChangeKind":{"oneOf":[{"properties":{"type":{"enum":["add"],"title":"AddPatchChangeKindType","type":"string"}},"required":["type"],"title":"AddPatchChangeKind","type":"object"},{"properties":{"type":{"enum":["delete"],"title":"DeletePatchChangeKindType","type":"string"}},"required":["type"],"title":"DeletePatchChangeKind","type":"object"},{"properties":{"move_path":{"type":["string","null"]},"type":{"enum":["update"],"title":"UpdatePatchChangeKindType","type":"string"}},"required":["type"],"title":"UpdatePatchChangeKind","type":"object"}]},"ReasoningEffort":{"description":"A non-empty reasoning effort value advertised by the model.","minLength":1,"type":"string"},"SubAgentActivityKind":{"enum":["started","interacted","interrupted"],"type":"string"},"TextElement":{"properties":{"byteRange":{"allOf":[{"$ref":"#/definitions/ByteRange"}],"description":"Byte range in the parent `text` buffer that this element occupies."},"placeholder":{"description":"Optional human-readable placeholder for the element, displayed in the UI.","type":["string","null"]}},"required":["byteRange"],"type":"object"},"ThreadItem":{"oneOf":[{"properties":{"clientId":{"type":["string","null"]},"content":{"items":{"$ref":"#/definitions/UserInput"},"type":"array"},"id":{"type":"string"},"type":{"enum":["userMessage"],"title":"UserMessageThreadItemType","type":"string"}},"required":["content","id","type"],"title":"UserMessageThreadItem","type":"object"},{"properties":{"fragments":{"items":{"$ref":"#/definitions/HookPromptFragment"},"type":"array"},"id":{"type":"string"},"type":{"enum":["hookPrompt"],"title":"HookPromptThreadItemType","type":"string"}},"required":["fragments","id","type"],"title":"HookPromptThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"memoryCitation":{"anyOf":[{"$ref":"#/definitions/MemoryCitation"},{"type":"null"}],"default":null},"phase":{"anyOf":[{"$ref":"#/definitions/MessagePhase"},{"type":"null"}],"default":null},"text":{"type":"string"},"type":{"enum":["agentMessage"],"title":"AgentMessageThreadItemType","type":"string"}},"required":["id","text","type"],"title":"AgentMessageThreadItem","type":"object"},{"description":"EXPERIMENTAL - proposed plan item content. The completed plan item is authoritative and may not match the concatenation of `PlanDelta` text.","properties":{"id":{"type":"string"},"text":{"type":"string"},"type":{"enum":["plan"],"title":"PlanThreadItemType","type":"string"}},"required":["id","text","type"],"title":"PlanThreadItem","type":"object"},{"properties":{"content":{"default":[],"items":{"type":"string"},"type":"array"},"id":{"type":"string"},"summary":{"default":[],"items":{"type":"string"},"type":"array"},"type":{"enum":["reasoning"],"title":"ReasoningThreadItemType","type":"string"}},"required":["id","type"],"title":"ReasoningThreadItem","type":"object"},{"properties":{"aggregatedOutput":{"description":"The command's output, aggregated from stdout and stderr.","type":["string","null"]},"command":{"description":"The command to be executed.","type":"string"},"commandActions":{"description":"A best-effort parsing of the command to understand the action(s) it will perform. This returns a list of CommandAction objects because a single shell command may be composed of many commands piped together.","items":{"$ref":"#/definitions/CommandAction"},"type":"array"},"cwd":{"allOf":[{"$ref":"#/definitions/LegacyAppPathString"}],"description":"The command's working directory."},"durationMs":{"description":"The duration of the command execution in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"exitCode":{"description":"The command's exit code.","type":["integer","null"],"minimum":-2147483648,"maximum":2147483647},"id":{"type":"string"},"processId":{"description":"Identifier for the underlying PTY process (when available).","type":["string","null"]},"source":{"allOf":[{"$ref":"#/definitions/CommandExecutionSource"}],"default":"agent"},"status":{"$ref":"#/definitions/CommandExecutionStatus"},"type":{"enum":["commandExecution"],"title":"CommandExecutionThreadItemType","type":"string"}},"required":["command","commandActions","cwd","id","status","type"],"title":"CommandExecutionThreadItem","type":"object"},{"properties":{"changes":{"items":{"$ref":"#/definitions/FileUpdateChange"},"type":"array"},"id":{"type":"string"},"status":{"$ref":"#/definitions/PatchApplyStatus"},"type":{"enum":["fileChange"],"title":"FileChangeThreadItemType","type":"string"}},"required":["changes","id","status","type"],"title":"FileChangeThreadItem","type":"object"},{"properties":{"appContext":{"anyOf":[{"$ref":"#/definitions/McpToolCallAppContext"},{"type":"null"}]},"arguments":true,"durationMs":{"description":"The duration of the MCP tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/McpToolCallError"},{"type":"null"}]},"id":{"type":"string"},"mcpAppResourceUri":{"description":"Deprecated: use `appContext.resourceUri` instead.","type":["string","null"]},"pluginId":{"type":["string","null"]},"result":{"anyOf":[{"$ref":"#/definitions/McpToolCallResult"},{"type":"null"}]},"server":{"type":"string"},"status":{"$ref":"#/definitions/McpToolCallStatus"},"tool":{"type":"string"},"type":{"enum":["mcpToolCall"],"title":"McpToolCallThreadItemType","type":"string"}},"required":["arguments","id","server","status","tool","type"],"title":"McpToolCallThreadItem","type":"object"},{"properties":{"arguments":true,"contentItems":{"items":{"$ref":"#/definitions/DynamicToolCallOutputContentItem"},"type":["array","null"]},"durationMs":{"description":"The duration of the dynamic tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"id":{"type":"string"},"namespace":{"type":["string","null"]},"status":{"$ref":"#/definitions/DynamicToolCallStatus"},"success":{"type":["boolean","null"]},"tool":{"type":"string"},"type":{"enum":["dynamicToolCall"],"title":"DynamicToolCallThreadItemType","type":"string"}},"required":["arguments","id","status","tool","type"],"title":"DynamicToolCallThreadItem","type":"object"},{"properties":{"agentsStates":{"additionalProperties":{"$ref":"#/definitions/CollabAgentState"},"description":"Last known status of the target agents, when available.","type":"object"},"id":{"description":"Unique identifier for this collab tool call.","type":"string"},"model":{"description":"Model requested for the spawned agent, when applicable.","type":["string","null"]},"prompt":{"description":"Prompt text sent as part of the collab tool call, when available.","type":["string","null"]},"reasoningEffort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}],"description":"Reasoning effort requested for the spawned agent, when applicable."},"receiverThreadIds":{"description":"Thread ID of the receiving agent, when applicable. In case of spawn operation, this corresponds to the newly spawned agent.","items":{"type":"string"},"type":"array"},"senderThreadId":{"description":"Thread ID of the agent issuing the collab request.","type":"string"},"status":{"allOf":[{"$ref":"#/definitions/CollabAgentToolCallStatus"}],"description":"Current status of the collab tool call."},"tool":{"allOf":[{"$ref":"#/definitions/CollabAgentTool"}],"description":"Name of the collab tool that was invoked."},"type":{"enum":["collabAgentToolCall"],"title":"CollabAgentToolCallThreadItemType","type":"string"}},"required":["agentsStates","id","receiverThreadIds","senderThreadId","status","tool","type"],"title":"CollabAgentToolCallThreadItem","type":"object"},{"properties":{"agentPath":{"type":"string"},"agentThreadId":{"type":"string"},"id":{"type":"string"},"kind":{"$ref":"#/definitions/SubAgentActivityKind"},"type":{"enum":["subAgentActivity"],"title":"SubAgentActivityThreadItemType","type":"string"}},"required":["agentPath","agentThreadId","id","kind","type"],"title":"SubAgentActivityThreadItem","type":"object"},{"properties":{"action":{"anyOf":[{"$ref":"#/definitions/WebSearchAction"},{"type":"null"}]},"id":{"type":"string"},"query":{"type":"string"},"type":{"enum":["webSearch"],"title":"WebSearchThreadItemType","type":"string"}},"required":["id","query","type"],"title":"WebSearchThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"path":{"$ref":"#/definitions/LegacyAppPathString"},"type":{"enum":["imageView"],"title":"ImageViewThreadItemType","type":"string"}},"required":["id","path","type"],"title":"ImageViewThreadItem","type":"object"},{"properties":{"durationMs":{"minimum":0,"type":"integer","maximum":9007199254740991},"id":{"type":"string"},"type":{"enum":["sleep"],"title":"SleepThreadItemType","type":"string"}},"required":["durationMs","id","type"],"title":"SleepThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"result":{"type":"string"},"revisedPrompt":{"type":["string","null"]},"savedPath":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}]},"status":{"type":"string"},"type":{"enum":["imageGeneration"],"title":"ImageGenerationThreadItemType","type":"string"}},"required":["id","result","status","type"],"title":"ImageGenerationThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["enteredReviewMode"],"title":"EnteredReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"EnteredReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["exitedReviewMode"],"title":"ExitedReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"ExitedReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"type":{"enum":["contextCompaction"],"title":"ContextCompactionThreadItemType","type":"string"}},"required":["id","type"],"title":"ContextCompactionThreadItem","type":"object"}]},"Turn":{"properties":{"completedAt":{"description":"Unix timestamp (in seconds) when the turn completed.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"durationMs":{"description":"Duration between turn start and completion in milliseconds, if known.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/TurnError"},{"type":"null"}],"description":"Only populated when the Turn's status is failed."},"id":{"description":"Identifier for this turn. Codex-generated turn IDs are UUIDv7.","type":"string"},"items":{"description":"Thread items currently included in this turn payload.","items":{"$ref":"#/definitions/ThreadItem"},"type":"array"},"itemsView":{"allOf":[{"$ref":"#/definitions/TurnItemsView"}],"default":"full","description":"Describes how much of `items` has been loaded for this turn."},"startedAt":{"description":"Unix timestamp (in seconds) when the turn started.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"status":{"$ref":"#/definitions/TurnStatus"}},"required":["id","items","status"],"type":"object"},"TurnError":{"properties":{"additionalDetails":{"default":null,"type":["string","null"]},"codexErrorInfo":{"anyOf":[{"$ref":"#/definitions/CodexErrorInfo"},{"type":"null"}]},"message":{"type":"string"}},"required":["message"],"type":"object"},"TurnItemsView":{"oneOf":[{"description":"`items` was not loaded for this turn. The field is intentionally empty.","enum":["notLoaded"],"type":"string"},{"description":"`items` contains only a display summary for this turn.","enum":["summary"],"type":"string"},{"description":"`items` contains every ThreadItem available from persisted app-server history for this turn.","enum":["full"],"type":"string"}]},"TurnStatus":{"enum":["completed","interrupted","failed","inProgress"],"type":"string"},"UserInput":{"oneOf":[{"properties":{"text":{"type":"string"},"text_elements":{"default":[],"description":"UI-defined spans within `text` used to render or persist special elements.","items":{"$ref":"#/definitions/TextElement"},"type":"array"},"type":{"enum":["text"],"title":"TextUserInputType","type":"string"}},"required":["text","type"],"title":"TextUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"type":{"enum":["image"],"title":"ImageUserInputType","type":"string"},"url":{"type":"string"}},"required":["type","url"],"title":"ImageUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"path":{"type":"string"},"type":{"enum":["localImage"],"title":"LocalImageUserInputType","type":"string"}},"required":["path","type"],"title":"LocalImageUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["skill"],"title":"SkillUserInputType","type":"string"}},"required":["name","path","type"],"title":"SkillUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["mention"],"title":"MentionUserInputType","type":"string"}},"required":["name","path","type"],"title":"MentionUserInput","type":"object"}]},"WebSearchAction":{"oneOf":[{"properties":{"queries":{"items":{"type":"string"},"type":["array","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchWebSearchActionType","type":"string"}},"required":["type"],"title":"SearchWebSearchAction","type":"object"},{"properties":{"type":{"enum":["openPage"],"title":"OpenPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"OpenPageWebSearchAction","type":"object"},{"properties":{"pattern":{"type":["string","null"]},"type":{"enum":["findInPage"],"title":"FindInPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"FindInPageWebSearchAction","type":"object"},{"properties":{"type":{"enum":["other"],"title":"OtherWebSearchActionType","type":"string"}},"required":["type"],"title":"OtherWebSearchAction","type":"object"}]}},"properties":{"reviewThreadId":{"description":"Identifies the thread where the review runs.\n\nFor inline reviews, this is the original thread id. For detached reviews, this is the id of the new review thread.","type":"string"},"turn":{"$ref":"#/definitions/Turn"}},"required":["reviewThreadId","turn"],"title":"ReviewStartResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ReviewStartResponse"};
+const schema787 = {"properties":{"completedAt":{"description":"Unix timestamp (in seconds) when the turn completed.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"durationMs":{"description":"Duration between turn start and completion in milliseconds, if known.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/TurnError"},{"type":"null"}],"description":"Only populated when the Turn's status is failed."},"id":{"description":"Identifier for this turn. Codex-generated turn IDs are UUIDv7.","type":"string"},"items":{"description":"Thread items currently included in this turn payload.","items":{"$ref":"#/definitions/ThreadItem"},"type":"array"},"itemsView":{"allOf":[{"$ref":"#/definitions/TurnItemsView"}],"default":"full","description":"Describes how much of `items` has been loaded for this turn."},"startedAt":{"description":"Unix timestamp (in seconds) when the turn started.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"status":{"$ref":"#/definitions/TurnStatus"}},"required":["id","items","status"],"type":"object"};
+const schema824 = {"oneOf":[{"description":"`items` was not loaded for this turn. The field is intentionally empty.","enum":["notLoaded"],"type":"string"},{"description":"`items` contains only a display summary for this turn.","enum":["summary"],"type":"string"},{"description":"`items` contains every ThreadItem available from persisted app-server history for this turn.","enum":["full"],"type":"string"}]};
+const schema825 = {"enum":["completed","interrupted","failed","inProgress"],"type":"string"};
+const schema788 = {"properties":{"additionalDetails":{"default":null,"type":["string","null"]},"codexErrorInfo":{"anyOf":[{"$ref":"#/definitions/CodexErrorInfo"},{"type":"null"}]},"message":{"type":"string"}},"required":["message"],"type":"object"};
+const schema789 = {"description":"This translation layer make sure that we expose codex error code in camel case.\n\nWhen an upstream HTTP status is available (for example, from the Responses API or a provider), it is forwarded in `httpStatusCode` on the relevant `codexErrorInfo` variant.","oneOf":[{"enum":["contextWindowExceeded","sessionBudgetExceeded","usageLimitExceeded","serverOverloaded","cyberPolicy","internalServerError","unauthorized","badRequest","threadRollbackFailed","sandboxError","other"],"type":"string"},{"additionalProperties":false,"properties":{"httpConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["httpConnectionFailed"],"title":"HttpConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Failed to connect to the response SSE stream.","properties":{"responseStreamConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamConnectionFailed"],"title":"ResponseStreamConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"The response SSE stream disconnected in the middle of a turn before completion.","properties":{"responseStreamDisconnected":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamDisconnected"],"title":"ResponseStreamDisconnectedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Reached the retry limit for responses.","properties":{"responseTooManyFailedAttempts":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseTooManyFailedAttempts"],"title":"ResponseTooManyFailedAttemptsCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Returned when `turn/start` or `turn/steer` is submitted while the current active turn cannot accept same-turn steering, for example `/review` or manual `/compact`.","properties":{"activeTurnNotSteerable":{"properties":{"turnKind":{"$ref":"#/definitions/NonSteerableTurnKind"}},"required":["turnKind"],"type":"object"}},"required":["activeTurnNotSteerable"],"title":"ActiveTurnNotSteerableCodexErrorInfo","type":"object"}]};
+const schema790 = {"enum":["review","compact"],"type":"string"};
 
-function validate480(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate520(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 const _errs0 = errors;
@@ -98160,7 +103219,7 @@ vErrors.push(err0);
 errors++;
 }
 if(!(((((((((((data === "contextWindowExceeded") || (data === "sessionBudgetExceeded")) || (data === "usageLimitExceeded")) || (data === "serverOverloaded")) || (data === "cyberPolicy")) || (data === "internalServerError")) || (data === "unauthorized")) || (data === "badRequest")) || (data === "threadRollbackFailed")) || (data === "sandboxError")) || (data === "other"))){
-const err1 = {instancePath,schemaPath:"#/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema742.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+const err1 = {instancePath,schemaPath:"#/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema789.oneOf[0].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err1];
 }
@@ -98204,7 +103263,7 @@ if(data0 && typeof data0 == "object" && !Array.isArray(data0)){
 if(data0.httpStatusCode !== undefined){
 let data1 = data0.httpStatusCode;
 if((!(((typeof data1 == "number") && (!(data1 % 1) && !isNaN(data1))) && (isFinite(data1)))) && (data1 !== null)){
-const err4 = {instancePath:instancePath+"/httpConnectionFailed/httpStatusCode",schemaPath:"#/oneOf/1/properties/httpConnectionFailed/properties/httpStatusCode/type",keyword:"type",params:{type: schema742.oneOf[1].properties.httpConnectionFailed.properties.httpStatusCode.type},message:"must be integer,null"};
+const err4 = {instancePath:instancePath+"/httpConnectionFailed/httpStatusCode",schemaPath:"#/oneOf/1/properties/httpConnectionFailed/properties/httpStatusCode/type",keyword:"type",params:{type: schema789.oneOf[1].properties.httpConnectionFailed.properties.httpStatusCode.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -98299,7 +103358,7 @@ if(data2 && typeof data2 == "object" && !Array.isArray(data2)){
 if(data2.httpStatusCode !== undefined){
 let data3 = data2.httpStatusCode;
 if((!(((typeof data3 == "number") && (!(data3 % 1) && !isNaN(data3))) && (isFinite(data3)))) && (data3 !== null)){
-const err11 = {instancePath:instancePath+"/responseStreamConnectionFailed/httpStatusCode",schemaPath:"#/oneOf/2/properties/responseStreamConnectionFailed/properties/httpStatusCode/type",keyword:"type",params:{type: schema742.oneOf[2].properties.responseStreamConnectionFailed.properties.httpStatusCode.type},message:"must be integer,null"};
+const err11 = {instancePath:instancePath+"/responseStreamConnectionFailed/httpStatusCode",schemaPath:"#/oneOf/2/properties/responseStreamConnectionFailed/properties/httpStatusCode/type",keyword:"type",params:{type: schema789.oneOf[2].properties.responseStreamConnectionFailed.properties.httpStatusCode.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err11];
 }
@@ -98394,7 +103453,7 @@ if(data4 && typeof data4 == "object" && !Array.isArray(data4)){
 if(data4.httpStatusCode !== undefined){
 let data5 = data4.httpStatusCode;
 if((!(((typeof data5 == "number") && (!(data5 % 1) && !isNaN(data5))) && (isFinite(data5)))) && (data5 !== null)){
-const err18 = {instancePath:instancePath+"/responseStreamDisconnected/httpStatusCode",schemaPath:"#/oneOf/3/properties/responseStreamDisconnected/properties/httpStatusCode/type",keyword:"type",params:{type: schema742.oneOf[3].properties.responseStreamDisconnected.properties.httpStatusCode.type},message:"must be integer,null"};
+const err18 = {instancePath:instancePath+"/responseStreamDisconnected/httpStatusCode",schemaPath:"#/oneOf/3/properties/responseStreamDisconnected/properties/httpStatusCode/type",keyword:"type",params:{type: schema789.oneOf[3].properties.responseStreamDisconnected.properties.httpStatusCode.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err18];
 }
@@ -98489,7 +103548,7 @@ if(data6 && typeof data6 == "object" && !Array.isArray(data6)){
 if(data6.httpStatusCode !== undefined){
 let data7 = data6.httpStatusCode;
 if((!(((typeof data7 == "number") && (!(data7 % 1) && !isNaN(data7))) && (isFinite(data7)))) && (data7 !== null)){
-const err25 = {instancePath:instancePath+"/responseTooManyFailedAttempts/httpStatusCode",schemaPath:"#/oneOf/4/properties/responseTooManyFailedAttempts/properties/httpStatusCode/type",keyword:"type",params:{type: schema742.oneOf[4].properties.responseTooManyFailedAttempts.properties.httpStatusCode.type},message:"must be integer,null"};
+const err25 = {instancePath:instancePath+"/responseTooManyFailedAttempts/httpStatusCode",schemaPath:"#/oneOf/4/properties/responseTooManyFailedAttempts/properties/httpStatusCode/type",keyword:"type",params:{type: schema789.oneOf[4].properties.responseTooManyFailedAttempts.properties.httpStatusCode.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err25];
 }
@@ -98604,7 +103663,7 @@ vErrors.push(err33);
 errors++;
 }
 if(!((data9 === "review") || (data9 === "compact"))){
-const err34 = {instancePath:instancePath+"/activeTurnNotSteerable/turnKind",schemaPath:"#/definitions/NonSteerableTurnKind/enum",keyword:"enum",params:{allowedValues: schema743.enum},message:"must be equal to one of the allowed values"};
+const err34 = {instancePath:instancePath+"/activeTurnNotSteerable/turnKind",schemaPath:"#/definitions/NonSteerableTurnKind/enum",keyword:"enum",params:{allowedValues: schema790.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err34];
 }
@@ -98673,12 +103732,12 @@ vErrors = null;
 }
 }
 }
-validate480.errors = vErrors;
+validate520.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate479(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate519(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -98695,7 +103754,7 @@ errors++;
 if(data.additionalDetails !== undefined){
 let data0 = data.additionalDetails;
 if((typeof data0 !== "string") && (data0 !== null)){
-const err1 = {instancePath:instancePath+"/additionalDetails",schemaPath:"#/properties/additionalDetails/type",keyword:"type",params:{type: schema741.properties.additionalDetails.type},message:"must be string,null"};
+const err1 = {instancePath:instancePath+"/additionalDetails",schemaPath:"#/properties/additionalDetails/type",keyword:"type",params:{type: schema788.properties.additionalDetails.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err1];
 }
@@ -98710,8 +103769,8 @@ let data1 = data.codexErrorInfo;
 const _errs4 = errors;
 let valid1 = false;
 const _errs5 = errors;
-if(!(validate480(data1, {instancePath:instancePath+"/codexErrorInfo",parentData:data,parentDataProperty:"codexErrorInfo",rootData}))){
-vErrors = vErrors === null ? validate480.errors : vErrors.concat(validate480.errors);
+if(!(validate520(data1, {instancePath:instancePath+"/codexErrorInfo",parentData:data,parentDataProperty:"codexErrorInfo",rootData}))){
+vErrors = vErrors === null ? validate520.errors : vErrors.concat(validate520.errors);
 errors = vErrors.length;
 }
 var _valid0 = _errs5 === errors;
@@ -98776,35 +103835,35 @@ vErrors.push(err5);
 }
 errors++;
 }
-validate479.errors = vErrors;
+validate519.errors = vErrors;
 return errors === 0;
 }
 
-const schema744 = {"oneOf":[{"properties":{"clientId":{"type":["string","null"]},"content":{"items":{"$ref":"#/definitions/UserInput"},"type":"array"},"id":{"type":"string"},"type":{"enum":["userMessage"],"title":"UserMessageThreadItemType","type":"string"}},"required":["content","id","type"],"title":"UserMessageThreadItem","type":"object"},{"properties":{"fragments":{"items":{"$ref":"#/definitions/HookPromptFragment"},"type":"array"},"id":{"type":"string"},"type":{"enum":["hookPrompt"],"title":"HookPromptThreadItemType","type":"string"}},"required":["fragments","id","type"],"title":"HookPromptThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"memoryCitation":{"anyOf":[{"$ref":"#/definitions/MemoryCitation"},{"type":"null"}],"default":null},"phase":{"anyOf":[{"$ref":"#/definitions/MessagePhase"},{"type":"null"}],"default":null},"text":{"type":"string"},"type":{"enum":["agentMessage"],"title":"AgentMessageThreadItemType","type":"string"}},"required":["id","text","type"],"title":"AgentMessageThreadItem","type":"object"},{"description":"EXPERIMENTAL - proposed plan item content. The completed plan item is authoritative and may not match the concatenation of `PlanDelta` text.","properties":{"id":{"type":"string"},"text":{"type":"string"},"type":{"enum":["plan"],"title":"PlanThreadItemType","type":"string"}},"required":["id","text","type"],"title":"PlanThreadItem","type":"object"},{"properties":{"content":{"default":[],"items":{"type":"string"},"type":"array"},"id":{"type":"string"},"summary":{"default":[],"items":{"type":"string"},"type":"array"},"type":{"enum":["reasoning"],"title":"ReasoningThreadItemType","type":"string"}},"required":["id","type"],"title":"ReasoningThreadItem","type":"object"},{"properties":{"aggregatedOutput":{"description":"The command's output, aggregated from stdout and stderr.","type":["string","null"]},"command":{"description":"The command to be executed.","type":"string"},"commandActions":{"description":"A best-effort parsing of the command to understand the action(s) it will perform. This returns a list of CommandAction objects because a single shell command may be composed of many commands piped together.","items":{"$ref":"#/definitions/CommandAction"},"type":"array"},"cwd":{"allOf":[{"$ref":"#/definitions/LegacyAppPathString"}],"description":"The command's working directory."},"durationMs":{"description":"The duration of the command execution in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"exitCode":{"description":"The command's exit code.","type":["integer","null"],"minimum":-2147483648,"maximum":2147483647},"id":{"type":"string"},"processId":{"description":"Identifier for the underlying PTY process (when available).","type":["string","null"]},"source":{"allOf":[{"$ref":"#/definitions/CommandExecutionSource"}],"default":"agent"},"status":{"$ref":"#/definitions/CommandExecutionStatus"},"type":{"enum":["commandExecution"],"title":"CommandExecutionThreadItemType","type":"string"}},"required":["command","commandActions","cwd","id","status","type"],"title":"CommandExecutionThreadItem","type":"object"},{"properties":{"changes":{"items":{"$ref":"#/definitions/FileUpdateChange"},"type":"array"},"id":{"type":"string"},"status":{"$ref":"#/definitions/PatchApplyStatus"},"type":{"enum":["fileChange"],"title":"FileChangeThreadItemType","type":"string"}},"required":["changes","id","status","type"],"title":"FileChangeThreadItem","type":"object"},{"properties":{"appContext":{"anyOf":[{"$ref":"#/definitions/McpToolCallAppContext"},{"type":"null"}]},"arguments":true,"durationMs":{"description":"The duration of the MCP tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/McpToolCallError"},{"type":"null"}]},"id":{"type":"string"},"mcpAppResourceUri":{"description":"Deprecated: use `appContext.resourceUri` instead.","type":["string","null"]},"pluginId":{"type":["string","null"]},"result":{"anyOf":[{"$ref":"#/definitions/McpToolCallResult"},{"type":"null"}]},"server":{"type":"string"},"status":{"$ref":"#/definitions/McpToolCallStatus"},"tool":{"type":"string"},"type":{"enum":["mcpToolCall"],"title":"McpToolCallThreadItemType","type":"string"}},"required":["arguments","id","server","status","tool","type"],"title":"McpToolCallThreadItem","type":"object"},{"properties":{"arguments":true,"contentItems":{"items":{"$ref":"#/definitions/DynamicToolCallOutputContentItem"},"type":["array","null"]},"durationMs":{"description":"The duration of the dynamic tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"id":{"type":"string"},"namespace":{"type":["string","null"]},"status":{"$ref":"#/definitions/DynamicToolCallStatus"},"success":{"type":["boolean","null"]},"tool":{"type":"string"},"type":{"enum":["dynamicToolCall"],"title":"DynamicToolCallThreadItemType","type":"string"}},"required":["arguments","id","status","tool","type"],"title":"DynamicToolCallThreadItem","type":"object"},{"properties":{"agentsStates":{"additionalProperties":{"$ref":"#/definitions/CollabAgentState"},"description":"Last known status of the target agents, when available.","type":"object"},"id":{"description":"Unique identifier for this collab tool call.","type":"string"},"model":{"description":"Model requested for the spawned agent, when applicable.","type":["string","null"]},"prompt":{"description":"Prompt text sent as part of the collab tool call, when available.","type":["string","null"]},"reasoningEffort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}],"description":"Reasoning effort requested for the spawned agent, when applicable."},"receiverThreadIds":{"description":"Thread ID of the receiving agent, when applicable. In case of spawn operation, this corresponds to the newly spawned agent.","items":{"type":"string"},"type":"array"},"senderThreadId":{"description":"Thread ID of the agent issuing the collab request.","type":"string"},"status":{"allOf":[{"$ref":"#/definitions/CollabAgentToolCallStatus"}],"description":"Current status of the collab tool call."},"tool":{"allOf":[{"$ref":"#/definitions/CollabAgentTool"}],"description":"Name of the collab tool that was invoked."},"type":{"enum":["collabAgentToolCall"],"title":"CollabAgentToolCallThreadItemType","type":"string"}},"required":["agentsStates","id","receiverThreadIds","senderThreadId","status","tool","type"],"title":"CollabAgentToolCallThreadItem","type":"object"},{"properties":{"agentPath":{"type":"string"},"agentThreadId":{"type":"string"},"id":{"type":"string"},"kind":{"$ref":"#/definitions/SubAgentActivityKind"},"type":{"enum":["subAgentActivity"],"title":"SubAgentActivityThreadItemType","type":"string"}},"required":["agentPath","agentThreadId","id","kind","type"],"title":"SubAgentActivityThreadItem","type":"object"},{"properties":{"action":{"anyOf":[{"$ref":"#/definitions/WebSearchAction"},{"type":"null"}]},"id":{"type":"string"},"query":{"type":"string"},"type":{"enum":["webSearch"],"title":"WebSearchThreadItemType","type":"string"}},"required":["id","query","type"],"title":"WebSearchThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"path":{"$ref":"#/definitions/LegacyAppPathString"},"type":{"enum":["imageView"],"title":"ImageViewThreadItemType","type":"string"}},"required":["id","path","type"],"title":"ImageViewThreadItem","type":"object"},{"properties":{"durationMs":{"minimum":0,"type":"integer","maximum":9007199254740991},"id":{"type":"string"},"type":{"enum":["sleep"],"title":"SleepThreadItemType","type":"string"}},"required":["durationMs","id","type"],"title":"SleepThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"result":{"type":"string"},"revisedPrompt":{"type":["string","null"]},"savedPath":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}]},"status":{"type":"string"},"type":{"enum":["imageGeneration"],"title":"ImageGenerationThreadItemType","type":"string"}},"required":["id","result","status","type"],"title":"ImageGenerationThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["enteredReviewMode"],"title":"EnteredReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"EnteredReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["exitedReviewMode"],"title":"ExitedReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"ExitedReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"type":{"enum":["contextCompaction"],"title":"ContextCompactionThreadItemType","type":"string"}},"required":["id","type"],"title":"ContextCompactionThreadItem","type":"object"}]};
-const schema750 = {"properties":{"hookRunId":{"type":"string"},"text":{"type":"string"}},"required":["hookRunId","text"],"type":"object"};
-const schema753 = {"description":"Classifies an assistant message as interim commentary or final answer text.\n\nProviders do not emit this consistently, so callers must treat `None` as \"phase unknown\" and keep compatibility behavior for legacy models.","oneOf":[{"description":"Mid-turn assistant text (for example preamble/progress narration).\n\nAdditional tool calls or assistant output may follow before turn completion.","enum":["commentary"],"type":"string"},{"description":"The assistant's terminal answer text for the current turn.","enum":["final_answer"],"type":"string"}]};
-const schema756 = {"type":"string"};
-const schema757 = {"enum":["agent","userShell","unifiedExecStartup","unifiedExecInteraction"],"type":"string"};
-const schema758 = {"enum":["inProgress","completed","failed","declined"],"type":"string"};
-const schema761 = {"enum":["inProgress","completed","failed","declined"],"type":"string"};
-const schema762 = {"properties":{"actionName":{"type":["string","null"]},"appName":{"type":["string","null"]},"connectorId":{"type":"string"},"linkId":{"type":["string","null"]},"resourceUri":{"type":["string","null"]},"templateId":{"type":["string","null"]}},"required":["connectorId"],"type":"object"};
-const schema763 = {"properties":{"message":{"type":"string"}},"required":["message"],"type":"object"};
-const schema764 = {"properties":{"_meta":true,"content":{"items":true,"type":"array"},"structuredContent":true},"required":["content"],"type":"object"};
-const schema765 = {"enum":["inProgress","completed","failed"],"type":"string"};
-const schema766 = {"oneOf":[{"properties":{"text":{"type":"string"},"type":{"enum":["inputText"],"title":"InputTextDynamicToolCallOutputContentItemType","type":"string"}},"required":["text","type"],"title":"InputTextDynamicToolCallOutputContentItem","type":"object"},{"properties":{"imageUrl":{"type":"string"},"type":{"enum":["inputImage"],"title":"InputImageDynamicToolCallOutputContentItemType","type":"string"}},"required":["imageUrl","type"],"title":"InputImageDynamicToolCallOutputContentItem","type":"object"}]};
-const schema767 = {"enum":["inProgress","completed","failed"],"type":"string"};
-const schema770 = {"description":"A non-empty reasoning effort value advertised by the model.","minLength":1,"type":"string"};
-const schema771 = {"enum":["inProgress","completed","failed"],"type":"string"};
-const schema772 = {"enum":["spawnAgent","sendInput","resumeAgent","wait","closeAgent"],"type":"string"};
-const schema773 = {"enum":["started","interacted","interrupted"],"type":"string"};
-const schema774 = {"oneOf":[{"properties":{"queries":{"items":{"type":"string"},"type":["array","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchWebSearchActionType","type":"string"}},"required":["type"],"title":"SearchWebSearchAction","type":"object"},{"properties":{"type":{"enum":["openPage"],"title":"OpenPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"OpenPageWebSearchAction","type":"object"},{"properties":{"pattern":{"type":["string","null"]},"type":{"enum":["findInPage"],"title":"FindInPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"FindInPageWebSearchAction","type":"object"},{"properties":{"type":{"enum":["other"],"title":"OtherWebSearchActionType","type":"string"}},"required":["type"],"title":"OtherWebSearchAction","type":"object"}]};
-const schema755 = {"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"};
-const schema745 = {"oneOf":[{"properties":{"text":{"type":"string"},"text_elements":{"default":[],"description":"UI-defined spans within `text` used to render or persist special elements.","items":{"$ref":"#/definitions/TextElement"},"type":"array"},"type":{"enum":["text"],"title":"TextUserInputType","type":"string"}},"required":["text","type"],"title":"TextUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"type":{"enum":["image"],"title":"ImageUserInputType","type":"string"},"url":{"type":"string"}},"required":["type","url"],"title":"ImageUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"path":{"type":"string"},"type":{"enum":["localImage"],"title":"LocalImageUserInputType","type":"string"}},"required":["path","type"],"title":"LocalImageUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["skill"],"title":"SkillUserInputType","type":"string"}},"required":["name","path","type"],"title":"SkillUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["mention"],"title":"MentionUserInputType","type":"string"}},"required":["name","path","type"],"title":"MentionUserInput","type":"object"}]};
-const schema748 = {"enum":["auto","low","high","original"],"type":"string"};
-const schema746 = {"properties":{"byteRange":{"allOf":[{"$ref":"#/definitions/ByteRange"}],"description":"Byte range in the parent `text` buffer that this element occupies."},"placeholder":{"description":"Optional human-readable placeholder for the element, displayed in the UI.","type":["string","null"]}},"required":["byteRange"],"type":"object"};
-const schema747 = {"properties":{"end":{"minimum":0,"type":"integer","maximum":9007199254740991},"start":{"minimum":0,"type":"integer","maximum":9007199254740991}},"required":["end","start"],"type":"object"};
+const schema791 = {"oneOf":[{"properties":{"clientId":{"type":["string","null"]},"content":{"items":{"$ref":"#/definitions/UserInput"},"type":"array"},"id":{"type":"string"},"type":{"enum":["userMessage"],"title":"UserMessageThreadItemType","type":"string"}},"required":["content","id","type"],"title":"UserMessageThreadItem","type":"object"},{"properties":{"fragments":{"items":{"$ref":"#/definitions/HookPromptFragment"},"type":"array"},"id":{"type":"string"},"type":{"enum":["hookPrompt"],"title":"HookPromptThreadItemType","type":"string"}},"required":["fragments","id","type"],"title":"HookPromptThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"memoryCitation":{"anyOf":[{"$ref":"#/definitions/MemoryCitation"},{"type":"null"}],"default":null},"phase":{"anyOf":[{"$ref":"#/definitions/MessagePhase"},{"type":"null"}],"default":null},"text":{"type":"string"},"type":{"enum":["agentMessage"],"title":"AgentMessageThreadItemType","type":"string"}},"required":["id","text","type"],"title":"AgentMessageThreadItem","type":"object"},{"description":"EXPERIMENTAL - proposed plan item content. The completed plan item is authoritative and may not match the concatenation of `PlanDelta` text.","properties":{"id":{"type":"string"},"text":{"type":"string"},"type":{"enum":["plan"],"title":"PlanThreadItemType","type":"string"}},"required":["id","text","type"],"title":"PlanThreadItem","type":"object"},{"properties":{"content":{"default":[],"items":{"type":"string"},"type":"array"},"id":{"type":"string"},"summary":{"default":[],"items":{"type":"string"},"type":"array"},"type":{"enum":["reasoning"],"title":"ReasoningThreadItemType","type":"string"}},"required":["id","type"],"title":"ReasoningThreadItem","type":"object"},{"properties":{"aggregatedOutput":{"description":"The command's output, aggregated from stdout and stderr.","type":["string","null"]},"command":{"description":"The command to be executed.","type":"string"},"commandActions":{"description":"A best-effort parsing of the command to understand the action(s) it will perform. This returns a list of CommandAction objects because a single shell command may be composed of many commands piped together.","items":{"$ref":"#/definitions/CommandAction"},"type":"array"},"cwd":{"allOf":[{"$ref":"#/definitions/LegacyAppPathString"}],"description":"The command's working directory."},"durationMs":{"description":"The duration of the command execution in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"exitCode":{"description":"The command's exit code.","type":["integer","null"],"minimum":-2147483648,"maximum":2147483647},"id":{"type":"string"},"processId":{"description":"Identifier for the underlying PTY process (when available).","type":["string","null"]},"source":{"allOf":[{"$ref":"#/definitions/CommandExecutionSource"}],"default":"agent"},"status":{"$ref":"#/definitions/CommandExecutionStatus"},"type":{"enum":["commandExecution"],"title":"CommandExecutionThreadItemType","type":"string"}},"required":["command","commandActions","cwd","id","status","type"],"title":"CommandExecutionThreadItem","type":"object"},{"properties":{"changes":{"items":{"$ref":"#/definitions/FileUpdateChange"},"type":"array"},"id":{"type":"string"},"status":{"$ref":"#/definitions/PatchApplyStatus"},"type":{"enum":["fileChange"],"title":"FileChangeThreadItemType","type":"string"}},"required":["changes","id","status","type"],"title":"FileChangeThreadItem","type":"object"},{"properties":{"appContext":{"anyOf":[{"$ref":"#/definitions/McpToolCallAppContext"},{"type":"null"}]},"arguments":true,"durationMs":{"description":"The duration of the MCP tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/McpToolCallError"},{"type":"null"}]},"id":{"type":"string"},"mcpAppResourceUri":{"description":"Deprecated: use `appContext.resourceUri` instead.","type":["string","null"]},"pluginId":{"type":["string","null"]},"result":{"anyOf":[{"$ref":"#/definitions/McpToolCallResult"},{"type":"null"}]},"server":{"type":"string"},"status":{"$ref":"#/definitions/McpToolCallStatus"},"tool":{"type":"string"},"type":{"enum":["mcpToolCall"],"title":"McpToolCallThreadItemType","type":"string"}},"required":["arguments","id","server","status","tool","type"],"title":"McpToolCallThreadItem","type":"object"},{"properties":{"arguments":true,"contentItems":{"items":{"$ref":"#/definitions/DynamicToolCallOutputContentItem"},"type":["array","null"]},"durationMs":{"description":"The duration of the dynamic tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"id":{"type":"string"},"namespace":{"type":["string","null"]},"status":{"$ref":"#/definitions/DynamicToolCallStatus"},"success":{"type":["boolean","null"]},"tool":{"type":"string"},"type":{"enum":["dynamicToolCall"],"title":"DynamicToolCallThreadItemType","type":"string"}},"required":["arguments","id","status","tool","type"],"title":"DynamicToolCallThreadItem","type":"object"},{"properties":{"agentsStates":{"additionalProperties":{"$ref":"#/definitions/CollabAgentState"},"description":"Last known status of the target agents, when available.","type":"object"},"id":{"description":"Unique identifier for this collab tool call.","type":"string"},"model":{"description":"Model requested for the spawned agent, when applicable.","type":["string","null"]},"prompt":{"description":"Prompt text sent as part of the collab tool call, when available.","type":["string","null"]},"reasoningEffort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}],"description":"Reasoning effort requested for the spawned agent, when applicable."},"receiverThreadIds":{"description":"Thread ID of the receiving agent, when applicable. In case of spawn operation, this corresponds to the newly spawned agent.","items":{"type":"string"},"type":"array"},"senderThreadId":{"description":"Thread ID of the agent issuing the collab request.","type":"string"},"status":{"allOf":[{"$ref":"#/definitions/CollabAgentToolCallStatus"}],"description":"Current status of the collab tool call."},"tool":{"allOf":[{"$ref":"#/definitions/CollabAgentTool"}],"description":"Name of the collab tool that was invoked."},"type":{"enum":["collabAgentToolCall"],"title":"CollabAgentToolCallThreadItemType","type":"string"}},"required":["agentsStates","id","receiverThreadIds","senderThreadId","status","tool","type"],"title":"CollabAgentToolCallThreadItem","type":"object"},{"properties":{"agentPath":{"type":"string"},"agentThreadId":{"type":"string"},"id":{"type":"string"},"kind":{"$ref":"#/definitions/SubAgentActivityKind"},"type":{"enum":["subAgentActivity"],"title":"SubAgentActivityThreadItemType","type":"string"}},"required":["agentPath","agentThreadId","id","kind","type"],"title":"SubAgentActivityThreadItem","type":"object"},{"properties":{"action":{"anyOf":[{"$ref":"#/definitions/WebSearchAction"},{"type":"null"}]},"id":{"type":"string"},"query":{"type":"string"},"type":{"enum":["webSearch"],"title":"WebSearchThreadItemType","type":"string"}},"required":["id","query","type"],"title":"WebSearchThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"path":{"$ref":"#/definitions/LegacyAppPathString"},"type":{"enum":["imageView"],"title":"ImageViewThreadItemType","type":"string"}},"required":["id","path","type"],"title":"ImageViewThreadItem","type":"object"},{"properties":{"durationMs":{"minimum":0,"type":"integer","maximum":9007199254740991},"id":{"type":"string"},"type":{"enum":["sleep"],"title":"SleepThreadItemType","type":"string"}},"required":["durationMs","id","type"],"title":"SleepThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"result":{"type":"string"},"revisedPrompt":{"type":["string","null"]},"savedPath":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}]},"status":{"type":"string"},"type":{"enum":["imageGeneration"],"title":"ImageGenerationThreadItemType","type":"string"}},"required":["id","result","status","type"],"title":"ImageGenerationThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["enteredReviewMode"],"title":"EnteredReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"EnteredReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["exitedReviewMode"],"title":"ExitedReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"ExitedReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"type":{"enum":["contextCompaction"],"title":"ContextCompactionThreadItemType","type":"string"}},"required":["id","type"],"title":"ContextCompactionThreadItem","type":"object"}]};
+const schema797 = {"properties":{"hookRunId":{"type":"string"},"text":{"type":"string"}},"required":["hookRunId","text"],"type":"object"};
+const schema800 = {"description":"Classifies an assistant message as interim commentary or final answer text.\n\nProviders do not emit this consistently, so callers must treat `None` as \"phase unknown\" and keep compatibility behavior for legacy models.","oneOf":[{"description":"Mid-turn assistant text (for example preamble/progress narration).\n\nAdditional tool calls or assistant output may follow before turn completion.","enum":["commentary"],"type":"string"},{"description":"The assistant's terminal answer text for the current turn.","enum":["final_answer"],"type":"string"}]};
+const schema803 = {"type":"string"};
+const schema804 = {"enum":["agent","userShell","unifiedExecStartup","unifiedExecInteraction"],"type":"string"};
+const schema805 = {"enum":["inProgress","completed","failed","declined"],"type":"string"};
+const schema808 = {"enum":["inProgress","completed","failed","declined"],"type":"string"};
+const schema809 = {"properties":{"actionName":{"type":["string","null"]},"appName":{"type":["string","null"]},"connectorId":{"type":"string"},"linkId":{"type":["string","null"]},"resourceUri":{"type":["string","null"]},"templateId":{"type":["string","null"]}},"required":["connectorId"],"type":"object"};
+const schema810 = {"properties":{"message":{"type":"string"}},"required":["message"],"type":"object"};
+const schema811 = {"properties":{"_meta":true,"content":{"items":true,"type":"array"},"structuredContent":true},"required":["content"],"type":"object"};
+const schema812 = {"enum":["inProgress","completed","failed"],"type":"string"};
+const schema813 = {"oneOf":[{"properties":{"text":{"type":"string"},"type":{"enum":["inputText"],"title":"InputTextDynamicToolCallOutputContentItemType","type":"string"}},"required":["text","type"],"title":"InputTextDynamicToolCallOutputContentItem","type":"object"},{"properties":{"imageUrl":{"type":"string"},"type":{"enum":["inputImage"],"title":"InputImageDynamicToolCallOutputContentItemType","type":"string"}},"required":["imageUrl","type"],"title":"InputImageDynamicToolCallOutputContentItem","type":"object"}]};
+const schema814 = {"enum":["inProgress","completed","failed"],"type":"string"};
+const schema817 = {"description":"A non-empty reasoning effort value advertised by the model.","minLength":1,"type":"string"};
+const schema818 = {"enum":["inProgress","completed","failed"],"type":"string"};
+const schema819 = {"enum":["spawnAgent","sendInput","resumeAgent","wait","closeAgent"],"type":"string"};
+const schema820 = {"enum":["started","interacted","interrupted"],"type":"string"};
+const schema821 = {"oneOf":[{"properties":{"queries":{"items":{"type":"string"},"type":["array","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchWebSearchActionType","type":"string"}},"required":["type"],"title":"SearchWebSearchAction","type":"object"},{"properties":{"type":{"enum":["openPage"],"title":"OpenPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"OpenPageWebSearchAction","type":"object"},{"properties":{"pattern":{"type":["string","null"]},"type":{"enum":["findInPage"],"title":"FindInPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"FindInPageWebSearchAction","type":"object"},{"properties":{"type":{"enum":["other"],"title":"OtherWebSearchActionType","type":"string"}},"required":["type"],"title":"OtherWebSearchAction","type":"object"}]};
+const schema802 = {"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"};
+const schema792 = {"oneOf":[{"properties":{"text":{"type":"string"},"text_elements":{"default":[],"description":"UI-defined spans within `text` used to render or persist special elements.","items":{"$ref":"#/definitions/TextElement"},"type":"array"},"type":{"enum":["text"],"title":"TextUserInputType","type":"string"}},"required":["text","type"],"title":"TextUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"type":{"enum":["image"],"title":"ImageUserInputType","type":"string"},"url":{"type":"string"}},"required":["type","url"],"title":"ImageUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"path":{"type":"string"},"type":{"enum":["localImage"],"title":"LocalImageUserInputType","type":"string"}},"required":["path","type"],"title":"LocalImageUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["skill"],"title":"SkillUserInputType","type":"string"}},"required":["name","path","type"],"title":"SkillUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["mention"],"title":"MentionUserInputType","type":"string"}},"required":["name","path","type"],"title":"MentionUserInput","type":"object"}]};
+const schema795 = {"enum":["auto","low","high","original"],"type":"string"};
+const schema793 = {"properties":{"byteRange":{"allOf":[{"$ref":"#/definitions/ByteRange"}],"description":"Byte range in the parent `text` buffer that this element occupies."},"placeholder":{"description":"Optional human-readable placeholder for the element, displayed in the UI.","type":["string","null"]}},"required":["byteRange"],"type":"object"};
+const schema794 = {"properties":{"end":{"minimum":0,"type":"integer","maximum":9007199254740991},"start":{"minimum":0,"type":"integer","maximum":9007199254740991}},"required":["end","start"],"type":"object"};
 
-function validate485(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate525(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -98926,7 +103985,7 @@ errors++;
 if(data.placeholder !== undefined){
 let data3 = data.placeholder;
 if((typeof data3 !== "string") && (data3 !== null)){
-const err10 = {instancePath:instancePath+"/placeholder",schemaPath:"#/properties/placeholder/type",keyword:"type",params:{type: schema746.properties.placeholder.type},message:"must be string,null"};
+const err10 = {instancePath:instancePath+"/placeholder",schemaPath:"#/properties/placeholder/type",keyword:"type",params:{type: schema793.properties.placeholder.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -98947,12 +104006,12 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate485.errors = vErrors;
+validate525.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate484(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate524(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 const _errs0 = errors;
@@ -98997,8 +104056,8 @@ let data1 = data.text_elements;
 if(Array.isArray(data1)){
 const len0 = data1.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate485(data1[i0], {instancePath:instancePath+"/text_elements/" + i0,parentData:data1,parentDataProperty:i0,rootData}))){
-vErrors = vErrors === null ? validate485.errors : vErrors.concat(validate485.errors);
+if(!(validate525(data1[i0], {instancePath:instancePath+"/text_elements/" + i0,parentData:data1,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate525.errors : vErrors.concat(validate525.errors);
 errors = vErrors.length;
 }
 }
@@ -99027,7 +104086,7 @@ vErrors.push(err4);
 errors++;
 }
 if(!(data3 === "text")){
-const err5 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema745.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err5 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema792.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err5];
 }
@@ -99091,7 +104150,7 @@ vErrors.push(err9);
 errors++;
 }
 if(!((((data4 === "auto") || (data4 === "low")) || (data4 === "high")) || (data4 === "original"))){
-const err10 = {instancePath:instancePath+"/detail",schemaPath:"#/definitions/ImageDetail/enum",keyword:"enum",params:{allowedValues: schema748.enum},message:"must be equal to one of the allowed values"};
+const err10 = {instancePath:instancePath+"/detail",schemaPath:"#/definitions/ImageDetail/enum",keyword:"enum",params:{allowedValues: schema795.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -99152,7 +104211,7 @@ vErrors.push(err13);
 errors++;
 }
 if(!(data5 === "image")){
-const err14 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema745.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err14 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema792.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err14];
 }
@@ -99233,7 +104292,7 @@ vErrors.push(err19);
 errors++;
 }
 if(!((((data7 === "auto") || (data7 === "low")) || (data7 === "high")) || (data7 === "original"))){
-const err20 = {instancePath:instancePath+"/detail",schemaPath:"#/definitions/ImageDetail/enum",keyword:"enum",params:{allowedValues: schema748.enum},message:"must be equal to one of the allowed values"};
+const err20 = {instancePath:instancePath+"/detail",schemaPath:"#/definitions/ImageDetail/enum",keyword:"enum",params:{allowedValues: schema795.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -99306,7 +104365,7 @@ vErrors.push(err24);
 errors++;
 }
 if(!(data9 === "localImage")){
-const err25 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema745.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err25 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema792.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err25];
 }
@@ -99406,7 +104465,7 @@ vErrors.push(err32);
 errors++;
 }
 if(!(data12 === "skill")){
-const err33 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema745.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err33 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema792.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err33];
 }
@@ -99506,7 +104565,7 @@ vErrors.push(err40);
 errors++;
 }
 if(!(data15 === "mention")){
-const err41 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/enum",keyword:"enum",params:{allowedValues: schema745.oneOf[4].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err41 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/enum",keyword:"enum",params:{allowedValues: schema792.oneOf[4].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err41];
 }
@@ -99562,14 +104621,14 @@ vErrors = null;
 }
 }
 }
-validate484.errors = vErrors;
+validate524.errors = vErrors;
 return errors === 0;
 }
 
-const schema751 = {"properties":{"entries":{"items":{"$ref":"#/definitions/MemoryCitationEntry"},"type":"array"},"threadIds":{"items":{"type":"string"},"type":"array"}},"required":["entries","threadIds"],"type":"object"};
-const schema752 = {"properties":{"lineEnd":{"minimum":0,"type":"integer","maximum":4294967295},"lineStart":{"minimum":0,"type":"integer","maximum":4294967295},"note":{"type":"string"},"path":{"type":"string"}},"required":["lineEnd","lineStart","note","path"],"type":"object"};
+const schema798 = {"properties":{"entries":{"items":{"$ref":"#/definitions/MemoryCitationEntry"},"type":"array"},"threadIds":{"items":{"type":"string"},"type":"array"}},"required":["entries","threadIds"],"type":"object"};
+const schema799 = {"properties":{"lineEnd":{"minimum":0,"type":"integer","maximum":4294967295},"lineStart":{"minimum":0,"type":"integer","maximum":4294967295},"note":{"type":"string"},"path":{"type":"string"}},"required":["lineEnd","lineStart","note","path"],"type":"object"};
 
-function validate488(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate528(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -99797,13 +104856,13 @@ vErrors.push(err18);
 }
 errors++;
 }
-validate488.errors = vErrors;
+validate528.errors = vErrors;
 return errors === 0;
 }
 
-const schema754 = {"oneOf":[{"properties":{"command":{"type":"string"},"name":{"type":"string"},"path":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["read"],"title":"ReadCommandActionType","type":"string"}},"required":["command","name","path","type"],"title":"ReadCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"type":{"enum":["listFiles"],"title":"ListFilesCommandActionType","type":"string"}},"required":["command","type"],"title":"ListFilesCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchCommandActionType","type":"string"}},"required":["command","type"],"title":"SearchCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"type":{"enum":["unknown"],"title":"UnknownCommandActionType","type":"string"}},"required":["command","type"],"title":"UnknownCommandAction","type":"object"}]};
+const schema801 = {"oneOf":[{"properties":{"command":{"type":"string"},"name":{"type":"string"},"path":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["read"],"title":"ReadCommandActionType","type":"string"}},"required":["command","name","path","type"],"title":"ReadCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"type":{"enum":["listFiles"],"title":"ListFilesCommandActionType","type":"string"}},"required":["command","type"],"title":"ListFilesCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchCommandActionType","type":"string"}},"required":["command","type"],"title":"SearchCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"type":{"enum":["unknown"],"title":"UnknownCommandActionType","type":"string"}},"required":["command","type"],"title":"UnknownCommandAction","type":"object"}]};
 
-function validate490(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate530(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 const _errs0 = errors;
@@ -99900,7 +104959,7 @@ vErrors.push(err7);
 errors++;
 }
 if(!(data3 === "read")){
-const err8 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema754.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err8 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema801.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err8];
 }
@@ -99963,7 +105022,7 @@ errors++;
 if(data.path !== undefined){
 let data5 = data.path;
 if((typeof data5 !== "string") && (data5 !== null)){
-const err13 = {instancePath:instancePath+"/path",schemaPath:"#/oneOf/1/properties/path/type",keyword:"type",params:{type: schema754.oneOf[1].properties.path.type},message:"must be string,null"};
+const err13 = {instancePath:instancePath+"/path",schemaPath:"#/oneOf/1/properties/path/type",keyword:"type",params:{type: schema801.oneOf[1].properties.path.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -99986,7 +105045,7 @@ vErrors.push(err14);
 errors++;
 }
 if(!(data6 === "listFiles")){
-const err15 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema754.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err15 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema801.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err15];
 }
@@ -100054,7 +105113,7 @@ errors++;
 if(data.path !== undefined){
 let data8 = data.path;
 if((typeof data8 !== "string") && (data8 !== null)){
-const err20 = {instancePath:instancePath+"/path",schemaPath:"#/oneOf/2/properties/path/type",keyword:"type",params:{type: schema754.oneOf[2].properties.path.type},message:"must be string,null"};
+const err20 = {instancePath:instancePath+"/path",schemaPath:"#/oneOf/2/properties/path/type",keyword:"type",params:{type: schema801.oneOf[2].properties.path.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -100067,7 +105126,7 @@ errors++;
 if(data.query !== undefined){
 let data9 = data.query;
 if((typeof data9 !== "string") && (data9 !== null)){
-const err21 = {instancePath:instancePath+"/query",schemaPath:"#/oneOf/2/properties/query/type",keyword:"type",params:{type: schema754.oneOf[2].properties.query.type},message:"must be string,null"};
+const err21 = {instancePath:instancePath+"/query",schemaPath:"#/oneOf/2/properties/query/type",keyword:"type",params:{type: schema801.oneOf[2].properties.query.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err21];
 }
@@ -100090,7 +105149,7 @@ vErrors.push(err22);
 errors++;
 }
 if(!(data10 === "search")){
-const err23 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema754.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err23 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema801.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err23];
 }
@@ -100168,7 +105227,7 @@ vErrors.push(err28);
 errors++;
 }
 if(!(data12 === "unknown")){
-const err29 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema754.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err29 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema801.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err29];
 }
@@ -100223,14 +105282,14 @@ vErrors = null;
 }
 }
 }
-validate490.errors = vErrors;
+validate530.errors = vErrors;
 return errors === 0;
 }
 
-const schema759 = {"properties":{"diff":{"type":"string"},"kind":{"$ref":"#/definitions/PatchChangeKind"},"path":{"type":"string"}},"required":["diff","kind","path"],"type":"object"};
-const schema760 = {"oneOf":[{"properties":{"type":{"enum":["add"],"title":"AddPatchChangeKindType","type":"string"}},"required":["type"],"title":"AddPatchChangeKind","type":"object"},{"properties":{"type":{"enum":["delete"],"title":"DeletePatchChangeKindType","type":"string"}},"required":["type"],"title":"DeletePatchChangeKind","type":"object"},{"properties":{"move_path":{"type":["string","null"]},"type":{"enum":["update"],"title":"UpdatePatchChangeKindType","type":"string"}},"required":["type"],"title":"UpdatePatchChangeKind","type":"object"}]};
+const schema806 = {"properties":{"diff":{"type":"string"},"kind":{"$ref":"#/definitions/PatchChangeKind"},"path":{"type":"string"}},"required":["diff","kind","path"],"type":"object"};
+const schema807 = {"oneOf":[{"properties":{"type":{"enum":["add"],"title":"AddPatchChangeKindType","type":"string"}},"required":["type"],"title":"AddPatchChangeKind","type":"object"},{"properties":{"type":{"enum":["delete"],"title":"DeletePatchChangeKindType","type":"string"}},"required":["type"],"title":"DeletePatchChangeKind","type":"object"},{"properties":{"move_path":{"type":["string","null"]},"type":{"enum":["update"],"title":"UpdatePatchChangeKindType","type":"string"}},"required":["type"],"title":"UpdatePatchChangeKind","type":"object"}]};
 
-function validate492(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate532(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -100306,7 +105365,7 @@ vErrors.push(err5);
 errors++;
 }
 if(!(data2 === "add")){
-const err6 = {instancePath:instancePath+"/kind/type",schemaPath:"#/definitions/PatchChangeKind/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema760.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err6 = {instancePath:instancePath+"/kind/type",schemaPath:"#/definitions/PatchChangeKind/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err6];
 }
@@ -100357,7 +105416,7 @@ vErrors.push(err9);
 errors++;
 }
 if(!(data3 === "delete")){
-const err10 = {instancePath:instancePath+"/kind/type",schemaPath:"#/definitions/PatchChangeKind/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema760.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err10 = {instancePath:instancePath+"/kind/type",schemaPath:"#/definitions/PatchChangeKind/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -100403,7 +105462,7 @@ errors++;
 if(data1.move_path !== undefined){
 let data4 = data1.move_path;
 if((typeof data4 !== "string") && (data4 !== null)){
-const err13 = {instancePath:instancePath+"/kind/move_path",schemaPath:"#/definitions/PatchChangeKind/oneOf/2/properties/move_path/type",keyword:"type",params:{type: schema760.oneOf[2].properties.move_path.type},message:"must be string,null"};
+const err13 = {instancePath:instancePath+"/kind/move_path",schemaPath:"#/definitions/PatchChangeKind/oneOf/2/properties/move_path/type",keyword:"type",params:{type: schema807.oneOf[2].properties.move_path.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -100426,7 +105485,7 @@ vErrors.push(err14);
 errors++;
 }
 if(!(data5 === "update")){
-const err15 = {instancePath:instancePath+"/kind/type",schemaPath:"#/definitions/PatchChangeKind/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema760.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err15 = {instancePath:instancePath+"/kind/type",schemaPath:"#/definitions/PatchChangeKind/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err15];
 }
@@ -100504,14 +105563,14 @@ vErrors.push(err19);
 }
 errors++;
 }
-validate492.errors = vErrors;
+validate532.errors = vErrors;
 return errors === 0;
 }
 
-const schema768 = {"properties":{"message":{"type":["string","null"]},"status":{"$ref":"#/definitions/CollabAgentStatus"}},"required":["status"],"type":"object"};
-const schema769 = {"enum":["pendingInit","running","interrupted","completed","errored","shutdown","notFound"],"type":"string"};
+const schema815 = {"properties":{"message":{"type":["string","null"]},"status":{"$ref":"#/definitions/CollabAgentStatus"}},"required":["status"],"type":"object"};
+const schema816 = {"enum":["pendingInit","running","interrupted","completed","errored","shutdown","notFound"],"type":"string"};
 
-function validate494(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate534(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -100528,7 +105587,7 @@ errors++;
 if(data.message !== undefined){
 let data0 = data.message;
 if((typeof data0 !== "string") && (data0 !== null)){
-const err1 = {instancePath:instancePath+"/message",schemaPath:"#/properties/message/type",keyword:"type",params:{type: schema768.properties.message.type},message:"must be string,null"};
+const err1 = {instancePath:instancePath+"/message",schemaPath:"#/properties/message/type",keyword:"type",params:{type: schema815.properties.message.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err1];
 }
@@ -100551,7 +105610,7 @@ vErrors.push(err2);
 errors++;
 }
 if(!(((((((data1 === "pendingInit") || (data1 === "running")) || (data1 === "interrupted")) || (data1 === "completed")) || (data1 === "errored")) || (data1 === "shutdown")) || (data1 === "notFound"))){
-const err3 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/CollabAgentStatus/enum",keyword:"enum",params:{allowedValues: schema769.enum},message:"must be equal to one of the allowed values"};
+const err3 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/CollabAgentStatus/enum",keyword:"enum",params:{allowedValues: schema816.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err3];
 }
@@ -100572,12 +105631,12 @@ vErrors.push(err4);
 }
 errors++;
 }
-validate494.errors = vErrors;
+validate534.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate483(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate523(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 const _errs0 = errors;
@@ -100618,7 +105677,7 @@ errors++;
 if(data.clientId !== undefined){
 let data0 = data.clientId;
 if((typeof data0 !== "string") && (data0 !== null)){
-const err3 = {instancePath:instancePath+"/clientId",schemaPath:"#/oneOf/0/properties/clientId/type",keyword:"type",params:{type: schema744.oneOf[0].properties.clientId.type},message:"must be string,null"};
+const err3 = {instancePath:instancePath+"/clientId",schemaPath:"#/oneOf/0/properties/clientId/type",keyword:"type",params:{type: schema791.oneOf[0].properties.clientId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err3];
 }
@@ -100633,8 +105692,8 @@ let data1 = data.content;
 if(Array.isArray(data1)){
 const len0 = data1.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate484(data1[i0], {instancePath:instancePath+"/content/" + i0,parentData:data1,parentDataProperty:i0,rootData}))){
-vErrors = vErrors === null ? validate484.errors : vErrors.concat(validate484.errors);
+if(!(validate524(data1[i0], {instancePath:instancePath+"/content/" + i0,parentData:data1,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate524.errors : vErrors.concat(validate524.errors);
 errors = vErrors.length;
 }
 }
@@ -100675,7 +105734,7 @@ vErrors.push(err6);
 errors++;
 }
 if(!(data4 === "userMessage")){
-const err7 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err7 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err7];
 }
@@ -100833,7 +105892,7 @@ vErrors.push(err19);
 errors++;
 }
 if(!(data10 === "hookPrompt")){
-const err20 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err20 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -100913,8 +105972,8 @@ let data12 = data.memoryCitation;
 const _errs32 = errors;
 let valid10 = false;
 const _errs33 = errors;
-if(!(validate488(data12, {instancePath:instancePath+"/memoryCitation",parentData:data,parentDataProperty:"memoryCitation",rootData}))){
-vErrors = vErrors === null ? validate488.errors : vErrors.concat(validate488.errors);
+if(!(validate528(data12, {instancePath:instancePath+"/memoryCitation",parentData:data,parentDataProperty:"memoryCitation",rootData}))){
+vErrors = vErrors === null ? validate528.errors : vErrors.concat(validate528.errors);
 errors = vErrors.length;
 }
 var _valid1 = _errs33 === errors;
@@ -100976,7 +106035,7 @@ vErrors.push(err28);
 errors++;
 }
 if(!(data13 === "commentary")){
-const err29 = {instancePath:instancePath+"/phase",schemaPath:"#/definitions/MessagePhase/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema753.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+const err29 = {instancePath:instancePath+"/phase",schemaPath:"#/definitions/MessagePhase/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema800.oneOf[0].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err29];
 }
@@ -101002,7 +106061,7 @@ vErrors.push(err30);
 errors++;
 }
 if(!(data13 === "final_answer")){
-const err31 = {instancePath:instancePath+"/phase",schemaPath:"#/definitions/MessagePhase/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema753.oneOf[1].enum},message:"must be equal to one of the allowed values"};
+const err31 = {instancePath:instancePath+"/phase",schemaPath:"#/definitions/MessagePhase/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema800.oneOf[1].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err31];
 }
@@ -101107,7 +106166,7 @@ vErrors.push(err36);
 errors++;
 }
 if(!(data15 === "agentMessage")){
-const err37 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err37 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err37];
 }
@@ -101207,7 +106266,7 @@ vErrors.push(err44);
 errors++;
 }
 if(!(data18 === "plan")){
-const err45 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err45 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err45];
 }
@@ -101341,7 +106400,7 @@ vErrors.push(err54);
 errors++;
 }
 if(!(data24 === "reasoning")){
-const err55 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[4].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err55 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[4].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err55];
 }
@@ -101437,7 +106496,7 @@ errors++;
 if(data.aggregatedOutput !== undefined){
 let data25 = data.aggregatedOutput;
 if((typeof data25 !== "string") && (data25 !== null)){
-const err63 = {instancePath:instancePath+"/aggregatedOutput",schemaPath:"#/oneOf/5/properties/aggregatedOutput/type",keyword:"type",params:{type: schema744.oneOf[5].properties.aggregatedOutput.type},message:"must be string,null"};
+const err63 = {instancePath:instancePath+"/aggregatedOutput",schemaPath:"#/oneOf/5/properties/aggregatedOutput/type",keyword:"type",params:{type: schema791.oneOf[5].properties.aggregatedOutput.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err63];
 }
@@ -101464,8 +106523,8 @@ let data27 = data.commandActions;
 if(Array.isArray(data27)){
 const len4 = data27.length;
 for(let i4=0; i4<len4; i4++){
-if(!(validate490(data27[i4], {instancePath:instancePath+"/commandActions/" + i4,parentData:data27,parentDataProperty:i4,rootData}))){
-vErrors = vErrors === null ? validate490.errors : vErrors.concat(validate490.errors);
+if(!(validate530(data27[i4], {instancePath:instancePath+"/commandActions/" + i4,parentData:data27,parentDataProperty:i4,rootData}))){
+vErrors = vErrors === null ? validate530.errors : vErrors.concat(validate530.errors);
 errors = vErrors.length;
 }
 }
@@ -101496,7 +106555,7 @@ errors++;
 if(data.durationMs !== undefined){
 let data30 = data.durationMs;
 if((!(((typeof data30 == "number") && (!(data30 % 1) && !isNaN(data30))) && (isFinite(data30)))) && (data30 !== null)){
-const err67 = {instancePath:instancePath+"/durationMs",schemaPath:"#/oneOf/5/properties/durationMs/type",keyword:"type",params:{type: schema744.oneOf[5].properties.durationMs.type},message:"must be integer,null"};
+const err67 = {instancePath:instancePath+"/durationMs",schemaPath:"#/oneOf/5/properties/durationMs/type",keyword:"type",params:{type: schema791.oneOf[5].properties.durationMs.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err67];
 }
@@ -101531,7 +106590,7 @@ errors++;
 if(data.exitCode !== undefined){
 let data31 = data.exitCode;
 if((!(((typeof data31 == "number") && (!(data31 % 1) && !isNaN(data31))) && (isFinite(data31)))) && (data31 !== null)){
-const err70 = {instancePath:instancePath+"/exitCode",schemaPath:"#/oneOf/5/properties/exitCode/type",keyword:"type",params:{type: schema744.oneOf[5].properties.exitCode.type},message:"must be integer,null"};
+const err70 = {instancePath:instancePath+"/exitCode",schemaPath:"#/oneOf/5/properties/exitCode/type",keyword:"type",params:{type: schema791.oneOf[5].properties.exitCode.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err70];
 }
@@ -101578,7 +106637,7 @@ errors++;
 if(data.processId !== undefined){
 let data33 = data.processId;
 if((typeof data33 !== "string") && (data33 !== null)){
-const err74 = {instancePath:instancePath+"/processId",schemaPath:"#/oneOf/5/properties/processId/type",keyword:"type",params:{type: schema744.oneOf[5].properties.processId.type},message:"must be string,null"};
+const err74 = {instancePath:instancePath+"/processId",schemaPath:"#/oneOf/5/properties/processId/type",keyword:"type",params:{type: schema791.oneOf[5].properties.processId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err74];
 }
@@ -101601,7 +106660,7 @@ vErrors.push(err75);
 errors++;
 }
 if(!((((data34 === "agent") || (data34 === "userShell")) || (data34 === "unifiedExecStartup")) || (data34 === "unifiedExecInteraction"))){
-const err76 = {instancePath:instancePath+"/source",schemaPath:"#/definitions/CommandExecutionSource/enum",keyword:"enum",params:{allowedValues: schema757.enum},message:"must be equal to one of the allowed values"};
+const err76 = {instancePath:instancePath+"/source",schemaPath:"#/definitions/CommandExecutionSource/enum",keyword:"enum",params:{allowedValues: schema804.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err76];
 }
@@ -101624,7 +106683,7 @@ vErrors.push(err77);
 errors++;
 }
 if(!((((data35 === "inProgress") || (data35 === "completed")) || (data35 === "failed")) || (data35 === "declined"))){
-const err78 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/CommandExecutionStatus/enum",keyword:"enum",params:{allowedValues: schema758.enum},message:"must be equal to one of the allowed values"};
+const err78 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/CommandExecutionStatus/enum",keyword:"enum",params:{allowedValues: schema805.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err78];
 }
@@ -101647,7 +106706,7 @@ vErrors.push(err79);
 errors++;
 }
 if(!(data36 === "commandExecution")){
-const err80 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/5/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[5].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err80 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/5/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[5].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err80];
 }
@@ -101725,8 +106784,8 @@ let data37 = data.changes;
 if(Array.isArray(data37)){
 const len5 = data37.length;
 for(let i5=0; i5<len5; i5++){
-if(!(validate492(data37[i5], {instancePath:instancePath+"/changes/" + i5,parentData:data37,parentDataProperty:i5,rootData}))){
-vErrors = vErrors === null ? validate492.errors : vErrors.concat(validate492.errors);
+if(!(validate532(data37[i5], {instancePath:instancePath+"/changes/" + i5,parentData:data37,parentDataProperty:i5,rootData}))){
+vErrors = vErrors === null ? validate532.errors : vErrors.concat(validate532.errors);
 errors = vErrors.length;
 }
 }
@@ -101767,7 +106826,7 @@ vErrors.push(err88);
 errors++;
 }
 if(!((((data40 === "inProgress") || (data40 === "completed")) || (data40 === "failed")) || (data40 === "declined"))){
-const err89 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/PatchApplyStatus/enum",keyword:"enum",params:{allowedValues: schema761.enum},message:"must be equal to one of the allowed values"};
+const err89 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/PatchApplyStatus/enum",keyword:"enum",params:{allowedValues: schema808.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err89];
 }
@@ -101790,7 +106849,7 @@ vErrors.push(err90);
 errors++;
 }
 if(!(data41 === "fileChange")){
-const err91 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/6/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[6].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err91 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/6/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[6].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err91];
 }
@@ -101902,7 +106961,7 @@ errors++;
 if(data42.actionName !== undefined){
 let data43 = data42.actionName;
 if((typeof data43 !== "string") && (data43 !== null)){
-const err100 = {instancePath:instancePath+"/appContext/actionName",schemaPath:"#/definitions/McpToolCallAppContext/properties/actionName/type",keyword:"type",params:{type: schema762.properties.actionName.type},message:"must be string,null"};
+const err100 = {instancePath:instancePath+"/appContext/actionName",schemaPath:"#/definitions/McpToolCallAppContext/properties/actionName/type",keyword:"type",params:{type: schema809.properties.actionName.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err100];
 }
@@ -101915,7 +106974,7 @@ errors++;
 if(data42.appName !== undefined){
 let data44 = data42.appName;
 if((typeof data44 !== "string") && (data44 !== null)){
-const err101 = {instancePath:instancePath+"/appContext/appName",schemaPath:"#/definitions/McpToolCallAppContext/properties/appName/type",keyword:"type",params:{type: schema762.properties.appName.type},message:"must be string,null"};
+const err101 = {instancePath:instancePath+"/appContext/appName",schemaPath:"#/definitions/McpToolCallAppContext/properties/appName/type",keyword:"type",params:{type: schema809.properties.appName.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err101];
 }
@@ -101940,7 +106999,7 @@ errors++;
 if(data42.linkId !== undefined){
 let data46 = data42.linkId;
 if((typeof data46 !== "string") && (data46 !== null)){
-const err103 = {instancePath:instancePath+"/appContext/linkId",schemaPath:"#/definitions/McpToolCallAppContext/properties/linkId/type",keyword:"type",params:{type: schema762.properties.linkId.type},message:"must be string,null"};
+const err103 = {instancePath:instancePath+"/appContext/linkId",schemaPath:"#/definitions/McpToolCallAppContext/properties/linkId/type",keyword:"type",params:{type: schema809.properties.linkId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err103];
 }
@@ -101953,7 +107012,7 @@ errors++;
 if(data42.resourceUri !== undefined){
 let data47 = data42.resourceUri;
 if((typeof data47 !== "string") && (data47 !== null)){
-const err104 = {instancePath:instancePath+"/appContext/resourceUri",schemaPath:"#/definitions/McpToolCallAppContext/properties/resourceUri/type",keyword:"type",params:{type: schema762.properties.resourceUri.type},message:"must be string,null"};
+const err104 = {instancePath:instancePath+"/appContext/resourceUri",schemaPath:"#/definitions/McpToolCallAppContext/properties/resourceUri/type",keyword:"type",params:{type: schema809.properties.resourceUri.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err104];
 }
@@ -101966,7 +107025,7 @@ errors++;
 if(data42.templateId !== undefined){
 let data48 = data42.templateId;
 if((typeof data48 !== "string") && (data48 !== null)){
-const err105 = {instancePath:instancePath+"/appContext/templateId",schemaPath:"#/definitions/McpToolCallAppContext/properties/templateId/type",keyword:"type",params:{type: schema762.properties.templateId.type},message:"must be string,null"};
+const err105 = {instancePath:instancePath+"/appContext/templateId",schemaPath:"#/definitions/McpToolCallAppContext/properties/templateId/type",keyword:"type",params:{type: schema809.properties.templateId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err105];
 }
@@ -102029,7 +107088,7 @@ vErrors = null;
 if(data.durationMs !== undefined){
 let data49 = data.durationMs;
 if((!(((typeof data49 == "number") && (!(data49 % 1) && !isNaN(data49))) && (isFinite(data49)))) && (data49 !== null)){
-const err109 = {instancePath:instancePath+"/durationMs",schemaPath:"#/oneOf/7/properties/durationMs/type",keyword:"type",params:{type: schema744.oneOf[7].properties.durationMs.type},message:"must be integer,null"};
+const err109 = {instancePath:instancePath+"/durationMs",schemaPath:"#/oneOf/7/properties/durationMs/type",keyword:"type",params:{type: schema791.oneOf[7].properties.durationMs.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err109];
 }
@@ -102154,7 +107213,7 @@ errors++;
 if(data.mcpAppResourceUri !== undefined){
 let data53 = data.mcpAppResourceUri;
 if((typeof data53 !== "string") && (data53 !== null)){
-const err118 = {instancePath:instancePath+"/mcpAppResourceUri",schemaPath:"#/oneOf/7/properties/mcpAppResourceUri/type",keyword:"type",params:{type: schema744.oneOf[7].properties.mcpAppResourceUri.type},message:"must be string,null"};
+const err118 = {instancePath:instancePath+"/mcpAppResourceUri",schemaPath:"#/oneOf/7/properties/mcpAppResourceUri/type",keyword:"type",params:{type: schema791.oneOf[7].properties.mcpAppResourceUri.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err118];
 }
@@ -102167,7 +107226,7 @@ errors++;
 if(data.pluginId !== undefined){
 let data54 = data.pluginId;
 if((typeof data54 !== "string") && (data54 !== null)){
-const err119 = {instancePath:instancePath+"/pluginId",schemaPath:"#/oneOf/7/properties/pluginId/type",keyword:"type",params:{type: schema744.oneOf[7].properties.pluginId.type},message:"must be string,null"};
+const err119 = {instancePath:instancePath+"/pluginId",schemaPath:"#/oneOf/7/properties/pluginId/type",keyword:"type",params:{type: schema791.oneOf[7].properties.pluginId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err119];
 }
@@ -102280,7 +107339,7 @@ vErrors.push(err126);
 errors++;
 }
 if(!(((data58 === "inProgress") || (data58 === "completed")) || (data58 === "failed"))){
-const err127 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/McpToolCallStatus/enum",keyword:"enum",params:{allowedValues: schema765.enum},message:"must be equal to one of the allowed values"};
+const err127 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/McpToolCallStatus/enum",keyword:"enum",params:{allowedValues: schema812.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err127];
 }
@@ -102315,7 +107374,7 @@ vErrors.push(err129);
 errors++;
 }
 if(!(data60 === "mcpToolCall")){
-const err130 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/7/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[7].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err130 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/7/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[7].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err130];
 }
@@ -102401,7 +107460,7 @@ errors++;
 if(data.contentItems !== undefined){
 let data61 = data.contentItems;
 if((!(Array.isArray(data61))) && (data61 !== null)){
-const err137 = {instancePath:instancePath+"/contentItems",schemaPath:"#/oneOf/8/properties/contentItems/type",keyword:"type",params:{type: schema744.oneOf[8].properties.contentItems.type},message:"must be array,null"};
+const err137 = {instancePath:instancePath+"/contentItems",schemaPath:"#/oneOf/8/properties/contentItems/type",keyword:"type",params:{type: schema791.oneOf[8].properties.contentItems.type},message:"must be array,null"};
 if(vErrors === null){
 vErrors = [err137];
 }
@@ -102464,7 +107523,7 @@ vErrors.push(err141);
 errors++;
 }
 if(!(data64 === "inputText")){
-const err142 = {instancePath:instancePath+"/contentItems/" + i6+"/type",schemaPath:"#/definitions/DynamicToolCallOutputContentItem/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema766.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err142 = {instancePath:instancePath+"/contentItems/" + i6+"/type",schemaPath:"#/definitions/DynamicToolCallOutputContentItem/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema813.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err142];
 }
@@ -102537,7 +107596,7 @@ vErrors.push(err147);
 errors++;
 }
 if(!(data66 === "inputImage")){
-const err148 = {instancePath:instancePath+"/contentItems/" + i6+"/type",schemaPath:"#/definitions/DynamicToolCallOutputContentItem/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema766.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err148 = {instancePath:instancePath+"/contentItems/" + i6+"/type",schemaPath:"#/definitions/DynamicToolCallOutputContentItem/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema813.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err148];
 }
@@ -102596,7 +107655,7 @@ vErrors = null;
 if(data.durationMs !== undefined){
 let data67 = data.durationMs;
 if((!(((typeof data67 == "number") && (!(data67 % 1) && !isNaN(data67))) && (isFinite(data67)))) && (data67 !== null)){
-const err151 = {instancePath:instancePath+"/durationMs",schemaPath:"#/oneOf/8/properties/durationMs/type",keyword:"type",params:{type: schema744.oneOf[8].properties.durationMs.type},message:"must be integer,null"};
+const err151 = {instancePath:instancePath+"/durationMs",schemaPath:"#/oneOf/8/properties/durationMs/type",keyword:"type",params:{type: schema791.oneOf[8].properties.durationMs.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err151];
 }
@@ -102643,7 +107702,7 @@ errors++;
 if(data.namespace !== undefined){
 let data69 = data.namespace;
 if((typeof data69 !== "string") && (data69 !== null)){
-const err155 = {instancePath:instancePath+"/namespace",schemaPath:"#/oneOf/8/properties/namespace/type",keyword:"type",params:{type: schema744.oneOf[8].properties.namespace.type},message:"must be string,null"};
+const err155 = {instancePath:instancePath+"/namespace",schemaPath:"#/oneOf/8/properties/namespace/type",keyword:"type",params:{type: schema791.oneOf[8].properties.namespace.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err155];
 }
@@ -102666,7 +107725,7 @@ vErrors.push(err156);
 errors++;
 }
 if(!(((data70 === "inProgress") || (data70 === "completed")) || (data70 === "failed"))){
-const err157 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/DynamicToolCallStatus/enum",keyword:"enum",params:{allowedValues: schema767.enum},message:"must be equal to one of the allowed values"};
+const err157 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/DynamicToolCallStatus/enum",keyword:"enum",params:{allowedValues: schema814.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err157];
 }
@@ -102679,7 +107738,7 @@ errors++;
 if(data.success !== undefined){
 let data71 = data.success;
 if((typeof data71 !== "boolean") && (data71 !== null)){
-const err158 = {instancePath:instancePath+"/success",schemaPath:"#/oneOf/8/properties/success/type",keyword:"type",params:{type: schema744.oneOf[8].properties.success.type},message:"must be boolean,null"};
+const err158 = {instancePath:instancePath+"/success",schemaPath:"#/oneOf/8/properties/success/type",keyword:"type",params:{type: schema791.oneOf[8].properties.success.type},message:"must be boolean,null"};
 if(vErrors === null){
 vErrors = [err158];
 }
@@ -102714,7 +107773,7 @@ vErrors.push(err160);
 errors++;
 }
 if(!(data73 === "dynamicToolCall")){
-const err161 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/8/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[8].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err161 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/8/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[8].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err161];
 }
@@ -102821,8 +107880,8 @@ if(data.agentsStates !== undefined){
 let data74 = data.agentsStates;
 if(data74 && typeof data74 == "object" && !Array.isArray(data74)){
 for(const key0 in data74){
-if(!(validate494(data74[key0], {instancePath:instancePath+"/agentsStates/" + key0.replace(/~/g, "~0").replace(/\//g, "~1"),parentData:data74,parentDataProperty:key0,rootData}))){
-vErrors = vErrors === null ? validate494.errors : vErrors.concat(validate494.errors);
+if(!(validate534(data74[key0], {instancePath:instancePath+"/agentsStates/" + key0.replace(/~/g, "~0").replace(/\//g, "~1"),parentData:data74,parentDataProperty:key0,rootData}))){
+vErrors = vErrors === null ? validate534.errors : vErrors.concat(validate534.errors);
 errors = vErrors.length;
 }
 }
@@ -102853,7 +107912,7 @@ errors++;
 if(data.model !== undefined){
 let data77 = data.model;
 if((typeof data77 !== "string") && (data77 !== null)){
-const err172 = {instancePath:instancePath+"/model",schemaPath:"#/oneOf/9/properties/model/type",keyword:"type",params:{type: schema744.oneOf[9].properties.model.type},message:"must be string,null"};
+const err172 = {instancePath:instancePath+"/model",schemaPath:"#/oneOf/9/properties/model/type",keyword:"type",params:{type: schema791.oneOf[9].properties.model.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err172];
 }
@@ -102866,7 +107925,7 @@ errors++;
 if(data.prompt !== undefined){
 let data78 = data.prompt;
 if((typeof data78 !== "string") && (data78 !== null)){
-const err173 = {instancePath:instancePath+"/prompt",schemaPath:"#/oneOf/9/properties/prompt/type",keyword:"type",params:{type: schema744.oneOf[9].properties.prompt.type},message:"must be string,null"};
+const err173 = {instancePath:instancePath+"/prompt",schemaPath:"#/oneOf/9/properties/prompt/type",keyword:"type",params:{type: schema791.oneOf[9].properties.prompt.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err173];
 }
@@ -102995,7 +108054,7 @@ vErrors.push(err181);
 errors++;
 }
 if(!(((data83 === "inProgress") || (data83 === "completed")) || (data83 === "failed"))){
-const err182 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/CollabAgentToolCallStatus/enum",keyword:"enum",params:{allowedValues: schema771.enum},message:"must be equal to one of the allowed values"};
+const err182 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/CollabAgentToolCallStatus/enum",keyword:"enum",params:{allowedValues: schema818.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err182];
 }
@@ -103018,7 +108077,7 @@ vErrors.push(err183);
 errors++;
 }
 if(!(((((data84 === "spawnAgent") || (data84 === "sendInput")) || (data84 === "resumeAgent")) || (data84 === "wait")) || (data84 === "closeAgent"))){
-const err184 = {instancePath:instancePath+"/tool",schemaPath:"#/definitions/CollabAgentTool/enum",keyword:"enum",params:{allowedValues: schema772.enum},message:"must be equal to one of the allowed values"};
+const err184 = {instancePath:instancePath+"/tool",schemaPath:"#/definitions/CollabAgentTool/enum",keyword:"enum",params:{allowedValues: schema819.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err184];
 }
@@ -103041,7 +108100,7 @@ vErrors.push(err185);
 errors++;
 }
 if(!(data85 === "collabAgentToolCall")){
-const err186 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/9/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[9].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err186 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/9/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[9].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err186];
 }
@@ -103173,7 +108232,7 @@ vErrors.push(err196);
 errors++;
 }
 if(!(((data89 === "started") || (data89 === "interacted")) || (data89 === "interrupted"))){
-const err197 = {instancePath:instancePath+"/kind",schemaPath:"#/definitions/SubAgentActivityKind/enum",keyword:"enum",params:{allowedValues: schema773.enum},message:"must be equal to one of the allowed values"};
+const err197 = {instancePath:instancePath+"/kind",schemaPath:"#/definitions/SubAgentActivityKind/enum",keyword:"enum",params:{allowedValues: schema820.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err197];
 }
@@ -103196,7 +108255,7 @@ vErrors.push(err198);
 errors++;
 }
 if(!(data90 === "subAgentActivity")){
-const err199 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/10/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[10].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err199 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/10/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[10].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err199];
 }
@@ -103282,7 +108341,7 @@ errors++;
 if(data91.queries !== undefined){
 let data92 = data91.queries;
 if((!(Array.isArray(data92))) && (data92 !== null)){
-const err205 = {instancePath:instancePath+"/action/queries",schemaPath:"#/definitions/WebSearchAction/oneOf/0/properties/queries/type",keyword:"type",params:{type: schema774.oneOf[0].properties.queries.type},message:"must be array,null"};
+const err205 = {instancePath:instancePath+"/action/queries",schemaPath:"#/definitions/WebSearchAction/oneOf/0/properties/queries/type",keyword:"type",params:{type: schema821.oneOf[0].properties.queries.type},message:"must be array,null"};
 if(vErrors === null){
 vErrors = [err205];
 }
@@ -103310,7 +108369,7 @@ errors++;
 if(data91.query !== undefined){
 let data94 = data91.query;
 if((typeof data94 !== "string") && (data94 !== null)){
-const err207 = {instancePath:instancePath+"/action/query",schemaPath:"#/definitions/WebSearchAction/oneOf/0/properties/query/type",keyword:"type",params:{type: schema774.oneOf[0].properties.query.type},message:"must be string,null"};
+const err207 = {instancePath:instancePath+"/action/query",schemaPath:"#/definitions/WebSearchAction/oneOf/0/properties/query/type",keyword:"type",params:{type: schema821.oneOf[0].properties.query.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err207];
 }
@@ -103333,7 +108392,7 @@ vErrors.push(err208);
 errors++;
 }
 if(!(data95 === "search")){
-const err209 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema774.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err209 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema821.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err209];
 }
@@ -103384,7 +108443,7 @@ vErrors.push(err212);
 errors++;
 }
 if(!(data96 === "openPage")){
-const err213 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema774.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err213 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema821.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err213];
 }
@@ -103397,7 +108456,7 @@ errors++;
 if(data91.url !== undefined){
 let data97 = data91.url;
 if((typeof data97 !== "string") && (data97 !== null)){
-const err214 = {instancePath:instancePath+"/action/url",schemaPath:"#/definitions/WebSearchAction/oneOf/1/properties/url/type",keyword:"type",params:{type: schema774.oneOf[1].properties.url.type},message:"must be string,null"};
+const err214 = {instancePath:instancePath+"/action/url",schemaPath:"#/definitions/WebSearchAction/oneOf/1/properties/url/type",keyword:"type",params:{type: schema821.oneOf[1].properties.url.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err214];
 }
@@ -103443,7 +108502,7 @@ errors++;
 if(data91.pattern !== undefined){
 let data98 = data91.pattern;
 if((typeof data98 !== "string") && (data98 !== null)){
-const err217 = {instancePath:instancePath+"/action/pattern",schemaPath:"#/definitions/WebSearchAction/oneOf/2/properties/pattern/type",keyword:"type",params:{type: schema774.oneOf[2].properties.pattern.type},message:"must be string,null"};
+const err217 = {instancePath:instancePath+"/action/pattern",schemaPath:"#/definitions/WebSearchAction/oneOf/2/properties/pattern/type",keyword:"type",params:{type: schema821.oneOf[2].properties.pattern.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err217];
 }
@@ -103466,7 +108525,7 @@ vErrors.push(err218);
 errors++;
 }
 if(!(data99 === "findInPage")){
-const err219 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema774.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err219 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema821.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err219];
 }
@@ -103479,7 +108538,7 @@ errors++;
 if(data91.url !== undefined){
 let data100 = data91.url;
 if((typeof data100 !== "string") && (data100 !== null)){
-const err220 = {instancePath:instancePath+"/action/url",schemaPath:"#/definitions/WebSearchAction/oneOf/2/properties/url/type",keyword:"type",params:{type: schema774.oneOf[2].properties.url.type},message:"must be string,null"};
+const err220 = {instancePath:instancePath+"/action/url",schemaPath:"#/definitions/WebSearchAction/oneOf/2/properties/url/type",keyword:"type",params:{type: schema821.oneOf[2].properties.url.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err220];
 }
@@ -103535,7 +108594,7 @@ vErrors.push(err223);
 errors++;
 }
 if(!(data101 === "other")){
-const err224 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema774.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err224 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema821.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err224];
 }
@@ -103666,7 +108725,7 @@ vErrors.push(err231);
 errors++;
 }
 if(!(data104 === "webSearch")){
-const err232 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/11/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[11].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err232 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/11/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[11].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err232];
 }
@@ -103766,7 +108825,7 @@ vErrors.push(err239);
 errors++;
 }
 if(!(data107 === "imageView")){
-const err240 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/12/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[12].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err240 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/12/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[12].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err240];
 }
@@ -103889,7 +108948,7 @@ vErrors.push(err249);
 errors++;
 }
 if(!(data110 === "sleep")){
-const err250 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/13/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[13].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err250 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/13/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[13].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err250];
 }
@@ -103989,7 +109048,7 @@ errors++;
 if(data.revisedPrompt !== undefined){
 let data113 = data.revisedPrompt;
 if((typeof data113 !== "string") && (data113 !== null)){
-const err258 = {instancePath:instancePath+"/revisedPrompt",schemaPath:"#/oneOf/14/properties/revisedPrompt/type",keyword:"type",params:{type: schema744.oneOf[14].properties.revisedPrompt.type},message:"must be string,null"};
+const err258 = {instancePath:instancePath+"/revisedPrompt",schemaPath:"#/oneOf/14/properties/revisedPrompt/type",keyword:"type",params:{type: schema791.oneOf[14].properties.revisedPrompt.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err258];
 }
@@ -104078,7 +109137,7 @@ vErrors.push(err263);
 errors++;
 }
 if(!(data116 === "imageGeneration")){
-const err264 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/14/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[14].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err264 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/14/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[14].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err264];
 }
@@ -104178,7 +109237,7 @@ vErrors.push(err271);
 errors++;
 }
 if(!(data119 === "enteredReviewMode")){
-const err272 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/15/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[15].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err272 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/15/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[15].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err272];
 }
@@ -104278,7 +109337,7 @@ vErrors.push(err279);
 errors++;
 }
 if(!(data122 === "exitedReviewMode")){
-const err280 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/16/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[16].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err280 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/16/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[16].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err280];
 }
@@ -104356,7 +109415,7 @@ vErrors.push(err285);
 errors++;
 }
 if(!(data124 === "contextCompaction")){
-const err286 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/17/properties/type/enum",keyword:"enum",params:{allowedValues: schema744.oneOf[17].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err286 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/17/properties/type/enum",keyword:"enum",params:{allowedValues: schema791.oneOf[17].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err286];
 }
@@ -104425,12 +109484,12 @@ vErrors = null;
 }
 }
 }
-validate483.errors = vErrors;
+validate523.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate478(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate518(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -104467,7 +109526,7 @@ errors++;
 if(data.completedAt !== undefined){
 let data0 = data.completedAt;
 if((!(((typeof data0 == "number") && (!(data0 % 1) && !isNaN(data0))) && (isFinite(data0)))) && (data0 !== null)){
-const err3 = {instancePath:instancePath+"/completedAt",schemaPath:"#/properties/completedAt/type",keyword:"type",params:{type: schema740.properties.completedAt.type},message:"must be integer,null"};
+const err3 = {instancePath:instancePath+"/completedAt",schemaPath:"#/properties/completedAt/type",keyword:"type",params:{type: schema787.properties.completedAt.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err3];
 }
@@ -104502,7 +109561,7 @@ errors++;
 if(data.durationMs !== undefined){
 let data1 = data.durationMs;
 if((!(((typeof data1 == "number") && (!(data1 % 1) && !isNaN(data1))) && (isFinite(data1)))) && (data1 !== null)){
-const err6 = {instancePath:instancePath+"/durationMs",schemaPath:"#/properties/durationMs/type",keyword:"type",params:{type: schema740.properties.durationMs.type},message:"must be integer,null"};
+const err6 = {instancePath:instancePath+"/durationMs",schemaPath:"#/properties/durationMs/type",keyword:"type",params:{type: schema787.properties.durationMs.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err6];
 }
@@ -104539,8 +109598,8 @@ let data2 = data.error;
 const _errs6 = errors;
 let valid1 = false;
 const _errs7 = errors;
-if(!(validate479(data2, {instancePath:instancePath+"/error",parentData:data,parentDataProperty:"error",rootData}))){
-vErrors = vErrors === null ? validate479.errors : vErrors.concat(validate479.errors);
+if(!(validate519(data2, {instancePath:instancePath+"/error",parentData:data,parentDataProperty:"error",rootData}))){
+vErrors = vErrors === null ? validate519.errors : vErrors.concat(validate519.errors);
 errors = vErrors.length;
 }
 var _valid0 = _errs7 === errors;
@@ -104599,8 +109658,8 @@ let data4 = data.items;
 if(Array.isArray(data4)){
 const len0 = data4.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate483(data4[i0], {instancePath:instancePath+"/items/" + i0,parentData:data4,parentDataProperty:i0,rootData}))){
-vErrors = vErrors === null ? validate483.errors : vErrors.concat(validate483.errors);
+if(!(validate523(data4[i0], {instancePath:instancePath+"/items/" + i0,parentData:data4,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate523.errors : vErrors.concat(validate523.errors);
 errors = vErrors.length;
 }
 }
@@ -104633,7 +109692,7 @@ vErrors.push(err13);
 errors++;
 }
 if(!(data6 === "notLoaded")){
-const err14 = {instancePath:instancePath+"/itemsView",schemaPath:"#/definitions/TurnItemsView/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema777.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+const err14 = {instancePath:instancePath+"/itemsView",schemaPath:"#/definitions/TurnItemsView/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema824.oneOf[0].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err14];
 }
@@ -104659,7 +109718,7 @@ vErrors.push(err15);
 errors++;
 }
 if(!(data6 === "summary")){
-const err16 = {instancePath:instancePath+"/itemsView",schemaPath:"#/definitions/TurnItemsView/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema777.oneOf[1].enum},message:"must be equal to one of the allowed values"};
+const err16 = {instancePath:instancePath+"/itemsView",schemaPath:"#/definitions/TurnItemsView/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema824.oneOf[1].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err16];
 }
@@ -104690,7 +109749,7 @@ vErrors.push(err17);
 errors++;
 }
 if(!(data6 === "full")){
-const err18 = {instancePath:instancePath+"/itemsView",schemaPath:"#/definitions/TurnItemsView/oneOf/2/enum",keyword:"enum",params:{allowedValues: schema777.oneOf[2].enum},message:"must be equal to one of the allowed values"};
+const err18 = {instancePath:instancePath+"/itemsView",schemaPath:"#/definitions/TurnItemsView/oneOf/2/enum",keyword:"enum",params:{allowedValues: schema824.oneOf[2].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err18];
 }
@@ -104736,7 +109795,7 @@ vErrors = null;
 if(data.startedAt !== undefined){
 let data7 = data.startedAt;
 if((!(((typeof data7 == "number") && (!(data7 % 1) && !isNaN(data7))) && (isFinite(data7)))) && (data7 !== null)){
-const err20 = {instancePath:instancePath+"/startedAt",schemaPath:"#/properties/startedAt/type",keyword:"type",params:{type: schema740.properties.startedAt.type},message:"must be integer,null"};
+const err20 = {instancePath:instancePath+"/startedAt",schemaPath:"#/properties/startedAt/type",keyword:"type",params:{type: schema787.properties.startedAt.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -104781,7 +109840,7 @@ vErrors.push(err23);
 errors++;
 }
 if(!((((data8 === "completed") || (data8 === "interrupted")) || (data8 === "failed")) || (data8 === "inProgress"))){
-const err24 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/TurnStatus/enum",keyword:"enum",params:{allowedValues: schema778.enum},message:"must be equal to one of the allowed values"};
+const err24 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/TurnStatus/enum",keyword:"enum",params:{allowedValues: schema825.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err24];
 }
@@ -104802,12 +109861,12 @@ vErrors.push(err25);
 }
 errors++;
 }
-validate478.errors = vErrors;
+validate518.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate477(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate517(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 /*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ReviewStartResponse" */;
 let vErrors = null;
 let errors = 0;
@@ -104845,8 +109904,8 @@ errors++;
 }
 }
 if(data.turn !== undefined){
-if(!(validate478(data.turn, {instancePath:instancePath+"/turn",parentData:data,parentDataProperty:"turn",rootData}))){
-vErrors = vErrors === null ? validate478.errors : vErrors.concat(validate478.errors);
+if(!(validate518(data.turn, {instancePath:instancePath+"/turn",parentData:data,parentDataProperty:"turn",rootData}))){
+vErrors = vErrors === null ? validate518.errors : vErrors.concat(validate518.errors);
 errors = vErrors.length;
 }
 }
@@ -104861,23 +109920,23 @@ vErrors.push(err3);
 }
 errors++;
 }
-validate477.errors = vErrors;
+validate517.errors = vErrors;
 return errors === 0;
 }
 
-export const validateThreadForkResponse = validate498;
-const schema779 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"AbsolutePathBuf":{"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"},"ActivePermissionProfile":{"properties":{"extends":{"default":null,"description":"Parent profile identifier from the selected permissions profile's `extends` setting, when present.","type":["string","null"]},"id":{"description":"Identifier from `default_permissions` or the implicit built-in default, such as `:workspace` or a user-defined `[permissions.<id>]` profile.","type":"string"}},"required":["id"],"type":"object"},"AgentPath":{"type":"string"},"ApprovalsReviewer":{"description":"Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `auto_review` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request. The legacy value `guardian_subagent` is accepted for compatibility.","enum":["user","auto_review","guardian_subagent"],"type":"string"},"AskForApproval":{"oneOf":[{"enum":["untrusted","on-request","never"],"type":"string"},{"additionalProperties":false,"properties":{"granular":{"properties":{"mcp_elicitations":{"type":"boolean"},"request_permissions":{"default":false,"type":"boolean"},"rules":{"type":"boolean"},"sandbox_approval":{"type":"boolean"},"skill_approval":{"default":false,"type":"boolean"}},"required":["mcp_elicitations","rules","sandbox_approval"],"type":"object"}},"required":["granular"],"title":"GranularAskForApproval","type":"object"}]},"ByteRange":{"properties":{"end":{"minimum":0,"type":"integer","maximum":9007199254740991},"start":{"minimum":0,"type":"integer","maximum":9007199254740991}},"required":["end","start"],"type":"object"},"CodexErrorInfo":{"description":"This translation layer make sure that we expose codex error code in camel case.\n\nWhen an upstream HTTP status is available (for example, from the Responses API or a provider), it is forwarded in `httpStatusCode` on the relevant `codexErrorInfo` variant.","oneOf":[{"enum":["contextWindowExceeded","sessionBudgetExceeded","usageLimitExceeded","serverOverloaded","cyberPolicy","internalServerError","unauthorized","badRequest","threadRollbackFailed","sandboxError","other"],"type":"string"},{"additionalProperties":false,"properties":{"httpConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["httpConnectionFailed"],"title":"HttpConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Failed to connect to the response SSE stream.","properties":{"responseStreamConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamConnectionFailed"],"title":"ResponseStreamConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"The response SSE stream disconnected in the middle of a turn before completion.","properties":{"responseStreamDisconnected":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamDisconnected"],"title":"ResponseStreamDisconnectedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Reached the retry limit for responses.","properties":{"responseTooManyFailedAttempts":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseTooManyFailedAttempts"],"title":"ResponseTooManyFailedAttemptsCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Returned when `turn/start` or `turn/steer` is submitted while the current active turn cannot accept same-turn steering, for example `/review` or manual `/compact`.","properties":{"activeTurnNotSteerable":{"properties":{"turnKind":{"$ref":"#/definitions/NonSteerableTurnKind"}},"required":["turnKind"],"type":"object"}},"required":["activeTurnNotSteerable"],"title":"ActiveTurnNotSteerableCodexErrorInfo","type":"object"}]},"CollabAgentState":{"properties":{"message":{"type":["string","null"]},"status":{"$ref":"#/definitions/CollabAgentStatus"}},"required":["status"],"type":"object"},"CollabAgentStatus":{"enum":["pendingInit","running","interrupted","completed","errored","shutdown","notFound"],"type":"string"},"CollabAgentTool":{"enum":["spawnAgent","sendInput","resumeAgent","wait","closeAgent"],"type":"string"},"CollabAgentToolCallStatus":{"enum":["inProgress","completed","failed"],"type":"string"},"CommandAction":{"oneOf":[{"properties":{"command":{"type":"string"},"name":{"type":"string"},"path":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["read"],"title":"ReadCommandActionType","type":"string"}},"required":["command","name","path","type"],"title":"ReadCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"type":{"enum":["listFiles"],"title":"ListFilesCommandActionType","type":"string"}},"required":["command","type"],"title":"ListFilesCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchCommandActionType","type":"string"}},"required":["command","type"],"title":"SearchCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"type":{"enum":["unknown"],"title":"UnknownCommandActionType","type":"string"}},"required":["command","type"],"title":"UnknownCommandAction","type":"object"}]},"CommandExecutionSource":{"enum":["agent","userShell","unifiedExecStartup","unifiedExecInteraction"],"type":"string"},"CommandExecutionStatus":{"enum":["inProgress","completed","failed","declined"],"type":"string"},"DynamicToolCallOutputContentItem":{"oneOf":[{"properties":{"text":{"type":"string"},"type":{"enum":["inputText"],"title":"InputTextDynamicToolCallOutputContentItemType","type":"string"}},"required":["text","type"],"title":"InputTextDynamicToolCallOutputContentItem","type":"object"},{"properties":{"imageUrl":{"type":"string"},"type":{"enum":["inputImage"],"title":"InputImageDynamicToolCallOutputContentItemType","type":"string"}},"required":["imageUrl","type"],"title":"InputImageDynamicToolCallOutputContentItem","type":"object"}]},"DynamicToolCallStatus":{"enum":["inProgress","completed","failed"],"type":"string"},"FileUpdateChange":{"properties":{"diff":{"type":"string"},"kind":{"$ref":"#/definitions/PatchChangeKind"},"path":{"type":"string"}},"required":["diff","kind","path"],"type":"object"},"GitInfo":{"properties":{"branch":{"type":["string","null"]},"originUrl":{"type":["string","null"]},"sha":{"type":["string","null"]}},"type":"object"},"HookPromptFragment":{"properties":{"hookRunId":{"type":"string"},"text":{"type":"string"}},"required":["hookRunId","text"],"type":"object"},"ImageDetail":{"enum":["auto","low","high","original"],"type":"string"},"LegacyAppPathString":{"type":"string"},"McpToolCallAppContext":{"properties":{"actionName":{"type":["string","null"]},"appName":{"type":["string","null"]},"connectorId":{"type":"string"},"linkId":{"type":["string","null"]},"resourceUri":{"type":["string","null"]},"templateId":{"type":["string","null"]}},"required":["connectorId"],"type":"object"},"McpToolCallError":{"properties":{"message":{"type":"string"}},"required":["message"],"type":"object"},"McpToolCallResult":{"properties":{"_meta":true,"content":{"items":true,"type":"array"},"structuredContent":true},"required":["content"],"type":"object"},"McpToolCallStatus":{"enum":["inProgress","completed","failed"],"type":"string"},"MemoryCitation":{"properties":{"entries":{"items":{"$ref":"#/definitions/MemoryCitationEntry"},"type":"array"},"threadIds":{"items":{"type":"string"},"type":"array"}},"required":["entries","threadIds"],"type":"object"},"MemoryCitationEntry":{"properties":{"lineEnd":{"minimum":0,"type":"integer","maximum":4294967295},"lineStart":{"minimum":0,"type":"integer","maximum":4294967295},"note":{"type":"string"},"path":{"type":"string"}},"required":["lineEnd","lineStart","note","path"],"type":"object"},"MessagePhase":{"description":"Classifies an assistant message as interim commentary or final answer text.\n\nProviders do not emit this consistently, so callers must treat `None` as \"phase unknown\" and keep compatibility behavior for legacy models.","oneOf":[{"description":"Mid-turn assistant text (for example preamble/progress narration).\n\nAdditional tool calls or assistant output may follow before turn completion.","enum":["commentary"],"type":"string"},{"description":"The assistant's terminal answer text for the current turn.","enum":["final_answer"],"type":"string"}]},"MultiAgentMode":{"description":"Controls the effective multi-agent delegation instructions for a turn. `custom` means the configured mode hint defines the policy instead of a built-in policy.","oneOf":[{"enum":["explicitRequestOnly","proactive"],"type":"string"},{"additionalProperties":false,"properties":{"custom":{"type":"string"}},"required":["custom"],"title":"CustomMultiAgentMode","type":"object"}]},"NetworkAccess":{"enum":["restricted","enabled"],"type":"string"},"NonSteerableTurnKind":{"enum":["review","compact"],"type":"string"},"PatchApplyStatus":{"enum":["inProgress","completed","failed","declined"],"type":"string"},"PatchChangeKind":{"oneOf":[{"properties":{"type":{"enum":["add"],"title":"AddPatchChangeKindType","type":"string"}},"required":["type"],"title":"AddPatchChangeKind","type":"object"},{"properties":{"type":{"enum":["delete"],"title":"DeletePatchChangeKindType","type":"string"}},"required":["type"],"title":"DeletePatchChangeKind","type":"object"},{"properties":{"move_path":{"type":["string","null"]},"type":{"enum":["update"],"title":"UpdatePatchChangeKindType","type":"string"}},"required":["type"],"title":"UpdatePatchChangeKind","type":"object"}]},"ReasoningEffort":{"description":"A non-empty reasoning effort value advertised by the model.","minLength":1,"type":"string"},"SandboxPolicy":{"oneOf":[{"properties":{"type":{"enum":["dangerFullAccess"],"title":"DangerFullAccessSandboxPolicyType","type":"string"}},"required":["type"],"title":"DangerFullAccessSandboxPolicy","type":"object"},{"properties":{"networkAccess":{"default":false,"type":"boolean"},"type":{"enum":["readOnly"],"title":"ReadOnlySandboxPolicyType","type":"string"}},"required":["type"],"title":"ReadOnlySandboxPolicy","type":"object"},{"properties":{"networkAccess":{"allOf":[{"$ref":"#/definitions/NetworkAccess"}],"default":"restricted"},"type":{"enum":["externalSandbox"],"title":"ExternalSandboxSandboxPolicyType","type":"string"}},"required":["type"],"title":"ExternalSandboxSandboxPolicy","type":"object"},{"properties":{"excludeSlashTmp":{"default":false,"type":"boolean"},"excludeTmpdirEnvVar":{"default":false,"type":"boolean"},"networkAccess":{"default":false,"type":"boolean"},"type":{"enum":["workspaceWrite"],"title":"WorkspaceWriteSandboxPolicyType","type":"string"},"writableRoots":{"default":[],"items":{"$ref":"#/definitions/AbsolutePathBuf"},"type":"array"}},"required":["type"],"title":"WorkspaceWriteSandboxPolicy","type":"object"}]},"SessionSource":{"oneOf":[{"enum":["cli","vscode","exec","appServer","unknown"],"type":"string"},{"additionalProperties":false,"properties":{"custom":{"type":"string"}},"required":["custom"],"title":"CustomSessionSource","type":"object"},{"additionalProperties":false,"properties":{"subAgent":{"$ref":"#/definitions/SubAgentSource"}},"required":["subAgent"],"title":"SubAgentSessionSource","type":"object"}]},"SubAgentActivityKind":{"enum":["started","interacted","interrupted"],"type":"string"},"SubAgentSource":{"oneOf":[{"enum":["review","compact","memory_consolidation"],"type":"string"},{"additionalProperties":false,"properties":{"thread_spawn":{"properties":{"agent_nickname":{"default":null,"type":["string","null"]},"agent_path":{"anyOf":[{"$ref":"#/definitions/AgentPath"},{"type":"null"}],"default":null},"agent_role":{"default":null,"type":["string","null"]},"depth":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"parent_thread_id":{"$ref":"#/definitions/ThreadId"}},"required":["depth","parent_thread_id"],"type":"object"}},"required":["thread_spawn"],"title":"ThreadSpawnSubAgentSource","type":"object"},{"additionalProperties":false,"properties":{"other":{"type":"string"}},"required":["other"],"title":"OtherSubAgentSource","type":"object"}]},"TextElement":{"properties":{"byteRange":{"allOf":[{"$ref":"#/definitions/ByteRange"}],"description":"Byte range in the parent `text` buffer that this element occupies."},"placeholder":{"description":"Optional human-readable placeholder for the element, displayed in the UI.","type":["string","null"]}},"required":["byteRange"],"type":"object"},"Thread":{"properties":{"agentNickname":{"description":"Optional random unique nickname assigned to an AgentControl-spawned sub-agent.","type":["string","null"]},"agentRole":{"description":"Optional role (agent_role) assigned to an AgentControl-spawned sub-agent.","type":["string","null"]},"cliVersion":{"description":"Version of the CLI that created the thread.","type":"string"},"createdAt":{"description":"Unix timestamp (in seconds) when the thread was created.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"cwd":{"allOf":[{"$ref":"#/definitions/AbsolutePathBuf"}],"description":"Working directory captured for the thread."},"ephemeral":{"description":"Whether the thread is ephemeral and should not be materialized on disk.","type":"boolean"},"extra":{"anyOf":[{"$ref":"#/definitions/ThreadExtra"},{"type":"null"}],"description":"Optional implementation-specific thread data."},"forkedFromId":{"description":"Source thread id when this thread was created by forking another thread.","type":["string","null"]},"gitInfo":{"anyOf":[{"$ref":"#/definitions/GitInfo"},{"type":"null"}],"description":"Optional Git metadata captured when the thread was created."},"historyMode":{"allOf":[{"$ref":"#/definitions/ThreadHistoryMode"}],"default":"legacy","description":"Persisted thread history contract selected when this thread was created."},"id":{"description":"Identifier for this thread. Codex-generated thread IDs are UUIDv7.","type":"string"},"modelProvider":{"description":"Model provider used for this thread (for example, 'openai').","type":"string"},"name":{"description":"Optional user-facing thread title.","type":["string","null"]},"parentThreadId":{"description":"The ID of the parent thread. This will only be set if this thread is a subagent.","type":["string","null"]},"path":{"description":"[UNSTABLE] Path to the thread on disk.","type":["string","null"]},"preview":{"description":"Usually the first user message in the thread, if available.","type":"string"},"recencyAt":{"description":"Unix timestamp (in seconds) used for thread recency ordering.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"sessionId":{"description":"Session id shared by threads that belong to the same session tree.","type":"string"},"source":{"allOf":[{"$ref":"#/definitions/SessionSource"}],"description":"Origin of the thread (CLI, VSCode, codex exec, codex app-server, etc.)."},"status":{"allOf":[{"$ref":"#/definitions/ThreadStatus"}],"description":"Current runtime status for the thread."},"threadSource":{"anyOf":[{"$ref":"#/definitions/ThreadSource"},{"type":"null"}],"description":"Optional analytics source classification for this thread."},"turns":{"description":"Only populated on `thread/resume`, `thread/rollback`, `thread/fork`, and `thread/read` (when `includeTurns` is true) responses. For all other responses and notifications returning a Thread, the turns field will be an empty list.","items":{"$ref":"#/definitions/Turn"},"type":"array"},"updatedAt":{"description":"Unix timestamp (in seconds) when the thread was last updated.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}},"required":["cliVersion","createdAt","cwd","ephemeral","id","modelProvider","preview","sessionId","source","status","turns","updatedAt"],"type":"object"},"ThreadActiveFlag":{"enum":["waitingOnApproval","waitingOnUserInput"],"type":"string"},"ThreadExtra":{"description":"Extra app-server data for a thread.","type":"object"},"ThreadHistoryMode":{"enum":["legacy","paginated"],"type":"string"},"ThreadId":{"type":"string"},"ThreadItem":{"oneOf":[{"properties":{"clientId":{"type":["string","null"]},"content":{"items":{"$ref":"#/definitions/UserInput"},"type":"array"},"id":{"type":"string"},"type":{"enum":["userMessage"],"title":"UserMessageThreadItemType","type":"string"}},"required":["content","id","type"],"title":"UserMessageThreadItem","type":"object"},{"properties":{"fragments":{"items":{"$ref":"#/definitions/HookPromptFragment"},"type":"array"},"id":{"type":"string"},"type":{"enum":["hookPrompt"],"title":"HookPromptThreadItemType","type":"string"}},"required":["fragments","id","type"],"title":"HookPromptThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"memoryCitation":{"anyOf":[{"$ref":"#/definitions/MemoryCitation"},{"type":"null"}],"default":null},"phase":{"anyOf":[{"$ref":"#/definitions/MessagePhase"},{"type":"null"}],"default":null},"text":{"type":"string"},"type":{"enum":["agentMessage"],"title":"AgentMessageThreadItemType","type":"string"}},"required":["id","text","type"],"title":"AgentMessageThreadItem","type":"object"},{"description":"EXPERIMENTAL - proposed plan item content. The completed plan item is authoritative and may not match the concatenation of `PlanDelta` text.","properties":{"id":{"type":"string"},"text":{"type":"string"},"type":{"enum":["plan"],"title":"PlanThreadItemType","type":"string"}},"required":["id","text","type"],"title":"PlanThreadItem","type":"object"},{"properties":{"content":{"default":[],"items":{"type":"string"},"type":"array"},"id":{"type":"string"},"summary":{"default":[],"items":{"type":"string"},"type":"array"},"type":{"enum":["reasoning"],"title":"ReasoningThreadItemType","type":"string"}},"required":["id","type"],"title":"ReasoningThreadItem","type":"object"},{"properties":{"aggregatedOutput":{"description":"The command's output, aggregated from stdout and stderr.","type":["string","null"]},"command":{"description":"The command to be executed.","type":"string"},"commandActions":{"description":"A best-effort parsing of the command to understand the action(s) it will perform. This returns a list of CommandAction objects because a single shell command may be composed of many commands piped together.","items":{"$ref":"#/definitions/CommandAction"},"type":"array"},"cwd":{"allOf":[{"$ref":"#/definitions/LegacyAppPathString"}],"description":"The command's working directory."},"durationMs":{"description":"The duration of the command execution in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"exitCode":{"description":"The command's exit code.","type":["integer","null"],"minimum":-2147483648,"maximum":2147483647},"id":{"type":"string"},"processId":{"description":"Identifier for the underlying PTY process (when available).","type":["string","null"]},"source":{"allOf":[{"$ref":"#/definitions/CommandExecutionSource"}],"default":"agent"},"status":{"$ref":"#/definitions/CommandExecutionStatus"},"type":{"enum":["commandExecution"],"title":"CommandExecutionThreadItemType","type":"string"}},"required":["command","commandActions","cwd","id","status","type"],"title":"CommandExecutionThreadItem","type":"object"},{"properties":{"changes":{"items":{"$ref":"#/definitions/FileUpdateChange"},"type":"array"},"id":{"type":"string"},"status":{"$ref":"#/definitions/PatchApplyStatus"},"type":{"enum":["fileChange"],"title":"FileChangeThreadItemType","type":"string"}},"required":["changes","id","status","type"],"title":"FileChangeThreadItem","type":"object"},{"properties":{"appContext":{"anyOf":[{"$ref":"#/definitions/McpToolCallAppContext"},{"type":"null"}]},"arguments":true,"durationMs":{"description":"The duration of the MCP tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/McpToolCallError"},{"type":"null"}]},"id":{"type":"string"},"mcpAppResourceUri":{"description":"Deprecated: use `appContext.resourceUri` instead.","type":["string","null"]},"pluginId":{"type":["string","null"]},"result":{"anyOf":[{"$ref":"#/definitions/McpToolCallResult"},{"type":"null"}]},"server":{"type":"string"},"status":{"$ref":"#/definitions/McpToolCallStatus"},"tool":{"type":"string"},"type":{"enum":["mcpToolCall"],"title":"McpToolCallThreadItemType","type":"string"}},"required":["arguments","id","server","status","tool","type"],"title":"McpToolCallThreadItem","type":"object"},{"properties":{"arguments":true,"contentItems":{"items":{"$ref":"#/definitions/DynamicToolCallOutputContentItem"},"type":["array","null"]},"durationMs":{"description":"The duration of the dynamic tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"id":{"type":"string"},"namespace":{"type":["string","null"]},"status":{"$ref":"#/definitions/DynamicToolCallStatus"},"success":{"type":["boolean","null"]},"tool":{"type":"string"},"type":{"enum":["dynamicToolCall"],"title":"DynamicToolCallThreadItemType","type":"string"}},"required":["arguments","id","status","tool","type"],"title":"DynamicToolCallThreadItem","type":"object"},{"properties":{"agentsStates":{"additionalProperties":{"$ref":"#/definitions/CollabAgentState"},"description":"Last known status of the target agents, when available.","type":"object"},"id":{"description":"Unique identifier for this collab tool call.","type":"string"},"model":{"description":"Model requested for the spawned agent, when applicable.","type":["string","null"]},"prompt":{"description":"Prompt text sent as part of the collab tool call, when available.","type":["string","null"]},"reasoningEffort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}],"description":"Reasoning effort requested for the spawned agent, when applicable."},"receiverThreadIds":{"description":"Thread ID of the receiving agent, when applicable. In case of spawn operation, this corresponds to the newly spawned agent.","items":{"type":"string"},"type":"array"},"senderThreadId":{"description":"Thread ID of the agent issuing the collab request.","type":"string"},"status":{"allOf":[{"$ref":"#/definitions/CollabAgentToolCallStatus"}],"description":"Current status of the collab tool call."},"tool":{"allOf":[{"$ref":"#/definitions/CollabAgentTool"}],"description":"Name of the collab tool that was invoked."},"type":{"enum":["collabAgentToolCall"],"title":"CollabAgentToolCallThreadItemType","type":"string"}},"required":["agentsStates","id","receiverThreadIds","senderThreadId","status","tool","type"],"title":"CollabAgentToolCallThreadItem","type":"object"},{"properties":{"agentPath":{"type":"string"},"agentThreadId":{"type":"string"},"id":{"type":"string"},"kind":{"$ref":"#/definitions/SubAgentActivityKind"},"type":{"enum":["subAgentActivity"],"title":"SubAgentActivityThreadItemType","type":"string"}},"required":["agentPath","agentThreadId","id","kind","type"],"title":"SubAgentActivityThreadItem","type":"object"},{"properties":{"action":{"anyOf":[{"$ref":"#/definitions/WebSearchAction"},{"type":"null"}]},"id":{"type":"string"},"query":{"type":"string"},"type":{"enum":["webSearch"],"title":"WebSearchThreadItemType","type":"string"}},"required":["id","query","type"],"title":"WebSearchThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"path":{"$ref":"#/definitions/LegacyAppPathString"},"type":{"enum":["imageView"],"title":"ImageViewThreadItemType","type":"string"}},"required":["id","path","type"],"title":"ImageViewThreadItem","type":"object"},{"properties":{"durationMs":{"minimum":0,"type":"integer","maximum":9007199254740991},"id":{"type":"string"},"type":{"enum":["sleep"],"title":"SleepThreadItemType","type":"string"}},"required":["durationMs","id","type"],"title":"SleepThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"result":{"type":"string"},"revisedPrompt":{"type":["string","null"]},"savedPath":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}]},"status":{"type":"string"},"type":{"enum":["imageGeneration"],"title":"ImageGenerationThreadItemType","type":"string"}},"required":["id","result","status","type"],"title":"ImageGenerationThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["enteredReviewMode"],"title":"EnteredReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"EnteredReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["exitedReviewMode"],"title":"ExitedReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"ExitedReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"type":{"enum":["contextCompaction"],"title":"ContextCompactionThreadItemType","type":"string"}},"required":["id","type"],"title":"ContextCompactionThreadItem","type":"object"}]},"ThreadSource":{"type":"string"},"ThreadStatus":{"oneOf":[{"properties":{"type":{"enum":["notLoaded"],"title":"NotLoadedThreadStatusType","type":"string"}},"required":["type"],"title":"NotLoadedThreadStatus","type":"object"},{"properties":{"type":{"enum":["idle"],"title":"IdleThreadStatusType","type":"string"}},"required":["type"],"title":"IdleThreadStatus","type":"object"},{"properties":{"type":{"enum":["systemError"],"title":"SystemErrorThreadStatusType","type":"string"}},"required":["type"],"title":"SystemErrorThreadStatus","type":"object"},{"properties":{"activeFlags":{"items":{"$ref":"#/definitions/ThreadActiveFlag"},"type":"array"},"type":{"enum":["active"],"title":"ActiveThreadStatusType","type":"string"}},"required":["activeFlags","type"],"title":"ActiveThreadStatus","type":"object"}]},"Turn":{"properties":{"completedAt":{"description":"Unix timestamp (in seconds) when the turn completed.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"durationMs":{"description":"Duration between turn start and completion in milliseconds, if known.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/TurnError"},{"type":"null"}],"description":"Only populated when the Turn's status is failed."},"id":{"description":"Identifier for this turn. Codex-generated turn IDs are UUIDv7.","type":"string"},"items":{"description":"Thread items currently included in this turn payload.","items":{"$ref":"#/definitions/ThreadItem"},"type":"array"},"itemsView":{"allOf":[{"$ref":"#/definitions/TurnItemsView"}],"default":"full","description":"Describes how much of `items` has been loaded for this turn."},"startedAt":{"description":"Unix timestamp (in seconds) when the turn started.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"status":{"$ref":"#/definitions/TurnStatus"}},"required":["id","items","status"],"type":"object"},"TurnError":{"properties":{"additionalDetails":{"default":null,"type":["string","null"]},"codexErrorInfo":{"anyOf":[{"$ref":"#/definitions/CodexErrorInfo"},{"type":"null"}]},"message":{"type":"string"}},"required":["message"],"type":"object"},"TurnItemsView":{"oneOf":[{"description":"`items` was not loaded for this turn. The field is intentionally empty.","enum":["notLoaded"],"type":"string"},{"description":"`items` contains only a display summary for this turn.","enum":["summary"],"type":"string"},{"description":"`items` contains every ThreadItem available from persisted app-server history for this turn.","enum":["full"],"type":"string"}]},"TurnStatus":{"enum":["completed","interrupted","failed","inProgress"],"type":"string"},"UserInput":{"oneOf":[{"properties":{"text":{"type":"string"},"text_elements":{"default":[],"description":"UI-defined spans within `text` used to render or persist special elements.","items":{"$ref":"#/definitions/TextElement"},"type":"array"},"type":{"enum":["text"],"title":"TextUserInputType","type":"string"}},"required":["text","type"],"title":"TextUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"type":{"enum":["image"],"title":"ImageUserInputType","type":"string"},"url":{"type":"string"}},"required":["type","url"],"title":"ImageUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"path":{"type":"string"},"type":{"enum":["localImage"],"title":"LocalImageUserInputType","type":"string"}},"required":["path","type"],"title":"LocalImageUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["skill"],"title":"SkillUserInputType","type":"string"}},"required":["name","path","type"],"title":"SkillUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["mention"],"title":"MentionUserInputType","type":"string"}},"required":["name","path","type"],"title":"MentionUserInput","type":"object"}]},"WebSearchAction":{"oneOf":[{"properties":{"queries":{"items":{"type":"string"},"type":["array","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchWebSearchActionType","type":"string"}},"required":["type"],"title":"SearchWebSearchAction","type":"object"},{"properties":{"type":{"enum":["openPage"],"title":"OpenPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"OpenPageWebSearchAction","type":"object"},{"properties":{"pattern":{"type":["string","null"]},"type":{"enum":["findInPage"],"title":"FindInPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"FindInPageWebSearchAction","type":"object"},{"properties":{"type":{"enum":["other"],"title":"OtherWebSearchActionType","type":"string"}},"required":["type"],"title":"OtherWebSearchAction","type":"object"}]}},"properties":{"activePermissionProfile":{"anyOf":[{"$ref":"#/definitions/ActivePermissionProfile"},{"type":"null"}],"default":null,"description":"Named or implicit built-in profile that produced the active permissions, when known."},"approvalPolicy":{"$ref":"#/definitions/AskForApproval"},"approvalsReviewer":{"allOf":[{"$ref":"#/definitions/ApprovalsReviewer"}],"description":"Reviewer currently used for approval requests on this thread."},"cwd":{"$ref":"#/definitions/AbsolutePathBuf"},"instructionSources":{"default":[],"description":"Environment-native paths to instruction source files currently loaded for this thread.","items":{"$ref":"#/definitions/LegacyAppPathString"},"type":"array"},"model":{"type":"string"},"modelProvider":{"type":"string"},"multiAgentMode":{"allOf":[{"$ref":"#/definitions/MultiAgentMode"}],"default":"explicitRequestOnly","description":"@deprecated Always `explicitRequestOnly`. Use `reasoningEffort` for Ultra behavior."},"reasoningEffort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}]},"runtimeWorkspaceRoots":{"default":[],"description":"Thread-scoped runtime workspace roots used to materialize `:workspace_roots`.","items":{"$ref":"#/definitions/AbsolutePathBuf"},"type":"array"},"sandbox":{"allOf":[{"$ref":"#/definitions/SandboxPolicy"}],"description":"Legacy sandbox policy retained for compatibility. Experimental clients should prefer `activePermissionProfile` for profile provenance."},"serviceTier":{"type":["string","null"]},"thread":{"$ref":"#/definitions/Thread"}},"required":["approvalPolicy","approvalsReviewer","cwd","model","modelProvider","sandbox","thread"],"title":"ThreadForkResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ThreadForkResponse"};
-const schema780 = {"properties":{"extends":{"default":null,"description":"Parent profile identifier from the selected permissions profile's `extends` setting, when present.","type":["string","null"]},"id":{"description":"Identifier from `default_permissions` or the implicit built-in default, such as `:workspace` or a user-defined `[permissions.<id>]` profile.","type":"string"}},"required":["id"],"type":"object"};
-const schema781 = {"oneOf":[{"enum":["untrusted","on-request","never"],"type":"string"},{"additionalProperties":false,"properties":{"granular":{"properties":{"mcp_elicitations":{"type":"boolean"},"request_permissions":{"default":false,"type":"boolean"},"rules":{"type":"boolean"},"sandbox_approval":{"type":"boolean"},"skill_approval":{"default":false,"type":"boolean"}},"required":["mcp_elicitations","rules","sandbox_approval"],"type":"object"}},"required":["granular"],"title":"GranularAskForApproval","type":"object"}]};
-const schema782 = {"description":"Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `auto_review` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request. The legacy value `guardian_subagent` is accepted for compatibility.","enum":["user","auto_review","guardian_subagent"],"type":"string"};
-const schema783 = {"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"};
-const schema784 = {"type":"string"};
-const schema785 = {"description":"Controls the effective multi-agent delegation instructions for a turn. `custom` means the configured mode hint defines the policy instead of a built-in policy.","oneOf":[{"enum":["explicitRequestOnly","proactive"],"type":"string"},{"additionalProperties":false,"properties":{"custom":{"type":"string"}},"required":["custom"],"title":"CustomMultiAgentMode","type":"object"}]};
-const schema786 = {"description":"A non-empty reasoning effort value advertised by the model.","minLength":1,"type":"string"};
-const schema788 = {"oneOf":[{"properties":{"type":{"enum":["dangerFullAccess"],"title":"DangerFullAccessSandboxPolicyType","type":"string"}},"required":["type"],"title":"DangerFullAccessSandboxPolicy","type":"object"},{"properties":{"networkAccess":{"default":false,"type":"boolean"},"type":{"enum":["readOnly"],"title":"ReadOnlySandboxPolicyType","type":"string"}},"required":["type"],"title":"ReadOnlySandboxPolicy","type":"object"},{"properties":{"networkAccess":{"allOf":[{"$ref":"#/definitions/NetworkAccess"}],"default":"restricted"},"type":{"enum":["externalSandbox"],"title":"ExternalSandboxSandboxPolicyType","type":"string"}},"required":["type"],"title":"ExternalSandboxSandboxPolicy","type":"object"},{"properties":{"excludeSlashTmp":{"default":false,"type":"boolean"},"excludeTmpdirEnvVar":{"default":false,"type":"boolean"},"networkAccess":{"default":false,"type":"boolean"},"type":{"enum":["workspaceWrite"],"title":"WorkspaceWriteSandboxPolicyType","type":"string"},"writableRoots":{"default":[],"items":{"$ref":"#/definitions/AbsolutePathBuf"},"type":"array"}},"required":["type"],"title":"WorkspaceWriteSandboxPolicy","type":"object"}]};
-const schema789 = {"enum":["restricted","enabled"],"type":"string"};
+export const validateThreadForkResponse = validate538;
+const schema826 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"AbsolutePathBuf":{"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"},"ActivePermissionProfile":{"properties":{"extends":{"default":null,"description":"Parent profile identifier from the selected permissions profile's `extends` setting, when present.","type":["string","null"]},"id":{"description":"Identifier from `default_permissions` or the implicit built-in default, such as `:workspace` or a user-defined `[permissions.<id>]` profile.","type":"string"}},"required":["id"],"type":"object"},"AgentPath":{"type":"string"},"ApprovalsReviewer":{"description":"Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `auto_review` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request. The legacy value `guardian_subagent` is accepted for compatibility.","enum":["user","auto_review","guardian_subagent"],"type":"string"},"AskForApproval":{"oneOf":[{"enum":["untrusted","on-request","never"],"type":"string"},{"additionalProperties":false,"properties":{"granular":{"properties":{"mcp_elicitations":{"type":"boolean"},"request_permissions":{"default":false,"type":"boolean"},"rules":{"type":"boolean"},"sandbox_approval":{"type":"boolean"},"skill_approval":{"default":false,"type":"boolean"}},"required":["mcp_elicitations","rules","sandbox_approval"],"type":"object"}},"required":["granular"],"title":"GranularAskForApproval","type":"object"}]},"ByteRange":{"properties":{"end":{"minimum":0,"type":"integer","maximum":9007199254740991},"start":{"minimum":0,"type":"integer","maximum":9007199254740991}},"required":["end","start"],"type":"object"},"CodexErrorInfo":{"description":"This translation layer make sure that we expose codex error code in camel case.\n\nWhen an upstream HTTP status is available (for example, from the Responses API or a provider), it is forwarded in `httpStatusCode` on the relevant `codexErrorInfo` variant.","oneOf":[{"enum":["contextWindowExceeded","sessionBudgetExceeded","usageLimitExceeded","serverOverloaded","cyberPolicy","internalServerError","unauthorized","badRequest","threadRollbackFailed","sandboxError","other"],"type":"string"},{"additionalProperties":false,"properties":{"httpConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["httpConnectionFailed"],"title":"HttpConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Failed to connect to the response SSE stream.","properties":{"responseStreamConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamConnectionFailed"],"title":"ResponseStreamConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"The response SSE stream disconnected in the middle of a turn before completion.","properties":{"responseStreamDisconnected":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamDisconnected"],"title":"ResponseStreamDisconnectedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Reached the retry limit for responses.","properties":{"responseTooManyFailedAttempts":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseTooManyFailedAttempts"],"title":"ResponseTooManyFailedAttemptsCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Returned when `turn/start` or `turn/steer` is submitted while the current active turn cannot accept same-turn steering, for example `/review` or manual `/compact`.","properties":{"activeTurnNotSteerable":{"properties":{"turnKind":{"$ref":"#/definitions/NonSteerableTurnKind"}},"required":["turnKind"],"type":"object"}},"required":["activeTurnNotSteerable"],"title":"ActiveTurnNotSteerableCodexErrorInfo","type":"object"}]},"CollabAgentState":{"properties":{"message":{"type":["string","null"]},"status":{"$ref":"#/definitions/CollabAgentStatus"}},"required":["status"],"type":"object"},"CollabAgentStatus":{"enum":["pendingInit","running","interrupted","completed","errored","shutdown","notFound"],"type":"string"},"CollabAgentTool":{"enum":["spawnAgent","sendInput","resumeAgent","wait","closeAgent"],"type":"string"},"CollabAgentToolCallStatus":{"enum":["inProgress","completed","failed"],"type":"string"},"CommandAction":{"oneOf":[{"properties":{"command":{"type":"string"},"name":{"type":"string"},"path":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["read"],"title":"ReadCommandActionType","type":"string"}},"required":["command","name","path","type"],"title":"ReadCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"type":{"enum":["listFiles"],"title":"ListFilesCommandActionType","type":"string"}},"required":["command","type"],"title":"ListFilesCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchCommandActionType","type":"string"}},"required":["command","type"],"title":"SearchCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"type":{"enum":["unknown"],"title":"UnknownCommandActionType","type":"string"}},"required":["command","type"],"title":"UnknownCommandAction","type":"object"}]},"CommandExecutionSource":{"enum":["agent","userShell","unifiedExecStartup","unifiedExecInteraction"],"type":"string"},"CommandExecutionStatus":{"enum":["inProgress","completed","failed","declined"],"type":"string"},"DynamicToolCallOutputContentItem":{"oneOf":[{"properties":{"text":{"type":"string"},"type":{"enum":["inputText"],"title":"InputTextDynamicToolCallOutputContentItemType","type":"string"}},"required":["text","type"],"title":"InputTextDynamicToolCallOutputContentItem","type":"object"},{"properties":{"imageUrl":{"type":"string"},"type":{"enum":["inputImage"],"title":"InputImageDynamicToolCallOutputContentItemType","type":"string"}},"required":["imageUrl","type"],"title":"InputImageDynamicToolCallOutputContentItem","type":"object"}]},"DynamicToolCallStatus":{"enum":["inProgress","completed","failed"],"type":"string"},"FileUpdateChange":{"properties":{"diff":{"type":"string"},"kind":{"$ref":"#/definitions/PatchChangeKind"},"path":{"type":"string"}},"required":["diff","kind","path"],"type":"object"},"GitInfo":{"properties":{"branch":{"type":["string","null"]},"originUrl":{"type":["string","null"]},"sha":{"type":["string","null"]}},"type":"object"},"HookPromptFragment":{"properties":{"hookRunId":{"type":"string"},"text":{"type":"string"}},"required":["hookRunId","text"],"type":"object"},"ImageDetail":{"enum":["auto","low","high","original"],"type":"string"},"LegacyAppPathString":{"type":"string"},"McpToolCallAppContext":{"properties":{"actionName":{"type":["string","null"]},"appName":{"type":["string","null"]},"connectorId":{"type":"string"},"linkId":{"type":["string","null"]},"resourceUri":{"type":["string","null"]},"templateId":{"type":["string","null"]}},"required":["connectorId"],"type":"object"},"McpToolCallError":{"properties":{"message":{"type":"string"}},"required":["message"],"type":"object"},"McpToolCallResult":{"properties":{"_meta":true,"content":{"items":true,"type":"array"},"structuredContent":true},"required":["content"],"type":"object"},"McpToolCallStatus":{"enum":["inProgress","completed","failed"],"type":"string"},"MemoryCitation":{"properties":{"entries":{"items":{"$ref":"#/definitions/MemoryCitationEntry"},"type":"array"},"threadIds":{"items":{"type":"string"},"type":"array"}},"required":["entries","threadIds"],"type":"object"},"MemoryCitationEntry":{"properties":{"lineEnd":{"minimum":0,"type":"integer","maximum":4294967295},"lineStart":{"minimum":0,"type":"integer","maximum":4294967295},"note":{"type":"string"},"path":{"type":"string"}},"required":["lineEnd","lineStart","note","path"],"type":"object"},"MessagePhase":{"description":"Classifies an assistant message as interim commentary or final answer text.\n\nProviders do not emit this consistently, so callers must treat `None` as \"phase unknown\" and keep compatibility behavior for legacy models.","oneOf":[{"description":"Mid-turn assistant text (for example preamble/progress narration).\n\nAdditional tool calls or assistant output may follow before turn completion.","enum":["commentary"],"type":"string"},{"description":"The assistant's terminal answer text for the current turn.","enum":["final_answer"],"type":"string"}]},"MultiAgentMode":{"description":"Controls the effective multi-agent delegation instructions for a turn. `custom` means the configured mode hint defines the policy instead of a built-in policy.","oneOf":[{"enum":["explicitRequestOnly","proactive"],"type":"string"},{"additionalProperties":false,"properties":{"custom":{"type":"string"}},"required":["custom"],"title":"CustomMultiAgentMode","type":"object"}]},"NetworkAccess":{"enum":["restricted","enabled"],"type":"string"},"NonSteerableTurnKind":{"enum":["review","compact"],"type":"string"},"PatchApplyStatus":{"enum":["inProgress","completed","failed","declined"],"type":"string"},"PatchChangeKind":{"oneOf":[{"properties":{"type":{"enum":["add"],"title":"AddPatchChangeKindType","type":"string"}},"required":["type"],"title":"AddPatchChangeKind","type":"object"},{"properties":{"type":{"enum":["delete"],"title":"DeletePatchChangeKindType","type":"string"}},"required":["type"],"title":"DeletePatchChangeKind","type":"object"},{"properties":{"move_path":{"type":["string","null"]},"type":{"enum":["update"],"title":"UpdatePatchChangeKindType","type":"string"}},"required":["type"],"title":"UpdatePatchChangeKind","type":"object"}]},"ReasoningEffort":{"description":"A non-empty reasoning effort value advertised by the model.","minLength":1,"type":"string"},"SandboxPolicy":{"oneOf":[{"properties":{"type":{"enum":["dangerFullAccess"],"title":"DangerFullAccessSandboxPolicyType","type":"string"}},"required":["type"],"title":"DangerFullAccessSandboxPolicy","type":"object"},{"properties":{"networkAccess":{"default":false,"type":"boolean"},"type":{"enum":["readOnly"],"title":"ReadOnlySandboxPolicyType","type":"string"}},"required":["type"],"title":"ReadOnlySandboxPolicy","type":"object"},{"properties":{"networkAccess":{"allOf":[{"$ref":"#/definitions/NetworkAccess"}],"default":"restricted"},"type":{"enum":["externalSandbox"],"title":"ExternalSandboxSandboxPolicyType","type":"string"}},"required":["type"],"title":"ExternalSandboxSandboxPolicy","type":"object"},{"properties":{"excludeSlashTmp":{"default":false,"type":"boolean"},"excludeTmpdirEnvVar":{"default":false,"type":"boolean"},"networkAccess":{"default":false,"type":"boolean"},"type":{"enum":["workspaceWrite"],"title":"WorkspaceWriteSandboxPolicyType","type":"string"},"writableRoots":{"default":[],"items":{"$ref":"#/definitions/AbsolutePathBuf"},"type":"array"}},"required":["type"],"title":"WorkspaceWriteSandboxPolicy","type":"object"}]},"SessionSource":{"oneOf":[{"enum":["cli","vscode","exec","appServer","unknown"],"type":"string"},{"additionalProperties":false,"properties":{"custom":{"type":"string"}},"required":["custom"],"title":"CustomSessionSource","type":"object"},{"additionalProperties":false,"properties":{"subAgent":{"$ref":"#/definitions/SubAgentSource"}},"required":["subAgent"],"title":"SubAgentSessionSource","type":"object"}]},"SubAgentActivityKind":{"enum":["started","interacted","interrupted"],"type":"string"},"SubAgentSource":{"oneOf":[{"enum":["review","compact","memory_consolidation"],"type":"string"},{"additionalProperties":false,"properties":{"thread_spawn":{"properties":{"agent_nickname":{"default":null,"type":["string","null"]},"agent_path":{"anyOf":[{"$ref":"#/definitions/AgentPath"},{"type":"null"}],"default":null},"agent_role":{"default":null,"type":["string","null"]},"depth":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"parent_thread_id":{"$ref":"#/definitions/ThreadId"}},"required":["depth","parent_thread_id"],"type":"object"}},"required":["thread_spawn"],"title":"ThreadSpawnSubAgentSource","type":"object"},{"additionalProperties":false,"properties":{"other":{"type":"string"}},"required":["other"],"title":"OtherSubAgentSource","type":"object"}]},"TextElement":{"properties":{"byteRange":{"allOf":[{"$ref":"#/definitions/ByteRange"}],"description":"Byte range in the parent `text` buffer that this element occupies."},"placeholder":{"description":"Optional human-readable placeholder for the element, displayed in the UI.","type":["string","null"]}},"required":["byteRange"],"type":"object"},"Thread":{"properties":{"agentNickname":{"description":"Optional random unique nickname assigned to an AgentControl-spawned sub-agent.","type":["string","null"]},"agentRole":{"description":"Optional role (agent_role) assigned to an AgentControl-spawned sub-agent.","type":["string","null"]},"cliVersion":{"description":"Version of the CLI that created the thread.","type":"string"},"createdAt":{"description":"Unix timestamp (in seconds) when the thread was created.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"cwd":{"allOf":[{"$ref":"#/definitions/AbsolutePathBuf"}],"description":"Working directory captured for the thread."},"ephemeral":{"description":"Whether the thread is ephemeral and should not be materialized on disk.","type":"boolean"},"extra":{"anyOf":[{"$ref":"#/definitions/ThreadExtra"},{"type":"null"}],"description":"Optional implementation-specific thread data."},"forkedFromId":{"description":"Source thread id when this thread was created by forking another thread.","type":["string","null"]},"gitInfo":{"anyOf":[{"$ref":"#/definitions/GitInfo"},{"type":"null"}],"description":"Optional Git metadata captured when the thread was created."},"historyMode":{"allOf":[{"$ref":"#/definitions/ThreadHistoryMode"}],"default":"legacy","description":"Persisted thread history contract selected when this thread was created."},"id":{"description":"Identifier for this thread. Codex-generated thread IDs are UUIDv7.","type":"string"},"modelProvider":{"description":"Model provider used for this thread (for example, 'openai').","type":"string"},"name":{"description":"Optional user-facing thread title.","type":["string","null"]},"parentThreadId":{"description":"The ID of the parent thread. This will only be set if this thread is a subagent.","type":["string","null"]},"path":{"description":"[UNSTABLE] Path to the thread on disk.","type":["string","null"]},"preview":{"description":"Usually the first user message in the thread, if available.","type":"string"},"recencyAt":{"description":"Unix timestamp (in seconds) used for thread recency ordering.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"sessionId":{"description":"Session id shared by threads that belong to the same session tree.","type":"string"},"source":{"allOf":[{"$ref":"#/definitions/SessionSource"}],"description":"Origin of the thread (CLI, VSCode, codex exec, codex app-server, etc.)."},"status":{"allOf":[{"$ref":"#/definitions/ThreadStatus"}],"description":"Current runtime status for the thread."},"threadSource":{"anyOf":[{"$ref":"#/definitions/ThreadSource"},{"type":"null"}],"description":"Optional analytics source classification for this thread."},"turns":{"description":"Only populated on `thread/resume`, `thread/rollback`, `thread/fork`, and `thread/read` (when `includeTurns` is true) responses. For all other responses and notifications returning a Thread, the turns field will be an empty list.","items":{"$ref":"#/definitions/Turn"},"type":"array"},"updatedAt":{"description":"Unix timestamp (in seconds) when the thread was last updated.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}},"required":["cliVersion","createdAt","cwd","ephemeral","id","modelProvider","preview","sessionId","source","status","turns","updatedAt"],"type":"object"},"ThreadActiveFlag":{"enum":["waitingOnApproval","waitingOnUserInput"],"type":"string"},"ThreadExtra":{"description":"Extra app-server data for a thread.","type":"object"},"ThreadHistoryMode":{"enum":["legacy","paginated"],"type":"string"},"ThreadId":{"type":"string"},"ThreadItem":{"oneOf":[{"properties":{"clientId":{"type":["string","null"]},"content":{"items":{"$ref":"#/definitions/UserInput"},"type":"array"},"id":{"type":"string"},"type":{"enum":["userMessage"],"title":"UserMessageThreadItemType","type":"string"}},"required":["content","id","type"],"title":"UserMessageThreadItem","type":"object"},{"properties":{"fragments":{"items":{"$ref":"#/definitions/HookPromptFragment"},"type":"array"},"id":{"type":"string"},"type":{"enum":["hookPrompt"],"title":"HookPromptThreadItemType","type":"string"}},"required":["fragments","id","type"],"title":"HookPromptThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"memoryCitation":{"anyOf":[{"$ref":"#/definitions/MemoryCitation"},{"type":"null"}],"default":null},"phase":{"anyOf":[{"$ref":"#/definitions/MessagePhase"},{"type":"null"}],"default":null},"text":{"type":"string"},"type":{"enum":["agentMessage"],"title":"AgentMessageThreadItemType","type":"string"}},"required":["id","text","type"],"title":"AgentMessageThreadItem","type":"object"},{"description":"EXPERIMENTAL - proposed plan item content. The completed plan item is authoritative and may not match the concatenation of `PlanDelta` text.","properties":{"id":{"type":"string"},"text":{"type":"string"},"type":{"enum":["plan"],"title":"PlanThreadItemType","type":"string"}},"required":["id","text","type"],"title":"PlanThreadItem","type":"object"},{"properties":{"content":{"default":[],"items":{"type":"string"},"type":"array"},"id":{"type":"string"},"summary":{"default":[],"items":{"type":"string"},"type":"array"},"type":{"enum":["reasoning"],"title":"ReasoningThreadItemType","type":"string"}},"required":["id","type"],"title":"ReasoningThreadItem","type":"object"},{"properties":{"aggregatedOutput":{"description":"The command's output, aggregated from stdout and stderr.","type":["string","null"]},"command":{"description":"The command to be executed.","type":"string"},"commandActions":{"description":"A best-effort parsing of the command to understand the action(s) it will perform. This returns a list of CommandAction objects because a single shell command may be composed of many commands piped together.","items":{"$ref":"#/definitions/CommandAction"},"type":"array"},"cwd":{"allOf":[{"$ref":"#/definitions/LegacyAppPathString"}],"description":"The command's working directory."},"durationMs":{"description":"The duration of the command execution in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"exitCode":{"description":"The command's exit code.","type":["integer","null"],"minimum":-2147483648,"maximum":2147483647},"id":{"type":"string"},"processId":{"description":"Identifier for the underlying PTY process (when available).","type":["string","null"]},"source":{"allOf":[{"$ref":"#/definitions/CommandExecutionSource"}],"default":"agent"},"status":{"$ref":"#/definitions/CommandExecutionStatus"},"type":{"enum":["commandExecution"],"title":"CommandExecutionThreadItemType","type":"string"}},"required":["command","commandActions","cwd","id","status","type"],"title":"CommandExecutionThreadItem","type":"object"},{"properties":{"changes":{"items":{"$ref":"#/definitions/FileUpdateChange"},"type":"array"},"id":{"type":"string"},"status":{"$ref":"#/definitions/PatchApplyStatus"},"type":{"enum":["fileChange"],"title":"FileChangeThreadItemType","type":"string"}},"required":["changes","id","status","type"],"title":"FileChangeThreadItem","type":"object"},{"properties":{"appContext":{"anyOf":[{"$ref":"#/definitions/McpToolCallAppContext"},{"type":"null"}]},"arguments":true,"durationMs":{"description":"The duration of the MCP tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/McpToolCallError"},{"type":"null"}]},"id":{"type":"string"},"mcpAppResourceUri":{"description":"Deprecated: use `appContext.resourceUri` instead.","type":["string","null"]},"pluginId":{"type":["string","null"]},"result":{"anyOf":[{"$ref":"#/definitions/McpToolCallResult"},{"type":"null"}]},"server":{"type":"string"},"status":{"$ref":"#/definitions/McpToolCallStatus"},"tool":{"type":"string"},"type":{"enum":["mcpToolCall"],"title":"McpToolCallThreadItemType","type":"string"}},"required":["arguments","id","server","status","tool","type"],"title":"McpToolCallThreadItem","type":"object"},{"properties":{"arguments":true,"contentItems":{"items":{"$ref":"#/definitions/DynamicToolCallOutputContentItem"},"type":["array","null"]},"durationMs":{"description":"The duration of the dynamic tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"id":{"type":"string"},"namespace":{"type":["string","null"]},"status":{"$ref":"#/definitions/DynamicToolCallStatus"},"success":{"type":["boolean","null"]},"tool":{"type":"string"},"type":{"enum":["dynamicToolCall"],"title":"DynamicToolCallThreadItemType","type":"string"}},"required":["arguments","id","status","tool","type"],"title":"DynamicToolCallThreadItem","type":"object"},{"properties":{"agentsStates":{"additionalProperties":{"$ref":"#/definitions/CollabAgentState"},"description":"Last known status of the target agents, when available.","type":"object"},"id":{"description":"Unique identifier for this collab tool call.","type":"string"},"model":{"description":"Model requested for the spawned agent, when applicable.","type":["string","null"]},"prompt":{"description":"Prompt text sent as part of the collab tool call, when available.","type":["string","null"]},"reasoningEffort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}],"description":"Reasoning effort requested for the spawned agent, when applicable."},"receiverThreadIds":{"description":"Thread ID of the receiving agent, when applicable. In case of spawn operation, this corresponds to the newly spawned agent.","items":{"type":"string"},"type":"array"},"senderThreadId":{"description":"Thread ID of the agent issuing the collab request.","type":"string"},"status":{"allOf":[{"$ref":"#/definitions/CollabAgentToolCallStatus"}],"description":"Current status of the collab tool call."},"tool":{"allOf":[{"$ref":"#/definitions/CollabAgentTool"}],"description":"Name of the collab tool that was invoked."},"type":{"enum":["collabAgentToolCall"],"title":"CollabAgentToolCallThreadItemType","type":"string"}},"required":["agentsStates","id","receiverThreadIds","senderThreadId","status","tool","type"],"title":"CollabAgentToolCallThreadItem","type":"object"},{"properties":{"agentPath":{"type":"string"},"agentThreadId":{"type":"string"},"id":{"type":"string"},"kind":{"$ref":"#/definitions/SubAgentActivityKind"},"type":{"enum":["subAgentActivity"],"title":"SubAgentActivityThreadItemType","type":"string"}},"required":["agentPath","agentThreadId","id","kind","type"],"title":"SubAgentActivityThreadItem","type":"object"},{"properties":{"action":{"anyOf":[{"$ref":"#/definitions/WebSearchAction"},{"type":"null"}]},"id":{"type":"string"},"query":{"type":"string"},"type":{"enum":["webSearch"],"title":"WebSearchThreadItemType","type":"string"}},"required":["id","query","type"],"title":"WebSearchThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"path":{"$ref":"#/definitions/LegacyAppPathString"},"type":{"enum":["imageView"],"title":"ImageViewThreadItemType","type":"string"}},"required":["id","path","type"],"title":"ImageViewThreadItem","type":"object"},{"properties":{"durationMs":{"minimum":0,"type":"integer","maximum":9007199254740991},"id":{"type":"string"},"type":{"enum":["sleep"],"title":"SleepThreadItemType","type":"string"}},"required":["durationMs","id","type"],"title":"SleepThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"result":{"type":"string"},"revisedPrompt":{"type":["string","null"]},"savedPath":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}]},"status":{"type":"string"},"type":{"enum":["imageGeneration"],"title":"ImageGenerationThreadItemType","type":"string"}},"required":["id","result","status","type"],"title":"ImageGenerationThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["enteredReviewMode"],"title":"EnteredReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"EnteredReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["exitedReviewMode"],"title":"ExitedReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"ExitedReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"type":{"enum":["contextCompaction"],"title":"ContextCompactionThreadItemType","type":"string"}},"required":["id","type"],"title":"ContextCompactionThreadItem","type":"object"}]},"ThreadSource":{"type":"string"},"ThreadStatus":{"oneOf":[{"properties":{"type":{"enum":["notLoaded"],"title":"NotLoadedThreadStatusType","type":"string"}},"required":["type"],"title":"NotLoadedThreadStatus","type":"object"},{"properties":{"type":{"enum":["idle"],"title":"IdleThreadStatusType","type":"string"}},"required":["type"],"title":"IdleThreadStatus","type":"object"},{"properties":{"type":{"enum":["systemError"],"title":"SystemErrorThreadStatusType","type":"string"}},"required":["type"],"title":"SystemErrorThreadStatus","type":"object"},{"properties":{"activeFlags":{"items":{"$ref":"#/definitions/ThreadActiveFlag"},"type":"array"},"type":{"enum":["active"],"title":"ActiveThreadStatusType","type":"string"}},"required":["activeFlags","type"],"title":"ActiveThreadStatus","type":"object"}]},"Turn":{"properties":{"completedAt":{"description":"Unix timestamp (in seconds) when the turn completed.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"durationMs":{"description":"Duration between turn start and completion in milliseconds, if known.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/TurnError"},{"type":"null"}],"description":"Only populated when the Turn's status is failed."},"id":{"description":"Identifier for this turn. Codex-generated turn IDs are UUIDv7.","type":"string"},"items":{"description":"Thread items currently included in this turn payload.","items":{"$ref":"#/definitions/ThreadItem"},"type":"array"},"itemsView":{"allOf":[{"$ref":"#/definitions/TurnItemsView"}],"default":"full","description":"Describes how much of `items` has been loaded for this turn."},"startedAt":{"description":"Unix timestamp (in seconds) when the turn started.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"status":{"$ref":"#/definitions/TurnStatus"}},"required":["id","items","status"],"type":"object"},"TurnError":{"properties":{"additionalDetails":{"default":null,"type":["string","null"]},"codexErrorInfo":{"anyOf":[{"$ref":"#/definitions/CodexErrorInfo"},{"type":"null"}]},"message":{"type":"string"}},"required":["message"],"type":"object"},"TurnItemsView":{"oneOf":[{"description":"`items` was not loaded for this turn. The field is intentionally empty.","enum":["notLoaded"],"type":"string"},{"description":"`items` contains only a display summary for this turn.","enum":["summary"],"type":"string"},{"description":"`items` contains every ThreadItem available from persisted app-server history for this turn.","enum":["full"],"type":"string"}]},"TurnStatus":{"enum":["completed","interrupted","failed","inProgress"],"type":"string"},"UserInput":{"oneOf":[{"properties":{"text":{"type":"string"},"text_elements":{"default":[],"description":"UI-defined spans within `text` used to render or persist special elements.","items":{"$ref":"#/definitions/TextElement"},"type":"array"},"type":{"enum":["text"],"title":"TextUserInputType","type":"string"}},"required":["text","type"],"title":"TextUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"type":{"enum":["image"],"title":"ImageUserInputType","type":"string"},"url":{"type":"string"}},"required":["type","url"],"title":"ImageUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"path":{"type":"string"},"type":{"enum":["localImage"],"title":"LocalImageUserInputType","type":"string"}},"required":["path","type"],"title":"LocalImageUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["skill"],"title":"SkillUserInputType","type":"string"}},"required":["name","path","type"],"title":"SkillUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["mention"],"title":"MentionUserInputType","type":"string"}},"required":["name","path","type"],"title":"MentionUserInput","type":"object"}]},"WebSearchAction":{"oneOf":[{"properties":{"queries":{"items":{"type":"string"},"type":["array","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchWebSearchActionType","type":"string"}},"required":["type"],"title":"SearchWebSearchAction","type":"object"},{"properties":{"type":{"enum":["openPage"],"title":"OpenPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"OpenPageWebSearchAction","type":"object"},{"properties":{"pattern":{"type":["string","null"]},"type":{"enum":["findInPage"],"title":"FindInPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"FindInPageWebSearchAction","type":"object"},{"properties":{"type":{"enum":["other"],"title":"OtherWebSearchActionType","type":"string"}},"required":["type"],"title":"OtherWebSearchAction","type":"object"}]}},"properties":{"activePermissionProfile":{"anyOf":[{"$ref":"#/definitions/ActivePermissionProfile"},{"type":"null"}],"default":null,"description":"Named or implicit built-in profile that produced the active permissions, when known."},"approvalPolicy":{"$ref":"#/definitions/AskForApproval"},"approvalsReviewer":{"allOf":[{"$ref":"#/definitions/ApprovalsReviewer"}],"description":"Reviewer currently used for approval requests on this thread."},"cwd":{"$ref":"#/definitions/AbsolutePathBuf"},"instructionSources":{"default":[],"description":"Environment-native paths to instruction source files currently loaded for this thread.","items":{"$ref":"#/definitions/LegacyAppPathString"},"type":"array"},"model":{"type":"string"},"modelProvider":{"type":"string"},"multiAgentMode":{"allOf":[{"$ref":"#/definitions/MultiAgentMode"}],"default":"explicitRequestOnly","description":"@deprecated Always `explicitRequestOnly`. Use `reasoningEffort` for Ultra behavior."},"reasoningEffort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}]},"runtimeWorkspaceRoots":{"default":[],"description":"Thread-scoped runtime workspace roots used to materialize `:workspace_roots`.","items":{"$ref":"#/definitions/AbsolutePathBuf"},"type":"array"},"sandbox":{"allOf":[{"$ref":"#/definitions/SandboxPolicy"}],"description":"Legacy sandbox policy retained for compatibility. Experimental clients should prefer `activePermissionProfile` for profile provenance."},"serviceTier":{"type":["string","null"]},"thread":{"$ref":"#/definitions/Thread"}},"required":["approvalPolicy","approvalsReviewer","cwd","model","modelProvider","sandbox","thread"],"title":"ThreadForkResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ThreadForkResponse"};
+const schema827 = {"properties":{"extends":{"default":null,"description":"Parent profile identifier from the selected permissions profile's `extends` setting, when present.","type":["string","null"]},"id":{"description":"Identifier from `default_permissions` or the implicit built-in default, such as `:workspace` or a user-defined `[permissions.<id>]` profile.","type":"string"}},"required":["id"],"type":"object"};
+const schema828 = {"oneOf":[{"enum":["untrusted","on-request","never"],"type":"string"},{"additionalProperties":false,"properties":{"granular":{"properties":{"mcp_elicitations":{"type":"boolean"},"request_permissions":{"default":false,"type":"boolean"},"rules":{"type":"boolean"},"sandbox_approval":{"type":"boolean"},"skill_approval":{"default":false,"type":"boolean"}},"required":["mcp_elicitations","rules","sandbox_approval"],"type":"object"}},"required":["granular"],"title":"GranularAskForApproval","type":"object"}]};
+const schema829 = {"description":"Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `auto_review` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request. The legacy value `guardian_subagent` is accepted for compatibility.","enum":["user","auto_review","guardian_subagent"],"type":"string"};
+const schema830 = {"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"};
+const schema831 = {"type":"string"};
+const schema832 = {"description":"Controls the effective multi-agent delegation instructions for a turn. `custom` means the configured mode hint defines the policy instead of a built-in policy.","oneOf":[{"enum":["explicitRequestOnly","proactive"],"type":"string"},{"additionalProperties":false,"properties":{"custom":{"type":"string"}},"required":["custom"],"title":"CustomMultiAgentMode","type":"object"}]};
+const schema833 = {"description":"A non-empty reasoning effort value advertised by the model.","minLength":1,"type":"string"};
+const schema835 = {"oneOf":[{"properties":{"type":{"enum":["dangerFullAccess"],"title":"DangerFullAccessSandboxPolicyType","type":"string"}},"required":["type"],"title":"DangerFullAccessSandboxPolicy","type":"object"},{"properties":{"networkAccess":{"default":false,"type":"boolean"},"type":{"enum":["readOnly"],"title":"ReadOnlySandboxPolicyType","type":"string"}},"required":["type"],"title":"ReadOnlySandboxPolicy","type":"object"},{"properties":{"networkAccess":{"allOf":[{"$ref":"#/definitions/NetworkAccess"}],"default":"restricted"},"type":{"enum":["externalSandbox"],"title":"ExternalSandboxSandboxPolicyType","type":"string"}},"required":["type"],"title":"ExternalSandboxSandboxPolicy","type":"object"},{"properties":{"excludeSlashTmp":{"default":false,"type":"boolean"},"excludeTmpdirEnvVar":{"default":false,"type":"boolean"},"networkAccess":{"default":false,"type":"boolean"},"type":{"enum":["workspaceWrite"],"title":"WorkspaceWriteSandboxPolicyType","type":"string"},"writableRoots":{"default":[],"items":{"$ref":"#/definitions/AbsolutePathBuf"},"type":"array"}},"required":["type"],"title":"WorkspaceWriteSandboxPolicy","type":"object"}]};
+const schema836 = {"enum":["restricted","enabled"],"type":"string"};
 
-function validate499(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate539(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 const _errs0 = errors;
@@ -104908,7 +109967,7 @@ vErrors.push(err1);
 errors++;
 }
 if(!(data0 === "dangerFullAccess")){
-const err2 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema788.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err2 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema835.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err2];
 }
@@ -104971,7 +110030,7 @@ vErrors.push(err6);
 errors++;
 }
 if(!(data2 === "readOnly")){
-const err7 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema788.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err7 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema835.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err7];
 }
@@ -105027,7 +110086,7 @@ vErrors.push(err10);
 errors++;
 }
 if(!((data3 === "restricted") || (data3 === "enabled"))){
-const err11 = {instancePath:instancePath+"/networkAccess",schemaPath:"#/definitions/NetworkAccess/enum",keyword:"enum",params:{allowedValues: schema789.enum},message:"must be equal to one of the allowed values"};
+const err11 = {instancePath:instancePath+"/networkAccess",schemaPath:"#/definitions/NetworkAccess/enum",keyword:"enum",params:{allowedValues: schema836.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err11];
 }
@@ -105050,7 +110109,7 @@ vErrors.push(err12);
 errors++;
 }
 if(!(data4 === "externalSandbox")){
-const err13 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema788.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err13 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema835.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -105142,7 +110201,7 @@ vErrors.push(err19);
 errors++;
 }
 if(!(data8 === "workspaceWrite")){
-const err20 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema788.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err20 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema835.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -105225,21 +110284,21 @@ vErrors = null;
 }
 }
 }
-validate499.errors = vErrors;
+validate539.errors = vErrors;
 return errors === 0;
 }
 
-const schema791 = {"properties":{"agentNickname":{"description":"Optional random unique nickname assigned to an AgentControl-spawned sub-agent.","type":["string","null"]},"agentRole":{"description":"Optional role (agent_role) assigned to an AgentControl-spawned sub-agent.","type":["string","null"]},"cliVersion":{"description":"Version of the CLI that created the thread.","type":"string"},"createdAt":{"description":"Unix timestamp (in seconds) when the thread was created.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"cwd":{"allOf":[{"$ref":"#/definitions/AbsolutePathBuf"}],"description":"Working directory captured for the thread."},"ephemeral":{"description":"Whether the thread is ephemeral and should not be materialized on disk.","type":"boolean"},"extra":{"anyOf":[{"$ref":"#/definitions/ThreadExtra"},{"type":"null"}],"description":"Optional implementation-specific thread data."},"forkedFromId":{"description":"Source thread id when this thread was created by forking another thread.","type":["string","null"]},"gitInfo":{"anyOf":[{"$ref":"#/definitions/GitInfo"},{"type":"null"}],"description":"Optional Git metadata captured when the thread was created."},"historyMode":{"allOf":[{"$ref":"#/definitions/ThreadHistoryMode"}],"default":"legacy","description":"Persisted thread history contract selected when this thread was created."},"id":{"description":"Identifier for this thread. Codex-generated thread IDs are UUIDv7.","type":"string"},"modelProvider":{"description":"Model provider used for this thread (for example, 'openai').","type":"string"},"name":{"description":"Optional user-facing thread title.","type":["string","null"]},"parentThreadId":{"description":"The ID of the parent thread. This will only be set if this thread is a subagent.","type":["string","null"]},"path":{"description":"[UNSTABLE] Path to the thread on disk.","type":["string","null"]},"preview":{"description":"Usually the first user message in the thread, if available.","type":"string"},"recencyAt":{"description":"Unix timestamp (in seconds) used for thread recency ordering.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"sessionId":{"description":"Session id shared by threads that belong to the same session tree.","type":"string"},"source":{"allOf":[{"$ref":"#/definitions/SessionSource"}],"description":"Origin of the thread (CLI, VSCode, codex exec, codex app-server, etc.)."},"status":{"allOf":[{"$ref":"#/definitions/ThreadStatus"}],"description":"Current runtime status for the thread."},"threadSource":{"anyOf":[{"$ref":"#/definitions/ThreadSource"},{"type":"null"}],"description":"Optional analytics source classification for this thread."},"turns":{"description":"Only populated on `thread/resume`, `thread/rollback`, `thread/fork`, and `thread/read` (when `includeTurns` is true) responses. For all other responses and notifications returning a Thread, the turns field will be an empty list.","items":{"$ref":"#/definitions/Turn"},"type":"array"},"updatedAt":{"description":"Unix timestamp (in seconds) when the thread was last updated.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}},"required":["cliVersion","createdAt","cwd","ephemeral","id","modelProvider","preview","sessionId","source","status","turns","updatedAt"],"type":"object"};
-const schema793 = {"description":"Extra app-server data for a thread.","type":"object"};
-const schema794 = {"properties":{"branch":{"type":["string","null"]},"originUrl":{"type":["string","null"]},"sha":{"type":["string","null"]}},"type":"object"};
-const schema795 = {"enum":["legacy","paginated"],"type":"string"};
-const schema802 = {"type":"string"};
-const schema796 = {"oneOf":[{"enum":["cli","vscode","exec","appServer","unknown"],"type":"string"},{"additionalProperties":false,"properties":{"custom":{"type":"string"}},"required":["custom"],"title":"CustomSessionSource","type":"object"},{"additionalProperties":false,"properties":{"subAgent":{"$ref":"#/definitions/SubAgentSource"}},"required":["subAgent"],"title":"SubAgentSessionSource","type":"object"}]};
-const schema797 = {"oneOf":[{"enum":["review","compact","memory_consolidation"],"type":"string"},{"additionalProperties":false,"properties":{"thread_spawn":{"properties":{"agent_nickname":{"default":null,"type":["string","null"]},"agent_path":{"anyOf":[{"$ref":"#/definitions/AgentPath"},{"type":"null"}],"default":null},"agent_role":{"default":null,"type":["string","null"]},"depth":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"parent_thread_id":{"$ref":"#/definitions/ThreadId"}},"required":["depth","parent_thread_id"],"type":"object"}},"required":["thread_spawn"],"title":"ThreadSpawnSubAgentSource","type":"object"},{"additionalProperties":false,"properties":{"other":{"type":"string"}},"required":["other"],"title":"OtherSubAgentSource","type":"object"}]};
-const schema798 = {"type":"string"};
-const schema799 = {"type":"string"};
+const schema838 = {"properties":{"agentNickname":{"description":"Optional random unique nickname assigned to an AgentControl-spawned sub-agent.","type":["string","null"]},"agentRole":{"description":"Optional role (agent_role) assigned to an AgentControl-spawned sub-agent.","type":["string","null"]},"cliVersion":{"description":"Version of the CLI that created the thread.","type":"string"},"createdAt":{"description":"Unix timestamp (in seconds) when the thread was created.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"cwd":{"allOf":[{"$ref":"#/definitions/AbsolutePathBuf"}],"description":"Working directory captured for the thread."},"ephemeral":{"description":"Whether the thread is ephemeral and should not be materialized on disk.","type":"boolean"},"extra":{"anyOf":[{"$ref":"#/definitions/ThreadExtra"},{"type":"null"}],"description":"Optional implementation-specific thread data."},"forkedFromId":{"description":"Source thread id when this thread was created by forking another thread.","type":["string","null"]},"gitInfo":{"anyOf":[{"$ref":"#/definitions/GitInfo"},{"type":"null"}],"description":"Optional Git metadata captured when the thread was created."},"historyMode":{"allOf":[{"$ref":"#/definitions/ThreadHistoryMode"}],"default":"legacy","description":"Persisted thread history contract selected when this thread was created."},"id":{"description":"Identifier for this thread. Codex-generated thread IDs are UUIDv7.","type":"string"},"modelProvider":{"description":"Model provider used for this thread (for example, 'openai').","type":"string"},"name":{"description":"Optional user-facing thread title.","type":["string","null"]},"parentThreadId":{"description":"The ID of the parent thread. This will only be set if this thread is a subagent.","type":["string","null"]},"path":{"description":"[UNSTABLE] Path to the thread on disk.","type":["string","null"]},"preview":{"description":"Usually the first user message in the thread, if available.","type":"string"},"recencyAt":{"description":"Unix timestamp (in seconds) used for thread recency ordering.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"sessionId":{"description":"Session id shared by threads that belong to the same session tree.","type":"string"},"source":{"allOf":[{"$ref":"#/definitions/SessionSource"}],"description":"Origin of the thread (CLI, VSCode, codex exec, codex app-server, etc.)."},"status":{"allOf":[{"$ref":"#/definitions/ThreadStatus"}],"description":"Current runtime status for the thread."},"threadSource":{"anyOf":[{"$ref":"#/definitions/ThreadSource"},{"type":"null"}],"description":"Optional analytics source classification for this thread."},"turns":{"description":"Only populated on `thread/resume`, `thread/rollback`, `thread/fork`, and `thread/read` (when `includeTurns` is true) responses. For all other responses and notifications returning a Thread, the turns field will be an empty list.","items":{"$ref":"#/definitions/Turn"},"type":"array"},"updatedAt":{"description":"Unix timestamp (in seconds) when the thread was last updated.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}},"required":["cliVersion","createdAt","cwd","ephemeral","id","modelProvider","preview","sessionId","source","status","turns","updatedAt"],"type":"object"};
+const schema840 = {"description":"Extra app-server data for a thread.","type":"object"};
+const schema841 = {"properties":{"branch":{"type":["string","null"]},"originUrl":{"type":["string","null"]},"sha":{"type":["string","null"]}},"type":"object"};
+const schema842 = {"enum":["legacy","paginated"],"type":"string"};
+const schema849 = {"type":"string"};
+const schema843 = {"oneOf":[{"enum":["cli","vscode","exec","appServer","unknown"],"type":"string"},{"additionalProperties":false,"properties":{"custom":{"type":"string"}},"required":["custom"],"title":"CustomSessionSource","type":"object"},{"additionalProperties":false,"properties":{"subAgent":{"$ref":"#/definitions/SubAgentSource"}},"required":["subAgent"],"title":"SubAgentSessionSource","type":"object"}]};
+const schema844 = {"oneOf":[{"enum":["review","compact","memory_consolidation"],"type":"string"},{"additionalProperties":false,"properties":{"thread_spawn":{"properties":{"agent_nickname":{"default":null,"type":["string","null"]},"agent_path":{"anyOf":[{"$ref":"#/definitions/AgentPath"},{"type":"null"}],"default":null},"agent_role":{"default":null,"type":["string","null"]},"depth":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"parent_thread_id":{"$ref":"#/definitions/ThreadId"}},"required":["depth","parent_thread_id"],"type":"object"}},"required":["thread_spawn"],"title":"ThreadSpawnSubAgentSource","type":"object"},{"additionalProperties":false,"properties":{"other":{"type":"string"}},"required":["other"],"title":"OtherSubAgentSource","type":"object"}]};
+const schema845 = {"type":"string"};
+const schema846 = {"type":"string"};
 
-function validate503(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate543(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 const _errs0 = errors;
@@ -105257,7 +110316,7 @@ vErrors.push(err0);
 errors++;
 }
 if(!(((data === "review") || (data === "compact")) || (data === "memory_consolidation"))){
-const err1 = {instancePath,schemaPath:"#/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema797.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+const err1 = {instancePath,schemaPath:"#/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema844.oneOf[0].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err1];
 }
@@ -105321,7 +110380,7 @@ errors++;
 if(data0.agent_nickname !== undefined){
 let data1 = data0.agent_nickname;
 if((typeof data1 !== "string") && (data1 !== null)){
-const err6 = {instancePath:instancePath+"/thread_spawn/agent_nickname",schemaPath:"#/oneOf/1/properties/thread_spawn/properties/agent_nickname/type",keyword:"type",params:{type: schema797.oneOf[1].properties.thread_spawn.properties.agent_nickname.type},message:"must be string,null"};
+const err6 = {instancePath:instancePath+"/thread_spawn/agent_nickname",schemaPath:"#/oneOf/1/properties/thread_spawn/properties/agent_nickname/type",keyword:"type",params:{type: schema844.oneOf[1].properties.thread_spawn.properties.agent_nickname.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err6];
 }
@@ -105388,7 +110447,7 @@ vErrors = null;
 if(data0.agent_role !== undefined){
 let data3 = data0.agent_role;
 if((typeof data3 !== "string") && (data3 !== null)){
-const err10 = {instancePath:instancePath+"/thread_spawn/agent_role",schemaPath:"#/oneOf/1/properties/thread_spawn/properties/agent_role/type",keyword:"type",params:{type: schema797.oneOf[1].properties.thread_spawn.properties.agent_role.type},message:"must be string,null"};
+const err10 = {instancePath:instancePath+"/thread_spawn/agent_role",schemaPath:"#/oneOf/1/properties/thread_spawn/properties/agent_role/type",keyword:"type",params:{type: schema844.oneOf[1].properties.thread_spawn.properties.agent_role.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -105558,12 +110617,12 @@ vErrors = null;
 }
 }
 }
-validate503.errors = vErrors;
+validate543.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate502(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate542(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 const _errs0 = errors;
@@ -105581,7 +110640,7 @@ vErrors.push(err0);
 errors++;
 }
 if(!(((((data === "cli") || (data === "vscode")) || (data === "exec")) || (data === "appServer")) || (data === "unknown"))){
-const err1 = {instancePath,schemaPath:"#/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema796.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+const err1 = {instancePath,schemaPath:"#/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema843.oneOf[0].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err1];
 }
@@ -105677,8 +110736,8 @@ errors++;
 }
 }
 if(data.subAgent !== undefined){
-if(!(validate503(data.subAgent, {instancePath:instancePath+"/subAgent",parentData:data,parentDataProperty:"subAgent",rootData}))){
-vErrors = vErrors === null ? validate503.errors : vErrors.concat(validate503.errors);
+if(!(validate543(data.subAgent, {instancePath:instancePath+"/subAgent",parentData:data,parentDataProperty:"subAgent",rootData}))){
+vErrors = vErrors === null ? validate543.errors : vErrors.concat(validate543.errors);
 errors = vErrors.length;
 }
 }
@@ -105726,14 +110785,14 @@ vErrors = null;
 }
 }
 }
-validate502.errors = vErrors;
+validate542.errors = vErrors;
 return errors === 0;
 }
 
-const schema800 = {"oneOf":[{"properties":{"type":{"enum":["notLoaded"],"title":"NotLoadedThreadStatusType","type":"string"}},"required":["type"],"title":"NotLoadedThreadStatus","type":"object"},{"properties":{"type":{"enum":["idle"],"title":"IdleThreadStatusType","type":"string"}},"required":["type"],"title":"IdleThreadStatus","type":"object"},{"properties":{"type":{"enum":["systemError"],"title":"SystemErrorThreadStatusType","type":"string"}},"required":["type"],"title":"SystemErrorThreadStatus","type":"object"},{"properties":{"activeFlags":{"items":{"$ref":"#/definitions/ThreadActiveFlag"},"type":"array"},"type":{"enum":["active"],"title":"ActiveThreadStatusType","type":"string"}},"required":["activeFlags","type"],"title":"ActiveThreadStatus","type":"object"}]};
-const schema801 = {"enum":["waitingOnApproval","waitingOnUserInput"],"type":"string"};
+const schema847 = {"oneOf":[{"properties":{"type":{"enum":["notLoaded"],"title":"NotLoadedThreadStatusType","type":"string"}},"required":["type"],"title":"NotLoadedThreadStatus","type":"object"},{"properties":{"type":{"enum":["idle"],"title":"IdleThreadStatusType","type":"string"}},"required":["type"],"title":"IdleThreadStatus","type":"object"},{"properties":{"type":{"enum":["systemError"],"title":"SystemErrorThreadStatusType","type":"string"}},"required":["type"],"title":"SystemErrorThreadStatus","type":"object"},{"properties":{"activeFlags":{"items":{"$ref":"#/definitions/ThreadActiveFlag"},"type":"array"},"type":{"enum":["active"],"title":"ActiveThreadStatusType","type":"string"}},"required":["activeFlags","type"],"title":"ActiveThreadStatus","type":"object"}]};
+const schema848 = {"enum":["waitingOnApproval","waitingOnUserInput"],"type":"string"};
 
-function validate506(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate546(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 const _errs0 = errors;
@@ -105764,7 +110823,7 @@ vErrors.push(err1);
 errors++;
 }
 if(!(data0 === "notLoaded")){
-const err2 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema800.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err2 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema847.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err2];
 }
@@ -105815,7 +110874,7 @@ vErrors.push(err5);
 errors++;
 }
 if(!(data1 === "idle")){
-const err6 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema800.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err6 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema847.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err6];
 }
@@ -105871,7 +110930,7 @@ vErrors.push(err9);
 errors++;
 }
 if(!(data2 === "systemError")){
-const err10 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema800.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err10 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema847.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -105941,7 +111000,7 @@ vErrors.push(err14);
 errors++;
 }
 if(!((data4 === "waitingOnApproval") || (data4 === "waitingOnUserInput"))){
-const err15 = {instancePath:instancePath+"/activeFlags/" + i0,schemaPath:"#/definitions/ThreadActiveFlag/enum",keyword:"enum",params:{allowedValues: schema801.enum},message:"must be equal to one of the allowed values"};
+const err15 = {instancePath:instancePath+"/activeFlags/" + i0,schemaPath:"#/definitions/ThreadActiveFlag/enum",keyword:"enum",params:{allowedValues: schema848.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err15];
 }
@@ -105976,7 +111035,7 @@ vErrors.push(err17);
 errors++;
 }
 if(!(data5 === "active")){
-const err18 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema800.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err18 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema847.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err18];
 }
@@ -106031,18 +111090,18 @@ vErrors = null;
 }
 }
 }
-validate506.errors = vErrors;
+validate546.errors = vErrors;
 return errors === 0;
 }
 
-const schema803 = {"properties":{"completedAt":{"description":"Unix timestamp (in seconds) when the turn completed.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"durationMs":{"description":"Duration between turn start and completion in milliseconds, if known.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/TurnError"},{"type":"null"}],"description":"Only populated when the Turn's status is failed."},"id":{"description":"Identifier for this turn. Codex-generated turn IDs are UUIDv7.","type":"string"},"items":{"description":"Thread items currently included in this turn payload.","items":{"$ref":"#/definitions/ThreadItem"},"type":"array"},"itemsView":{"allOf":[{"$ref":"#/definitions/TurnItemsView"}],"default":"full","description":"Describes how much of `items` has been loaded for this turn."},"startedAt":{"description":"Unix timestamp (in seconds) when the turn started.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"status":{"$ref":"#/definitions/TurnStatus"}},"required":["id","items","status"],"type":"object"};
-const schema840 = {"oneOf":[{"description":"`items` was not loaded for this turn. The field is intentionally empty.","enum":["notLoaded"],"type":"string"},{"description":"`items` contains only a display summary for this turn.","enum":["summary"],"type":"string"},{"description":"`items` contains every ThreadItem available from persisted app-server history for this turn.","enum":["full"],"type":"string"}]};
-const schema841 = {"enum":["completed","interrupted","failed","inProgress"],"type":"string"};
-const schema804 = {"properties":{"additionalDetails":{"default":null,"type":["string","null"]},"codexErrorInfo":{"anyOf":[{"$ref":"#/definitions/CodexErrorInfo"},{"type":"null"}]},"message":{"type":"string"}},"required":["message"],"type":"object"};
-const schema805 = {"description":"This translation layer make sure that we expose codex error code in camel case.\n\nWhen an upstream HTTP status is available (for example, from the Responses API or a provider), it is forwarded in `httpStatusCode` on the relevant `codexErrorInfo` variant.","oneOf":[{"enum":["contextWindowExceeded","sessionBudgetExceeded","usageLimitExceeded","serverOverloaded","cyberPolicy","internalServerError","unauthorized","badRequest","threadRollbackFailed","sandboxError","other"],"type":"string"},{"additionalProperties":false,"properties":{"httpConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["httpConnectionFailed"],"title":"HttpConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Failed to connect to the response SSE stream.","properties":{"responseStreamConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamConnectionFailed"],"title":"ResponseStreamConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"The response SSE stream disconnected in the middle of a turn before completion.","properties":{"responseStreamDisconnected":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamDisconnected"],"title":"ResponseStreamDisconnectedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Reached the retry limit for responses.","properties":{"responseTooManyFailedAttempts":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseTooManyFailedAttempts"],"title":"ResponseTooManyFailedAttemptsCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Returned when `turn/start` or `turn/steer` is submitted while the current active turn cannot accept same-turn steering, for example `/review` or manual `/compact`.","properties":{"activeTurnNotSteerable":{"properties":{"turnKind":{"$ref":"#/definitions/NonSteerableTurnKind"}},"required":["turnKind"],"type":"object"}},"required":["activeTurnNotSteerable"],"title":"ActiveTurnNotSteerableCodexErrorInfo","type":"object"}]};
-const schema806 = {"enum":["review","compact"],"type":"string"};
+const schema850 = {"properties":{"completedAt":{"description":"Unix timestamp (in seconds) when the turn completed.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"durationMs":{"description":"Duration between turn start and completion in milliseconds, if known.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/TurnError"},{"type":"null"}],"description":"Only populated when the Turn's status is failed."},"id":{"description":"Identifier for this turn. Codex-generated turn IDs are UUIDv7.","type":"string"},"items":{"description":"Thread items currently included in this turn payload.","items":{"$ref":"#/definitions/ThreadItem"},"type":"array"},"itemsView":{"allOf":[{"$ref":"#/definitions/TurnItemsView"}],"default":"full","description":"Describes how much of `items` has been loaded for this turn."},"startedAt":{"description":"Unix timestamp (in seconds) when the turn started.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"status":{"$ref":"#/definitions/TurnStatus"}},"required":["id","items","status"],"type":"object"};
+const schema887 = {"oneOf":[{"description":"`items` was not loaded for this turn. The field is intentionally empty.","enum":["notLoaded"],"type":"string"},{"description":"`items` contains only a display summary for this turn.","enum":["summary"],"type":"string"},{"description":"`items` contains every ThreadItem available from persisted app-server history for this turn.","enum":["full"],"type":"string"}]};
+const schema888 = {"enum":["completed","interrupted","failed","inProgress"],"type":"string"};
+const schema851 = {"properties":{"additionalDetails":{"default":null,"type":["string","null"]},"codexErrorInfo":{"anyOf":[{"$ref":"#/definitions/CodexErrorInfo"},{"type":"null"}]},"message":{"type":"string"}},"required":["message"],"type":"object"};
+const schema852 = {"description":"This translation layer make sure that we expose codex error code in camel case.\n\nWhen an upstream HTTP status is available (for example, from the Responses API or a provider), it is forwarded in `httpStatusCode` on the relevant `codexErrorInfo` variant.","oneOf":[{"enum":["contextWindowExceeded","sessionBudgetExceeded","usageLimitExceeded","serverOverloaded","cyberPolicy","internalServerError","unauthorized","badRequest","threadRollbackFailed","sandboxError","other"],"type":"string"},{"additionalProperties":false,"properties":{"httpConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["httpConnectionFailed"],"title":"HttpConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Failed to connect to the response SSE stream.","properties":{"responseStreamConnectionFailed":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamConnectionFailed"],"title":"ResponseStreamConnectionFailedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"The response SSE stream disconnected in the middle of a turn before completion.","properties":{"responseStreamDisconnected":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseStreamDisconnected"],"title":"ResponseStreamDisconnectedCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Reached the retry limit for responses.","properties":{"responseTooManyFailedAttempts":{"properties":{"httpStatusCode":{"minimum":0,"type":["integer","null"],"maximum":65535}},"type":"object"}},"required":["responseTooManyFailedAttempts"],"title":"ResponseTooManyFailedAttemptsCodexErrorInfo","type":"object"},{"additionalProperties":false,"description":"Returned when `turn/start` or `turn/steer` is submitted while the current active turn cannot accept same-turn steering, for example `/review` or manual `/compact`.","properties":{"activeTurnNotSteerable":{"properties":{"turnKind":{"$ref":"#/definitions/NonSteerableTurnKind"}},"required":["turnKind"],"type":"object"}},"required":["activeTurnNotSteerable"],"title":"ActiveTurnNotSteerableCodexErrorInfo","type":"object"}]};
+const schema853 = {"enum":["review","compact"],"type":"string"};
 
-function validate510(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate550(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 const _errs0 = errors;
@@ -106060,7 +111119,7 @@ vErrors.push(err0);
 errors++;
 }
 if(!(((((((((((data === "contextWindowExceeded") || (data === "sessionBudgetExceeded")) || (data === "usageLimitExceeded")) || (data === "serverOverloaded")) || (data === "cyberPolicy")) || (data === "internalServerError")) || (data === "unauthorized")) || (data === "badRequest")) || (data === "threadRollbackFailed")) || (data === "sandboxError")) || (data === "other"))){
-const err1 = {instancePath,schemaPath:"#/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema805.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+const err1 = {instancePath,schemaPath:"#/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema852.oneOf[0].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err1];
 }
@@ -106104,7 +111163,7 @@ if(data0 && typeof data0 == "object" && !Array.isArray(data0)){
 if(data0.httpStatusCode !== undefined){
 let data1 = data0.httpStatusCode;
 if((!(((typeof data1 == "number") && (!(data1 % 1) && !isNaN(data1))) && (isFinite(data1)))) && (data1 !== null)){
-const err4 = {instancePath:instancePath+"/httpConnectionFailed/httpStatusCode",schemaPath:"#/oneOf/1/properties/httpConnectionFailed/properties/httpStatusCode/type",keyword:"type",params:{type: schema805.oneOf[1].properties.httpConnectionFailed.properties.httpStatusCode.type},message:"must be integer,null"};
+const err4 = {instancePath:instancePath+"/httpConnectionFailed/httpStatusCode",schemaPath:"#/oneOf/1/properties/httpConnectionFailed/properties/httpStatusCode/type",keyword:"type",params:{type: schema852.oneOf[1].properties.httpConnectionFailed.properties.httpStatusCode.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -106199,7 +111258,7 @@ if(data2 && typeof data2 == "object" && !Array.isArray(data2)){
 if(data2.httpStatusCode !== undefined){
 let data3 = data2.httpStatusCode;
 if((!(((typeof data3 == "number") && (!(data3 % 1) && !isNaN(data3))) && (isFinite(data3)))) && (data3 !== null)){
-const err11 = {instancePath:instancePath+"/responseStreamConnectionFailed/httpStatusCode",schemaPath:"#/oneOf/2/properties/responseStreamConnectionFailed/properties/httpStatusCode/type",keyword:"type",params:{type: schema805.oneOf[2].properties.responseStreamConnectionFailed.properties.httpStatusCode.type},message:"must be integer,null"};
+const err11 = {instancePath:instancePath+"/responseStreamConnectionFailed/httpStatusCode",schemaPath:"#/oneOf/2/properties/responseStreamConnectionFailed/properties/httpStatusCode/type",keyword:"type",params:{type: schema852.oneOf[2].properties.responseStreamConnectionFailed.properties.httpStatusCode.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err11];
 }
@@ -106294,7 +111353,7 @@ if(data4 && typeof data4 == "object" && !Array.isArray(data4)){
 if(data4.httpStatusCode !== undefined){
 let data5 = data4.httpStatusCode;
 if((!(((typeof data5 == "number") && (!(data5 % 1) && !isNaN(data5))) && (isFinite(data5)))) && (data5 !== null)){
-const err18 = {instancePath:instancePath+"/responseStreamDisconnected/httpStatusCode",schemaPath:"#/oneOf/3/properties/responseStreamDisconnected/properties/httpStatusCode/type",keyword:"type",params:{type: schema805.oneOf[3].properties.responseStreamDisconnected.properties.httpStatusCode.type},message:"must be integer,null"};
+const err18 = {instancePath:instancePath+"/responseStreamDisconnected/httpStatusCode",schemaPath:"#/oneOf/3/properties/responseStreamDisconnected/properties/httpStatusCode/type",keyword:"type",params:{type: schema852.oneOf[3].properties.responseStreamDisconnected.properties.httpStatusCode.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err18];
 }
@@ -106389,7 +111448,7 @@ if(data6 && typeof data6 == "object" && !Array.isArray(data6)){
 if(data6.httpStatusCode !== undefined){
 let data7 = data6.httpStatusCode;
 if((!(((typeof data7 == "number") && (!(data7 % 1) && !isNaN(data7))) && (isFinite(data7)))) && (data7 !== null)){
-const err25 = {instancePath:instancePath+"/responseTooManyFailedAttempts/httpStatusCode",schemaPath:"#/oneOf/4/properties/responseTooManyFailedAttempts/properties/httpStatusCode/type",keyword:"type",params:{type: schema805.oneOf[4].properties.responseTooManyFailedAttempts.properties.httpStatusCode.type},message:"must be integer,null"};
+const err25 = {instancePath:instancePath+"/responseTooManyFailedAttempts/httpStatusCode",schemaPath:"#/oneOf/4/properties/responseTooManyFailedAttempts/properties/httpStatusCode/type",keyword:"type",params:{type: schema852.oneOf[4].properties.responseTooManyFailedAttempts.properties.httpStatusCode.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err25];
 }
@@ -106504,7 +111563,7 @@ vErrors.push(err33);
 errors++;
 }
 if(!((data9 === "review") || (data9 === "compact"))){
-const err34 = {instancePath:instancePath+"/activeTurnNotSteerable/turnKind",schemaPath:"#/definitions/NonSteerableTurnKind/enum",keyword:"enum",params:{allowedValues: schema806.enum},message:"must be equal to one of the allowed values"};
+const err34 = {instancePath:instancePath+"/activeTurnNotSteerable/turnKind",schemaPath:"#/definitions/NonSteerableTurnKind/enum",keyword:"enum",params:{allowedValues: schema853.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err34];
 }
@@ -106573,12 +111632,12 @@ vErrors = null;
 }
 }
 }
-validate510.errors = vErrors;
+validate550.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate509(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate549(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -106595,7 +111654,7 @@ errors++;
 if(data.additionalDetails !== undefined){
 let data0 = data.additionalDetails;
 if((typeof data0 !== "string") && (data0 !== null)){
-const err1 = {instancePath:instancePath+"/additionalDetails",schemaPath:"#/properties/additionalDetails/type",keyword:"type",params:{type: schema804.properties.additionalDetails.type},message:"must be string,null"};
+const err1 = {instancePath:instancePath+"/additionalDetails",schemaPath:"#/properties/additionalDetails/type",keyword:"type",params:{type: schema851.properties.additionalDetails.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err1];
 }
@@ -106610,8 +111669,8 @@ let data1 = data.codexErrorInfo;
 const _errs4 = errors;
 let valid1 = false;
 const _errs5 = errors;
-if(!(validate510(data1, {instancePath:instancePath+"/codexErrorInfo",parentData:data,parentDataProperty:"codexErrorInfo",rootData}))){
-vErrors = vErrors === null ? validate510.errors : vErrors.concat(validate510.errors);
+if(!(validate550(data1, {instancePath:instancePath+"/codexErrorInfo",parentData:data,parentDataProperty:"codexErrorInfo",rootData}))){
+vErrors = vErrors === null ? validate550.errors : vErrors.concat(validate550.errors);
 errors = vErrors.length;
 }
 var _valid0 = _errs5 === errors;
@@ -106676,32 +111735,32 @@ vErrors.push(err5);
 }
 errors++;
 }
-validate509.errors = vErrors;
+validate549.errors = vErrors;
 return errors === 0;
 }
 
-const schema807 = {"oneOf":[{"properties":{"clientId":{"type":["string","null"]},"content":{"items":{"$ref":"#/definitions/UserInput"},"type":"array"},"id":{"type":"string"},"type":{"enum":["userMessage"],"title":"UserMessageThreadItemType","type":"string"}},"required":["content","id","type"],"title":"UserMessageThreadItem","type":"object"},{"properties":{"fragments":{"items":{"$ref":"#/definitions/HookPromptFragment"},"type":"array"},"id":{"type":"string"},"type":{"enum":["hookPrompt"],"title":"HookPromptThreadItemType","type":"string"}},"required":["fragments","id","type"],"title":"HookPromptThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"memoryCitation":{"anyOf":[{"$ref":"#/definitions/MemoryCitation"},{"type":"null"}],"default":null},"phase":{"anyOf":[{"$ref":"#/definitions/MessagePhase"},{"type":"null"}],"default":null},"text":{"type":"string"},"type":{"enum":["agentMessage"],"title":"AgentMessageThreadItemType","type":"string"}},"required":["id","text","type"],"title":"AgentMessageThreadItem","type":"object"},{"description":"EXPERIMENTAL - proposed plan item content. The completed plan item is authoritative and may not match the concatenation of `PlanDelta` text.","properties":{"id":{"type":"string"},"text":{"type":"string"},"type":{"enum":["plan"],"title":"PlanThreadItemType","type":"string"}},"required":["id","text","type"],"title":"PlanThreadItem","type":"object"},{"properties":{"content":{"default":[],"items":{"type":"string"},"type":"array"},"id":{"type":"string"},"summary":{"default":[],"items":{"type":"string"},"type":"array"},"type":{"enum":["reasoning"],"title":"ReasoningThreadItemType","type":"string"}},"required":["id","type"],"title":"ReasoningThreadItem","type":"object"},{"properties":{"aggregatedOutput":{"description":"The command's output, aggregated from stdout and stderr.","type":["string","null"]},"command":{"description":"The command to be executed.","type":"string"},"commandActions":{"description":"A best-effort parsing of the command to understand the action(s) it will perform. This returns a list of CommandAction objects because a single shell command may be composed of many commands piped together.","items":{"$ref":"#/definitions/CommandAction"},"type":"array"},"cwd":{"allOf":[{"$ref":"#/definitions/LegacyAppPathString"}],"description":"The command's working directory."},"durationMs":{"description":"The duration of the command execution in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"exitCode":{"description":"The command's exit code.","type":["integer","null"],"minimum":-2147483648,"maximum":2147483647},"id":{"type":"string"},"processId":{"description":"Identifier for the underlying PTY process (when available).","type":["string","null"]},"source":{"allOf":[{"$ref":"#/definitions/CommandExecutionSource"}],"default":"agent"},"status":{"$ref":"#/definitions/CommandExecutionStatus"},"type":{"enum":["commandExecution"],"title":"CommandExecutionThreadItemType","type":"string"}},"required":["command","commandActions","cwd","id","status","type"],"title":"CommandExecutionThreadItem","type":"object"},{"properties":{"changes":{"items":{"$ref":"#/definitions/FileUpdateChange"},"type":"array"},"id":{"type":"string"},"status":{"$ref":"#/definitions/PatchApplyStatus"},"type":{"enum":["fileChange"],"title":"FileChangeThreadItemType","type":"string"}},"required":["changes","id","status","type"],"title":"FileChangeThreadItem","type":"object"},{"properties":{"appContext":{"anyOf":[{"$ref":"#/definitions/McpToolCallAppContext"},{"type":"null"}]},"arguments":true,"durationMs":{"description":"The duration of the MCP tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/McpToolCallError"},{"type":"null"}]},"id":{"type":"string"},"mcpAppResourceUri":{"description":"Deprecated: use `appContext.resourceUri` instead.","type":["string","null"]},"pluginId":{"type":["string","null"]},"result":{"anyOf":[{"$ref":"#/definitions/McpToolCallResult"},{"type":"null"}]},"server":{"type":"string"},"status":{"$ref":"#/definitions/McpToolCallStatus"},"tool":{"type":"string"},"type":{"enum":["mcpToolCall"],"title":"McpToolCallThreadItemType","type":"string"}},"required":["arguments","id","server","status","tool","type"],"title":"McpToolCallThreadItem","type":"object"},{"properties":{"arguments":true,"contentItems":{"items":{"$ref":"#/definitions/DynamicToolCallOutputContentItem"},"type":["array","null"]},"durationMs":{"description":"The duration of the dynamic tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"id":{"type":"string"},"namespace":{"type":["string","null"]},"status":{"$ref":"#/definitions/DynamicToolCallStatus"},"success":{"type":["boolean","null"]},"tool":{"type":"string"},"type":{"enum":["dynamicToolCall"],"title":"DynamicToolCallThreadItemType","type":"string"}},"required":["arguments","id","status","tool","type"],"title":"DynamicToolCallThreadItem","type":"object"},{"properties":{"agentsStates":{"additionalProperties":{"$ref":"#/definitions/CollabAgentState"},"description":"Last known status of the target agents, when available.","type":"object"},"id":{"description":"Unique identifier for this collab tool call.","type":"string"},"model":{"description":"Model requested for the spawned agent, when applicable.","type":["string","null"]},"prompt":{"description":"Prompt text sent as part of the collab tool call, when available.","type":["string","null"]},"reasoningEffort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}],"description":"Reasoning effort requested for the spawned agent, when applicable."},"receiverThreadIds":{"description":"Thread ID of the receiving agent, when applicable. In case of spawn operation, this corresponds to the newly spawned agent.","items":{"type":"string"},"type":"array"},"senderThreadId":{"description":"Thread ID of the agent issuing the collab request.","type":"string"},"status":{"allOf":[{"$ref":"#/definitions/CollabAgentToolCallStatus"}],"description":"Current status of the collab tool call."},"tool":{"allOf":[{"$ref":"#/definitions/CollabAgentTool"}],"description":"Name of the collab tool that was invoked."},"type":{"enum":["collabAgentToolCall"],"title":"CollabAgentToolCallThreadItemType","type":"string"}},"required":["agentsStates","id","receiverThreadIds","senderThreadId","status","tool","type"],"title":"CollabAgentToolCallThreadItem","type":"object"},{"properties":{"agentPath":{"type":"string"},"agentThreadId":{"type":"string"},"id":{"type":"string"},"kind":{"$ref":"#/definitions/SubAgentActivityKind"},"type":{"enum":["subAgentActivity"],"title":"SubAgentActivityThreadItemType","type":"string"}},"required":["agentPath","agentThreadId","id","kind","type"],"title":"SubAgentActivityThreadItem","type":"object"},{"properties":{"action":{"anyOf":[{"$ref":"#/definitions/WebSearchAction"},{"type":"null"}]},"id":{"type":"string"},"query":{"type":"string"},"type":{"enum":["webSearch"],"title":"WebSearchThreadItemType","type":"string"}},"required":["id","query","type"],"title":"WebSearchThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"path":{"$ref":"#/definitions/LegacyAppPathString"},"type":{"enum":["imageView"],"title":"ImageViewThreadItemType","type":"string"}},"required":["id","path","type"],"title":"ImageViewThreadItem","type":"object"},{"properties":{"durationMs":{"minimum":0,"type":"integer","maximum":9007199254740991},"id":{"type":"string"},"type":{"enum":["sleep"],"title":"SleepThreadItemType","type":"string"}},"required":["durationMs","id","type"],"title":"SleepThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"result":{"type":"string"},"revisedPrompt":{"type":["string","null"]},"savedPath":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}]},"status":{"type":"string"},"type":{"enum":["imageGeneration"],"title":"ImageGenerationThreadItemType","type":"string"}},"required":["id","result","status","type"],"title":"ImageGenerationThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["enteredReviewMode"],"title":"EnteredReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"EnteredReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["exitedReviewMode"],"title":"ExitedReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"ExitedReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"type":{"enum":["contextCompaction"],"title":"ContextCompactionThreadItemType","type":"string"}},"required":["id","type"],"title":"ContextCompactionThreadItem","type":"object"}]};
-const schema813 = {"properties":{"hookRunId":{"type":"string"},"text":{"type":"string"}},"required":["hookRunId","text"],"type":"object"};
-const schema816 = {"description":"Classifies an assistant message as interim commentary or final answer text.\n\nProviders do not emit this consistently, so callers must treat `None` as \"phase unknown\" and keep compatibility behavior for legacy models.","oneOf":[{"description":"Mid-turn assistant text (for example preamble/progress narration).\n\nAdditional tool calls or assistant output may follow before turn completion.","enum":["commentary"],"type":"string"},{"description":"The assistant's terminal answer text for the current turn.","enum":["final_answer"],"type":"string"}]};
-const schema820 = {"enum":["agent","userShell","unifiedExecStartup","unifiedExecInteraction"],"type":"string"};
-const schema821 = {"enum":["inProgress","completed","failed","declined"],"type":"string"};
-const schema824 = {"enum":["inProgress","completed","failed","declined"],"type":"string"};
-const schema825 = {"properties":{"actionName":{"type":["string","null"]},"appName":{"type":["string","null"]},"connectorId":{"type":"string"},"linkId":{"type":["string","null"]},"resourceUri":{"type":["string","null"]},"templateId":{"type":["string","null"]}},"required":["connectorId"],"type":"object"};
-const schema826 = {"properties":{"message":{"type":"string"}},"required":["message"],"type":"object"};
-const schema827 = {"properties":{"_meta":true,"content":{"items":true,"type":"array"},"structuredContent":true},"required":["content"],"type":"object"};
-const schema828 = {"enum":["inProgress","completed","failed"],"type":"string"};
-const schema829 = {"oneOf":[{"properties":{"text":{"type":"string"},"type":{"enum":["inputText"],"title":"InputTextDynamicToolCallOutputContentItemType","type":"string"}},"required":["text","type"],"title":"InputTextDynamicToolCallOutputContentItem","type":"object"},{"properties":{"imageUrl":{"type":"string"},"type":{"enum":["inputImage"],"title":"InputImageDynamicToolCallOutputContentItemType","type":"string"}},"required":["imageUrl","type"],"title":"InputImageDynamicToolCallOutputContentItem","type":"object"}]};
-const schema830 = {"enum":["inProgress","completed","failed"],"type":"string"};
-const schema834 = {"enum":["inProgress","completed","failed"],"type":"string"};
-const schema835 = {"enum":["spawnAgent","sendInput","resumeAgent","wait","closeAgent"],"type":"string"};
-const schema836 = {"enum":["started","interacted","interrupted"],"type":"string"};
-const schema837 = {"oneOf":[{"properties":{"queries":{"items":{"type":"string"},"type":["array","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchWebSearchActionType","type":"string"}},"required":["type"],"title":"SearchWebSearchAction","type":"object"},{"properties":{"type":{"enum":["openPage"],"title":"OpenPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"OpenPageWebSearchAction","type":"object"},{"properties":{"pattern":{"type":["string","null"]},"type":{"enum":["findInPage"],"title":"FindInPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"FindInPageWebSearchAction","type":"object"},{"properties":{"type":{"enum":["other"],"title":"OtherWebSearchActionType","type":"string"}},"required":["type"],"title":"OtherWebSearchAction","type":"object"}]};
-const schema808 = {"oneOf":[{"properties":{"text":{"type":"string"},"text_elements":{"default":[],"description":"UI-defined spans within `text` used to render or persist special elements.","items":{"$ref":"#/definitions/TextElement"},"type":"array"},"type":{"enum":["text"],"title":"TextUserInputType","type":"string"}},"required":["text","type"],"title":"TextUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"type":{"enum":["image"],"title":"ImageUserInputType","type":"string"},"url":{"type":"string"}},"required":["type","url"],"title":"ImageUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"path":{"type":"string"},"type":{"enum":["localImage"],"title":"LocalImageUserInputType","type":"string"}},"required":["path","type"],"title":"LocalImageUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["skill"],"title":"SkillUserInputType","type":"string"}},"required":["name","path","type"],"title":"SkillUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["mention"],"title":"MentionUserInputType","type":"string"}},"required":["name","path","type"],"title":"MentionUserInput","type":"object"}]};
-const schema811 = {"enum":["auto","low","high","original"],"type":"string"};
-const schema809 = {"properties":{"byteRange":{"allOf":[{"$ref":"#/definitions/ByteRange"}],"description":"Byte range in the parent `text` buffer that this element occupies."},"placeholder":{"description":"Optional human-readable placeholder for the element, displayed in the UI.","type":["string","null"]}},"required":["byteRange"],"type":"object"};
-const schema810 = {"properties":{"end":{"minimum":0,"type":"integer","maximum":9007199254740991},"start":{"minimum":0,"type":"integer","maximum":9007199254740991}},"required":["end","start"],"type":"object"};
+const schema854 = {"oneOf":[{"properties":{"clientId":{"type":["string","null"]},"content":{"items":{"$ref":"#/definitions/UserInput"},"type":"array"},"id":{"type":"string"},"type":{"enum":["userMessage"],"title":"UserMessageThreadItemType","type":"string"}},"required":["content","id","type"],"title":"UserMessageThreadItem","type":"object"},{"properties":{"fragments":{"items":{"$ref":"#/definitions/HookPromptFragment"},"type":"array"},"id":{"type":"string"},"type":{"enum":["hookPrompt"],"title":"HookPromptThreadItemType","type":"string"}},"required":["fragments","id","type"],"title":"HookPromptThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"memoryCitation":{"anyOf":[{"$ref":"#/definitions/MemoryCitation"},{"type":"null"}],"default":null},"phase":{"anyOf":[{"$ref":"#/definitions/MessagePhase"},{"type":"null"}],"default":null},"text":{"type":"string"},"type":{"enum":["agentMessage"],"title":"AgentMessageThreadItemType","type":"string"}},"required":["id","text","type"],"title":"AgentMessageThreadItem","type":"object"},{"description":"EXPERIMENTAL - proposed plan item content. The completed plan item is authoritative and may not match the concatenation of `PlanDelta` text.","properties":{"id":{"type":"string"},"text":{"type":"string"},"type":{"enum":["plan"],"title":"PlanThreadItemType","type":"string"}},"required":["id","text","type"],"title":"PlanThreadItem","type":"object"},{"properties":{"content":{"default":[],"items":{"type":"string"},"type":"array"},"id":{"type":"string"},"summary":{"default":[],"items":{"type":"string"},"type":"array"},"type":{"enum":["reasoning"],"title":"ReasoningThreadItemType","type":"string"}},"required":["id","type"],"title":"ReasoningThreadItem","type":"object"},{"properties":{"aggregatedOutput":{"description":"The command's output, aggregated from stdout and stderr.","type":["string","null"]},"command":{"description":"The command to be executed.","type":"string"},"commandActions":{"description":"A best-effort parsing of the command to understand the action(s) it will perform. This returns a list of CommandAction objects because a single shell command may be composed of many commands piped together.","items":{"$ref":"#/definitions/CommandAction"},"type":"array"},"cwd":{"allOf":[{"$ref":"#/definitions/LegacyAppPathString"}],"description":"The command's working directory."},"durationMs":{"description":"The duration of the command execution in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"exitCode":{"description":"The command's exit code.","type":["integer","null"],"minimum":-2147483648,"maximum":2147483647},"id":{"type":"string"},"processId":{"description":"Identifier for the underlying PTY process (when available).","type":["string","null"]},"source":{"allOf":[{"$ref":"#/definitions/CommandExecutionSource"}],"default":"agent"},"status":{"$ref":"#/definitions/CommandExecutionStatus"},"type":{"enum":["commandExecution"],"title":"CommandExecutionThreadItemType","type":"string"}},"required":["command","commandActions","cwd","id","status","type"],"title":"CommandExecutionThreadItem","type":"object"},{"properties":{"changes":{"items":{"$ref":"#/definitions/FileUpdateChange"},"type":"array"},"id":{"type":"string"},"status":{"$ref":"#/definitions/PatchApplyStatus"},"type":{"enum":["fileChange"],"title":"FileChangeThreadItemType","type":"string"}},"required":["changes","id","status","type"],"title":"FileChangeThreadItem","type":"object"},{"properties":{"appContext":{"anyOf":[{"$ref":"#/definitions/McpToolCallAppContext"},{"type":"null"}]},"arguments":true,"durationMs":{"description":"The duration of the MCP tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"error":{"anyOf":[{"$ref":"#/definitions/McpToolCallError"},{"type":"null"}]},"id":{"type":"string"},"mcpAppResourceUri":{"description":"Deprecated: use `appContext.resourceUri` instead.","type":["string","null"]},"pluginId":{"type":["string","null"]},"result":{"anyOf":[{"$ref":"#/definitions/McpToolCallResult"},{"type":"null"}]},"server":{"type":"string"},"status":{"$ref":"#/definitions/McpToolCallStatus"},"tool":{"type":"string"},"type":{"enum":["mcpToolCall"],"title":"McpToolCallThreadItemType","type":"string"}},"required":["arguments","id","server","status","tool","type"],"title":"McpToolCallThreadItem","type":"object"},{"properties":{"arguments":true,"contentItems":{"items":{"$ref":"#/definitions/DynamicToolCallOutputContentItem"},"type":["array","null"]},"durationMs":{"description":"The duration of the dynamic tool call in milliseconds.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"id":{"type":"string"},"namespace":{"type":["string","null"]},"status":{"$ref":"#/definitions/DynamicToolCallStatus"},"success":{"type":["boolean","null"]},"tool":{"type":"string"},"type":{"enum":["dynamicToolCall"],"title":"DynamicToolCallThreadItemType","type":"string"}},"required":["arguments","id","status","tool","type"],"title":"DynamicToolCallThreadItem","type":"object"},{"properties":{"agentsStates":{"additionalProperties":{"$ref":"#/definitions/CollabAgentState"},"description":"Last known status of the target agents, when available.","type":"object"},"id":{"description":"Unique identifier for this collab tool call.","type":"string"},"model":{"description":"Model requested for the spawned agent, when applicable.","type":["string","null"]},"prompt":{"description":"Prompt text sent as part of the collab tool call, when available.","type":["string","null"]},"reasoningEffort":{"anyOf":[{"$ref":"#/definitions/ReasoningEffort"},{"type":"null"}],"description":"Reasoning effort requested for the spawned agent, when applicable."},"receiverThreadIds":{"description":"Thread ID of the receiving agent, when applicable. In case of spawn operation, this corresponds to the newly spawned agent.","items":{"type":"string"},"type":"array"},"senderThreadId":{"description":"Thread ID of the agent issuing the collab request.","type":"string"},"status":{"allOf":[{"$ref":"#/definitions/CollabAgentToolCallStatus"}],"description":"Current status of the collab tool call."},"tool":{"allOf":[{"$ref":"#/definitions/CollabAgentTool"}],"description":"Name of the collab tool that was invoked."},"type":{"enum":["collabAgentToolCall"],"title":"CollabAgentToolCallThreadItemType","type":"string"}},"required":["agentsStates","id","receiverThreadIds","senderThreadId","status","tool","type"],"title":"CollabAgentToolCallThreadItem","type":"object"},{"properties":{"agentPath":{"type":"string"},"agentThreadId":{"type":"string"},"id":{"type":"string"},"kind":{"$ref":"#/definitions/SubAgentActivityKind"},"type":{"enum":["subAgentActivity"],"title":"SubAgentActivityThreadItemType","type":"string"}},"required":["agentPath","agentThreadId","id","kind","type"],"title":"SubAgentActivityThreadItem","type":"object"},{"properties":{"action":{"anyOf":[{"$ref":"#/definitions/WebSearchAction"},{"type":"null"}]},"id":{"type":"string"},"query":{"type":"string"},"type":{"enum":["webSearch"],"title":"WebSearchThreadItemType","type":"string"}},"required":["id","query","type"],"title":"WebSearchThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"path":{"$ref":"#/definitions/LegacyAppPathString"},"type":{"enum":["imageView"],"title":"ImageViewThreadItemType","type":"string"}},"required":["id","path","type"],"title":"ImageViewThreadItem","type":"object"},{"properties":{"durationMs":{"minimum":0,"type":"integer","maximum":9007199254740991},"id":{"type":"string"},"type":{"enum":["sleep"],"title":"SleepThreadItemType","type":"string"}},"required":["durationMs","id","type"],"title":"SleepThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"result":{"type":"string"},"revisedPrompt":{"type":["string","null"]},"savedPath":{"anyOf":[{"$ref":"#/definitions/AbsolutePathBuf"},{"type":"null"}]},"status":{"type":"string"},"type":{"enum":["imageGeneration"],"title":"ImageGenerationThreadItemType","type":"string"}},"required":["id","result","status","type"],"title":"ImageGenerationThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["enteredReviewMode"],"title":"EnteredReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"EnteredReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"review":{"type":"string"},"type":{"enum":["exitedReviewMode"],"title":"ExitedReviewModeThreadItemType","type":"string"}},"required":["id","review","type"],"title":"ExitedReviewModeThreadItem","type":"object"},{"properties":{"id":{"type":"string"},"type":{"enum":["contextCompaction"],"title":"ContextCompactionThreadItemType","type":"string"}},"required":["id","type"],"title":"ContextCompactionThreadItem","type":"object"}]};
+const schema860 = {"properties":{"hookRunId":{"type":"string"},"text":{"type":"string"}},"required":["hookRunId","text"],"type":"object"};
+const schema863 = {"description":"Classifies an assistant message as interim commentary or final answer text.\n\nProviders do not emit this consistently, so callers must treat `None` as \"phase unknown\" and keep compatibility behavior for legacy models.","oneOf":[{"description":"Mid-turn assistant text (for example preamble/progress narration).\n\nAdditional tool calls or assistant output may follow before turn completion.","enum":["commentary"],"type":"string"},{"description":"The assistant's terminal answer text for the current turn.","enum":["final_answer"],"type":"string"}]};
+const schema867 = {"enum":["agent","userShell","unifiedExecStartup","unifiedExecInteraction"],"type":"string"};
+const schema868 = {"enum":["inProgress","completed","failed","declined"],"type":"string"};
+const schema871 = {"enum":["inProgress","completed","failed","declined"],"type":"string"};
+const schema872 = {"properties":{"actionName":{"type":["string","null"]},"appName":{"type":["string","null"]},"connectorId":{"type":"string"},"linkId":{"type":["string","null"]},"resourceUri":{"type":["string","null"]},"templateId":{"type":["string","null"]}},"required":["connectorId"],"type":"object"};
+const schema873 = {"properties":{"message":{"type":"string"}},"required":["message"],"type":"object"};
+const schema874 = {"properties":{"_meta":true,"content":{"items":true,"type":"array"},"structuredContent":true},"required":["content"],"type":"object"};
+const schema875 = {"enum":["inProgress","completed","failed"],"type":"string"};
+const schema876 = {"oneOf":[{"properties":{"text":{"type":"string"},"type":{"enum":["inputText"],"title":"InputTextDynamicToolCallOutputContentItemType","type":"string"}},"required":["text","type"],"title":"InputTextDynamicToolCallOutputContentItem","type":"object"},{"properties":{"imageUrl":{"type":"string"},"type":{"enum":["inputImage"],"title":"InputImageDynamicToolCallOutputContentItemType","type":"string"}},"required":["imageUrl","type"],"title":"InputImageDynamicToolCallOutputContentItem","type":"object"}]};
+const schema877 = {"enum":["inProgress","completed","failed"],"type":"string"};
+const schema881 = {"enum":["inProgress","completed","failed"],"type":"string"};
+const schema882 = {"enum":["spawnAgent","sendInput","resumeAgent","wait","closeAgent"],"type":"string"};
+const schema883 = {"enum":["started","interacted","interrupted"],"type":"string"};
+const schema884 = {"oneOf":[{"properties":{"queries":{"items":{"type":"string"},"type":["array","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchWebSearchActionType","type":"string"}},"required":["type"],"title":"SearchWebSearchAction","type":"object"},{"properties":{"type":{"enum":["openPage"],"title":"OpenPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"OpenPageWebSearchAction","type":"object"},{"properties":{"pattern":{"type":["string","null"]},"type":{"enum":["findInPage"],"title":"FindInPageWebSearchActionType","type":"string"},"url":{"type":["string","null"]}},"required":["type"],"title":"FindInPageWebSearchAction","type":"object"},{"properties":{"type":{"enum":["other"],"title":"OtherWebSearchActionType","type":"string"}},"required":["type"],"title":"OtherWebSearchAction","type":"object"}]};
+const schema855 = {"oneOf":[{"properties":{"text":{"type":"string"},"text_elements":{"default":[],"description":"UI-defined spans within `text` used to render or persist special elements.","items":{"$ref":"#/definitions/TextElement"},"type":"array"},"type":{"enum":["text"],"title":"TextUserInputType","type":"string"}},"required":["text","type"],"title":"TextUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"type":{"enum":["image"],"title":"ImageUserInputType","type":"string"},"url":{"type":"string"}},"required":["type","url"],"title":"ImageUserInput","type":"object"},{"properties":{"detail":{"anyOf":[{"$ref":"#/definitions/ImageDetail"},{"type":"null"}],"default":null},"path":{"type":"string"},"type":{"enum":["localImage"],"title":"LocalImageUserInputType","type":"string"}},"required":["path","type"],"title":"LocalImageUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["skill"],"title":"SkillUserInputType","type":"string"}},"required":["name","path","type"],"title":"SkillUserInput","type":"object"},{"properties":{"name":{"type":"string"},"path":{"type":"string"},"type":{"enum":["mention"],"title":"MentionUserInputType","type":"string"}},"required":["name","path","type"],"title":"MentionUserInput","type":"object"}]};
+const schema858 = {"enum":["auto","low","high","original"],"type":"string"};
+const schema856 = {"properties":{"byteRange":{"allOf":[{"$ref":"#/definitions/ByteRange"}],"description":"Byte range in the parent `text` buffer that this element occupies."},"placeholder":{"description":"Optional human-readable placeholder for the element, displayed in the UI.","type":["string","null"]}},"required":["byteRange"],"type":"object"};
+const schema857 = {"properties":{"end":{"minimum":0,"type":"integer","maximum":9007199254740991},"start":{"minimum":0,"type":"integer","maximum":9007199254740991}},"required":["end","start"],"type":"object"};
 
-function validate515(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate555(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -106823,7 +111882,7 @@ errors++;
 if(data.placeholder !== undefined){
 let data3 = data.placeholder;
 if((typeof data3 !== "string") && (data3 !== null)){
-const err10 = {instancePath:instancePath+"/placeholder",schemaPath:"#/properties/placeholder/type",keyword:"type",params:{type: schema809.properties.placeholder.type},message:"must be string,null"};
+const err10 = {instancePath:instancePath+"/placeholder",schemaPath:"#/properties/placeholder/type",keyword:"type",params:{type: schema856.properties.placeholder.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -106844,12 +111903,12 @@ vErrors.push(err11);
 }
 errors++;
 }
-validate515.errors = vErrors;
+validate555.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate514(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate554(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 const _errs0 = errors;
@@ -106894,8 +111953,8 @@ let data1 = data.text_elements;
 if(Array.isArray(data1)){
 const len0 = data1.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate515(data1[i0], {instancePath:instancePath+"/text_elements/" + i0,parentData:data1,parentDataProperty:i0,rootData}))){
-vErrors = vErrors === null ? validate515.errors : vErrors.concat(validate515.errors);
+if(!(validate555(data1[i0], {instancePath:instancePath+"/text_elements/" + i0,parentData:data1,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate555.errors : vErrors.concat(validate555.errors);
 errors = vErrors.length;
 }
 }
@@ -106924,7 +111983,7 @@ vErrors.push(err4);
 errors++;
 }
 if(!(data3 === "text")){
-const err5 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema808.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err5 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema855.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err5];
 }
@@ -106988,7 +112047,7 @@ vErrors.push(err9);
 errors++;
 }
 if(!((((data4 === "auto") || (data4 === "low")) || (data4 === "high")) || (data4 === "original"))){
-const err10 = {instancePath:instancePath+"/detail",schemaPath:"#/definitions/ImageDetail/enum",keyword:"enum",params:{allowedValues: schema811.enum},message:"must be equal to one of the allowed values"};
+const err10 = {instancePath:instancePath+"/detail",schemaPath:"#/definitions/ImageDetail/enum",keyword:"enum",params:{allowedValues: schema858.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -107049,7 +112108,7 @@ vErrors.push(err13);
 errors++;
 }
 if(!(data5 === "image")){
-const err14 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema808.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err14 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema855.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err14];
 }
@@ -107130,7 +112189,7 @@ vErrors.push(err19);
 errors++;
 }
 if(!((((data7 === "auto") || (data7 === "low")) || (data7 === "high")) || (data7 === "original"))){
-const err20 = {instancePath:instancePath+"/detail",schemaPath:"#/definitions/ImageDetail/enum",keyword:"enum",params:{allowedValues: schema811.enum},message:"must be equal to one of the allowed values"};
+const err20 = {instancePath:instancePath+"/detail",schemaPath:"#/definitions/ImageDetail/enum",keyword:"enum",params:{allowedValues: schema858.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -107203,7 +112262,7 @@ vErrors.push(err24);
 errors++;
 }
 if(!(data9 === "localImage")){
-const err25 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema808.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err25 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema855.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err25];
 }
@@ -107303,7 +112362,7 @@ vErrors.push(err32);
 errors++;
 }
 if(!(data12 === "skill")){
-const err33 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema808.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err33 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema855.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err33];
 }
@@ -107403,7 +112462,7 @@ vErrors.push(err40);
 errors++;
 }
 if(!(data15 === "mention")){
-const err41 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/enum",keyword:"enum",params:{allowedValues: schema808.oneOf[4].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err41 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/enum",keyword:"enum",params:{allowedValues: schema855.oneOf[4].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err41];
 }
@@ -107459,14 +112518,14 @@ vErrors = null;
 }
 }
 }
-validate514.errors = vErrors;
+validate554.errors = vErrors;
 return errors === 0;
 }
 
-const schema814 = {"properties":{"entries":{"items":{"$ref":"#/definitions/MemoryCitationEntry"},"type":"array"},"threadIds":{"items":{"type":"string"},"type":"array"}},"required":["entries","threadIds"],"type":"object"};
-const schema815 = {"properties":{"lineEnd":{"minimum":0,"type":"integer","maximum":4294967295},"lineStart":{"minimum":0,"type":"integer","maximum":4294967295},"note":{"type":"string"},"path":{"type":"string"}},"required":["lineEnd","lineStart","note","path"],"type":"object"};
+const schema861 = {"properties":{"entries":{"items":{"$ref":"#/definitions/MemoryCitationEntry"},"type":"array"},"threadIds":{"items":{"type":"string"},"type":"array"}},"required":["entries","threadIds"],"type":"object"};
+const schema862 = {"properties":{"lineEnd":{"minimum":0,"type":"integer","maximum":4294967295},"lineStart":{"minimum":0,"type":"integer","maximum":4294967295},"note":{"type":"string"},"path":{"type":"string"}},"required":["lineEnd","lineStart","note","path"],"type":"object"};
 
-function validate518(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate558(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -107694,13 +112753,13 @@ vErrors.push(err18);
 }
 errors++;
 }
-validate518.errors = vErrors;
+validate558.errors = vErrors;
 return errors === 0;
 }
 
-const schema817 = {"oneOf":[{"properties":{"command":{"type":"string"},"name":{"type":"string"},"path":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["read"],"title":"ReadCommandActionType","type":"string"}},"required":["command","name","path","type"],"title":"ReadCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"type":{"enum":["listFiles"],"title":"ListFilesCommandActionType","type":"string"}},"required":["command","type"],"title":"ListFilesCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchCommandActionType","type":"string"}},"required":["command","type"],"title":"SearchCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"type":{"enum":["unknown"],"title":"UnknownCommandActionType","type":"string"}},"required":["command","type"],"title":"UnknownCommandAction","type":"object"}]};
+const schema864 = {"oneOf":[{"properties":{"command":{"type":"string"},"name":{"type":"string"},"path":{"$ref":"#/definitions/AbsolutePathBuf"},"type":{"enum":["read"],"title":"ReadCommandActionType","type":"string"}},"required":["command","name","path","type"],"title":"ReadCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"type":{"enum":["listFiles"],"title":"ListFilesCommandActionType","type":"string"}},"required":["command","type"],"title":"ListFilesCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"path":{"type":["string","null"]},"query":{"type":["string","null"]},"type":{"enum":["search"],"title":"SearchCommandActionType","type":"string"}},"required":["command","type"],"title":"SearchCommandAction","type":"object"},{"properties":{"command":{"type":"string"},"type":{"enum":["unknown"],"title":"UnknownCommandActionType","type":"string"}},"required":["command","type"],"title":"UnknownCommandAction","type":"object"}]};
 
-function validate520(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate560(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 const _errs0 = errors;
@@ -107797,7 +112856,7 @@ vErrors.push(err7);
 errors++;
 }
 if(!(data3 === "read")){
-const err8 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema817.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err8 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema864.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err8];
 }
@@ -107860,7 +112919,7 @@ errors++;
 if(data.path !== undefined){
 let data5 = data.path;
 if((typeof data5 !== "string") && (data5 !== null)){
-const err13 = {instancePath:instancePath+"/path",schemaPath:"#/oneOf/1/properties/path/type",keyword:"type",params:{type: schema817.oneOf[1].properties.path.type},message:"must be string,null"};
+const err13 = {instancePath:instancePath+"/path",schemaPath:"#/oneOf/1/properties/path/type",keyword:"type",params:{type: schema864.oneOf[1].properties.path.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -107883,7 +112942,7 @@ vErrors.push(err14);
 errors++;
 }
 if(!(data6 === "listFiles")){
-const err15 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema817.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err15 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema864.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err15];
 }
@@ -107951,7 +113010,7 @@ errors++;
 if(data.path !== undefined){
 let data8 = data.path;
 if((typeof data8 !== "string") && (data8 !== null)){
-const err20 = {instancePath:instancePath+"/path",schemaPath:"#/oneOf/2/properties/path/type",keyword:"type",params:{type: schema817.oneOf[2].properties.path.type},message:"must be string,null"};
+const err20 = {instancePath:instancePath+"/path",schemaPath:"#/oneOf/2/properties/path/type",keyword:"type",params:{type: schema864.oneOf[2].properties.path.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -107964,7 +113023,7 @@ errors++;
 if(data.query !== undefined){
 let data9 = data.query;
 if((typeof data9 !== "string") && (data9 !== null)){
-const err21 = {instancePath:instancePath+"/query",schemaPath:"#/oneOf/2/properties/query/type",keyword:"type",params:{type: schema817.oneOf[2].properties.query.type},message:"must be string,null"};
+const err21 = {instancePath:instancePath+"/query",schemaPath:"#/oneOf/2/properties/query/type",keyword:"type",params:{type: schema864.oneOf[2].properties.query.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err21];
 }
@@ -107987,7 +113046,7 @@ vErrors.push(err22);
 errors++;
 }
 if(!(data10 === "search")){
-const err23 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema817.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err23 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema864.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err23];
 }
@@ -108065,7 +113124,7 @@ vErrors.push(err28);
 errors++;
 }
 if(!(data12 === "unknown")){
-const err29 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema817.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err29 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema864.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err29];
 }
@@ -108120,14 +113179,14 @@ vErrors = null;
 }
 }
 }
-validate520.errors = vErrors;
+validate560.errors = vErrors;
 return errors === 0;
 }
 
-const schema822 = {"properties":{"diff":{"type":"string"},"kind":{"$ref":"#/definitions/PatchChangeKind"},"path":{"type":"string"}},"required":["diff","kind","path"],"type":"object"};
-const schema823 = {"oneOf":[{"properties":{"type":{"enum":["add"],"title":"AddPatchChangeKindType","type":"string"}},"required":["type"],"title":"AddPatchChangeKind","type":"object"},{"properties":{"type":{"enum":["delete"],"title":"DeletePatchChangeKindType","type":"string"}},"required":["type"],"title":"DeletePatchChangeKind","type":"object"},{"properties":{"move_path":{"type":["string","null"]},"type":{"enum":["update"],"title":"UpdatePatchChangeKindType","type":"string"}},"required":["type"],"title":"UpdatePatchChangeKind","type":"object"}]};
+const schema869 = {"properties":{"diff":{"type":"string"},"kind":{"$ref":"#/definitions/PatchChangeKind"},"path":{"type":"string"}},"required":["diff","kind","path"],"type":"object"};
+const schema870 = {"oneOf":[{"properties":{"type":{"enum":["add"],"title":"AddPatchChangeKindType","type":"string"}},"required":["type"],"title":"AddPatchChangeKind","type":"object"},{"properties":{"type":{"enum":["delete"],"title":"DeletePatchChangeKindType","type":"string"}},"required":["type"],"title":"DeletePatchChangeKind","type":"object"},{"properties":{"move_path":{"type":["string","null"]},"type":{"enum":["update"],"title":"UpdatePatchChangeKindType","type":"string"}},"required":["type"],"title":"UpdatePatchChangeKind","type":"object"}]};
 
-function validate522(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate562(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -108203,7 +113262,7 @@ vErrors.push(err5);
 errors++;
 }
 if(!(data2 === "add")){
-const err6 = {instancePath:instancePath+"/kind/type",schemaPath:"#/definitions/PatchChangeKind/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema823.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err6 = {instancePath:instancePath+"/kind/type",schemaPath:"#/definitions/PatchChangeKind/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema870.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err6];
 }
@@ -108254,7 +113313,7 @@ vErrors.push(err9);
 errors++;
 }
 if(!(data3 === "delete")){
-const err10 = {instancePath:instancePath+"/kind/type",schemaPath:"#/definitions/PatchChangeKind/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema823.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err10 = {instancePath:instancePath+"/kind/type",schemaPath:"#/definitions/PatchChangeKind/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema870.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err10];
 }
@@ -108300,7 +113359,7 @@ errors++;
 if(data1.move_path !== undefined){
 let data4 = data1.move_path;
 if((typeof data4 !== "string") && (data4 !== null)){
-const err13 = {instancePath:instancePath+"/kind/move_path",schemaPath:"#/definitions/PatchChangeKind/oneOf/2/properties/move_path/type",keyword:"type",params:{type: schema823.oneOf[2].properties.move_path.type},message:"must be string,null"};
+const err13 = {instancePath:instancePath+"/kind/move_path",schemaPath:"#/definitions/PatchChangeKind/oneOf/2/properties/move_path/type",keyword:"type",params:{type: schema870.oneOf[2].properties.move_path.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -108323,7 +113382,7 @@ vErrors.push(err14);
 errors++;
 }
 if(!(data5 === "update")){
-const err15 = {instancePath:instancePath+"/kind/type",schemaPath:"#/definitions/PatchChangeKind/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema823.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err15 = {instancePath:instancePath+"/kind/type",schemaPath:"#/definitions/PatchChangeKind/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema870.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err15];
 }
@@ -108401,14 +113460,14 @@ vErrors.push(err19);
 }
 errors++;
 }
-validate522.errors = vErrors;
+validate562.errors = vErrors;
 return errors === 0;
 }
 
-const schema831 = {"properties":{"message":{"type":["string","null"]},"status":{"$ref":"#/definitions/CollabAgentStatus"}},"required":["status"],"type":"object"};
-const schema832 = {"enum":["pendingInit","running","interrupted","completed","errored","shutdown","notFound"],"type":"string"};
+const schema878 = {"properties":{"message":{"type":["string","null"]},"status":{"$ref":"#/definitions/CollabAgentStatus"}},"required":["status"],"type":"object"};
+const schema879 = {"enum":["pendingInit","running","interrupted","completed","errored","shutdown","notFound"],"type":"string"};
 
-function validate524(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate564(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -108425,7 +113484,7 @@ errors++;
 if(data.message !== undefined){
 let data0 = data.message;
 if((typeof data0 !== "string") && (data0 !== null)){
-const err1 = {instancePath:instancePath+"/message",schemaPath:"#/properties/message/type",keyword:"type",params:{type: schema831.properties.message.type},message:"must be string,null"};
+const err1 = {instancePath:instancePath+"/message",schemaPath:"#/properties/message/type",keyword:"type",params:{type: schema878.properties.message.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err1];
 }
@@ -108448,7 +113507,7 @@ vErrors.push(err2);
 errors++;
 }
 if(!(((((((data1 === "pendingInit") || (data1 === "running")) || (data1 === "interrupted")) || (data1 === "completed")) || (data1 === "errored")) || (data1 === "shutdown")) || (data1 === "notFound"))){
-const err3 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/CollabAgentStatus/enum",keyword:"enum",params:{allowedValues: schema832.enum},message:"must be equal to one of the allowed values"};
+const err3 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/CollabAgentStatus/enum",keyword:"enum",params:{allowedValues: schema879.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err3];
 }
@@ -108469,12 +113528,12 @@ vErrors.push(err4);
 }
 errors++;
 }
-validate524.errors = vErrors;
+validate564.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate513(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate553(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 const _errs0 = errors;
@@ -108515,7 +113574,7 @@ errors++;
 if(data.clientId !== undefined){
 let data0 = data.clientId;
 if((typeof data0 !== "string") && (data0 !== null)){
-const err3 = {instancePath:instancePath+"/clientId",schemaPath:"#/oneOf/0/properties/clientId/type",keyword:"type",params:{type: schema807.oneOf[0].properties.clientId.type},message:"must be string,null"};
+const err3 = {instancePath:instancePath+"/clientId",schemaPath:"#/oneOf/0/properties/clientId/type",keyword:"type",params:{type: schema854.oneOf[0].properties.clientId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err3];
 }
@@ -108530,8 +113589,8 @@ let data1 = data.content;
 if(Array.isArray(data1)){
 const len0 = data1.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate514(data1[i0], {instancePath:instancePath+"/content/" + i0,parentData:data1,parentDataProperty:i0,rootData}))){
-vErrors = vErrors === null ? validate514.errors : vErrors.concat(validate514.errors);
+if(!(validate554(data1[i0], {instancePath:instancePath+"/content/" + i0,parentData:data1,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate554.errors : vErrors.concat(validate554.errors);
 errors = vErrors.length;
 }
 }
@@ -108572,7 +113631,7 @@ vErrors.push(err6);
 errors++;
 }
 if(!(data4 === "userMessage")){
-const err7 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err7 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err7];
 }
@@ -108730,7 +113789,7 @@ vErrors.push(err19);
 errors++;
 }
 if(!(data10 === "hookPrompt")){
-const err20 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err20 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -108810,8 +113869,8 @@ let data12 = data.memoryCitation;
 const _errs32 = errors;
 let valid10 = false;
 const _errs33 = errors;
-if(!(validate518(data12, {instancePath:instancePath+"/memoryCitation",parentData:data,parentDataProperty:"memoryCitation",rootData}))){
-vErrors = vErrors === null ? validate518.errors : vErrors.concat(validate518.errors);
+if(!(validate558(data12, {instancePath:instancePath+"/memoryCitation",parentData:data,parentDataProperty:"memoryCitation",rootData}))){
+vErrors = vErrors === null ? validate558.errors : vErrors.concat(validate558.errors);
 errors = vErrors.length;
 }
 var _valid1 = _errs33 === errors;
@@ -108873,7 +113932,7 @@ vErrors.push(err28);
 errors++;
 }
 if(!(data13 === "commentary")){
-const err29 = {instancePath:instancePath+"/phase",schemaPath:"#/definitions/MessagePhase/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema816.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+const err29 = {instancePath:instancePath+"/phase",schemaPath:"#/definitions/MessagePhase/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema863.oneOf[0].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err29];
 }
@@ -108899,7 +113958,7 @@ vErrors.push(err30);
 errors++;
 }
 if(!(data13 === "final_answer")){
-const err31 = {instancePath:instancePath+"/phase",schemaPath:"#/definitions/MessagePhase/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema816.oneOf[1].enum},message:"must be equal to one of the allowed values"};
+const err31 = {instancePath:instancePath+"/phase",schemaPath:"#/definitions/MessagePhase/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema863.oneOf[1].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err31];
 }
@@ -109004,7 +114063,7 @@ vErrors.push(err36);
 errors++;
 }
 if(!(data15 === "agentMessage")){
-const err37 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err37 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err37];
 }
@@ -109104,7 +114163,7 @@ vErrors.push(err44);
 errors++;
 }
 if(!(data18 === "plan")){
-const err45 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err45 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err45];
 }
@@ -109238,7 +114297,7 @@ vErrors.push(err54);
 errors++;
 }
 if(!(data24 === "reasoning")){
-const err55 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[4].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err55 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/4/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[4].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err55];
 }
@@ -109334,7 +114393,7 @@ errors++;
 if(data.aggregatedOutput !== undefined){
 let data25 = data.aggregatedOutput;
 if((typeof data25 !== "string") && (data25 !== null)){
-const err63 = {instancePath:instancePath+"/aggregatedOutput",schemaPath:"#/oneOf/5/properties/aggregatedOutput/type",keyword:"type",params:{type: schema807.oneOf[5].properties.aggregatedOutput.type},message:"must be string,null"};
+const err63 = {instancePath:instancePath+"/aggregatedOutput",schemaPath:"#/oneOf/5/properties/aggregatedOutput/type",keyword:"type",params:{type: schema854.oneOf[5].properties.aggregatedOutput.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err63];
 }
@@ -109361,8 +114420,8 @@ let data27 = data.commandActions;
 if(Array.isArray(data27)){
 const len4 = data27.length;
 for(let i4=0; i4<len4; i4++){
-if(!(validate520(data27[i4], {instancePath:instancePath+"/commandActions/" + i4,parentData:data27,parentDataProperty:i4,rootData}))){
-vErrors = vErrors === null ? validate520.errors : vErrors.concat(validate520.errors);
+if(!(validate560(data27[i4], {instancePath:instancePath+"/commandActions/" + i4,parentData:data27,parentDataProperty:i4,rootData}))){
+vErrors = vErrors === null ? validate560.errors : vErrors.concat(validate560.errors);
 errors = vErrors.length;
 }
 }
@@ -109393,7 +114452,7 @@ errors++;
 if(data.durationMs !== undefined){
 let data30 = data.durationMs;
 if((!(((typeof data30 == "number") && (!(data30 % 1) && !isNaN(data30))) && (isFinite(data30)))) && (data30 !== null)){
-const err67 = {instancePath:instancePath+"/durationMs",schemaPath:"#/oneOf/5/properties/durationMs/type",keyword:"type",params:{type: schema807.oneOf[5].properties.durationMs.type},message:"must be integer,null"};
+const err67 = {instancePath:instancePath+"/durationMs",schemaPath:"#/oneOf/5/properties/durationMs/type",keyword:"type",params:{type: schema854.oneOf[5].properties.durationMs.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err67];
 }
@@ -109428,7 +114487,7 @@ errors++;
 if(data.exitCode !== undefined){
 let data31 = data.exitCode;
 if((!(((typeof data31 == "number") && (!(data31 % 1) && !isNaN(data31))) && (isFinite(data31)))) && (data31 !== null)){
-const err70 = {instancePath:instancePath+"/exitCode",schemaPath:"#/oneOf/5/properties/exitCode/type",keyword:"type",params:{type: schema807.oneOf[5].properties.exitCode.type},message:"must be integer,null"};
+const err70 = {instancePath:instancePath+"/exitCode",schemaPath:"#/oneOf/5/properties/exitCode/type",keyword:"type",params:{type: schema854.oneOf[5].properties.exitCode.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err70];
 }
@@ -109475,7 +114534,7 @@ errors++;
 if(data.processId !== undefined){
 let data33 = data.processId;
 if((typeof data33 !== "string") && (data33 !== null)){
-const err74 = {instancePath:instancePath+"/processId",schemaPath:"#/oneOf/5/properties/processId/type",keyword:"type",params:{type: schema807.oneOf[5].properties.processId.type},message:"must be string,null"};
+const err74 = {instancePath:instancePath+"/processId",schemaPath:"#/oneOf/5/properties/processId/type",keyword:"type",params:{type: schema854.oneOf[5].properties.processId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err74];
 }
@@ -109498,7 +114557,7 @@ vErrors.push(err75);
 errors++;
 }
 if(!((((data34 === "agent") || (data34 === "userShell")) || (data34 === "unifiedExecStartup")) || (data34 === "unifiedExecInteraction"))){
-const err76 = {instancePath:instancePath+"/source",schemaPath:"#/definitions/CommandExecutionSource/enum",keyword:"enum",params:{allowedValues: schema820.enum},message:"must be equal to one of the allowed values"};
+const err76 = {instancePath:instancePath+"/source",schemaPath:"#/definitions/CommandExecutionSource/enum",keyword:"enum",params:{allowedValues: schema867.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err76];
 }
@@ -109521,7 +114580,7 @@ vErrors.push(err77);
 errors++;
 }
 if(!((((data35 === "inProgress") || (data35 === "completed")) || (data35 === "failed")) || (data35 === "declined"))){
-const err78 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/CommandExecutionStatus/enum",keyword:"enum",params:{allowedValues: schema821.enum},message:"must be equal to one of the allowed values"};
+const err78 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/CommandExecutionStatus/enum",keyword:"enum",params:{allowedValues: schema868.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err78];
 }
@@ -109544,7 +114603,7 @@ vErrors.push(err79);
 errors++;
 }
 if(!(data36 === "commandExecution")){
-const err80 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/5/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[5].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err80 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/5/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[5].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err80];
 }
@@ -109622,8 +114681,8 @@ let data37 = data.changes;
 if(Array.isArray(data37)){
 const len5 = data37.length;
 for(let i5=0; i5<len5; i5++){
-if(!(validate522(data37[i5], {instancePath:instancePath+"/changes/" + i5,parentData:data37,parentDataProperty:i5,rootData}))){
-vErrors = vErrors === null ? validate522.errors : vErrors.concat(validate522.errors);
+if(!(validate562(data37[i5], {instancePath:instancePath+"/changes/" + i5,parentData:data37,parentDataProperty:i5,rootData}))){
+vErrors = vErrors === null ? validate562.errors : vErrors.concat(validate562.errors);
 errors = vErrors.length;
 }
 }
@@ -109664,7 +114723,7 @@ vErrors.push(err88);
 errors++;
 }
 if(!((((data40 === "inProgress") || (data40 === "completed")) || (data40 === "failed")) || (data40 === "declined"))){
-const err89 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/PatchApplyStatus/enum",keyword:"enum",params:{allowedValues: schema824.enum},message:"must be equal to one of the allowed values"};
+const err89 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/PatchApplyStatus/enum",keyword:"enum",params:{allowedValues: schema871.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err89];
 }
@@ -109687,7 +114746,7 @@ vErrors.push(err90);
 errors++;
 }
 if(!(data41 === "fileChange")){
-const err91 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/6/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[6].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err91 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/6/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[6].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err91];
 }
@@ -109799,7 +114858,7 @@ errors++;
 if(data42.actionName !== undefined){
 let data43 = data42.actionName;
 if((typeof data43 !== "string") && (data43 !== null)){
-const err100 = {instancePath:instancePath+"/appContext/actionName",schemaPath:"#/definitions/McpToolCallAppContext/properties/actionName/type",keyword:"type",params:{type: schema825.properties.actionName.type},message:"must be string,null"};
+const err100 = {instancePath:instancePath+"/appContext/actionName",schemaPath:"#/definitions/McpToolCallAppContext/properties/actionName/type",keyword:"type",params:{type: schema872.properties.actionName.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err100];
 }
@@ -109812,7 +114871,7 @@ errors++;
 if(data42.appName !== undefined){
 let data44 = data42.appName;
 if((typeof data44 !== "string") && (data44 !== null)){
-const err101 = {instancePath:instancePath+"/appContext/appName",schemaPath:"#/definitions/McpToolCallAppContext/properties/appName/type",keyword:"type",params:{type: schema825.properties.appName.type},message:"must be string,null"};
+const err101 = {instancePath:instancePath+"/appContext/appName",schemaPath:"#/definitions/McpToolCallAppContext/properties/appName/type",keyword:"type",params:{type: schema872.properties.appName.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err101];
 }
@@ -109837,7 +114896,7 @@ errors++;
 if(data42.linkId !== undefined){
 let data46 = data42.linkId;
 if((typeof data46 !== "string") && (data46 !== null)){
-const err103 = {instancePath:instancePath+"/appContext/linkId",schemaPath:"#/definitions/McpToolCallAppContext/properties/linkId/type",keyword:"type",params:{type: schema825.properties.linkId.type},message:"must be string,null"};
+const err103 = {instancePath:instancePath+"/appContext/linkId",schemaPath:"#/definitions/McpToolCallAppContext/properties/linkId/type",keyword:"type",params:{type: schema872.properties.linkId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err103];
 }
@@ -109850,7 +114909,7 @@ errors++;
 if(data42.resourceUri !== undefined){
 let data47 = data42.resourceUri;
 if((typeof data47 !== "string") && (data47 !== null)){
-const err104 = {instancePath:instancePath+"/appContext/resourceUri",schemaPath:"#/definitions/McpToolCallAppContext/properties/resourceUri/type",keyword:"type",params:{type: schema825.properties.resourceUri.type},message:"must be string,null"};
+const err104 = {instancePath:instancePath+"/appContext/resourceUri",schemaPath:"#/definitions/McpToolCallAppContext/properties/resourceUri/type",keyword:"type",params:{type: schema872.properties.resourceUri.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err104];
 }
@@ -109863,7 +114922,7 @@ errors++;
 if(data42.templateId !== undefined){
 let data48 = data42.templateId;
 if((typeof data48 !== "string") && (data48 !== null)){
-const err105 = {instancePath:instancePath+"/appContext/templateId",schemaPath:"#/definitions/McpToolCallAppContext/properties/templateId/type",keyword:"type",params:{type: schema825.properties.templateId.type},message:"must be string,null"};
+const err105 = {instancePath:instancePath+"/appContext/templateId",schemaPath:"#/definitions/McpToolCallAppContext/properties/templateId/type",keyword:"type",params:{type: schema872.properties.templateId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err105];
 }
@@ -109926,7 +114985,7 @@ vErrors = null;
 if(data.durationMs !== undefined){
 let data49 = data.durationMs;
 if((!(((typeof data49 == "number") && (!(data49 % 1) && !isNaN(data49))) && (isFinite(data49)))) && (data49 !== null)){
-const err109 = {instancePath:instancePath+"/durationMs",schemaPath:"#/oneOf/7/properties/durationMs/type",keyword:"type",params:{type: schema807.oneOf[7].properties.durationMs.type},message:"must be integer,null"};
+const err109 = {instancePath:instancePath+"/durationMs",schemaPath:"#/oneOf/7/properties/durationMs/type",keyword:"type",params:{type: schema854.oneOf[7].properties.durationMs.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err109];
 }
@@ -110051,7 +115110,7 @@ errors++;
 if(data.mcpAppResourceUri !== undefined){
 let data53 = data.mcpAppResourceUri;
 if((typeof data53 !== "string") && (data53 !== null)){
-const err118 = {instancePath:instancePath+"/mcpAppResourceUri",schemaPath:"#/oneOf/7/properties/mcpAppResourceUri/type",keyword:"type",params:{type: schema807.oneOf[7].properties.mcpAppResourceUri.type},message:"must be string,null"};
+const err118 = {instancePath:instancePath+"/mcpAppResourceUri",schemaPath:"#/oneOf/7/properties/mcpAppResourceUri/type",keyword:"type",params:{type: schema854.oneOf[7].properties.mcpAppResourceUri.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err118];
 }
@@ -110064,7 +115123,7 @@ errors++;
 if(data.pluginId !== undefined){
 let data54 = data.pluginId;
 if((typeof data54 !== "string") && (data54 !== null)){
-const err119 = {instancePath:instancePath+"/pluginId",schemaPath:"#/oneOf/7/properties/pluginId/type",keyword:"type",params:{type: schema807.oneOf[7].properties.pluginId.type},message:"must be string,null"};
+const err119 = {instancePath:instancePath+"/pluginId",schemaPath:"#/oneOf/7/properties/pluginId/type",keyword:"type",params:{type: schema854.oneOf[7].properties.pluginId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err119];
 }
@@ -110177,7 +115236,7 @@ vErrors.push(err126);
 errors++;
 }
 if(!(((data58 === "inProgress") || (data58 === "completed")) || (data58 === "failed"))){
-const err127 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/McpToolCallStatus/enum",keyword:"enum",params:{allowedValues: schema828.enum},message:"must be equal to one of the allowed values"};
+const err127 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/McpToolCallStatus/enum",keyword:"enum",params:{allowedValues: schema875.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err127];
 }
@@ -110212,7 +115271,7 @@ vErrors.push(err129);
 errors++;
 }
 if(!(data60 === "mcpToolCall")){
-const err130 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/7/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[7].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err130 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/7/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[7].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err130];
 }
@@ -110298,7 +115357,7 @@ errors++;
 if(data.contentItems !== undefined){
 let data61 = data.contentItems;
 if((!(Array.isArray(data61))) && (data61 !== null)){
-const err137 = {instancePath:instancePath+"/contentItems",schemaPath:"#/oneOf/8/properties/contentItems/type",keyword:"type",params:{type: schema807.oneOf[8].properties.contentItems.type},message:"must be array,null"};
+const err137 = {instancePath:instancePath+"/contentItems",schemaPath:"#/oneOf/8/properties/contentItems/type",keyword:"type",params:{type: schema854.oneOf[8].properties.contentItems.type},message:"must be array,null"};
 if(vErrors === null){
 vErrors = [err137];
 }
@@ -110361,7 +115420,7 @@ vErrors.push(err141);
 errors++;
 }
 if(!(data64 === "inputText")){
-const err142 = {instancePath:instancePath+"/contentItems/" + i6+"/type",schemaPath:"#/definitions/DynamicToolCallOutputContentItem/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema829.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err142 = {instancePath:instancePath+"/contentItems/" + i6+"/type",schemaPath:"#/definitions/DynamicToolCallOutputContentItem/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema876.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err142];
 }
@@ -110434,7 +115493,7 @@ vErrors.push(err147);
 errors++;
 }
 if(!(data66 === "inputImage")){
-const err148 = {instancePath:instancePath+"/contentItems/" + i6+"/type",schemaPath:"#/definitions/DynamicToolCallOutputContentItem/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema829.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err148 = {instancePath:instancePath+"/contentItems/" + i6+"/type",schemaPath:"#/definitions/DynamicToolCallOutputContentItem/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema876.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err148];
 }
@@ -110493,7 +115552,7 @@ vErrors = null;
 if(data.durationMs !== undefined){
 let data67 = data.durationMs;
 if((!(((typeof data67 == "number") && (!(data67 % 1) && !isNaN(data67))) && (isFinite(data67)))) && (data67 !== null)){
-const err151 = {instancePath:instancePath+"/durationMs",schemaPath:"#/oneOf/8/properties/durationMs/type",keyword:"type",params:{type: schema807.oneOf[8].properties.durationMs.type},message:"must be integer,null"};
+const err151 = {instancePath:instancePath+"/durationMs",schemaPath:"#/oneOf/8/properties/durationMs/type",keyword:"type",params:{type: schema854.oneOf[8].properties.durationMs.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err151];
 }
@@ -110540,7 +115599,7 @@ errors++;
 if(data.namespace !== undefined){
 let data69 = data.namespace;
 if((typeof data69 !== "string") && (data69 !== null)){
-const err155 = {instancePath:instancePath+"/namespace",schemaPath:"#/oneOf/8/properties/namespace/type",keyword:"type",params:{type: schema807.oneOf[8].properties.namespace.type},message:"must be string,null"};
+const err155 = {instancePath:instancePath+"/namespace",schemaPath:"#/oneOf/8/properties/namespace/type",keyword:"type",params:{type: schema854.oneOf[8].properties.namespace.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err155];
 }
@@ -110563,7 +115622,7 @@ vErrors.push(err156);
 errors++;
 }
 if(!(((data70 === "inProgress") || (data70 === "completed")) || (data70 === "failed"))){
-const err157 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/DynamicToolCallStatus/enum",keyword:"enum",params:{allowedValues: schema830.enum},message:"must be equal to one of the allowed values"};
+const err157 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/DynamicToolCallStatus/enum",keyword:"enum",params:{allowedValues: schema877.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err157];
 }
@@ -110576,7 +115635,7 @@ errors++;
 if(data.success !== undefined){
 let data71 = data.success;
 if((typeof data71 !== "boolean") && (data71 !== null)){
-const err158 = {instancePath:instancePath+"/success",schemaPath:"#/oneOf/8/properties/success/type",keyword:"type",params:{type: schema807.oneOf[8].properties.success.type},message:"must be boolean,null"};
+const err158 = {instancePath:instancePath+"/success",schemaPath:"#/oneOf/8/properties/success/type",keyword:"type",params:{type: schema854.oneOf[8].properties.success.type},message:"must be boolean,null"};
 if(vErrors === null){
 vErrors = [err158];
 }
@@ -110611,7 +115670,7 @@ vErrors.push(err160);
 errors++;
 }
 if(!(data73 === "dynamicToolCall")){
-const err161 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/8/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[8].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err161 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/8/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[8].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err161];
 }
@@ -110718,8 +115777,8 @@ if(data.agentsStates !== undefined){
 let data74 = data.agentsStates;
 if(data74 && typeof data74 == "object" && !Array.isArray(data74)){
 for(const key0 in data74){
-if(!(validate524(data74[key0], {instancePath:instancePath+"/agentsStates/" + key0.replace(/~/g, "~0").replace(/\//g, "~1"),parentData:data74,parentDataProperty:key0,rootData}))){
-vErrors = vErrors === null ? validate524.errors : vErrors.concat(validate524.errors);
+if(!(validate564(data74[key0], {instancePath:instancePath+"/agentsStates/" + key0.replace(/~/g, "~0").replace(/\//g, "~1"),parentData:data74,parentDataProperty:key0,rootData}))){
+vErrors = vErrors === null ? validate564.errors : vErrors.concat(validate564.errors);
 errors = vErrors.length;
 }
 }
@@ -110750,7 +115809,7 @@ errors++;
 if(data.model !== undefined){
 let data77 = data.model;
 if((typeof data77 !== "string") && (data77 !== null)){
-const err172 = {instancePath:instancePath+"/model",schemaPath:"#/oneOf/9/properties/model/type",keyword:"type",params:{type: schema807.oneOf[9].properties.model.type},message:"must be string,null"};
+const err172 = {instancePath:instancePath+"/model",schemaPath:"#/oneOf/9/properties/model/type",keyword:"type",params:{type: schema854.oneOf[9].properties.model.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err172];
 }
@@ -110763,7 +115822,7 @@ errors++;
 if(data.prompt !== undefined){
 let data78 = data.prompt;
 if((typeof data78 !== "string") && (data78 !== null)){
-const err173 = {instancePath:instancePath+"/prompt",schemaPath:"#/oneOf/9/properties/prompt/type",keyword:"type",params:{type: schema807.oneOf[9].properties.prompt.type},message:"must be string,null"};
+const err173 = {instancePath:instancePath+"/prompt",schemaPath:"#/oneOf/9/properties/prompt/type",keyword:"type",params:{type: schema854.oneOf[9].properties.prompt.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err173];
 }
@@ -110892,7 +115951,7 @@ vErrors.push(err181);
 errors++;
 }
 if(!(((data83 === "inProgress") || (data83 === "completed")) || (data83 === "failed"))){
-const err182 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/CollabAgentToolCallStatus/enum",keyword:"enum",params:{allowedValues: schema834.enum},message:"must be equal to one of the allowed values"};
+const err182 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/CollabAgentToolCallStatus/enum",keyword:"enum",params:{allowedValues: schema881.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err182];
 }
@@ -110915,7 +115974,7 @@ vErrors.push(err183);
 errors++;
 }
 if(!(((((data84 === "spawnAgent") || (data84 === "sendInput")) || (data84 === "resumeAgent")) || (data84 === "wait")) || (data84 === "closeAgent"))){
-const err184 = {instancePath:instancePath+"/tool",schemaPath:"#/definitions/CollabAgentTool/enum",keyword:"enum",params:{allowedValues: schema835.enum},message:"must be equal to one of the allowed values"};
+const err184 = {instancePath:instancePath+"/tool",schemaPath:"#/definitions/CollabAgentTool/enum",keyword:"enum",params:{allowedValues: schema882.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err184];
 }
@@ -110938,7 +115997,7 @@ vErrors.push(err185);
 errors++;
 }
 if(!(data85 === "collabAgentToolCall")){
-const err186 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/9/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[9].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err186 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/9/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[9].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err186];
 }
@@ -111070,7 +116129,7 @@ vErrors.push(err196);
 errors++;
 }
 if(!(((data89 === "started") || (data89 === "interacted")) || (data89 === "interrupted"))){
-const err197 = {instancePath:instancePath+"/kind",schemaPath:"#/definitions/SubAgentActivityKind/enum",keyword:"enum",params:{allowedValues: schema836.enum},message:"must be equal to one of the allowed values"};
+const err197 = {instancePath:instancePath+"/kind",schemaPath:"#/definitions/SubAgentActivityKind/enum",keyword:"enum",params:{allowedValues: schema883.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err197];
 }
@@ -111093,7 +116152,7 @@ vErrors.push(err198);
 errors++;
 }
 if(!(data90 === "subAgentActivity")){
-const err199 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/10/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[10].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err199 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/10/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[10].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err199];
 }
@@ -111179,7 +116238,7 @@ errors++;
 if(data91.queries !== undefined){
 let data92 = data91.queries;
 if((!(Array.isArray(data92))) && (data92 !== null)){
-const err205 = {instancePath:instancePath+"/action/queries",schemaPath:"#/definitions/WebSearchAction/oneOf/0/properties/queries/type",keyword:"type",params:{type: schema837.oneOf[0].properties.queries.type},message:"must be array,null"};
+const err205 = {instancePath:instancePath+"/action/queries",schemaPath:"#/definitions/WebSearchAction/oneOf/0/properties/queries/type",keyword:"type",params:{type: schema884.oneOf[0].properties.queries.type},message:"must be array,null"};
 if(vErrors === null){
 vErrors = [err205];
 }
@@ -111207,7 +116266,7 @@ errors++;
 if(data91.query !== undefined){
 let data94 = data91.query;
 if((typeof data94 !== "string") && (data94 !== null)){
-const err207 = {instancePath:instancePath+"/action/query",schemaPath:"#/definitions/WebSearchAction/oneOf/0/properties/query/type",keyword:"type",params:{type: schema837.oneOf[0].properties.query.type},message:"must be string,null"};
+const err207 = {instancePath:instancePath+"/action/query",schemaPath:"#/definitions/WebSearchAction/oneOf/0/properties/query/type",keyword:"type",params:{type: schema884.oneOf[0].properties.query.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err207];
 }
@@ -111230,7 +116289,7 @@ vErrors.push(err208);
 errors++;
 }
 if(!(data95 === "search")){
-const err209 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema837.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err209 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/0/properties/type/enum",keyword:"enum",params:{allowedValues: schema884.oneOf[0].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err209];
 }
@@ -111281,7 +116340,7 @@ vErrors.push(err212);
 errors++;
 }
 if(!(data96 === "openPage")){
-const err213 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema837.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err213 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/1/properties/type/enum",keyword:"enum",params:{allowedValues: schema884.oneOf[1].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err213];
 }
@@ -111294,7 +116353,7 @@ errors++;
 if(data91.url !== undefined){
 let data97 = data91.url;
 if((typeof data97 !== "string") && (data97 !== null)){
-const err214 = {instancePath:instancePath+"/action/url",schemaPath:"#/definitions/WebSearchAction/oneOf/1/properties/url/type",keyword:"type",params:{type: schema837.oneOf[1].properties.url.type},message:"must be string,null"};
+const err214 = {instancePath:instancePath+"/action/url",schemaPath:"#/definitions/WebSearchAction/oneOf/1/properties/url/type",keyword:"type",params:{type: schema884.oneOf[1].properties.url.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err214];
 }
@@ -111340,7 +116399,7 @@ errors++;
 if(data91.pattern !== undefined){
 let data98 = data91.pattern;
 if((typeof data98 !== "string") && (data98 !== null)){
-const err217 = {instancePath:instancePath+"/action/pattern",schemaPath:"#/definitions/WebSearchAction/oneOf/2/properties/pattern/type",keyword:"type",params:{type: schema837.oneOf[2].properties.pattern.type},message:"must be string,null"};
+const err217 = {instancePath:instancePath+"/action/pattern",schemaPath:"#/definitions/WebSearchAction/oneOf/2/properties/pattern/type",keyword:"type",params:{type: schema884.oneOf[2].properties.pattern.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err217];
 }
@@ -111363,7 +116422,7 @@ vErrors.push(err218);
 errors++;
 }
 if(!(data99 === "findInPage")){
-const err219 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema837.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err219 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/2/properties/type/enum",keyword:"enum",params:{allowedValues: schema884.oneOf[2].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err219];
 }
@@ -111376,7 +116435,7 @@ errors++;
 if(data91.url !== undefined){
 let data100 = data91.url;
 if((typeof data100 !== "string") && (data100 !== null)){
-const err220 = {instancePath:instancePath+"/action/url",schemaPath:"#/definitions/WebSearchAction/oneOf/2/properties/url/type",keyword:"type",params:{type: schema837.oneOf[2].properties.url.type},message:"must be string,null"};
+const err220 = {instancePath:instancePath+"/action/url",schemaPath:"#/definitions/WebSearchAction/oneOf/2/properties/url/type",keyword:"type",params:{type: schema884.oneOf[2].properties.url.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err220];
 }
@@ -111432,7 +116491,7 @@ vErrors.push(err223);
 errors++;
 }
 if(!(data101 === "other")){
-const err224 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema837.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err224 = {instancePath:instancePath+"/action/type",schemaPath:"#/definitions/WebSearchAction/oneOf/3/properties/type/enum",keyword:"enum",params:{allowedValues: schema884.oneOf[3].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err224];
 }
@@ -111563,7 +116622,7 @@ vErrors.push(err231);
 errors++;
 }
 if(!(data104 === "webSearch")){
-const err232 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/11/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[11].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err232 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/11/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[11].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err232];
 }
@@ -111663,7 +116722,7 @@ vErrors.push(err239);
 errors++;
 }
 if(!(data107 === "imageView")){
-const err240 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/12/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[12].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err240 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/12/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[12].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err240];
 }
@@ -111786,7 +116845,7 @@ vErrors.push(err249);
 errors++;
 }
 if(!(data110 === "sleep")){
-const err250 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/13/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[13].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err250 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/13/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[13].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err250];
 }
@@ -111886,7 +116945,7 @@ errors++;
 if(data.revisedPrompt !== undefined){
 let data113 = data.revisedPrompt;
 if((typeof data113 !== "string") && (data113 !== null)){
-const err258 = {instancePath:instancePath+"/revisedPrompt",schemaPath:"#/oneOf/14/properties/revisedPrompt/type",keyword:"type",params:{type: schema807.oneOf[14].properties.revisedPrompt.type},message:"must be string,null"};
+const err258 = {instancePath:instancePath+"/revisedPrompt",schemaPath:"#/oneOf/14/properties/revisedPrompt/type",keyword:"type",params:{type: schema854.oneOf[14].properties.revisedPrompt.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err258];
 }
@@ -111975,7 +117034,7 @@ vErrors.push(err263);
 errors++;
 }
 if(!(data116 === "imageGeneration")){
-const err264 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/14/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[14].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err264 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/14/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[14].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err264];
 }
@@ -112075,7 +117134,7 @@ vErrors.push(err271);
 errors++;
 }
 if(!(data119 === "enteredReviewMode")){
-const err272 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/15/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[15].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err272 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/15/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[15].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err272];
 }
@@ -112175,7 +117234,7 @@ vErrors.push(err279);
 errors++;
 }
 if(!(data122 === "exitedReviewMode")){
-const err280 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/16/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[16].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err280 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/16/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[16].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err280];
 }
@@ -112253,7 +117312,7 @@ vErrors.push(err285);
 errors++;
 }
 if(!(data124 === "contextCompaction")){
-const err286 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/17/properties/type/enum",keyword:"enum",params:{allowedValues: schema807.oneOf[17].properties.type.enum},message:"must be equal to one of the allowed values"};
+const err286 = {instancePath:instancePath+"/type",schemaPath:"#/oneOf/17/properties/type/enum",keyword:"enum",params:{allowedValues: schema854.oneOf[17].properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err286];
 }
@@ -112322,12 +117381,12 @@ vErrors = null;
 }
 }
 }
-validate513.errors = vErrors;
+validate553.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate508(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate548(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -112364,7 +117423,7 @@ errors++;
 if(data.completedAt !== undefined){
 let data0 = data.completedAt;
 if((!(((typeof data0 == "number") && (!(data0 % 1) && !isNaN(data0))) && (isFinite(data0)))) && (data0 !== null)){
-const err3 = {instancePath:instancePath+"/completedAt",schemaPath:"#/properties/completedAt/type",keyword:"type",params:{type: schema803.properties.completedAt.type},message:"must be integer,null"};
+const err3 = {instancePath:instancePath+"/completedAt",schemaPath:"#/properties/completedAt/type",keyword:"type",params:{type: schema850.properties.completedAt.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err3];
 }
@@ -112399,7 +117458,7 @@ errors++;
 if(data.durationMs !== undefined){
 let data1 = data.durationMs;
 if((!(((typeof data1 == "number") && (!(data1 % 1) && !isNaN(data1))) && (isFinite(data1)))) && (data1 !== null)){
-const err6 = {instancePath:instancePath+"/durationMs",schemaPath:"#/properties/durationMs/type",keyword:"type",params:{type: schema803.properties.durationMs.type},message:"must be integer,null"};
+const err6 = {instancePath:instancePath+"/durationMs",schemaPath:"#/properties/durationMs/type",keyword:"type",params:{type: schema850.properties.durationMs.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err6];
 }
@@ -112436,8 +117495,8 @@ let data2 = data.error;
 const _errs6 = errors;
 let valid1 = false;
 const _errs7 = errors;
-if(!(validate509(data2, {instancePath:instancePath+"/error",parentData:data,parentDataProperty:"error",rootData}))){
-vErrors = vErrors === null ? validate509.errors : vErrors.concat(validate509.errors);
+if(!(validate549(data2, {instancePath:instancePath+"/error",parentData:data,parentDataProperty:"error",rootData}))){
+vErrors = vErrors === null ? validate549.errors : vErrors.concat(validate549.errors);
 errors = vErrors.length;
 }
 var _valid0 = _errs7 === errors;
@@ -112496,8 +117555,8 @@ let data4 = data.items;
 if(Array.isArray(data4)){
 const len0 = data4.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate513(data4[i0], {instancePath:instancePath+"/items/" + i0,parentData:data4,parentDataProperty:i0,rootData}))){
-vErrors = vErrors === null ? validate513.errors : vErrors.concat(validate513.errors);
+if(!(validate553(data4[i0], {instancePath:instancePath+"/items/" + i0,parentData:data4,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate553.errors : vErrors.concat(validate553.errors);
 errors = vErrors.length;
 }
 }
@@ -112530,7 +117589,7 @@ vErrors.push(err13);
 errors++;
 }
 if(!(data6 === "notLoaded")){
-const err14 = {instancePath:instancePath+"/itemsView",schemaPath:"#/definitions/TurnItemsView/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema840.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+const err14 = {instancePath:instancePath+"/itemsView",schemaPath:"#/definitions/TurnItemsView/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema887.oneOf[0].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err14];
 }
@@ -112556,7 +117615,7 @@ vErrors.push(err15);
 errors++;
 }
 if(!(data6 === "summary")){
-const err16 = {instancePath:instancePath+"/itemsView",schemaPath:"#/definitions/TurnItemsView/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema840.oneOf[1].enum},message:"must be equal to one of the allowed values"};
+const err16 = {instancePath:instancePath+"/itemsView",schemaPath:"#/definitions/TurnItemsView/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema887.oneOf[1].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err16];
 }
@@ -112587,7 +117646,7 @@ vErrors.push(err17);
 errors++;
 }
 if(!(data6 === "full")){
-const err18 = {instancePath:instancePath+"/itemsView",schemaPath:"#/definitions/TurnItemsView/oneOf/2/enum",keyword:"enum",params:{allowedValues: schema840.oneOf[2].enum},message:"must be equal to one of the allowed values"};
+const err18 = {instancePath:instancePath+"/itemsView",schemaPath:"#/definitions/TurnItemsView/oneOf/2/enum",keyword:"enum",params:{allowedValues: schema887.oneOf[2].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err18];
 }
@@ -112633,7 +117692,7 @@ vErrors = null;
 if(data.startedAt !== undefined){
 let data7 = data.startedAt;
 if((!(((typeof data7 == "number") && (!(data7 % 1) && !isNaN(data7))) && (isFinite(data7)))) && (data7 !== null)){
-const err20 = {instancePath:instancePath+"/startedAt",schemaPath:"#/properties/startedAt/type",keyword:"type",params:{type: schema803.properties.startedAt.type},message:"must be integer,null"};
+const err20 = {instancePath:instancePath+"/startedAt",schemaPath:"#/properties/startedAt/type",keyword:"type",params:{type: schema850.properties.startedAt.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -112678,7 +117737,7 @@ vErrors.push(err23);
 errors++;
 }
 if(!((((data8 === "completed") || (data8 === "interrupted")) || (data8 === "failed")) || (data8 === "inProgress"))){
-const err24 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/TurnStatus/enum",keyword:"enum",params:{allowedValues: schema841.enum},message:"must be equal to one of the allowed values"};
+const err24 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/TurnStatus/enum",keyword:"enum",params:{allowedValues: schema888.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err24];
 }
@@ -112699,12 +117758,12 @@ vErrors.push(err25);
 }
 errors++;
 }
-validate508.errors = vErrors;
+validate548.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate501(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate541(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -112831,7 +117890,7 @@ errors++;
 if(data.agentNickname !== undefined){
 let data0 = data.agentNickname;
 if((typeof data0 !== "string") && (data0 !== null)){
-const err12 = {instancePath:instancePath+"/agentNickname",schemaPath:"#/properties/agentNickname/type",keyword:"type",params:{type: schema791.properties.agentNickname.type},message:"must be string,null"};
+const err12 = {instancePath:instancePath+"/agentNickname",schemaPath:"#/properties/agentNickname/type",keyword:"type",params:{type: schema838.properties.agentNickname.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err12];
 }
@@ -112844,7 +117903,7 @@ errors++;
 if(data.agentRole !== undefined){
 let data1 = data.agentRole;
 if((typeof data1 !== "string") && (data1 !== null)){
-const err13 = {instancePath:instancePath+"/agentRole",schemaPath:"#/properties/agentRole/type",keyword:"type",params:{type: schema791.properties.agentRole.type},message:"must be string,null"};
+const err13 = {instancePath:instancePath+"/agentRole",schemaPath:"#/properties/agentRole/type",keyword:"type",params:{type: schema838.properties.agentRole.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -112982,7 +118041,7 @@ vErrors = null;
 if(data.forkedFromId !== undefined){
 let data7 = data.forkedFromId;
 if((typeof data7 !== "string") && (data7 !== null)){
-const err23 = {instancePath:instancePath+"/forkedFromId",schemaPath:"#/properties/forkedFromId/type",keyword:"type",params:{type: schema791.properties.forkedFromId.type},message:"must be string,null"};
+const err23 = {instancePath:instancePath+"/forkedFromId",schemaPath:"#/properties/forkedFromId/type",keyword:"type",params:{type: schema838.properties.forkedFromId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err23];
 }
@@ -113001,7 +118060,7 @@ if(data8 && typeof data8 == "object" && !Array.isArray(data8)){
 if(data8.branch !== undefined){
 let data9 = data8.branch;
 if((typeof data9 !== "string") && (data9 !== null)){
-const err24 = {instancePath:instancePath+"/gitInfo/branch",schemaPath:"#/definitions/GitInfo/properties/branch/type",keyword:"type",params:{type: schema794.properties.branch.type},message:"must be string,null"};
+const err24 = {instancePath:instancePath+"/gitInfo/branch",schemaPath:"#/definitions/GitInfo/properties/branch/type",keyword:"type",params:{type: schema841.properties.branch.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err24];
 }
@@ -113014,7 +118073,7 @@ errors++;
 if(data8.originUrl !== undefined){
 let data10 = data8.originUrl;
 if((typeof data10 !== "string") && (data10 !== null)){
-const err25 = {instancePath:instancePath+"/gitInfo/originUrl",schemaPath:"#/definitions/GitInfo/properties/originUrl/type",keyword:"type",params:{type: schema794.properties.originUrl.type},message:"must be string,null"};
+const err25 = {instancePath:instancePath+"/gitInfo/originUrl",schemaPath:"#/definitions/GitInfo/properties/originUrl/type",keyword:"type",params:{type: schema841.properties.originUrl.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err25];
 }
@@ -113027,7 +118086,7 @@ errors++;
 if(data8.sha !== undefined){
 let data11 = data8.sha;
 if((typeof data11 !== "string") && (data11 !== null)){
-const err26 = {instancePath:instancePath+"/gitInfo/sha",schemaPath:"#/definitions/GitInfo/properties/sha/type",keyword:"type",params:{type: schema794.properties.sha.type},message:"must be string,null"};
+const err26 = {instancePath:instancePath+"/gitInfo/sha",schemaPath:"#/definitions/GitInfo/properties/sha/type",keyword:"type",params:{type: schema841.properties.sha.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err26];
 }
@@ -113100,7 +118159,7 @@ vErrors.push(err30);
 errors++;
 }
 if(!((data12 === "legacy") || (data12 === "paginated"))){
-const err31 = {instancePath:instancePath+"/historyMode",schemaPath:"#/definitions/ThreadHistoryMode/enum",keyword:"enum",params:{allowedValues: schema795.enum},message:"must be equal to one of the allowed values"};
+const err31 = {instancePath:instancePath+"/historyMode",schemaPath:"#/definitions/ThreadHistoryMode/enum",keyword:"enum",params:{allowedValues: schema842.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err31];
 }
@@ -113137,7 +118196,7 @@ errors++;
 if(data.name !== undefined){
 let data15 = data.name;
 if((typeof data15 !== "string") && (data15 !== null)){
-const err34 = {instancePath:instancePath+"/name",schemaPath:"#/properties/name/type",keyword:"type",params:{type: schema791.properties.name.type},message:"must be string,null"};
+const err34 = {instancePath:instancePath+"/name",schemaPath:"#/properties/name/type",keyword:"type",params:{type: schema838.properties.name.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err34];
 }
@@ -113150,7 +118209,7 @@ errors++;
 if(data.parentThreadId !== undefined){
 let data16 = data.parentThreadId;
 if((typeof data16 !== "string") && (data16 !== null)){
-const err35 = {instancePath:instancePath+"/parentThreadId",schemaPath:"#/properties/parentThreadId/type",keyword:"type",params:{type: schema791.properties.parentThreadId.type},message:"must be string,null"};
+const err35 = {instancePath:instancePath+"/parentThreadId",schemaPath:"#/properties/parentThreadId/type",keyword:"type",params:{type: schema838.properties.parentThreadId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err35];
 }
@@ -113163,7 +118222,7 @@ errors++;
 if(data.path !== undefined){
 let data17 = data.path;
 if((typeof data17 !== "string") && (data17 !== null)){
-const err36 = {instancePath:instancePath+"/path",schemaPath:"#/properties/path/type",keyword:"type",params:{type: schema791.properties.path.type},message:"must be string,null"};
+const err36 = {instancePath:instancePath+"/path",schemaPath:"#/properties/path/type",keyword:"type",params:{type: schema838.properties.path.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err36];
 }
@@ -113188,7 +118247,7 @@ errors++;
 if(data.recencyAt !== undefined){
 let data19 = data.recencyAt;
 if((!(((typeof data19 == "number") && (!(data19 % 1) && !isNaN(data19))) && (isFinite(data19)))) && (data19 !== null)){
-const err38 = {instancePath:instancePath+"/recencyAt",schemaPath:"#/properties/recencyAt/type",keyword:"type",params:{type: schema791.properties.recencyAt.type},message:"must be integer,null"};
+const err38 = {instancePath:instancePath+"/recencyAt",schemaPath:"#/properties/recencyAt/type",keyword:"type",params:{type: schema838.properties.recencyAt.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err38];
 }
@@ -113233,14 +118292,14 @@ errors++;
 }
 }
 if(data.source !== undefined){
-if(!(validate502(data.source, {instancePath:instancePath+"/source",parentData:data,parentDataProperty:"source",rootData}))){
-vErrors = vErrors === null ? validate502.errors : vErrors.concat(validate502.errors);
+if(!(validate542(data.source, {instancePath:instancePath+"/source",parentData:data,parentDataProperty:"source",rootData}))){
+vErrors = vErrors === null ? validate542.errors : vErrors.concat(validate542.errors);
 errors = vErrors.length;
 }
 }
 if(data.status !== undefined){
-if(!(validate506(data.status, {instancePath:instancePath+"/status",parentData:data,parentDataProperty:"status",rootData}))){
-vErrors = vErrors === null ? validate506.errors : vErrors.concat(validate506.errors);
+if(!(validate546(data.status, {instancePath:instancePath+"/status",parentData:data,parentDataProperty:"status",rootData}))){
+vErrors = vErrors === null ? validate546.errors : vErrors.concat(validate546.errors);
 errors = vErrors.length;
 }
 }
@@ -113303,8 +118362,8 @@ let data24 = data.turns;
 if(Array.isArray(data24)){
 const len0 = data24.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate508(data24[i0], {instancePath:instancePath+"/turns/" + i0,parentData:data24,parentDataProperty:i0,rootData}))){
-vErrors = vErrors === null ? validate508.errors : vErrors.concat(validate508.errors);
+if(!(validate548(data24[i0], {instancePath:instancePath+"/turns/" + i0,parentData:data24,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate548.errors : vErrors.concat(validate548.errors);
 errors = vErrors.length;
 }
 }
@@ -113366,12 +118425,12 @@ vErrors.push(err49);
 }
 errors++;
 }
-validate501.errors = vErrors;
+validate541.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate498(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate538(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 /*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ThreadForkResponse" */;
 let vErrors = null;
 let errors = 0;
@@ -113465,7 +118524,7 @@ errors++;
 if(data0.extends !== undefined){
 let data1 = data0.extends;
 if((typeof data1 !== "string") && (data1 !== null)){
-const err8 = {instancePath:instancePath+"/activePermissionProfile/extends",schemaPath:"#/definitions/ActivePermissionProfile/properties/extends/type",keyword:"type",params:{type: schema780.properties.extends.type},message:"must be string,null"};
+const err8 = {instancePath:instancePath+"/activePermissionProfile/extends",schemaPath:"#/definitions/ActivePermissionProfile/properties/extends/type",keyword:"type",params:{type: schema827.properties.extends.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err8];
 }
@@ -113554,7 +118613,7 @@ vErrors.push(err13);
 errors++;
 }
 if(!(((data3 === "untrusted") || (data3 === "on-request")) || (data3 === "never"))){
-const err14 = {instancePath:instancePath+"/approvalPolicy",schemaPath:"#/definitions/AskForApproval/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema781.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+const err14 = {instancePath:instancePath+"/approvalPolicy",schemaPath:"#/definitions/AskForApproval/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema828.oneOf[0].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err14];
 }
@@ -113754,7 +118813,7 @@ vErrors.push(err28);
 errors++;
 }
 if(!(((data10 === "user") || (data10 === "auto_review")) || (data10 === "guardian_subagent"))){
-const err29 = {instancePath:instancePath+"/approvalsReviewer",schemaPath:"#/definitions/ApprovalsReviewer/enum",keyword:"enum",params:{allowedValues: schema782.enum},message:"must be equal to one of the allowed values"};
+const err29 = {instancePath:instancePath+"/approvalsReviewer",schemaPath:"#/definitions/ApprovalsReviewer/enum",keyword:"enum",params:{allowedValues: schema829.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err29];
 }
@@ -113845,7 +118904,7 @@ vErrors.push(err35);
 errors++;
 }
 if(!((data16 === "explicitRequestOnly") || (data16 === "proactive"))){
-const err36 = {instancePath:instancePath+"/multiAgentMode",schemaPath:"#/definitions/MultiAgentMode/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema785.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+const err36 = {instancePath:instancePath+"/multiAgentMode",schemaPath:"#/definitions/MultiAgentMode/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema832.oneOf[0].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err36];
 }
@@ -114034,15 +119093,15 @@ errors++;
 }
 }
 if(data.sandbox !== undefined){
-if(!(validate499(data.sandbox, {instancePath:instancePath+"/sandbox",parentData:data,parentDataProperty:"sandbox",rootData}))){
-vErrors = vErrors === null ? validate499.errors : vErrors.concat(validate499.errors);
+if(!(validate539(data.sandbox, {instancePath:instancePath+"/sandbox",parentData:data,parentDataProperty:"sandbox",rootData}))){
+vErrors = vErrors === null ? validate539.errors : vErrors.concat(validate539.errors);
 errors = vErrors.length;
 }
 }
 if(data.serviceTier !== undefined){
 let data22 = data.serviceTier;
 if((typeof data22 !== "string") && (data22 !== null)){
-const err48 = {instancePath:instancePath+"/serviceTier",schemaPath:"#/properties/serviceTier/type",keyword:"type",params:{type: schema779.properties.serviceTier.type},message:"must be string,null"};
+const err48 = {instancePath:instancePath+"/serviceTier",schemaPath:"#/properties/serviceTier/type",keyword:"type",params:{type: schema826.properties.serviceTier.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err48];
 }
@@ -114053,8 +119112,8 @@ errors++;
 }
 }
 if(data.thread !== undefined){
-if(!(validate501(data.thread, {instancePath:instancePath+"/thread",parentData:data,parentDataProperty:"thread",rootData}))){
-vErrors = vErrors === null ? validate501.errors : vErrors.concat(validate501.errors);
+if(!(validate541(data.thread, {instancePath:instancePath+"/thread",parentData:data,parentDataProperty:"thread",rootData}))){
+vErrors = vErrors === null ? validate541.errors : vErrors.concat(validate541.errors);
 errors = vErrors.length;
 }
 }
@@ -114069,14 +119128,14 @@ vErrors.push(err49);
 }
 errors++;
 }
-validate498.errors = vErrors;
+validate538.errors = vErrors;
 return errors === 0;
 }
 
-export const validateFsReadFileResponse = validate529;
-const schema842 = {"$schema":"http://json-schema.org/draft-07/schema#","description":"Base64-encoded file contents returned by `fs/readFile`.","properties":{"dataBase64":{"description":"File contents encoded as base64.","type":"string"}},"required":["dataBase64"],"title":"FsReadFileResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:FsReadFileResponse"};
+export const validateFsReadFileResponse = validate569;
+const schema889 = {"$schema":"http://json-schema.org/draft-07/schema#","description":"Base64-encoded file contents returned by `fs/readFile`.","properties":{"dataBase64":{"description":"File contents encoded as base64.","type":"string"}},"required":["dataBase64"],"title":"FsReadFileResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:FsReadFileResponse"};
 
-function validate529(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate569(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 /*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:FsReadFileResponse" */;
 let vErrors = null;
 let errors = 0;
@@ -114114,14 +119173,14 @@ vErrors.push(err2);
 }
 errors++;
 }
-validate529.errors = vErrors;
+validate569.errors = vErrors;
 return errors === 0;
 }
 
-export const validateFsGetMetadataResponse = validate530;
-const schema843 = {"$schema":"http://json-schema.org/draft-07/schema#","description":"Metadata returned by `fs/getMetadata`.","properties":{"createdAtMs":{"description":"File creation time in Unix milliseconds when available, otherwise `0`.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"isDirectory":{"description":"Whether the path resolves to a directory.","type":"boolean"},"isFile":{"description":"Whether the path resolves to a regular file.","type":"boolean"},"isSymlink":{"description":"Whether the path itself is a symbolic link.","type":"boolean"},"modifiedAtMs":{"description":"File modification time in Unix milliseconds when available, otherwise `0`.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}},"required":["createdAtMs","isDirectory","isFile","isSymlink","modifiedAtMs"],"title":"FsGetMetadataResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:FsGetMetadataResponse"};
+export const validateFsGetMetadataResponse = validate570;
+const schema890 = {"$schema":"http://json-schema.org/draft-07/schema#","description":"Metadata returned by `fs/getMetadata`.","properties":{"createdAtMs":{"description":"File creation time in Unix milliseconds when available, otherwise `0`.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"isDirectory":{"description":"Whether the path resolves to a directory.","type":"boolean"},"isFile":{"description":"Whether the path resolves to a regular file.","type":"boolean"},"isSymlink":{"description":"Whether the path itself is a symbolic link.","type":"boolean"},"modifiedAtMs":{"description":"File modification time in Unix milliseconds when available, otherwise `0`.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}},"required":["createdAtMs","isDirectory","isFile","isSymlink","modifiedAtMs"],"title":"FsGetMetadataResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:FsGetMetadataResponse"};
 
-function validate530(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate570(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 /*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:FsGetMetadataResponse" */;
 let vErrors = null;
 let errors = 0;
@@ -114293,18 +119352,18 @@ vErrors.push(err14);
 }
 errors++;
 }
-validate530.errors = vErrors;
+validate570.errors = vErrors;
 return errors === 0;
 }
 
-export const validateGetAccountRateLimitsResponse = validate531;
-const schema844 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"CreditsSnapshot":{"properties":{"balance":{"type":["string","null"]},"hasCredits":{"type":"boolean"},"unlimited":{"type":"boolean"}},"required":["hasCredits","unlimited"],"type":"object"},"PlanType":{"enum":["free","go","plus","pro","prolite","team","self_serve_business_usage_based","business","enterprise_cbp_usage_based","enterprise","edu","unknown"],"type":"string"},"RateLimitReachedType":{"enum":["rate_limit_reached","workspace_owner_credits_depleted","workspace_member_credits_depleted","workspace_owner_usage_limit_reached","workspace_member_usage_limit_reached"],"type":"string"},"RateLimitResetCredit":{"properties":{"description":{"description":"Backend-provided display description for this credit, or `null` when unavailable.","type":["string","null"]},"expiresAt":{"description":"Unix timestamp in seconds when the credit expires, or `null` if it does not expire.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"grantedAt":{"description":"Unix timestamp in seconds when the credit was granted.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"id":{"description":"Opaque backend identifier for this reset credit.","type":"string"},"resetType":{"$ref":"#/definitions/RateLimitResetType"},"status":{"$ref":"#/definitions/RateLimitResetCreditStatus"},"title":{"description":"Backend-provided display title for this credit, or `null` when unavailable.","type":["string","null"]}},"required":["grantedAt","id","resetType","status"],"type":"object"},"RateLimitResetCreditStatus":{"enum":["available","redeeming","redeemed","unknown"],"type":"string"},"RateLimitResetCreditsSummary":{"properties":{"availableCount":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"credits":{"description":"Detail rows for available reset credits, when the backend provides them.\n\n`null` means only `availableCount` is known, while an empty array means details were fetched and no available credits were returned. The backend may cap this list, so its length can be less than `availableCount`.","items":{"$ref":"#/definitions/RateLimitResetCredit"},"type":["array","null"]}},"required":["availableCount"],"type":"object"},"RateLimitResetType":{"enum":["codexRateLimits","unknown"],"type":"string"},"RateLimitSnapshot":{"properties":{"credits":{"anyOf":[{"$ref":"#/definitions/CreditsSnapshot"},{"type":"null"}]},"individualLimit":{"anyOf":[{"$ref":"#/definitions/SpendControlLimitSnapshot"},{"type":"null"}]},"limitId":{"type":["string","null"]},"limitName":{"type":["string","null"]},"planType":{"anyOf":[{"$ref":"#/definitions/PlanType"},{"type":"null"}]},"primary":{"anyOf":[{"$ref":"#/definitions/RateLimitWindow"},{"type":"null"}]},"rateLimitReachedType":{"anyOf":[{"$ref":"#/definitions/RateLimitReachedType"},{"type":"null"}]},"secondary":{"anyOf":[{"$ref":"#/definitions/RateLimitWindow"},{"type":"null"}]}},"type":"object"},"RateLimitWindow":{"properties":{"resetsAt":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"usedPercent":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"windowDurationMins":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991}},"required":["usedPercent"],"type":"object"},"SpendControlLimitSnapshot":{"properties":{"limit":{"type":"string"},"remainingPercent":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"resetsAt":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"used":{"type":"string"}},"required":["limit","remainingPercent","resetsAt","used"],"type":"object"}},"properties":{"rateLimitResetCredits":{"anyOf":[{"$ref":"#/definitions/RateLimitResetCreditsSummary"},{"type":"null"}]},"rateLimits":{"allOf":[{"$ref":"#/definitions/RateLimitSnapshot"}],"description":"Backward-compatible single-bucket view; mirrors the historical payload."},"rateLimitsByLimitId":{"additionalProperties":{"$ref":"#/definitions/RateLimitSnapshot"},"description":"Multi-bucket view keyed by metered `limit_id` (for example, `codex`).","type":["object","null"]}},"required":["rateLimits"],"title":"GetAccountRateLimitsResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:GetAccountRateLimitsResponse"};
-const schema845 = {"properties":{"availableCount":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"credits":{"description":"Detail rows for available reset credits, when the backend provides them.\n\n`null` means only `availableCount` is known, while an empty array means details were fetched and no available credits were returned. The backend may cap this list, so its length can be less than `availableCount`.","items":{"$ref":"#/definitions/RateLimitResetCredit"},"type":["array","null"]}},"required":["availableCount"],"type":"object"};
-const schema846 = {"properties":{"description":{"description":"Backend-provided display description for this credit, or `null` when unavailable.","type":["string","null"]},"expiresAt":{"description":"Unix timestamp in seconds when the credit expires, or `null` if it does not expire.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"grantedAt":{"description":"Unix timestamp in seconds when the credit was granted.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"id":{"description":"Opaque backend identifier for this reset credit.","type":"string"},"resetType":{"$ref":"#/definitions/RateLimitResetType"},"status":{"$ref":"#/definitions/RateLimitResetCreditStatus"},"title":{"description":"Backend-provided display title for this credit, or `null` when unavailable.","type":["string","null"]}},"required":["grantedAt","id","resetType","status"],"type":"object"};
-const schema847 = {"enum":["codexRateLimits","unknown"],"type":"string"};
-const schema848 = {"enum":["available","redeeming","redeemed","unknown"],"type":"string"};
+export const validateGetAccountRateLimitsResponse = validate571;
+const schema891 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"CreditsSnapshot":{"properties":{"balance":{"type":["string","null"]},"hasCredits":{"type":"boolean"},"unlimited":{"type":"boolean"}},"required":["hasCredits","unlimited"],"type":"object"},"PlanType":{"enum":["free","go","plus","pro","prolite","team","self_serve_business_usage_based","business","enterprise_cbp_usage_based","enterprise","edu","unknown"],"type":"string"},"RateLimitReachedType":{"enum":["rate_limit_reached","workspace_owner_credits_depleted","workspace_member_credits_depleted","workspace_owner_usage_limit_reached","workspace_member_usage_limit_reached"],"type":"string"},"RateLimitResetCredit":{"properties":{"description":{"description":"Backend-provided display description for this credit, or `null` when unavailable.","type":["string","null"]},"expiresAt":{"description":"Unix timestamp in seconds when the credit expires, or `null` if it does not expire.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"grantedAt":{"description":"Unix timestamp in seconds when the credit was granted.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"id":{"description":"Opaque backend identifier for this reset credit.","type":"string"},"resetType":{"$ref":"#/definitions/RateLimitResetType"},"status":{"$ref":"#/definitions/RateLimitResetCreditStatus"},"title":{"description":"Backend-provided display title for this credit, or `null` when unavailable.","type":["string","null"]}},"required":["grantedAt","id","resetType","status"],"type":"object"},"RateLimitResetCreditStatus":{"enum":["available","redeeming","redeemed","unknown"],"type":"string"},"RateLimitResetCreditsSummary":{"properties":{"availableCount":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"credits":{"description":"Detail rows for available reset credits, when the backend provides them.\n\n`null` means only `availableCount` is known, while an empty array means details were fetched and no available credits were returned. The backend may cap this list, so its length can be less than `availableCount`.","items":{"$ref":"#/definitions/RateLimitResetCredit"},"type":["array","null"]}},"required":["availableCount"],"type":"object"},"RateLimitResetType":{"enum":["codexRateLimits","unknown"],"type":"string"},"RateLimitSnapshot":{"properties":{"credits":{"anyOf":[{"$ref":"#/definitions/CreditsSnapshot"},{"type":"null"}]},"individualLimit":{"anyOf":[{"$ref":"#/definitions/SpendControlLimitSnapshot"},{"type":"null"}]},"limitId":{"type":["string","null"]},"limitName":{"type":["string","null"]},"planType":{"anyOf":[{"$ref":"#/definitions/PlanType"},{"type":"null"}]},"primary":{"anyOf":[{"$ref":"#/definitions/RateLimitWindow"},{"type":"null"}]},"rateLimitReachedType":{"anyOf":[{"$ref":"#/definitions/RateLimitReachedType"},{"type":"null"}]},"secondary":{"anyOf":[{"$ref":"#/definitions/RateLimitWindow"},{"type":"null"}]}},"type":"object"},"RateLimitWindow":{"properties":{"resetsAt":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"usedPercent":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"windowDurationMins":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991}},"required":["usedPercent"],"type":"object"},"SpendControlLimitSnapshot":{"properties":{"limit":{"type":"string"},"remainingPercent":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"resetsAt":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"used":{"type":"string"}},"required":["limit","remainingPercent","resetsAt","used"],"type":"object"}},"properties":{"rateLimitResetCredits":{"anyOf":[{"$ref":"#/definitions/RateLimitResetCreditsSummary"},{"type":"null"}]},"rateLimits":{"allOf":[{"$ref":"#/definitions/RateLimitSnapshot"}],"description":"Backward-compatible single-bucket view; mirrors the historical payload."},"rateLimitsByLimitId":{"additionalProperties":{"$ref":"#/definitions/RateLimitSnapshot"},"description":"Multi-bucket view keyed by metered `limit_id` (for example, `codex`).","type":["object","null"]}},"required":["rateLimits"],"title":"GetAccountRateLimitsResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:GetAccountRateLimitsResponse"};
+const schema892 = {"properties":{"availableCount":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"credits":{"description":"Detail rows for available reset credits, when the backend provides them.\n\n`null` means only `availableCount` is known, while an empty array means details were fetched and no available credits were returned. The backend may cap this list, so its length can be less than `availableCount`.","items":{"$ref":"#/definitions/RateLimitResetCredit"},"type":["array","null"]}},"required":["availableCount"],"type":"object"};
+const schema893 = {"properties":{"description":{"description":"Backend-provided display description for this credit, or `null` when unavailable.","type":["string","null"]},"expiresAt":{"description":"Unix timestamp in seconds when the credit expires, or `null` if it does not expire.","type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"grantedAt":{"description":"Unix timestamp in seconds when the credit was granted.","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"id":{"description":"Opaque backend identifier for this reset credit.","type":"string"},"resetType":{"$ref":"#/definitions/RateLimitResetType"},"status":{"$ref":"#/definitions/RateLimitResetCreditStatus"},"title":{"description":"Backend-provided display title for this credit, or `null` when unavailable.","type":["string","null"]}},"required":["grantedAt","id","resetType","status"],"type":"object"};
+const schema894 = {"enum":["codexRateLimits","unknown"],"type":"string"};
+const schema895 = {"enum":["available","redeeming","redeemed","unknown"],"type":"string"};
 
-function validate533(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate573(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -114351,7 +119410,7 @@ errors++;
 if(data.description !== undefined){
 let data0 = data.description;
 if((typeof data0 !== "string") && (data0 !== null)){
-const err4 = {instancePath:instancePath+"/description",schemaPath:"#/properties/description/type",keyword:"type",params:{type: schema846.properties.description.type},message:"must be string,null"};
+const err4 = {instancePath:instancePath+"/description",schemaPath:"#/properties/description/type",keyword:"type",params:{type: schema893.properties.description.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -114364,7 +119423,7 @@ errors++;
 if(data.expiresAt !== undefined){
 let data1 = data.expiresAt;
 if((!(((typeof data1 == "number") && (!(data1 % 1) && !isNaN(data1))) && (isFinite(data1)))) && (data1 !== null)){
-const err5 = {instancePath:instancePath+"/expiresAt",schemaPath:"#/properties/expiresAt/type",keyword:"type",params:{type: schema846.properties.expiresAt.type},message:"must be integer,null"};
+const err5 = {instancePath:instancePath+"/expiresAt",schemaPath:"#/properties/expiresAt/type",keyword:"type",params:{type: schema893.properties.expiresAt.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err5];
 }
@@ -114456,7 +119515,7 @@ vErrors.push(err12);
 errors++;
 }
 if(!((data4 === "codexRateLimits") || (data4 === "unknown"))){
-const err13 = {instancePath:instancePath+"/resetType",schemaPath:"#/definitions/RateLimitResetType/enum",keyword:"enum",params:{allowedValues: schema847.enum},message:"must be equal to one of the allowed values"};
+const err13 = {instancePath:instancePath+"/resetType",schemaPath:"#/definitions/RateLimitResetType/enum",keyword:"enum",params:{allowedValues: schema894.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err13];
 }
@@ -114479,7 +119538,7 @@ vErrors.push(err14);
 errors++;
 }
 if(!((((data5 === "available") || (data5 === "redeeming")) || (data5 === "redeemed")) || (data5 === "unknown"))){
-const err15 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/RateLimitResetCreditStatus/enum",keyword:"enum",params:{allowedValues: schema848.enum},message:"must be equal to one of the allowed values"};
+const err15 = {instancePath:instancePath+"/status",schemaPath:"#/definitions/RateLimitResetCreditStatus/enum",keyword:"enum",params:{allowedValues: schema895.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err15];
 }
@@ -114492,7 +119551,7 @@ errors++;
 if(data.title !== undefined){
 let data6 = data.title;
 if((typeof data6 !== "string") && (data6 !== null)){
-const err16 = {instancePath:instancePath+"/title",schemaPath:"#/properties/title/type",keyword:"type",params:{type: schema846.properties.title.type},message:"must be string,null"};
+const err16 = {instancePath:instancePath+"/title",schemaPath:"#/properties/title/type",keyword:"type",params:{type: schema893.properties.title.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err16];
 }
@@ -114513,12 +119572,12 @@ vErrors.push(err17);
 }
 errors++;
 }
-validate533.errors = vErrors;
+validate573.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate532(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate572(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -114570,7 +119629,7 @@ errors++;
 if(data.credits !== undefined){
 let data1 = data.credits;
 if((!(Array.isArray(data1))) && (data1 !== null)){
-const err4 = {instancePath:instancePath+"/credits",schemaPath:"#/properties/credits/type",keyword:"type",params:{type: schema845.properties.credits.type},message:"must be array,null"};
+const err4 = {instancePath:instancePath+"/credits",schemaPath:"#/properties/credits/type",keyword:"type",params:{type: schema892.properties.credits.type},message:"must be array,null"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -114582,8 +119641,8 @@ errors++;
 if(Array.isArray(data1)){
 const len0 = data1.length;
 for(let i0=0; i0<len0; i0++){
-if(!(validate533(data1[i0], {instancePath:instancePath+"/credits/" + i0,parentData:data1,parentDataProperty:i0,rootData}))){
-vErrors = vErrors === null ? validate533.errors : vErrors.concat(validate533.errors);
+if(!(validate573(data1[i0], {instancePath:instancePath+"/credits/" + i0,parentData:data1,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate573.errors : vErrors.concat(validate573.errors);
 errors = vErrors.length;
 }
 }
@@ -114600,18 +119659,18 @@ vErrors.push(err5);
 }
 errors++;
 }
-validate532.errors = vErrors;
+validate572.errors = vErrors;
 return errors === 0;
 }
 
-const schema849 = {"properties":{"credits":{"anyOf":[{"$ref":"#/definitions/CreditsSnapshot"},{"type":"null"}]},"individualLimit":{"anyOf":[{"$ref":"#/definitions/SpendControlLimitSnapshot"},{"type":"null"}]},"limitId":{"type":["string","null"]},"limitName":{"type":["string","null"]},"planType":{"anyOf":[{"$ref":"#/definitions/PlanType"},{"type":"null"}]},"primary":{"anyOf":[{"$ref":"#/definitions/RateLimitWindow"},{"type":"null"}]},"rateLimitReachedType":{"anyOf":[{"$ref":"#/definitions/RateLimitReachedType"},{"type":"null"}]},"secondary":{"anyOf":[{"$ref":"#/definitions/RateLimitWindow"},{"type":"null"}]}},"type":"object"};
-const schema850 = {"properties":{"balance":{"type":["string","null"]},"hasCredits":{"type":"boolean"},"unlimited":{"type":"boolean"}},"required":["hasCredits","unlimited"],"type":"object"};
-const schema851 = {"properties":{"limit":{"type":"string"},"remainingPercent":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"resetsAt":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"used":{"type":"string"}},"required":["limit","remainingPercent","resetsAt","used"],"type":"object"};
-const schema852 = {"enum":["free","go","plus","pro","prolite","team","self_serve_business_usage_based","business","enterprise_cbp_usage_based","enterprise","edu","unknown"],"type":"string"};
-const schema853 = {"properties":{"resetsAt":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"usedPercent":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"windowDurationMins":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991}},"required":["usedPercent"],"type":"object"};
-const schema854 = {"enum":["rate_limit_reached","workspace_owner_credits_depleted","workspace_member_credits_depleted","workspace_owner_usage_limit_reached","workspace_member_usage_limit_reached"],"type":"string"};
+const schema896 = {"properties":{"credits":{"anyOf":[{"$ref":"#/definitions/CreditsSnapshot"},{"type":"null"}]},"individualLimit":{"anyOf":[{"$ref":"#/definitions/SpendControlLimitSnapshot"},{"type":"null"}]},"limitId":{"type":["string","null"]},"limitName":{"type":["string","null"]},"planType":{"anyOf":[{"$ref":"#/definitions/PlanType"},{"type":"null"}]},"primary":{"anyOf":[{"$ref":"#/definitions/RateLimitWindow"},{"type":"null"}]},"rateLimitReachedType":{"anyOf":[{"$ref":"#/definitions/RateLimitReachedType"},{"type":"null"}]},"secondary":{"anyOf":[{"$ref":"#/definitions/RateLimitWindow"},{"type":"null"}]}},"type":"object"};
+const schema897 = {"properties":{"balance":{"type":["string","null"]},"hasCredits":{"type":"boolean"},"unlimited":{"type":"boolean"}},"required":["hasCredits","unlimited"],"type":"object"};
+const schema898 = {"properties":{"limit":{"type":"string"},"remainingPercent":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"resetsAt":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991},"used":{"type":"string"}},"required":["limit","remainingPercent","resetsAt","used"],"type":"object"};
+const schema899 = {"enum":["free","go","plus","pro","prolite","team","self_serve_business_usage_based","business","enterprise_cbp_usage_based","enterprise","edu","unknown"],"type":"string"};
+const schema900 = {"properties":{"resetsAt":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"usedPercent":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"windowDurationMins":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991}},"required":["usedPercent"],"type":"object"};
+const schema901 = {"enum":["rate_limit_reached","workspace_owner_credits_depleted","workspace_member_credits_depleted","workspace_owner_usage_limit_reached","workspace_member_usage_limit_reached"],"type":"string"};
 
-function validate536(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate576(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 let vErrors = null;
 let errors = 0;
 if(data && typeof data == "object" && !Array.isArray(data)){
@@ -114644,7 +119703,7 @@ errors++;
 if(data0.balance !== undefined){
 let data1 = data0.balance;
 if((typeof data1 !== "string") && (data1 !== null)){
-const err2 = {instancePath:instancePath+"/credits/balance",schemaPath:"#/definitions/CreditsSnapshot/properties/balance/type",keyword:"type",params:{type: schema850.properties.balance.type},message:"must be string,null"};
+const err2 = {instancePath:instancePath+"/credits/balance",schemaPath:"#/definitions/CreditsSnapshot/properties/balance/type",keyword:"type",params:{type: schema897.properties.balance.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err2];
 }
@@ -114921,7 +119980,7 @@ vErrors = null;
 if(data.limitId !== undefined){
 let data9 = data.limitId;
 if((typeof data9 !== "string") && (data9 !== null)){
-const err23 = {instancePath:instancePath+"/limitId",schemaPath:"#/properties/limitId/type",keyword:"type",params:{type: schema849.properties.limitId.type},message:"must be string,null"};
+const err23 = {instancePath:instancePath+"/limitId",schemaPath:"#/properties/limitId/type",keyword:"type",params:{type: schema896.properties.limitId.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err23];
 }
@@ -114934,7 +119993,7 @@ errors++;
 if(data.limitName !== undefined){
 let data10 = data.limitName;
 if((typeof data10 !== "string") && (data10 !== null)){
-const err24 = {instancePath:instancePath+"/limitName",schemaPath:"#/properties/limitName/type",keyword:"type",params:{type: schema849.properties.limitName.type},message:"must be string,null"};
+const err24 = {instancePath:instancePath+"/limitName",schemaPath:"#/properties/limitName/type",keyword:"type",params:{type: schema896.properties.limitName.type},message:"must be string,null"};
 if(vErrors === null){
 vErrors = [err24];
 }
@@ -114960,7 +120019,7 @@ vErrors.push(err25);
 errors++;
 }
 if(!((((((((((((data11 === "free") || (data11 === "go")) || (data11 === "plus")) || (data11 === "pro")) || (data11 === "prolite")) || (data11 === "team")) || (data11 === "self_serve_business_usage_based")) || (data11 === "business")) || (data11 === "enterprise_cbp_usage_based")) || (data11 === "enterprise")) || (data11 === "edu")) || (data11 === "unknown"))){
-const err26 = {instancePath:instancePath+"/planType",schemaPath:"#/definitions/PlanType/enum",keyword:"enum",params:{allowedValues: schema852.enum},message:"must be equal to one of the allowed values"};
+const err26 = {instancePath:instancePath+"/planType",schemaPath:"#/definitions/PlanType/enum",keyword:"enum",params:{allowedValues: schema899.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err26];
 }
@@ -115027,7 +120086,7 @@ errors++;
 if(data12.resetsAt !== undefined){
 let data13 = data12.resetsAt;
 if((!(((typeof data13 == "number") && (!(data13 % 1) && !isNaN(data13))) && (isFinite(data13)))) && (data13 !== null)){
-const err30 = {instancePath:instancePath+"/primary/resetsAt",schemaPath:"#/definitions/RateLimitWindow/properties/resetsAt/type",keyword:"type",params:{type: schema853.properties.resetsAt.type},message:"must be integer,null"};
+const err30 = {instancePath:instancePath+"/primary/resetsAt",schemaPath:"#/definitions/RateLimitWindow/properties/resetsAt/type",keyword:"type",params:{type: schema900.properties.resetsAt.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err30];
 }
@@ -115097,7 +120156,7 @@ errors++;
 if(data12.windowDurationMins !== undefined){
 let data15 = data12.windowDurationMins;
 if((!(((typeof data15 == "number") && (!(data15 % 1) && !isNaN(data15))) && (isFinite(data15)))) && (data15 !== null)){
-const err36 = {instancePath:instancePath+"/primary/windowDurationMins",schemaPath:"#/definitions/RateLimitWindow/properties/windowDurationMins/type",keyword:"type",params:{type: schema853.properties.windowDurationMins.type},message:"must be integer,null"};
+const err36 = {instancePath:instancePath+"/primary/windowDurationMins",schemaPath:"#/definitions/RateLimitWindow/properties/windowDurationMins/type",keyword:"type",params:{type: schema900.properties.windowDurationMins.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err36];
 }
@@ -115195,7 +120254,7 @@ vErrors.push(err42);
 errors++;
 }
 if(!(((((data16 === "rate_limit_reached") || (data16 === "workspace_owner_credits_depleted")) || (data16 === "workspace_member_credits_depleted")) || (data16 === "workspace_owner_usage_limit_reached")) || (data16 === "workspace_member_usage_limit_reached"))){
-const err43 = {instancePath:instancePath+"/rateLimitReachedType",schemaPath:"#/definitions/RateLimitReachedType/enum",keyword:"enum",params:{allowedValues: schema854.enum},message:"must be equal to one of the allowed values"};
+const err43 = {instancePath:instancePath+"/rateLimitReachedType",schemaPath:"#/definitions/RateLimitReachedType/enum",keyword:"enum",params:{allowedValues: schema901.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err43];
 }
@@ -115262,7 +120321,7 @@ errors++;
 if(data17.resetsAt !== undefined){
 let data18 = data17.resetsAt;
 if((!(((typeof data18 == "number") && (!(data18 % 1) && !isNaN(data18))) && (isFinite(data18)))) && (data18 !== null)){
-const err47 = {instancePath:instancePath+"/secondary/resetsAt",schemaPath:"#/definitions/RateLimitWindow/properties/resetsAt/type",keyword:"type",params:{type: schema853.properties.resetsAt.type},message:"must be integer,null"};
+const err47 = {instancePath:instancePath+"/secondary/resetsAt",schemaPath:"#/definitions/RateLimitWindow/properties/resetsAt/type",keyword:"type",params:{type: schema900.properties.resetsAt.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err47];
 }
@@ -115332,7 +120391,7 @@ errors++;
 if(data17.windowDurationMins !== undefined){
 let data20 = data17.windowDurationMins;
 if((!(((typeof data20 == "number") && (!(data20 % 1) && !isNaN(data20))) && (isFinite(data20)))) && (data20 !== null)){
-const err53 = {instancePath:instancePath+"/secondary/windowDurationMins",schemaPath:"#/definitions/RateLimitWindow/properties/windowDurationMins/type",keyword:"type",params:{type: schema853.properties.windowDurationMins.type},message:"must be integer,null"};
+const err53 = {instancePath:instancePath+"/secondary/windowDurationMins",schemaPath:"#/definitions/RateLimitWindow/properties/windowDurationMins/type",keyword:"type",params:{type: schema900.properties.windowDurationMins.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err53];
 }
@@ -115425,12 +120484,12 @@ vErrors.push(err59);
 }
 errors++;
 }
-validate536.errors = vErrors;
+validate576.errors = vErrors;
 return errors === 0;
 }
 
 
-function validate531(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate571(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 /*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:GetAccountRateLimitsResponse" */;
 let vErrors = null;
 let errors = 0;
@@ -115450,8 +120509,8 @@ let data0 = data.rateLimitResetCredits;
 const _errs2 = errors;
 let valid1 = false;
 const _errs3 = errors;
-if(!(validate532(data0, {instancePath:instancePath+"/rateLimitResetCredits",parentData:data,parentDataProperty:"rateLimitResetCredits",rootData}))){
-vErrors = vErrors === null ? validate532.errors : vErrors.concat(validate532.errors);
+if(!(validate572(data0, {instancePath:instancePath+"/rateLimitResetCredits",parentData:data,parentDataProperty:"rateLimitResetCredits",rootData}))){
+vErrors = vErrors === null ? validate572.errors : vErrors.concat(validate572.errors);
 errors = vErrors.length;
 }
 var _valid0 = _errs3 === errors;
@@ -115494,15 +120553,15 @@ vErrors = null;
 }
 }
 if(data.rateLimits !== undefined){
-if(!(validate536(data.rateLimits, {instancePath:instancePath+"/rateLimits",parentData:data,parentDataProperty:"rateLimits",rootData}))){
-vErrors = vErrors === null ? validate536.errors : vErrors.concat(validate536.errors);
+if(!(validate576(data.rateLimits, {instancePath:instancePath+"/rateLimits",parentData:data,parentDataProperty:"rateLimits",rootData}))){
+vErrors = vErrors === null ? validate576.errors : vErrors.concat(validate576.errors);
 errors = vErrors.length;
 }
 }
 if(data.rateLimitsByLimitId !== undefined){
 let data2 = data.rateLimitsByLimitId;
 if((!(data2 && typeof data2 == "object" && !Array.isArray(data2))) && (data2 !== null)){
-const err3 = {instancePath:instancePath+"/rateLimitsByLimitId",schemaPath:"#/properties/rateLimitsByLimitId/type",keyword:"type",params:{type: schema844.properties.rateLimitsByLimitId.type},message:"must be object,null"};
+const err3 = {instancePath:instancePath+"/rateLimitsByLimitId",schemaPath:"#/properties/rateLimitsByLimitId/type",keyword:"type",params:{type: schema891.properties.rateLimitsByLimitId.type},message:"must be object,null"};
 if(vErrors === null){
 vErrors = [err3];
 }
@@ -115513,8 +120572,8 @@ errors++;
 }
 if(data2 && typeof data2 == "object" && !Array.isArray(data2)){
 for(const key0 in data2){
-if(!(validate536(data2[key0], {instancePath:instancePath+"/rateLimitsByLimitId/" + key0.replace(/~/g, "~0").replace(/\//g, "~1"),parentData:data2,parentDataProperty:key0,rootData}))){
-vErrors = vErrors === null ? validate536.errors : vErrors.concat(validate536.errors);
+if(!(validate576(data2[key0], {instancePath:instancePath+"/rateLimitsByLimitId/" + key0.replace(/~/g, "~0").replace(/\//g, "~1"),parentData:data2,parentDataProperty:key0,rootData}))){
+vErrors = vErrors === null ? validate576.errors : vErrors.concat(validate576.errors);
 errors = vErrors.length;
 }
 }
@@ -115531,15 +120590,15 @@ vErrors.push(err4);
 }
 errors++;
 }
-validate531.errors = vErrors;
+validate571.errors = vErrors;
 return errors === 0;
 }
 
-export const validateConsumeAccountRateLimitResetCreditResponse = validate539;
-const schema856 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"ConsumeAccountRateLimitResetCreditOutcome":{"oneOf":[{"description":"A reset credit was consumed and the eligible rate-limit windows were reset.","enum":["reset"],"type":"string"},{"description":"No current rate-limit window is eligible for a reset.","enum":["nothingToReset"],"type":"string"},{"description":"The account has no earned reset credits available.","enum":["noCredit"],"type":"string"},{"description":"The same idempotency key already completed a reset successfully.","enum":["alreadyRedeemed"],"type":"string"}]}},"properties":{"outcome":{"$ref":"#/definitions/ConsumeAccountRateLimitResetCreditOutcome"}},"required":["outcome"],"title":"ConsumeAccountRateLimitResetCreditResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ConsumeAccountRateLimitResetCreditResponse"};
-const schema857 = {"oneOf":[{"description":"A reset credit was consumed and the eligible rate-limit windows were reset.","enum":["reset"],"type":"string"},{"description":"No current rate-limit window is eligible for a reset.","enum":["nothingToReset"],"type":"string"},{"description":"The account has no earned reset credits available.","enum":["noCredit"],"type":"string"},{"description":"The same idempotency key already completed a reset successfully.","enum":["alreadyRedeemed"],"type":"string"}]};
+export const validateConsumeAccountRateLimitResetCreditResponse = validate579;
+const schema903 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"ConsumeAccountRateLimitResetCreditOutcome":{"oneOf":[{"description":"A reset credit was consumed and the eligible rate-limit windows were reset.","enum":["reset"],"type":"string"},{"description":"No current rate-limit window is eligible for a reset.","enum":["nothingToReset"],"type":"string"},{"description":"The account has no earned reset credits available.","enum":["noCredit"],"type":"string"},{"description":"The same idempotency key already completed a reset successfully.","enum":["alreadyRedeemed"],"type":"string"}]}},"properties":{"outcome":{"$ref":"#/definitions/ConsumeAccountRateLimitResetCreditOutcome"}},"required":["outcome"],"title":"ConsumeAccountRateLimitResetCreditResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ConsumeAccountRateLimitResetCreditResponse"};
+const schema904 = {"oneOf":[{"description":"A reset credit was consumed and the eligible rate-limit windows were reset.","enum":["reset"],"type":"string"},{"description":"No current rate-limit window is eligible for a reset.","enum":["nothingToReset"],"type":"string"},{"description":"The account has no earned reset credits available.","enum":["noCredit"],"type":"string"},{"description":"The same idempotency key already completed a reset successfully.","enum":["alreadyRedeemed"],"type":"string"}]};
 
-function validate539(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate579(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 /*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ConsumeAccountRateLimitResetCreditResponse" */;
 let vErrors = null;
 let errors = 0;
@@ -115571,7 +120630,7 @@ vErrors.push(err1);
 errors++;
 }
 if(!(data0 === "reset")){
-const err2 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema857.oneOf[0].enum},message:"must be equal to one of the allowed values"};
+const err2 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/0/enum",keyword:"enum",params:{allowedValues: schema904.oneOf[0].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err2];
 }
@@ -115597,7 +120656,7 @@ vErrors.push(err3);
 errors++;
 }
 if(!(data0 === "nothingToReset")){
-const err4 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema857.oneOf[1].enum},message:"must be equal to one of the allowed values"};
+const err4 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/1/enum",keyword:"enum",params:{allowedValues: schema904.oneOf[1].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err4];
 }
@@ -115628,7 +120687,7 @@ vErrors.push(err5);
 errors++;
 }
 if(!(data0 === "noCredit")){
-const err6 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/2/enum",keyword:"enum",params:{allowedValues: schema857.oneOf[2].enum},message:"must be equal to one of the allowed values"};
+const err6 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/2/enum",keyword:"enum",params:{allowedValues: schema904.oneOf[2].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err6];
 }
@@ -115659,7 +120718,7 @@ vErrors.push(err7);
 errors++;
 }
 if(!(data0 === "alreadyRedeemed")){
-const err8 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/3/enum",keyword:"enum",params:{allowedValues: schema857.oneOf[3].enum},message:"must be equal to one of the allowed values"};
+const err8 = {instancePath:instancePath+"/outcome",schemaPath:"#/definitions/ConsumeAccountRateLimitResetCreditOutcome/oneOf/3/enum",keyword:"enum",params:{allowedValues: schema904.oneOf[3].enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err8];
 }
@@ -115714,16 +120773,16 @@ vErrors.push(err10);
 }
 errors++;
 }
-validate539.errors = vErrors;
+validate579.errors = vErrors;
 return errors === 0;
 }
 
-export const validateGetAccountTokenUsageResponse = validate540;
-const schema858 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"AccountTokenUsageDailyBucket":{"properties":{"startDate":{"type":"string"},"tokens":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}},"required":["startDate","tokens"],"type":"object"},"AccountTokenUsageSummary":{"properties":{"currentStreakDays":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"lifetimeTokens":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"longestRunningTurnSec":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"longestStreakDays":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"peakDailyTokens":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991}},"type":"object"}},"properties":{"dailyUsageBuckets":{"items":{"$ref":"#/definitions/AccountTokenUsageDailyBucket"},"type":["array","null"]},"summary":{"$ref":"#/definitions/AccountTokenUsageSummary"}},"required":["summary"],"title":"GetAccountTokenUsageResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:GetAccountTokenUsageResponse"};
-const schema859 = {"properties":{"startDate":{"type":"string"},"tokens":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}},"required":["startDate","tokens"],"type":"object"};
-const schema860 = {"properties":{"currentStreakDays":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"lifetimeTokens":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"longestRunningTurnSec":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"longestStreakDays":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"peakDailyTokens":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991}},"type":"object"};
+export const validateGetAccountTokenUsageResponse = validate580;
+const schema905 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"AccountTokenUsageDailyBucket":{"properties":{"startDate":{"type":"string"},"tokens":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}},"required":["startDate","tokens"],"type":"object"},"AccountTokenUsageSummary":{"properties":{"currentStreakDays":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"lifetimeTokens":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"longestRunningTurnSec":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"longestStreakDays":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"peakDailyTokens":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991}},"type":"object"}},"properties":{"dailyUsageBuckets":{"items":{"$ref":"#/definitions/AccountTokenUsageDailyBucket"},"type":["array","null"]},"summary":{"$ref":"#/definitions/AccountTokenUsageSummary"}},"required":["summary"],"title":"GetAccountTokenUsageResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:GetAccountTokenUsageResponse"};
+const schema906 = {"properties":{"startDate":{"type":"string"},"tokens":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}},"required":["startDate","tokens"],"type":"object"};
+const schema907 = {"properties":{"currentStreakDays":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"lifetimeTokens":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"longestRunningTurnSec":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"longestStreakDays":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991},"peakDailyTokens":{"type":["integer","null"],"minimum":-9007199254740991,"maximum":9007199254740991}},"type":"object"};
 
-function validate540(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+function validate580(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
 /*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:GetAccountTokenUsageResponse" */;
 let vErrors = null;
 let errors = 0;
@@ -115741,7 +120800,7 @@ errors++;
 if(data.dailyUsageBuckets !== undefined){
 let data0 = data.dailyUsageBuckets;
 if((!(Array.isArray(data0))) && (data0 !== null)){
-const err1 = {instancePath:instancePath+"/dailyUsageBuckets",schemaPath:"#/properties/dailyUsageBuckets/type",keyword:"type",params:{type: schema858.properties.dailyUsageBuckets.type},message:"must be array,null"};
+const err1 = {instancePath:instancePath+"/dailyUsageBuckets",schemaPath:"#/properties/dailyUsageBuckets/type",keyword:"type",params:{type: schema905.properties.dailyUsageBuckets.type},message:"must be array,null"};
 if(vErrors === null){
 vErrors = [err1];
 }
@@ -115842,7 +120901,7 @@ if(data4 && typeof data4 == "object" && !Array.isArray(data4)){
 if(data4.currentStreakDays !== undefined){
 let data5 = data4.currentStreakDays;
 if((!(((typeof data5 == "number") && (!(data5 % 1) && !isNaN(data5))) && (isFinite(data5)))) && (data5 !== null)){
-const err9 = {instancePath:instancePath+"/summary/currentStreakDays",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/currentStreakDays/type",keyword:"type",params:{type: schema860.properties.currentStreakDays.type},message:"must be integer,null"};
+const err9 = {instancePath:instancePath+"/summary/currentStreakDays",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/currentStreakDays/type",keyword:"type",params:{type: schema907.properties.currentStreakDays.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err9];
 }
@@ -115877,7 +120936,7 @@ errors++;
 if(data4.lifetimeTokens !== undefined){
 let data6 = data4.lifetimeTokens;
 if((!(((typeof data6 == "number") && (!(data6 % 1) && !isNaN(data6))) && (isFinite(data6)))) && (data6 !== null)){
-const err12 = {instancePath:instancePath+"/summary/lifetimeTokens",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/lifetimeTokens/type",keyword:"type",params:{type: schema860.properties.lifetimeTokens.type},message:"must be integer,null"};
+const err12 = {instancePath:instancePath+"/summary/lifetimeTokens",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/lifetimeTokens/type",keyword:"type",params:{type: schema907.properties.lifetimeTokens.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err12];
 }
@@ -115912,7 +120971,7 @@ errors++;
 if(data4.longestRunningTurnSec !== undefined){
 let data7 = data4.longestRunningTurnSec;
 if((!(((typeof data7 == "number") && (!(data7 % 1) && !isNaN(data7))) && (isFinite(data7)))) && (data7 !== null)){
-const err15 = {instancePath:instancePath+"/summary/longestRunningTurnSec",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/longestRunningTurnSec/type",keyword:"type",params:{type: schema860.properties.longestRunningTurnSec.type},message:"must be integer,null"};
+const err15 = {instancePath:instancePath+"/summary/longestRunningTurnSec",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/longestRunningTurnSec/type",keyword:"type",params:{type: schema907.properties.longestRunningTurnSec.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err15];
 }
@@ -115947,7 +121006,7 @@ errors++;
 if(data4.longestStreakDays !== undefined){
 let data8 = data4.longestStreakDays;
 if((!(((typeof data8 == "number") && (!(data8 % 1) && !isNaN(data8))) && (isFinite(data8)))) && (data8 !== null)){
-const err18 = {instancePath:instancePath+"/summary/longestStreakDays",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/longestStreakDays/type",keyword:"type",params:{type: schema860.properties.longestStreakDays.type},message:"must be integer,null"};
+const err18 = {instancePath:instancePath+"/summary/longestStreakDays",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/longestStreakDays/type",keyword:"type",params:{type: schema907.properties.longestStreakDays.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err18];
 }
@@ -115982,7 +121041,7 @@ errors++;
 if(data4.peakDailyTokens !== undefined){
 let data9 = data4.peakDailyTokens;
 if((!(((typeof data9 == "number") && (!(data9 % 1) && !isNaN(data9))) && (isFinite(data9)))) && (data9 !== null)){
-const err21 = {instancePath:instancePath+"/summary/peakDailyTokens",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/peakDailyTokens/type",keyword:"type",params:{type: schema860.properties.peakDailyTokens.type},message:"must be integer,null"};
+const err21 = {instancePath:instancePath+"/summary/peakDailyTokens",schemaPath:"#/definitions/AccountTokenUsageSummary/properties/peakDailyTokens/type",keyword:"type",params:{type: schema907.properties.peakDailyTokens.type},message:"must be integer,null"};
 if(vErrors === null){
 vErrors = [err21];
 }
@@ -116037,6 +121096,6 @@ vErrors.push(err25);
 }
 errors++;
 }
-validate540.errors = vErrors;
+validate580.errors = vErrors;
 return errors === 0;
 }

@@ -23,6 +23,8 @@ import type {
   SkillsListResponse,
   FuzzyFileSearchResponse,
   PermissionProfileListResponse,
+  ConfigReadResponse,
+  ConfigRequirementsReadResponse,
   AppsListResponse,
   PluginListResponse,
   ThreadCompactStartResponse,
@@ -55,6 +57,8 @@ import {
   validateSkillsListResponse as validateSkillsListResponseSchema,
   validateFuzzyFileSearchResponse as validateFuzzyFileSearchResponseSchema,
   validatePermissionProfileListResponse as validatePermissionProfileListResponseSchema,
+  validateConfigReadResponse as validateConfigReadResponseSchema,
+  validateConfigRequirementsReadResponse as validateConfigRequirementsReadResponseSchema,
   validateAppsListResponse as validateAppsListResponseSchema,
   validatePluginListResponse as validatePluginListResponseSchema,
   validateThreadCompactStartResponse as validateThreadCompactStartResponseSchema,
@@ -319,6 +323,18 @@ export function validatePermissionProfileListResponse(
   value: unknown,
 ): ProtocolValidationResult<PermissionProfileListResponse> {
   return validateWithSchema(value, validatePermissionProfileListResponseSchema, "invalid_params", "params", "permissionProfile/list 响应校验失败");
+}
+
+export function validateConfigReadResponse(
+  value: unknown,
+): ProtocolValidationResult<ConfigReadResponse> {
+  return validateWithSchema(value, validateConfigReadResponseSchema, "invalid_params", "params", "config/read 响应校验失败");
+}
+
+export function validateConfigRequirementsReadResponse(
+  value: unknown,
+): ProtocolValidationResult<ConfigRequirementsReadResponse> {
+  return validateWithSchema(value, validateConfigRequirementsReadResponseSchema, "invalid_params", "params", "configRequirements/read 响应校验失败");
 }
 
 export function validateAppsListResponse(

@@ -301,20 +301,25 @@ describe("Composer", () => {
     const user = userEvent.setup();
     const { onSend } = renderComposer({ models });
     const trigger = await screen.findByRole("button", { name: "模型" });
+    expect(trigger).toHaveTextContent("默认 · GPT-5 · medium");
     fireEvent.keyDown(trigger, { key: "ArrowDown" });
     expect(screen.getByRole("dialog", { name: "模型设置" })).toBeVisible();
     expect(screen.getByRole("listbox", { name: "选择模型" })).toBeVisible();
     expect(screen.getByText("适合复杂工程任务")).toBeVisible();
     expect(screen.getByText("文本输入 · 图片输入 · 可调推理强度 · 个性化")).toBeVisible();
-    expect(screen.getByRole("option", { name: /✓ 服务器默认/u })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("option", { name: /✓ 服务器默认 · GPT-5/u })).toHaveAttribute("aria-selected", "true");
     fireEvent.keyDown(trigger, { key: "ArrowDown" });
     fireEvent.keyDown(trigger, { key: "ArrowDown" });
     fireEvent.keyDown(trigger, { key: "Enter" });
-    expect(trigger).toHaveTextContent("GPT-5 Pro");
+    expect(trigger).toHaveTextContent("GPT-5 Pro · 默认 high");
     fireEvent.click(trigger);
+    expect(screen.getByRole("combobox", { name: "思考程度" })).toHaveDisplayValue(
+      "服务器默认 · high",
+    );
     fireEvent.change(screen.getByRole("combobox", { name: "思考程度" }), {
       target: { value: "high" },
     });
+    expect(trigger).toHaveTextContent("GPT-5 Pro · high");
     expect(screen.queryByRole("combobox", { name: "推理强度" })).not.toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "任务输入" }), "分析问题");
     await user.click(screen.getByRole("button", { name: "发送" }));
@@ -361,6 +366,26 @@ describe("Composer", () => {
     await waitFor(() => expect(onSend).toHaveBeenCalledWith(
       [{ type: "text", text: "检查项目" }],
       { cwd: "/workspace/project", permissions: ":danger-full-access" },
+    ));
+  });
+
+  it("展示明确的默认权限但发送时保持字段省略", async () => {
+    const user = userEvent.setup();
+    const { onSend } = renderComposer({
+      defaultPermission: ":workspace",
+      permissions: [{ allowed: true, id: ":workspace" }],
+    });
+
+    const permissionTrigger = screen.getByRole("button", { name: "权限" });
+    expect(permissionTrigger).toHaveTextContent("默认 · 工作区写入");
+    await user.click(permissionTrigger);
+    expect(screen.getByRole("option", { name: /✓ 默认 · 工作区写入/u })).toBeVisible();
+
+    await user.type(screen.getByRole("textbox", { name: "任务输入" }), "使用默认权限");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith(
+      [{ type: "text", text: "使用默认权限" }],
+      { cwd: "/workspace/project" },
     ));
   });
 

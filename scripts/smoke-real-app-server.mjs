@@ -8,6 +8,8 @@ import { isAbsolute, join } from "node:path";
 import { createInterface } from "node:readline";
 
 import {
+  validateConfigReadResponse,
+  validateConfigRequirementsReadResponse,
   validateInitializeResponse,
   validateJSONRPCMessage,
   validateThreadListResponse,
@@ -99,6 +101,30 @@ try {
     throw new Error("真实 app-server 初始化响应不符合固定 Schema");
   }
   send({ method: "initialized" });
+
+  const configRead = await request("real-config-read", "config/read", {
+    includeLayers: false,
+  });
+  if ("error" in configRead) {
+    throw new Error(`真实 app-server 拒绝 config/read（code=${configRead.error.code}）`);
+  }
+  if (!validateConfigReadResponse(configRead.result)) {
+    throw new Error("真实 app-server config/read 响应不符合固定 Schema");
+  }
+
+  const configRequirementsRead = await request(
+    "real-config-requirements-read",
+    "configRequirements/read",
+    undefined,
+  );
+  if ("error" in configRequirementsRead) {
+    throw new Error(
+      `真实 app-server 拒绝 configRequirements/read（code=${configRequirementsRead.error.code}）`,
+    );
+  }
+  if (!validateConfigRequirementsReadResponse(configRequirementsRead.result)) {
+    throw new Error("真实 app-server configRequirements/read 响应不符合固定 Schema");
+  }
 
   const threadList = await request("real-thread-list", "thread/list", {
     archived: false,

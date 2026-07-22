@@ -108,6 +108,7 @@ export interface ComposerProps {
   readonly error: string | null;
   readonly models?: readonly Model[];
   readonly modelsLoading?: boolean;
+  readonly defaultPermission?: string | null;
   readonly permissions?: readonly PermissionProfileSummary[];
   readonly permissionsLoading?: boolean;
   readonly recentCwds?: readonly string[];
@@ -147,6 +148,7 @@ export function Composer({
   error,
   models = [],
   modelsLoading = false,
+  defaultPermission = null,
   permissions = [],
   permissionsLoading = false,
   recentCwds = [],
@@ -216,7 +218,7 @@ export function Composer({
   const savedPrompts = useSavedPrompts(savedPromptStore);
   currentDraftRef.current = { text, tokens };
   const normalized = text.trim();
-  const defaultModel = models.find(({ isDefault }) => isDefault) ?? models[0] ?? null;
+  const defaultModel = models.find(({ isDefault }) => isDefault) ?? null;
   const activeModel = models.find(({ model }) => model === selectedModel)
     ?? defaultModel;
   const selectedModelRejectsImages = activeModel !== null
@@ -1022,6 +1024,7 @@ export function Composer({
               ) : null}
             </div>
             <PermissionPicker
+              defaultPermission={defaultPermission}
               disabled={activeTurn || permissionsLoading}
               loading={permissionsLoading}
               onSelect={setSelectedPermission}
@@ -1297,9 +1300,17 @@ function ModelPicker({
       (current + direction + optionCount) % optionCount,
     );
   };
+  const defaultModel = models.find(({ isDefault }) => isDefault) ?? null;
+  const displayedEffort = selectedEffort ?? activeModel?.defaultReasoningEffort ?? null;
   const effortDescription = activeModel?.supportedReasoningEfforts.find(
-    ({ reasoningEffort }) => reasoningEffort === selectedEffort,
+    ({ reasoningEffort }) => reasoningEffort === displayedEffort,
   )?.description;
+  const modelLabel = activeModel === null
+    ? loading ? "加载模型" : "服务器默认模型"
+    : `${selectedModel === null ? "默认 · " : ""}${activeModel.displayName}`;
+  const effortLabel = displayedEffort === null
+    ? ""
+    : ` · ${selectedEffort === null && selectedModel !== null ? "默认 " : ""}${displayedEffort}`;
 
   return (
     <div className={styles.modelPicker} ref={containerRef}>
@@ -1325,12 +1336,10 @@ function ModelPicker({
         }}
         title={activeModel === null
           ? undefined
-          : `${selectedModel === null ? "服务器默认 · " : ""}${activeModel.description}`}
+          : `${selectedModel === null ? "服务器默认 · " : ""}${activeModel.description}${displayedEffort === null ? "" : ` · 思考程度 ${displayedEffort}`}`}
         type="button"
       >
-        {activeModel === null
-          ? loading ? "加载模型" : "服务器默认模型"
-          : `${selectedModel === null ? "默认 · " : ""}${activeModel.displayName}`}
+        {modelLabel}{effortLabel}
         <span aria-hidden="true">⌄</span>
       </button>
       {open ? (
@@ -1350,7 +1359,10 @@ function ModelPicker({
               type="button"
             >
               <span>
-                <strong>{selectedModel === null ? "✓ " : ""}服务器默认</strong>
+                <strong>
+                  {selectedModel === null ? "✓ " : ""}服务器默认
+                  {defaultModel === null ? "" : ` · ${defaultModel.displayName}`}
+                </strong>
               </span>
               <small>不覆盖服务器的模型与思考程度配置</small>
             </button>
@@ -1384,7 +1396,9 @@ function ModelPicker({
                 title={effortDescription}
                 value={selectedEffort ?? ""}
               >
-                <option value="">服务器默认</option>
+                <option value="">
+                  服务器默认 · {activeModel.defaultReasoningEffort}
+                </option>
                 {activeModel.supportedReasoningEfforts.map((effort) => (
                   <option key={effort.reasoningEffort} value={effort.reasoningEffort}>
                     {effort.reasoningEffort} · {effort.description}
@@ -1400,12 +1414,14 @@ function ModelPicker({
 }
 
 function PermissionPicker({
+  defaultPermission,
   disabled,
   loading,
   onSelect,
   permissions,
   selectedPermission,
 }: {
+  readonly defaultPermission: string | null;
   readonly disabled: boolean;
   readonly loading: boolean;
   readonly onSelect: (permission: string | null) => void;
@@ -1416,8 +1432,14 @@ function PermissionPicker({
   const containerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const options = useMemo(
-    () => [{ id: null, allowed: true, description: "使用服务器默认审批、沙箱和网络策略" } as const, ...permissions],
-    [permissions],
+    () => [{
+      id: null,
+      allowed: true,
+      description: defaultPermission === null
+        ? "使用服务器默认审批、沙箱和网络策略"
+        : `使用服务器明确配置的默认权限：${permissionTitle(defaultPermission)}`,
+    } as const, ...permissions],
+    [defaultPermission, permissions],
   );
   const selectedIndex = options.findIndex(({ id }) => id === selectedPermission);
   const [focusedIndex, setFocusedIndex] = useState(Math.max(0, selectedIndex));
@@ -1469,7 +1491,11 @@ function PermissionPicker({
         title={selected?.description ?? undefined}
         type="button"
       >
-        {loading ? "加载权限" : permissionTitle(selected?.id ?? null)}
+        {loading
+          ? "加载权限"
+          : selectedPermission === null
+            ? defaultPermissionTitle(defaultPermission)
+            : permissionTitle(selectedPermission)}
         <span aria-hidden="true">⌄</span>
       </button>
       {open ? (
@@ -1488,7 +1514,7 @@ function PermissionPicker({
                 role="option"
                 type="button"
               >
-                <span><strong>{option.id === selectedPermission ? "✓ " : ""}{permissionTitle(option.id)}</strong>{presentation.risk === "high" ? <small>高风险</small> : null}</span>
+                <span><strong>{option.id === selectedPermission ? "✓ " : ""}{option.id === null ? defaultPermissionTitle(defaultPermission) : permissionTitle(option.id)}</strong>{presentation.risk === "high" ? <small>高风险</small> : null}</span>
                 <small>{option.allowed ? presentation.description : "服务器当前不允许选择此配置"}</small>
               </button>
             );
@@ -1521,11 +1547,20 @@ function permissionTitle(id: string | null): string {
   return id;
 }
 
+function defaultPermissionTitle(defaultPermission: string | null): string {
+  return defaultPermission === null
+    ? "默认权限"
+    : `默认 · ${permissionTitle(defaultPermission)}`;
+}
+
 function permissionPresentation(
   id: string | null,
   serverDescription?: string | null,
 ): { readonly description: string; readonly risk: "normal" | "high" } {
-  if (id === null) return { description: "使用服务器默认审批、沙箱和网络策略", risk: "normal" };
+  if (id === null) return {
+    description: serverDescription ?? "使用服务器默认审批、沙箱和网络策略",
+    risk: "normal",
+  };
   if (id === ":read-only") return { description: "文件系统只读，网络受限；需要写入的操作会由服务端处理审批", risk: "normal" };
   if (id === ":workspace") return { description: "允许写入当前工作区，工作区外和网络访问仍受限", risk: "normal" };
   if (id === ":danger-full-access") return { description: "不启用外层沙箱，可访问工作区外文件和网络，请仅在可信任务中使用", risk: "high" };

@@ -20,6 +20,7 @@ export interface ComposerMentionReference {
 export interface ComposerCapabilities {
   readonly models: readonly Model[];
   readonly modelsLoading: boolean;
+  readonly defaultPermission: string | null;
   readonly permissions: readonly PermissionProfileSummary[];
   readonly permissionsLoading: boolean;
   readonly mentionReferences: readonly ComposerMentionReference[];
@@ -41,6 +42,7 @@ export function useComposerCapabilities(
 ): ComposerCapabilities {
   const [models, setModels] = useState<readonly Model[]>([]);
   const [permissions, setPermissions] = useState<readonly PermissionProfileSummary[]>([]);
+  const [defaultPermission, setDefaultPermission] = useState<string | null>(null);
   const [skills, setSkills] = useState<readonly SkillMetadata[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [permissionsLoading, setPermissionsLoading] = useState(false);
@@ -62,6 +64,7 @@ export function useComposerCapabilities(
     let disposed = false;
     setModels([]);
     setPermissions([]);
+    setDefaultPermission(null);
     setSkills([]);
     setSkillsLoaded(false);
     setMentionReferences([]);
@@ -92,10 +95,11 @@ export function useComposerCapabilities(
     );
 
     setPermissionsLoading(true);
-    void readAllPermissions(client, cwd).then(
-      (data) => {
+    void readPermissionCapabilities(client, cwd).then(
+      ({ defaultPermission: nextDefaultPermission, permissions: data }) => {
         if (!disposed) {
           setPermissions(data);
+          setDefaultPermission(nextDefaultPermission);
           setPermissionsLoading(false);
         }
       },
@@ -193,6 +197,7 @@ export function useComposerCapabilities(
   return {
     models,
     modelsLoading,
+    defaultPermission,
     permissions,
     permissionsLoading,
     mentionReferences,
@@ -291,4 +296,47 @@ async function readAllPermissions(
     cursor = response.nextCursor;
   } while (cursor !== null && cursor !== undefined);
   return data;
+}
+
+async function readPermissionCapabilities(
+  client: CapabilityClient,
+  cwd: string | null,
+): Promise<{
+  readonly defaultPermission: string | null;
+  readonly permissions: readonly PermissionProfileSummary[];
+}> {
+  const [permissionsResult, configResult, requirementsResult] = await Promise.allSettled([
+    readAllPermissions(client, cwd),
+    client.readConfig({ cwd, includeLayers: false }).result,
+    client.readConfigRequirements().result,
+  ]);
+  if (permissionsResult.status === "rejected") {
+    throw permissionsResult.reason;
+  }
+
+  const configuredDefault = configResult.status === "fulfilled"
+    ? nonEmptyString(configResult.value.config.default_permissions)
+    : null;
+  const requirements = requirementsResult.status === "fulfilled"
+    ? requirementsResult.value.requirements
+    : null;
+  const managedDefault = nonEmptyString(requirements?.defaultPermissions);
+  const allowed = requirements?.allowedPermissionProfiles;
+  const configuredAllowed = configuredDefault !== null && (
+    allowed === null || allowed === undefined || allowed[configuredDefault] === true
+  );
+  const managedAllowed = managedDefault !== null && (
+    allowed === null || allowed === undefined || allowed[managedDefault] === true
+  );
+
+  return {
+    defaultPermission: configuredAllowed
+      ? configuredDefault
+      : managedAllowed ? managedDefault : null,
+    permissions: permissionsResult.value,
+  };
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
