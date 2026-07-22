@@ -349,7 +349,7 @@
 .activityGroup[data-expanded="true"] > .activityGroupHeader {
   position: sticky;
   z-index: 3;
-  top: 0;
+  top: var(--conversation-sticky-question-height, 0px);
   background: var(--color-content-bg);
 }
 
@@ -472,12 +472,12 @@ button.activityRowHeader {
 .activityDisclosure[data-expanded="true"] > .activityRowHeader {
   position: sticky;
   z-index: 2;
-  top: 0;
+  top: var(--conversation-sticky-question-height, 0px);
   background: var(--color-content-bg);
 }
 
 .activityGroupContent > .activityDisclosure[data-expanded="true"] > .activityRowHeader {
-  top: 36px;
+  top: calc(var(--conversation-sticky-question-height, 0px) + 36px);
 }
 
 .activityDetailSize {

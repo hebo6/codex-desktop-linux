@@ -535,7 +535,12 @@ export function ConversationView({
     : 0;
 
   return (
-    <section className={styles.conversation}>
+    <section
+      className={styles.conversation}
+      style={{
+        "--conversation-sticky-question-height": `${stickyQuestionHeight}px`,
+      } as CSSProperties}
+    >
       <div
         aria-label="会话消息"
         className={styles.scroller}

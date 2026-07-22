@@ -32,6 +32,7 @@ function mockOverflowingTitle(text: string) {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   Object.defineProperty(globalThis, "ResizeObserver", {
     configurable: true,
     value: OriginalResizeObserver,
@@ -155,7 +156,8 @@ describe("ConversationView", () => {
     await waitFor(() => {
       for (const activityGroup of activityGroups) {
         expect(getComputedStyle(activityGroup).position).toBe("sticky");
-        expect(getComputedStyle(activityGroup).top).toBe("0px");
+        expect(getComputedStyle(activityGroup).top)
+          .toBe("var(--conversation-sticky-question-height, 0px)");
       }
     });
     await waitFor(() => expect(screen.getByText("Hook 提示")).toBeVisible());
@@ -163,7 +165,8 @@ describe("ConversationView", () => {
     const commandHeading = screen.getByRole("button", { name: "Ran pnpm test" });
     await waitFor(() => {
       expect(getComputedStyle(commandHeading).position).toBe("sticky");
-      expect(getComputedStyle(commandHeading).top).toBe("36px");
+      expect(getComputedStyle(commandHeading).top)
+        .toBe("calc(var(--conversation-sticky-question-height, 0px) + 36px)");
     });
     await waitFor(() => expect(screen.getByText("全部通过")).toBeVisible());
 
@@ -219,6 +222,67 @@ describe("ConversationView", () => {
     fireEvent.click(groupHeading);
     expect(screen.getAllByRole("button", { name: /已运行/u })).toHaveLength(1);
     await waitFor(() => expect(getComputedStyle(groupHeading).position).toBe("sticky"));
+  });
+
+  it("活动粘性标题依次排列在动态高度的问题下方", async () => {
+    vi.spyOn(
+      HTMLElement.prototype,
+      "getBoundingClientRect",
+    ).mockImplementation(function (this: HTMLElement) {
+      const height = this.matches("[data-sticky-question]") ? 80 : 0;
+      return {
+        bottom: height,
+        height,
+        left: 0,
+        right: 0,
+        toJSON: () => ({}),
+        top: 0,
+        width: 0,
+        x: 0,
+        y: 0,
+      };
+    });
+    render(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...RESTORED, nextCursor: null }}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    scroller.scrollTop = 24;
+    fireEvent.scroll(scroller);
+    const conversation = scroller.closest<HTMLElement>("section");
+    if (conversation === null) {
+      throw new Error("缺少对话容器");
+    }
+
+    await waitFor(() => {
+      expect(conversation.style.getPropertyValue(
+        "--conversation-sticky-question-height",
+      )).toBe("80px");
+    });
+    expect(conversation.querySelector("[data-sticky-question]"))
+      .toHaveTextContent("请检查项目");
+
+    const activityGroup = screen.getByRole("button", { name: /已运行/u });
+    fireEvent.click(activityGroup);
+    await waitFor(() => {
+      expect(getComputedStyle(activityGroup).position).toBe("sticky");
+      expect(getComputedStyle(activityGroup).top)
+        .toBe("var(--conversation-sticky-question-height, 0px)");
+    });
+
+    const commandHeading = await screen.findByRole("button", {
+      name: "Ran pnpm test",
+    });
+    fireEvent.click(commandHeading);
+    await waitFor(() => {
+      expect(getComputedStyle(commandHeading).position).toBe("sticky");
+      expect(getComputedStyle(commandHeading).top)
+        .toBe("calc(var(--conversation-sticky-question-height, 0px) + 36px)");
+    });
   });
 
   it("优先使用 commandActions 生成命令标题", async () => {
