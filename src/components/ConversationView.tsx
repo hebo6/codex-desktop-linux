@@ -174,6 +174,7 @@ export function ConversationView({
   const pageFollowingRef = useRef(false);
   const manualScrollRef = useRef(false);
   const manualScrollTimerRef = useRef<number | null>(null);
+  const manualForwardScrollLimitRef = useRef<number | null>(null);
   const pointerScrollRef = useRef(false);
   const pendingQuestionPositionRef = useRef<string | null>(null);
   const loadingAnchorRef = useRef(false);
@@ -360,6 +361,7 @@ export function ConversationView({
       manualScrollTimerRef.current = null;
     }
     manualScrollRef.current = false;
+    manualForwardScrollLimitRef.current = null;
   }, []);
 
   const restartManualScrollDelay = useCallback(() => {
@@ -373,6 +375,7 @@ export function ConversationView({
         return;
       }
       manualScrollRef.current = false;
+      manualForwardScrollLimitRef.current = null;
       const scroller = scrollerRef.current;
       if (scroller === null) {
         return;
@@ -407,12 +410,37 @@ export function ConversationView({
     restartManualScrollDelay();
   }, [restartManualScrollDelay, stopPageFollowing]);
 
+  const captureManualForwardScrollLimit = useCallback(() => {
+    const scroller = scrollerRef.current;
+    const tail = conversationTailRef.current;
+    if (scroller === null || tail === null) {
+      manualForwardScrollLimitRef.current = null;
+      return;
+    }
+    const viewportBottom = scroller.getBoundingClientRect().top +
+      scroller.clientHeight;
+    const distanceToTail = tail.getBoundingClientRect().bottom - viewportBottom;
+    manualForwardScrollLimitRef.current = scroller.scrollTop +
+      Math.max(0, distanceToTail);
+  }, []);
+
+  const prepareManualScroll = useCallback(() => {
+    captureManualForwardScrollLimit();
+    startManualScroll();
+  }, [captureManualForwardScrollLimit, startManualScroll]);
+
+  const preparePointerScroll = useCallback(() => {
+    pointerScrollRef.current = true;
+    captureManualForwardScrollLimit();
+  }, [captureManualForwardScrollLimit]);
+
   const finishPointerScroll = useCallback(() => {
     pointerScrollRef.current = false;
-    if (
-      manualScrollRef.current &&
-      manualScrollTimerRef.current === null
-    ) {
+    if (!manualScrollRef.current) {
+      manualForwardScrollLimitRef.current = null;
+      return;
+    }
+    if (manualScrollTimerRef.current === null) {
       restartManualScrollDelay();
     }
   }, [restartManualScrollDelay]);
@@ -660,9 +688,18 @@ export function ConversationView({
 
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     const scroller = event.currentTarget;
+    const manualScroll = pointerScrollRef.current || manualScrollRef.current;
+    const forwardLimit = manualForwardScrollLimitRef.current;
+    if (
+      manualScroll &&
+      forwardLimit !== null &&
+      scroller.scrollTop > forwardLimit + 0.5
+    ) {
+      scroller.scrollTop = forwardLimit;
+    }
     updateStickyQuestion(scroller);
     updateConversationBottom(scroller);
-    if (pointerScrollRef.current || manualScrollRef.current) {
+    if (manualScroll) {
       startManualScroll();
     }
     if (scroller.scrollTop <= 48) {
@@ -696,17 +733,15 @@ export function ConversationView({
         className={styles.scroller}
         onKeyDown={(event) => {
           if (isScrollKey(event.key)) {
-            startManualScroll();
+            prepareManualScroll();
           }
         }}
         onPointerCancel={finishPointerScroll}
-        onPointerDown={() => {
-          pointerScrollRef.current = true;
-        }}
+        onPointerDown={preparePointerScroll}
         onPointerUp={finishPointerScroll}
         onScroll={handleScroll}
-        onTouchMove={startManualScroll}
-        onWheel={startManualScroll}
+        onTouchMove={prepareManualScroll}
+        onWheel={prepareManualScroll}
         ref={scrollerRef}
       >
         <div

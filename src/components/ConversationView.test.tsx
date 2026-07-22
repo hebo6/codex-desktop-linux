@@ -700,6 +700,44 @@ describe("ConversationView", () => {
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });
 
+  it("手动向末尾滚动时不越过实际会话内容末尾", () => {
+    render(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...RESTORED, nextCursor: null }}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    const tail = scroller.querySelector<HTMLElement>("[data-conversation-tail]");
+    if (tail === null) {
+      throw new Error("缺少会话内容末尾标记");
+    }
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 500 },
+      scrollHeight: { configurable: true, value: 1_500 },
+    });
+    const tailDocumentBottom = 900;
+    mockElementBottom(tail, () => tailDocumentBottom - scroller.scrollTop);
+
+    scroller.scrollTop = 100;
+    fireEvent.wheel(scroller);
+    scroller.scrollTop = 600;
+    fireEvent.scroll(scroller);
+    expect(scroller.scrollTop).toBe(400);
+
+    fireEvent.wheel(scroller);
+    scroller.scrollTop = 500;
+    fireEvent.scroll(scroller);
+    expect(scroller.scrollTop).toBe(400);
+
+    fireEvent.wheel(scroller);
+    scroller.scrollTop = 300;
+    fireEvent.scroll(scroller);
+    expect(scroller.scrollTop).toBe(300);
+  });
+
   it("运行中滚动到内容末尾后将最近问题置顶", () => {
     vi.useFakeTimers();
     const earlierTurn = {
