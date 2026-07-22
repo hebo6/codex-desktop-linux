@@ -231,11 +231,12 @@ describe("useConversation", () => {
 
   it("已有会话只通过线程设置更新 Fast 速率", async () => {
     const client = new FakeConversationClient();
+    const snapshot = restored([]);
     const { result } = renderHook(() =>
       useConversation({
         client,
         currentThreadId: "thread-1",
-        restoredThread: restored([]),
+        restoredThread: snapshot,
         onThreadCreated: vi.fn(async () => undefined),
       }),
     );
