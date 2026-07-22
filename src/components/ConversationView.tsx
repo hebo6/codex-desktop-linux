@@ -169,7 +169,10 @@ export function ConversationView({
 }: ConversationViewProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickyQuestionRef = useRef<HTMLDivElement>(null);
+  const conversationTailRef = useRef<HTMLDivElement>(null);
   const pageFollowingRef = useRef(false);
+  const manualScrollRef = useRef(false);
+  const pointerScrollRef = useRef(false);
   const pendingQuestionPositionRef = useRef<string | null>(null);
   const loadingAnchorRef = useRef(false);
   const observedThreadIdRef = useRef(restoredThread.metadata.id);
@@ -181,7 +184,6 @@ export function ConversationView({
     threadId: null,
   });
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
-  const [pageFollowing, setPageFollowing] = useState(false);
   const [preservePageEndSpace, setPreservePageEndSpace] = useState(false);
   const [scrollerHeight, setScrollerHeight] = useState(0);
   const [stickyQuestionHeight, setStickyQuestionHeight] = useState(0);
@@ -268,7 +270,6 @@ export function ConversationView({
       pendingQuestionPositionRef.current = null;
     }
     pageFollowingRef.current = following;
-    setPageFollowing(following);
   }, []);
 
   const questionTop = useCallback(
@@ -329,12 +330,14 @@ export function ConversationView({
     [historyQuestions, questionTop, stickyQuestionHeight],
   );
 
-  const updateJumpToBottom = useCallback((scroller: HTMLDivElement) => {
-    const distanceFromBottom =
-      scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
-    setShowJumpToBottom(
-      !pageFollowingRef.current && distanceFromBottom > ANSWER_BOTTOM_INSET,
-    );
+  const updateConversationBottom = useCallback((scroller: HTMLDivElement) => {
+    const tail = conversationTailRef.current;
+    const viewportBottom = scroller.getBoundingClientRect().top +
+      scroller.clientHeight;
+    const atBottom = tail === null ||
+      tail.getBoundingClientRect().bottom <= viewportBottom + 0.5;
+    setShowJumpToBottom(!atBottom);
+    return atBottom;
   }, []);
 
   const stopPageFollowing = useCallback(() => {
@@ -343,9 +346,27 @@ export function ConversationView({
       setPageFollowingMode(false);
     }
     if (scroller !== null) {
-      updateJumpToBottom(scroller);
+      updateConversationBottom(scroller);
     }
-  }, [setPageFollowingMode, updateJumpToBottom]);
+  }, [setPageFollowingMode, updateConversationBottom]);
+
+  const startManualScroll = useCallback(() => {
+    manualScrollRef.current = true;
+    stopPageFollowing();
+  }, [stopPageFollowing]);
+
+  const finishPointerScroll = useCallback(() => {
+    pointerScrollRef.current = false;
+    const scroller = scrollerRef.current;
+    if (
+      scroller !== null &&
+      activeTurn !== undefined &&
+      updateConversationBottom(scroller)
+    ) {
+      setPageFollowingMode(true);
+    }
+    manualScrollRef.current = false;
+  }, [activeTurn, setPageFollowingMode, updateConversationBottom]);
 
   const handleActivityExpandedChange = useCallback((expanded: boolean) => {
     if (expanded) {
@@ -434,26 +455,15 @@ export function ConversationView({
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     const pagingTurnId = activeTurn?.id ?? previousActiveTurnIdRef.current;
+    if (scroller === null) {
+      return;
+    }
+    const atBottom = updateConversationBottom(scroller);
     if (
-      scroller === null ||
+      atBottom ||
       pagingTurnId === null ||
       !pageFollowingRef.current
     ) {
-      return;
-    }
-    const tailRows = Array.from(
-      scroller.querySelectorAll<HTMLElement>("[data-turn-id]"),
-    ).filter((element) => element.dataset.turnId === pagingTurnId);
-    const tail = tailRows.at(-1);
-    if (tail === undefined) {
-      return;
-    }
-    const scrollerRect = scroller.getBoundingClientRect();
-    const tailRect = tail.getBoundingClientRect();
-    const contentBottom = scroller.scrollTop + tailRect.bottom - scrollerRect.top;
-    const readableBottom =
-      scroller.scrollTop + scroller.clientHeight - ANSWER_BOTTOM_INSET;
-    if (contentBottom <= readableBottom + 0.5) {
       return;
     }
     const pageHeight = Math.max(
@@ -467,10 +477,13 @@ export function ConversationView({
     }
     scroller.scrollTop = nextTop;
     updateStickyQuestion(scroller);
+    updateConversationBottom(scroller);
   }, [
     activeTurn,
     itemCount,
+    scrollerHeight,
     stickyQuestionHeight,
+    updateConversationBottom,
     updateStickyQuestion,
     virtual.totalSize,
   ]);
@@ -482,10 +495,10 @@ export function ConversationView({
       setPageFollowingMode(false);
       const scroller = scrollerRef.current;
       if (scroller !== null) {
-        updateJumpToBottom(scroller);
+        updateConversationBottom(scroller);
       }
     }
-  }, [activeTurn, setPageFollowingMode, updateJumpToBottom]);
+  }, [activeTurn, setPageFollowingMode, updateConversationBottom]);
 
   useLayoutEffect(() => {
     initialBottomScrollRef.current = {
@@ -495,6 +508,8 @@ export function ConversationView({
     observedThreadIdRef.current = restoredThread.metadata.id;
     observedQuestionIdRef.current = latestQuestion?.itemId ?? null;
     pendingQuestionPositionRef.current = null;
+    manualScrollRef.current = false;
+    pointerScrollRef.current = false;
     setPreservePageEndSpace(activeTurn !== undefined);
     setPageFollowingMode(activeTurn !== undefined);
     setShowJumpToBottom(false);
@@ -584,7 +599,17 @@ export function ConversationView({
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     const scroller = event.currentTarget;
     updateStickyQuestion(scroller);
-    updateJumpToBottom(scroller);
+    const atBottom = updateConversationBottom(scroller);
+    if (
+      manualScrollRef.current &&
+      activeTurn !== undefined &&
+      atBottom
+    ) {
+      setPageFollowingMode(true);
+    }
+    if (!pointerScrollRef.current) {
+      manualScrollRef.current = false;
+    }
     if (scroller.scrollTop <= 48) {
       void loadOlder();
     }
@@ -616,13 +641,18 @@ export function ConversationView({
         className={styles.scroller}
         onKeyDown={(event) => {
           if (isScrollKey(event.key)) {
-            stopPageFollowing();
+            startManualScroll();
           }
         }}
-        onPointerDown={stopPageFollowing}
+        onPointerCancel={finishPointerScroll}
+        onPointerDown={() => {
+          pointerScrollRef.current = true;
+          startManualScroll();
+        }}
+        onPointerUp={finishPointerScroll}
         onScroll={handleScroll}
-        onTouchMove={stopPageFollowing}
-        onWheel={stopPageFollowing}
+        onTouchMove={startManualScroll}
+        onWheel={startManualScroll}
         ref={scrollerRef}
       >
         <div
@@ -689,6 +719,7 @@ export function ConversationView({
               );
             })}
           </div>
+          <div aria-hidden="true" data-conversation-tail ref={conversationTailRef} />
           {pageEndSpacerHeight <= 0 ? null : (
             <div
               aria-hidden="true"
@@ -724,7 +755,7 @@ export function ConversationView({
             if (scroller !== null && top !== null) {
               scroller.scrollTop = top;
               updateStickyQuestion(scroller);
-              setShowJumpToBottom(true);
+              updateConversationBottom(scroller);
             }
           }}
           questions={historyQuestions}
@@ -738,7 +769,6 @@ export function ConversationView({
             if (scroller !== null) {
               const resumeFollowing = activeTurn !== undefined;
               setPageFollowingMode(resumeFollowing);
-              setShowJumpToBottom(false);
               if (!resumeFollowing && preservePageEndSpace) {
                 setPreservePageEndSpace(false);
                 requestAnimationFrame(() => {
@@ -746,16 +776,18 @@ export function ConversationView({
                   if (current !== null) {
                     current.scrollTop = current.scrollHeight;
                     updateStickyQuestion(current);
+                    updateConversationBottom(current);
                   }
                 });
               } else {
                 scroller.scrollTop = scroller.scrollHeight;
                 updateStickyQuestion(scroller);
+                updateConversationBottom(scroller);
               }
             }
           }}
           type="button"
-          aria-label={pageFollowing || activeTurn !== undefined ? "继续跟随" : "回到底部"}
+          aria-label="回到底部"
         >
           <svg
             width="16"

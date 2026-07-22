@@ -31,6 +31,23 @@ function mockOverflowingTitle(text: string) {
   });
 }
 
+function mockElementBottom(element: HTMLElement, bottom: () => number) {
+  element.getBoundingClientRect = () => {
+    const edge = bottom();
+    return {
+      bottom: edge,
+      height: 0,
+      left: 0,
+      right: 0,
+      toJSON: () => ({}),
+      top: edge,
+      width: 0,
+      x: 0,
+      y: edge,
+    };
+  };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   Object.defineProperty(globalThis, "ResizeObserver", {
@@ -612,6 +629,36 @@ describe("ConversationView", () => {
     expect(scroller.scrollTop).toBe(800);
   });
 
+  it("只按会话内容末尾判断是否已在底部", () => {
+    render(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...RESTORED, nextCursor: null }}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    const tail = scroller.querySelector<HTMLElement>("[data-conversation-tail]");
+    if (tail === null) {
+      throw new Error("缺少会话内容末尾标记");
+    }
+    let tailBottom = 500;
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 500 },
+      scrollHeight: { configurable: true, value: 1_500 },
+    });
+    mockElementBottom(tail, () => tailBottom);
+
+    fireEvent.scroll(scroller);
+    expect(screen.queryByRole("button", { name: "回到底部" }))
+      .not.toBeInTheDocument();
+
+    tailBottom = 501;
+    fireEvent.scroll(scroller);
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+  });
+
   it("思考项目没有摘要时显示占位，工具到达后不保留占位", async () => {
     const thinkingTurn = {
       id: "turn-thinking",
@@ -733,6 +780,11 @@ describe("ConversationView", () => {
 
     const scroller = screen.getByLabelText("会话消息");
     Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 200 });
+    const tail = scroller.querySelector<HTMLElement>("[data-conversation-tail]");
+    if (tail === null) {
+      throw new Error("缺少会话内容末尾标记");
+    }
+    mockElementBottom(tail, () => 1_200 - scroller.scrollTop);
     scroller.scrollTop = 900;
     fireEvent.click(firstMarker);
     expect(scroller.scrollTop).toBe(24);
@@ -841,7 +893,7 @@ describe("ConversationView", () => {
     const scroller = screen.getByLabelText("会话消息");
     Object.defineProperties(scroller, {
       clientHeight: { configurable: true, value: 500 },
-      scrollHeight: { configurable: true, value: 1_200 },
+      scrollHeight: { configurable: true, value: 1_600 },
     });
     const activeTurn = {
       id: "turn-page-2",
@@ -878,22 +930,17 @@ describe("ConversationView", () => {
     expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
       .toHaveAttribute("data-sticky-question", "user-page-2");
 
-    const activeTail = screen.getByText("正在流式回答")
-      .closest<HTMLElement>("[data-turn-id]");
-    if (activeTail === null) {
-      throw new Error("缺少活跃回答行");
+    const conversationTail = scroller.querySelector<HTMLElement>(
+      "[data-conversation-tail]",
+    );
+    if (conversationTail === null) {
+      throw new Error("缺少会话内容末尾标记");
     }
-    activeTail.getBoundingClientRect = () => ({
-      bottom: 450,
-      height: 180,
-      left: 0,
-      right: 0,
-      toJSON: () => ({}),
-      top: 270,
-      width: 0,
-      x: 0,
-      y: 270,
-    });
+    let tailDocumentBottom = 850;
+    mockElementBottom(
+      conversationTail,
+      () => tailDocumentBottom - scroller.scrollTop,
+    );
     rerender(
       <ConversationView
         hasOlderTurns={false}
@@ -905,7 +952,7 @@ describe("ConversationView", () => {
 
     expect(scroller.scrollTop).toBe(680);
 
-    scroller.scrollTop = 500;
+    scroller.scrollTop = 100;
     fireEvent.wheel(scroller);
     fireEvent.scroll(scroller);
     rerender(
@@ -916,8 +963,27 @@ describe("ConversationView", () => {
         restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
       />,
     );
-    expect(scroller.scrollTop).toBe(500);
-    expect(screen.getByRole("button", { name: "继续跟随" })).toBeVisible();
+    expect(scroller.scrollTop).toBe(100);
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+
+    scroller.scrollTop = 350;
+    fireEvent.wheel(scroller);
+    fireEvent.scroll(scroller);
+    expect(screen.queryByRole("button", { name: "回到底部" }))
+      .not.toBeInTheDocument();
+
+    tailDocumentBottom = 1_200;
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
+      />,
+    );
+    expect(scroller.scrollTop).toBe(730);
+    expect(screen.queryByRole("button", { name: "回到底部" }))
+      .not.toBeInTheDocument();
   });
 
   it("新问题首次定位受限时在回答到达后重试", () => {
