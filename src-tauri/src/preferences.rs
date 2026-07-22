@@ -235,6 +235,7 @@ impl PreferencesRepository {
             "DELETE FROM proxies",
             "DELETE FROM credential_cleanup_queue",
             "DELETE FROM app_preferences",
+            "DELETE FROM saved_prompts",
         ] {
             sqlx::query(statement)
                 .execute(&mut *transaction)

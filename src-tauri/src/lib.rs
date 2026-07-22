@@ -10,6 +10,7 @@ mod header_policy;
 mod local_data;
 mod offline_cache;
 mod preferences;
+mod saved_prompts;
 mod sensitive;
 mod storage;
 mod window_state;
@@ -100,9 +101,15 @@ pub fn run() {
                     std::io::Error::other("draft repository was already initialized").into(),
                 );
             }
-            if !app.manage(preferences::PreferencesRepository::new(pool)) {
+            if !app.manage(preferences::PreferencesRepository::new(pool.clone())) {
                 return Err(std::io::Error::other(
                     "preferences repository was already initialized",
+                )
+                .into());
+            }
+            if !app.manage(saved_prompts::SavedPromptRepository::new(pool)) {
+                return Err(std::io::Error::other(
+                    "saved prompt repository was already initialized",
                 )
                 .into());
             }
@@ -242,6 +249,11 @@ pub fn run() {
             preferences::clear_application_logs,
             preferences::clear_temporary_files,
             preferences::clear_all_local_data,
+            saved_prompts::list_saved_prompts,
+            saved_prompts::create_saved_prompt,
+            saved_prompts::update_saved_prompt,
+            saved_prompts::delete_saved_prompt,
+            saved_prompts::reorder_saved_prompts,
             diagnostics::read_system_diagnostics,
             windows::get_window_button_layout
         ])

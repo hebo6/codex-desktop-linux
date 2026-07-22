@@ -1,0 +1,314 @@
+.backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  padding: var(--space-5);
+  place-items: center;
+  background: var(--color-backdrop);
+  pointer-events: auto;
+}
+
+.dialog {
+  display: grid;
+  width: min(100%, 760px);
+  max-height: calc(100dvh - 40px);
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  box-shadow: 0 24px 64px rgb(12 12 11 / 28%);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--color-divider-subtle);
+}
+
+.header > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.header h2,
+.header p {
+  margin: 0;
+}
+
+.header h2 {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.header p {
+  margin-top: var(--space-1);
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+}
+
+.closeButton {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  place-items: center;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.closeButton:hover:not(:disabled) {
+  background: var(--color-fill-hover);
+}
+
+.managerBody {
+  min-height: 0;
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  overflow: auto;
+}
+
+.toolbar {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.toolbar input {
+  min-width: 0;
+  min-height: 38px;
+  flex: 1;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  font: inherit;
+  font-size: 13px;
+}
+
+.primaryButton,
+.rowActions button,
+.editorActions button,
+.error button {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border-color: transparent;
+  color: var(--color-button-primary-text);
+  background: var(--color-button-primary-bg);
+}
+
+.sortNotice {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.list article {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-divider-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.promptText {
+  min-width: 0;
+  flex: 1;
+}
+
+.promptText strong {
+  font-size: 13px;
+}
+
+.promptText p {
+  display: -webkit-box;
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: pre-wrap;
+}
+
+.rowActions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.rowActions button {
+  min-width: 34px;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+}
+
+.rowActions .dangerText {
+  color: var(--color-status-danger);
+}
+
+.rowActions .dangerButton {
+  border-color: transparent;
+  color: #fff;
+  background: var(--color-status-danger);
+}
+
+.empty {
+  display: grid;
+  min-height: 150px;
+  margin: 0;
+  place-content: center;
+  gap: var(--space-1);
+  color: var(--color-text-tertiary);
+  text-align: center;
+  font-size: 12px;
+}
+
+.empty strong {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.editor {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.fields {
+  min-height: 0;
+  padding: var(--space-6);
+  overflow: auto;
+}
+
+.fields label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fields input,
+.fields textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.fields input {
+  min-height: 38px;
+  padding: 0 var(--space-3);
+}
+
+.fields textarea {
+  min-height: 220px;
+  padding: 10px var(--space-3);
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.fields :is(input, textarea)[aria-invalid="true"] {
+  border-color: var(--color-status-danger);
+}
+
+.fields > small {
+  display: block;
+  margin-top: calc(-1 * var(--space-2));
+  color: var(--color-text-tertiary);
+  text-align: right;
+  font-size: 11px;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  color: var(--color-status-danger);
+  font-size: 12px;
+}
+
+.error button {
+  min-height: 30px;
+  flex: none;
+  color: var(--color-status-danger);
+}
+
+.editorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--color-divider-subtle);
+  background: var(--color-fill-subtle);
+}
+
+.dialog button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 600px) {
+  .backdrop {
+    padding: var(--space-3);
+  }
+
+  .header,
+  .managerBody,
+  .fields {
+    padding-right: var(--space-4);
+    padding-left: var(--space-4);
+  }
+
+  .toolbar,
+  .list article {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rowActions {
+    flex-wrap: wrap;
+  }
+}

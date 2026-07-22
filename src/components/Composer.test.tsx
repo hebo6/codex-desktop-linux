@@ -1,9 +1,49 @@
-import { createEvent, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { Composer } from "./Composer";
+import type { SavedPrompt, SavedPromptStore } from "../transport/savedPrompts";
+
+const SAVED_PROMPT: SavedPrompt = {
+  promptId: "11111111-1111-4111-8111-111111111111",
+  name: "代码审查",
+  content: "  审查当前修改  ",
+  version: 1,
+  createdAtMs: 1,
+  updatedAtMs: 1,
+};
+
+function savedPromptStore(initial: readonly SavedPrompt[] = [SAVED_PROMPT]): SavedPromptStore {
+  let prompts = [...initial];
+  return {
+    list: vi.fn(async () => prompts),
+    create: vi.fn(async (draft) => {
+      const prompt: SavedPrompt = {
+        promptId: `11111111-1111-4111-8111-${String(prompts.length + 2).padStart(12, "0")}`,
+        ...draft,
+        version: 1,
+        createdAtMs: prompts.length + 2,
+        updatedAtMs: prompts.length + 2,
+      };
+      prompts = [...prompts, prompt];
+      return prompt;
+    }),
+    update: vi.fn(async (prompt, draft) => {
+      const updated = { ...prompt, ...draft, version: prompt.version + 1 };
+      prompts = prompts.map((current) => current.promptId === prompt.promptId ? updated : current);
+      return updated;
+    }),
+    delete: vi.fn(async (prompt) => {
+      prompts = prompts.filter((current) => current.promptId !== prompt.promptId);
+    }),
+    reorder: vi.fn(async (promptIds: readonly string[]) => {
+      const byId = new Map(prompts.map((prompt) => [prompt.promptId, prompt]));
+      prompts = promptIds.map((promptId) => byId.get(promptId)!);
+    }),
+  };
+}
 
 function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}) {
   const onSend = vi.fn(async () => true);
@@ -58,7 +98,7 @@ describe("Composer", () => {
   it("Enter 发送成功后清空，Shift+Enter 保留换行", async () => {
     const user = userEvent.setup();
     const { onSend } = renderComposer();
-    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
     await user.type(editor, "第一行{shift>}{enter}{/shift}第二行");
     expect(editor).toHaveValue("第一行\n第二行");
 
@@ -80,6 +120,126 @@ describe("Composer", () => {
     await user.click(screen.getByRole("menuitem", { name: /添加图片/ }));
 
     expect(openPicker).toHaveBeenCalledTimes(1);
+  });
+
+  it("常用提示词独立发送并完整保留输入框草稿", async () => {
+    const user = userEvent.setup();
+    const store = savedPromptStore();
+    const { onSend } = renderComposer({ savedPromptStore: store });
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+    await user.type(editor, "尚未发送的草稿");
+    const image = new File([new Uint8Array([137, 80, 78, 71])], "draft.png", { type: "image/png" });
+    fireEvent.change(screen.getByLabelText("选择图片附件"), { target: { files: [image] } });
+    await waitFor(() => expect(screen.getByLabelText("附件")).toHaveTextContent("draft.png"));
+    editor.setSelectionRange(2, 6, "forward");
+    fireEvent.select(editor);
+
+    await user.click(screen.getByRole("button", { name: "添加内容" }));
+    await user.click(screen.getByRole("menuitem", { name: /常用提示词/u }));
+    await user.click(await screen.findByRole("button", { name: "代码审查，立即发送" }));
+
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith(
+      [{ type: "text", text: "  审查当前修改  " }],
+      { cwd: "/workspace/project" },
+    ));
+    expect(editor).toHaveValue("尚未发送的草稿");
+    expect(screen.getByLabelText("附件")).toHaveTextContent("draft.png");
+    await waitFor(() => expect(editor).toHaveFocus());
+    expect(editor.selectionStart).toBe(2);
+    expect(editor.selectionEnd).toBe(6);
+  });
+
+  it("在新会话首次发送常用提示词时迁移并保留原草稿", async () => {
+    const user = userEvent.setup();
+    const promptStore = savedPromptStore();
+    const draftStore = {
+      load: vi.fn(async (key: string) => key === "window:server:draft"
+        ? { text: "需要稍后发送", tokens: [] }
+        : null),
+      save: vi.fn(async () => undefined),
+      delete: vi.fn(async () => undefined),
+    };
+    const onSend = vi.fn<ComponentProps<typeof Composer>["onSend"]>(async () => true);
+
+    function Harness() {
+      const [draftKey, setDraftKey] = useState("window:server:draft");
+      return (
+        <Composer
+          activeTurn={false}
+          cwd="/workspace/project"
+          draftKey={draftKey}
+          draftStore={draftStore}
+          error={null}
+          onSend={async (...arguments_) => {
+            setDraftKey("window:server:thread");
+            return onSend(...arguments_);
+          }}
+          onStop={async () => true}
+          savedPromptStore={promptStore}
+          showProjectPicker
+          stopping={false}
+          submitting={false}
+        />
+      );
+    }
+
+    render(<Harness />);
+    const editor = await screen.findByRole("textbox", { name: "任务输入" });
+    await waitFor(() => expect(editor).toHaveValue("需要稍后发送"));
+    await user.click(screen.getByRole("button", { name: "添加内容" }));
+    await user.click(screen.getByRole("menuitem", { name: /常用提示词/u }));
+    await user.click(await screen.findByRole("button", { name: "代码审查，立即发送" }));
+
+    await waitFor(() => expect(editor).toHaveValue("需要稍后发送"));
+    await waitFor(() => expect(draftStore.save).toHaveBeenCalledWith(
+      "window:server:thread",
+      { text: "需要稍后发送", tokens: [] },
+    ));
+    await waitFor(() => expect(draftStore.delete).toHaveBeenCalledWith("window:server:draft"));
+  });
+
+  it("管理常用提示词支持增删改查和手动排序", async () => {
+    const user = userEvent.setup();
+    const store = savedPromptStore([]);
+    renderComposer({ savedPromptStore: store });
+
+    await user.click(screen.getByRole("button", { name: "添加内容" }));
+    await user.click(screen.getByRole("menuitem", { name: /常用提示词/u }));
+    await user.click(await screen.findByRole("button", { name: "新建提示词" }));
+    expect(screen.getByRole("dialog", { name: "新建常用提示词" })).toBeVisible();
+    await user.type(screen.getByLabelText("名称"), "代码审查");
+    await user.type(screen.getByLabelText("提示词内容"), "审查当前修改");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    expect(await screen.findByRole("dialog", { name: "管理常用提示词" })).toBeVisible();
+
+    const firstRow = screen.getByText("代码审查").closest("article")!;
+    await user.click(within(firstRow).getByRole("button", { name: "编辑" }));
+    await user.clear(screen.getByLabelText("名称"));
+    await user.type(screen.getByLabelText("名称"), "严格审查");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    expect(await screen.findByText("严格审查")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "新建提示词" }));
+    await user.type(screen.getByLabelText("名称"), "补充测试");
+    await user.type(screen.getByLabelText("提示词内容"), "补充关键路径测试");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await user.click(await screen.findByRole("button", { name: "上移 补充测试" }));
+    expect(store.reorder).toHaveBeenCalledWith([
+      "11111111-1111-4111-8111-000000000003",
+      "11111111-1111-4111-8111-000000000002",
+    ]);
+
+    const search = screen.getByRole("searchbox", { name: "搜索常用提示词" });
+    await user.type(search, "严格");
+    expect(screen.getByText("严格审查")).toBeVisible();
+    expect(screen.queryByText("补充测试")).not.toBeInTheDocument();
+    await user.clear(search);
+
+    const deleteRow = screen.getByText("严格审查").closest("article")!;
+    await user.click(within(deleteRow).getByRole("button", { name: "删除" }));
+    await user.click(within(deleteRow).getByRole("button", { name: "确认删除" }));
+    await waitFor(() => expect(screen.queryByText("严格审查")).not.toBeInTheDocument());
+    expect(store.delete).toHaveBeenCalledTimes(1);
   });
 
   it("只在新建会话的输入框上方显示项目选择器", () => {

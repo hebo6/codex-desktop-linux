@@ -13,6 +13,7 @@ import {
 
 import type { ConversationTurnConfiguration } from "../app/useConversation";
 import type { ComposerMentionReference } from "../app/useComposerCapabilities";
+import { useSavedPrompts } from "../app/useSavedPrompts";
 import { sanitizeSvg } from "../content/sanitizeSvg";
 import {
   browserBlobUrls,
@@ -25,6 +26,12 @@ import type { PermissionProfileSummary } from "../protocol/generated/types/Permi
 import type { SkillMetadata } from "../protocol/generated/types/SkillsListResponse";
 import type { TurnStartParams } from "../protocol/generated";
 import { draftStore as persistentDraftStore, type DraftStore } from "../transport/drafts";
+import {
+  savedPromptStore as persistentSavedPromptStore,
+  type SavedPrompt,
+  type SavedPromptStore,
+} from "../transport/savedPrompts";
+import { SavedPromptManagerDialog } from "./SavedPromptManagerDialog";
 import styles from "./Composer.module.css";
 
 type StructuredInput = Extract<
@@ -95,6 +102,7 @@ export interface ComposerProps {
   readonly cwd: string | null;
   readonly draftKey?: string | null;
   readonly draftStore?: DraftStore;
+  readonly savedPromptStore?: SavedPromptStore;
   readonly blobUrlFactory?: BlobUrlFactory;
   readonly initialText?: string;
   readonly error: string | null;
@@ -133,6 +141,7 @@ export function Composer({
   cwd,
   draftKey = null,
   draftStore = persistentDraftStore,
+  savedPromptStore = persistentSavedPromptStore,
   blobUrlFactory = browserBlobUrls,
   initialText = "",
   error,
@@ -185,10 +194,27 @@ export function Composer({
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [loadedDraftKey, setLoadedDraftKey] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [savedPromptPickerOpen, setSavedPromptPickerOpen] = useState(false);
+  const [savedPromptManagerOpen, setSavedPromptManagerOpen] = useState(false);
+  const [savedPromptManagerCreate, setSavedPromptManagerCreate] = useState(false);
+  const [savedPromptQuery, setSavedPromptQuery] = useState("");
+  const [sendingPromptId, setSendingPromptId] = useState<string | null>(null);
+  const [savedPromptSendError, setSavedPromptSendError] = useState<string | null>(null);
   const plusMenuRef = useRef<HTMLDivElement>(null);
+  const savedPromptSearchRef = useRef<HTMLInputElement>(null);
   const fileSearchRef = useRef(0);
   const composingRef = useRef(false);
   const sendingRef = useRef(false);
+  const previousDraftKeyRef = useRef(draftKey);
+  const preserveDraftForNextKeyRef = useRef(false);
+  const currentDraftRef = useRef({ text, tokens });
+  const composerSelectionRef = useRef<{
+    start: number;
+    end: number;
+    direction: "forward" | "backward" | "none";
+  }>({ start: initialText.length, end: initialText.length, direction: "none" });
+  const savedPrompts = useSavedPrompts(savedPromptStore);
+  currentDraftRef.current = { text, tokens };
   const normalized = text.trim();
   const defaultModel = models.find(({ isDefault }) => isDefault) ?? models[0] ?? null;
   const activeModel = models.find(({ model }) => model === selectedModel)
@@ -202,6 +228,12 @@ export function Composer({
     tokens.length > 0 ||
     attachments.some(({ blob }) => blob !== null)
   ) && !hasInvalidAttachment && !preparingAttachments && !submitting && !stopping;
+  const normalizedSavedPromptQuery = savedPromptQuery.trim().toLocaleLowerCase();
+  const filteredSavedPrompts = useMemo(() => normalizedSavedPromptQuery.length === 0
+    ? savedPrompts.prompts
+    : savedPrompts.prompts.filter((prompt) =>
+      `${prompt.name}\n${prompt.content}`.toLocaleLowerCase().includes(normalizedSavedPromptQuery)),
+  [normalizedSavedPromptQuery, savedPrompts.prompts]);
   const cwdOptions = useMemo(() => {
     const directories = new Set(recentCwds.map((directory) => directory.trim()));
     directories.delete("");
@@ -250,19 +282,37 @@ export function Composer({
   }, [permissions, selectedPermission]);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen && !savedPromptPickerOpen) return;
     const handleOutsideClick = (event: PointerEvent) => {
       if (event.target instanceof Node && !plusMenuRef.current?.contains(event.target)) {
         setMenuOpen(false);
+        setSavedPromptPickerOpen(false);
       }
     };
     document.addEventListener("pointerdown", handleOutsideClick);
     return () => document.removeEventListener("pointerdown", handleOutsideClick);
-  }, [menuOpen]);
+  }, [menuOpen, savedPromptPickerOpen]);
+
+  useEffect(() => {
+    if (savedPromptPickerOpen) savedPromptSearchRef.current?.focus();
+  }, [savedPromptPickerOpen]);
 
   useEffect(() => {
     let disposed = false;
+    const previousDraftKey = previousDraftKeyRef.current;
+    previousDraftKeyRef.current = draftKey;
     setLoadedDraftKey(null);
+    if (preserveDraftForNextKeyRef.current && previousDraftKey !== draftKey) {
+      preserveDraftForNextKeyRef.current = false;
+      setLoadedDraftKey(draftKey);
+      const preserved = currentDraftRef.current;
+      if (draftKey !== null) {
+        void draftStore.save(draftKey, preserved).then(
+          () => previousDraftKey === null ? undefined : draftStore.delete(previousDraftKey),
+        ).catch(() => undefined);
+      }
+      return () => { disposed = true; };
+    }
     setSelectedModel(null);
     setSelectedEffort(null);
     setSelectedPermission(null);
@@ -372,10 +422,18 @@ export function Composer({
     setSelectedIndex(0);
   }, [trigger?.kind, trigger?.query]);
 
+  const turnConfiguration = (): ConversationTurnConfiguration => ({
+    ...(cwd === null ? {} : { cwd }),
+    ...(selectedModel === null ? {} : { model: selectedModel }),
+    ...(selectedEffort === null ? {} : { effort: selectedEffort }),
+    ...(selectedPermission === null ? {} : { permissions: selectedPermission }),
+  });
+
   const send = async () => {
     if (!canSend || sendingRef.current) {
       return;
     }
+    preserveDraftForNextKeyRef.current = false;
     sendingRef.current = true;
     setPreparingAttachments(true);
     try {
@@ -407,12 +465,7 @@ export function Composer({
           url === null ? [] : [{ type: "image" as const, url }],
         ),
       ];
-      if (await onSend(input, {
-        ...(cwd === null ? {} : { cwd }),
-        ...(selectedModel === null ? {} : { model: selectedModel }),
-        ...(selectedEffort === null ? {} : { effort: selectedEffort }),
-        ...(selectedPermission === null ? {} : { permissions: selectedPermission }),
-      })) {
+      if (await onSend(input, turnConfiguration())) {
         setText("");
         setTokens([]);
         setAttachments([]);
@@ -536,6 +589,76 @@ export function Composer({
   const handleUploadClick = () => {
     setMenuOpen(false);
     attachmentInputRef.current?.click();
+  };
+
+  const rememberComposerSelection = () => {
+    const textarea = textareaRef.current;
+    if (textarea === null) return;
+    composerSelectionRef.current = {
+      start: textarea.selectionStart,
+      end: textarea.selectionEnd,
+      direction: textarea.selectionDirection ?? "none",
+    };
+  };
+
+  const restoreComposerSelection = () => {
+    window.requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (textarea === null || textarea.disabled) return;
+      const selection = composerSelectionRef.current;
+      textarea.focus();
+      textarea.setSelectionRange(selection.start, selection.end, selection.direction);
+    });
+  };
+
+  const openSavedPromptPicker = () => {
+    rememberComposerSelection();
+    setMenuOpen(false);
+    setSavedPromptManagerOpen(false);
+    setSavedPromptPickerOpen(true);
+    setSavedPromptQuery("");
+    setSavedPromptSendError(null);
+    savedPrompts.clearError();
+    void savedPrompts.reload();
+  };
+
+  const openSavedPromptManager = (startCreating = false) => {
+    setMenuOpen(false);
+    setSavedPromptPickerOpen(false);
+    setSavedPromptManagerCreate(startCreating);
+    setSavedPromptManagerOpen(true);
+    setSavedPromptSendError(null);
+    void savedPrompts.reload();
+  };
+
+  const sendSavedPrompt = async (prompt: SavedPrompt) => {
+    if (sendingRef.current || submitting || stopping || preparingAttachments) return;
+    sendingRef.current = true;
+    setSendingPromptId(prompt.promptId);
+    setSavedPromptSendError(null);
+    if (showProjectPicker) preserveDraftForNextKeyRef.current = true;
+    try {
+      const sent = await onSend(
+        [{ type: "text", text: prompt.content }],
+        turnConfiguration(),
+      );
+      if (sent) {
+        setSavedPromptPickerOpen(false);
+      } else {
+        if (showProjectPicker) {
+          window.setTimeout(() => {
+            if (previousDraftKeyRef.current === draftKey) {
+              preserveDraftForNextKeyRef.current = false;
+            }
+          }, 0);
+        }
+        setSavedPromptSendError("未能发送常用提示词，当前草稿未受影响");
+      }
+    } finally {
+      sendingRef.current = false;
+      setSendingPromptId(null);
+      restoreComposerSelection();
+    }
   };
 
   const triggerMention = () => {
@@ -691,6 +814,7 @@ export function Composer({
           }}
           placeholder={activeTurn ? "输入要追加的内容" : "向 Codex 描述任务"}
           onPaste={handlePaste}
+          onSelect={rememberComposerSelection}
           ref={textareaRef}
           rows={1}
           value={text}
@@ -743,12 +867,20 @@ export function Composer({
           <div className={styles.context}>
             <div className={styles.plusMenuContainer} ref={plusMenuRef}>
               <button
-                aria-expanded={menuOpen}
+                aria-expanded={menuOpen || savedPromptPickerOpen}
                 aria-haspopup="true"
                 aria-label="添加内容"
                 className={styles.addButton}
-                disabled={submitting || preparingAttachments}
-                onClick={() => setMenuOpen((prev) => !prev)}
+                disabled={submitting || preparingAttachments || stopping}
+                onClick={() => {
+                  if (savedPromptPickerOpen) {
+                    setSavedPromptPickerOpen(false);
+                    restoreComposerSelection();
+                  } else {
+                    setMenuOpen((prev) => !prev);
+                  }
+                }}
+                onPointerDown={rememberComposerSelection}
                 title="添加内容"
                 type="button"
               >
@@ -756,7 +888,7 @@ export function Composer({
                   <path
                     d="M12 5v14M5 12h14"
                     style={{
-                      transform: menuOpen ? "rotate(45deg)" : "rotate(0deg)",
+                      transform: menuOpen || savedPromptPickerOpen ? "rotate(45deg)" : "rotate(0deg)",
                       transformOrigin: "center",
                       transition: "transform 0.2s ease",
                     }}
@@ -797,8 +929,97 @@ export function Composer({
                       <small>提及文件、目录或符号 (@)</small>
                     </div>
                   </button>
+                  <button
+                    onClick={openSavedPromptPicker}
+                    role="menuitem"
+                    type="button"
+                  >
+                    <svg aria-hidden="true" className={styles.menuIcon} viewBox="0 0 24 24">
+                      <path d="M8 4h8" />
+                      <path d="M6 8h12" />
+                      <path d="M5 12h10" />
+                      <path d="M5 16h7" />
+                      <path d="m17 15 3 2-3 2Z" />
+                    </svg>
+                    <div className={styles.menuText}>
+                      <strong>常用提示词</strong>
+                      <small>选择并立即发送</small>
+                    </div>
+                  </button>
                 </div>
               )}
+              {savedPromptPickerOpen ? (
+                <div
+                  aria-label="选择常用提示词"
+                  className={styles.savedPromptPicker}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setSavedPromptPickerOpen(false);
+                      restoreComposerSelection();
+                    }
+                  }}
+                  role="dialog"
+                >
+                  <header>
+                    <div>
+                      <strong>常用提示词</strong>
+                      <small>{activeTurn ? "点击后立即追加" : "点击后立即发送"}</small>
+                    </div>
+                    <button aria-label="关闭常用提示词" onClick={() => {
+                      setSavedPromptPickerOpen(false);
+                      restoreComposerSelection();
+                    }} type="button">×</button>
+                  </header>
+                  <input
+                    aria-label="搜索常用提示词"
+                    onChange={(event) => setSavedPromptQuery(event.target.value)}
+                    placeholder="搜索名称或内容"
+                    ref={savedPromptSearchRef}
+                    type="search"
+                    value={savedPromptQuery}
+                  />
+                  <div aria-live="polite" className={styles.savedPromptItems}>
+                    {savedPrompts.loading && savedPrompts.prompts.length === 0 ? (
+                      <p>正在加载常用提示词</p>
+                    ) : null}
+                    {!savedPrompts.loading && filteredSavedPrompts.length === 0 ? (
+                      <div className={styles.savedPromptEmpty}>
+                        <strong>{savedPrompts.prompts.length === 0 ? "还没有常用提示词" : "没有匹配的常用提示词"}</strong>
+                        <small>{savedPrompts.prompts.length === 0 ? "新建后即可从这里直接发送" : "尝试使用其他搜索词"}</small>
+                        {savedPrompts.prompts.length === 0 ? <button onClick={() => openSavedPromptManager(true)} type="button">新建提示词</button> : null}
+                      </div>
+                    ) : null}
+                    {filteredSavedPrompts.map((prompt) => (
+                      <button
+                        aria-label={`${prompt.name}，${activeTurn ? "立即追加" : "立即发送"}`}
+                        disabled={sendingPromptId !== null || submitting || stopping}
+                        key={prompt.promptId}
+                        onClick={() => void sendSavedPrompt(prompt)}
+                        type="button"
+                      >
+                        <span>
+                          <strong>{prompt.name}</strong>
+                          <small>{prompt.content}</small>
+                        </span>
+                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                          <path d="m5 12 14-7-4 14-3-6Z" />
+                          <path d="m12 13 7-8" />
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
+                  {savedPrompts.error === null && savedPromptSendError === null ? null : (
+                    <div className={styles.savedPromptError} role="alert">
+                      {savedPromptSendError ?? savedPrompts.error}
+                      {savedPrompts.error === null ? null : <button disabled={savedPrompts.loading} onClick={() => void savedPrompts.reload()} type="button">重试</button>}
+                    </div>
+                  )}
+                  <footer>
+                    <button onClick={() => openSavedPromptManager()} type="button">管理常用提示词…</button>
+                  </footer>
+                </div>
+              ) : null}
             </div>
             <PermissionPicker
               disabled={activeTurn || permissionsLoading}
@@ -866,6 +1087,25 @@ export function Composer({
           </div>
         </footer>
       </div>
+      <SavedPromptManagerDialog
+        error={savedPrompts.error}
+        loading={savedPrompts.loading}
+        onClearError={savedPrompts.clearError}
+        onClose={() => {
+          setSavedPromptManagerOpen(false);
+          setSavedPromptManagerCreate(false);
+          restoreComposerSelection();
+        }}
+        onCreate={savedPrompts.create}
+        onDelete={savedPrompts.remove}
+        onReload={savedPrompts.reload}
+        onReorder={savedPrompts.reorder}
+        onUpdate={savedPrompts.update}
+        open={savedPromptManagerOpen}
+        prompts={savedPrompts.prompts}
+        saving={savedPrompts.saving}
+        startCreating={savedPromptManagerCreate}
+      />
     </section>
   );
 }

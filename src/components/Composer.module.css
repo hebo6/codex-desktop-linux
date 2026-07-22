@@ -826,6 +826,228 @@
   margin-top: 1px;
 }
 
+.savedPromptPicker {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  z-index: 10;
+  display: grid;
+  width: min(380px, calc(100vw - 48px));
+  max-height: min(520px, calc(100dvh - 180px));
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  overflow: hidden;
+  border: 1px solid var(--color-divider-strong);
+  border-radius: 16px;
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 20%);
+  animation: plusMenuSlideIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: bottom left;
+}
+
+.savedPromptPicker > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+}
+
+.savedPromptPicker > header > div {
+  display: grid;
+  gap: 2px;
+}
+
+.savedPromptPicker > header strong {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.savedPromptPicker > header small {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.savedPromptPicker > header button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  place-items: center;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.savedPromptPicker > header button:hover {
+  background: var(--color-fill-hover);
+}
+
+.savedPromptPicker > input {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  margin: 0 var(--space-3) var(--space-2);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  font: inherit;
+  font-size: 12px;
+}
+
+.savedPromptItems {
+  min-height: 96px;
+  padding: 0 var(--space-2) var(--space-2);
+  overflow: auto;
+}
+
+.savedPromptItems > p {
+  margin: var(--space-6) 0;
+  color: var(--color-text-tertiary);
+  text-align: center;
+  font-size: 12px;
+}
+
+.savedPromptItems > button {
+  display: grid;
+  width: 100%;
+  min-height: 58px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: 10px;
+  color: var(--color-text-primary);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.savedPromptItems > button:hover:not(:disabled),
+.savedPromptItems > button:focus-visible {
+  background: var(--color-fill-hover);
+}
+
+.savedPromptItems > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.savedPromptItems > button > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.savedPromptItems > button strong,
+.savedPromptItems > button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.savedPromptItems > button strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.savedPromptItems > button small {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.savedPromptItems > button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--color-text-tertiary);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.savedPromptEmpty {
+  display: grid;
+  min-height: 132px;
+  padding: var(--space-4);
+  place-content: center;
+  gap: var(--space-1);
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+.savedPromptEmpty strong {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.savedPromptEmpty small {
+  font-size: 11px;
+}
+
+.savedPromptEmpty button,
+.savedPromptError button,
+.savedPromptPicker > footer button {
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.savedPromptEmpty button {
+  margin: var(--space-2) auto 0;
+  border: 1px solid var(--color-divider-strong);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+}
+
+.savedPromptError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--color-divider-subtle);
+  color: var(--color-status-danger);
+  background: var(--color-danger-surface);
+  font-size: 11px;
+}
+
+.savedPromptError button {
+  flex: none;
+  color: var(--color-status-danger);
+}
+
+.savedPromptPicker > footer {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  border-top: 1px solid var(--color-divider-subtle);
+}
+
+.savedPromptPicker > footer button {
+  width: 100%;
+  text-align: left;
+}
+
+.savedPromptPicker > footer button:hover,
+.savedPromptError button:hover,
+.savedPromptEmpty button:hover {
+  background: var(--color-fill-hover);
+}
+
 @keyframes plusMenuSlideIn {
   from {
     opacity: 0;
@@ -836,4 +1058,3 @@
     transform: translateY(0) scale(1);
   }
 }
-
