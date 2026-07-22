@@ -1345,6 +1345,96 @@ describe("ConversationView", () => {
     expect(screen.getAllByText(/回答 \d+/u).length).toBeLessThan(100);
   });
 
+  it("从侧边栏加载未虚拟化会话后等待真实行高再定位到底部", async () => {
+    class FakeResizeObserver {
+      constructor(_callback: ResizeObserverCallback) {}
+      disconnect() {}
+      observe() {}
+      unobserve() {}
+    }
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      value: FakeResizeObserver,
+    });
+    const originalBoundingRect = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        return this.getAttribute("aria-label") === "会话消息" ? 240 : 0;
+      });
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.getAttribute("aria-label") !== "会话消息") {
+          return 0;
+        }
+        const list = this.querySelector<HTMLElement>("[data-conversation-list]");
+        return Number.parseFloat(list?.style.height ?? "0") + 148;
+      });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        if (!this.matches("[data-virtual-key]")) {
+          return originalBoundingRect.call(this);
+        }
+        const height = this.textContent?.includes("很长的历史回答") ? 720 : 70;
+        return {
+          bottom: height,
+          height,
+          left: 0,
+          right: 0,
+          toJSON: () => ({}),
+          top: 0,
+          width: 0,
+          x: 0,
+          y: 0,
+        };
+      });
+    const turn = {
+      id: "turn-short-loaded",
+      items: [
+        {
+          content: [{ text: "历史问题", type: "text" as const }],
+          id: "user-short-loaded",
+          type: "userMessage" as const,
+        },
+        {
+          id: "answer-short-loaded",
+          phase: "final_answer" as const,
+          text: "很长的历史回答",
+          type: "agentMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "completed" as const,
+    } satisfies ThreadTurn;
+    const loadedThread = {
+      ...RESTORED,
+      metadata: {
+        ...RESTORED.metadata,
+        id: "thread-short-loaded",
+        turns: [turn],
+      },
+      nextCursor: null,
+      turns: [turn],
+    } satisfies RestoredThread;
+    const { rerender } = render(<ConversationPlaceholder kind="loading" />);
+
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={loadedThread}
+      />,
+    );
+
+    const scroller = screen.getByLabelText("会话消息");
+    expect(scroller.querySelectorAll("[data-virtual-key]")).toHaveLength(2);
+    await waitFor(() =>
+      expect(scroller.scrollTop).toBe(
+        scroller.scrollHeight - scroller.clientHeight,
+      ),
+    );
+  });
+
   it("从侧边栏加载长会话后定位到已测量内容的底部", async () => {
     class FakeResizeObserver {
       constructor(_callback: ResizeObserverCallback) {}

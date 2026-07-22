@@ -266,9 +266,9 @@ export function ConversationView({
   const lastRowVisible = lastRowKey === null || virtual.rows.some(
     ({ key }) => key === lastRowKey,
   );
-  const visibleRowsMeasured =
-    !virtual.virtualized ||
-    virtual.rows.every(({ key }) => virtual.isMeasured(key));
+  const visibleRowsMeasured = virtual.rows.every(
+    ({ key }) => virtual.isMeasured(key),
+  );
   const setPageFollowingMode = useCallback((following: boolean) => {
     if (!following) {
       pendingQuestionPositionRef.current = null;
@@ -574,7 +574,7 @@ export function ConversationView({
     if (scroller !== null) {
       updateStickyQuestion(scroller);
     }
-    if (!virtual.virtualized) {
+    if (typeof ResizeObserver === "undefined") {
       scrollState.pending = false;
       return;
     }
@@ -603,7 +603,6 @@ export function ConversationView({
     updateStickyQuestion,
     virtual.scrollToBottom,
     virtual.totalSize,
-    virtual.virtualized,
     visibleRowsMeasured,
   ]);
 
