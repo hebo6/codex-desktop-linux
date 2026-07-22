@@ -17,6 +17,7 @@ import type {
   ServerThreadsPhase,
 } from "../app/useServerThreads";
 import { useVirtualRows } from "./useVirtualRows";
+import { ArchiveIcon, DeleteIcon, DraftIcon } from "./SidebarIcons";
 import styles from "./RecentThreads.module.css";
 
 export interface RecentThreadsProps {
@@ -787,32 +788,6 @@ function contextMenuPosition(x: number, y: number): CSSProperties {
     left: Math.max(8, Math.min(x, window.innerWidth - 208)),
     top: Math.max(8, Math.min(y, window.innerHeight - 52)),
   };
-}
-
-function ArchiveIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M4 7h16M6 7v12h12V7M9 11h6" />
-      <rect height="3" rx="1" width="18" x="3" y="4" />
-    </svg>
-  );
-}
-
-function DeleteIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" />
-    </svg>
-  );
-}
-
-function DraftIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M14 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-      <path d="m13 14 7-7-3-3-7 7-1 4 4-1Z" />
-    </svg>
-  );
 }
 
 function threadTitle(thread: ThreadSummary): string {

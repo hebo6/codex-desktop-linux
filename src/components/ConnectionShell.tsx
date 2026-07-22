@@ -15,6 +15,16 @@ import type {
 import type { ReconnectViewState } from "../app/useConfiguredServerConnection";
 import type { ConnectionPhase } from "../store/connectionSlice";
 import { RecentThreads } from "./RecentThreads";
+import {
+  ComposeIcon,
+  GroupIcon,
+  MenuIcon,
+  MoreIcon,
+  RefreshIcon,
+  SearchIcon,
+  ServerIcon,
+  SidebarCollapseIcon,
+} from "./SidebarIcons";
 import { WindowControls } from "./WindowControls";
 import styles from "./ConnectionShell.module.css";
 
@@ -131,87 +141,6 @@ function getStepState(phase: ConnectionPhase, index: number): StepState {
   }
 
   return "pending";
-}
-
-function MenuIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
-      <path d="M4 7h16M4 12h16M4 17h16" />
-    </svg>
-  );
-}
-
-function SidebarCollapseIcon({ collapsed }: { collapsed: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      style={{
-        transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-        transform: collapsed ? "rotate(180deg)" : "rotate(0deg)",
-      }}
-    >
-      <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.8" fill="none" />
-      <path d="M9 4v16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M14 9l-3 3 3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function ComposeIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18">
-      <path d="M13.5 5.5 18.5 10.5M4 20l3.7-.8L19.4 7.5a1.8 1.8 0 0 0 0-2.5L19 4.6a1.8 1.8 0 0 0-2.5 0L4.8 16.3 4 20Z" />
-    </svg>
-  );
-}
-
-function GroupIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18">
-      <path d="M4 6h6l2 2h8v10H4V6Z" />
-      <path d="M8 12h8M8 15h6" />
-    </svg>
-  );
-}
-
-function RefreshIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18">
-      <path d="M19 8a8 8 0 1 0 1 6M19 4v4h-4" />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18">
-      <circle cx="11" cy="11" r="6" />
-      <path d="m16 16 4 4" />
-    </svg>
-  );
-}
-
-function MoreIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18">
-      <circle cx="5" cy="12" r="1" />
-      <circle cx="12" cy="12" r="1" />
-      <circle cx="19" cy="12" r="1" />
-    </svg>
-  );
-}
-
-function ServerIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
-      <rect x="4" y="4" width="16" height="6" rx="2" />
-      <rect x="4" y="14" width="16" height="6" rx="2" />
-      <path d="M8 7h.01M8 17h.01" />
-    </svg>
-  );
 }
 
 export function ConnectionShell({
