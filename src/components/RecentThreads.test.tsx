@@ -128,7 +128,9 @@ describe("RecentThreads", () => {
     expect(draft.closest("button")).toContainElement(
       screen.getByRole("img", { name: "正在运行" }),
     );
-    expect(document.querySelectorAll("[data-present]")).toHaveLength(2);
+    expect(document.querySelectorAll("[data-present]")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "预览标题 等待审批" }))
+      .toHaveAttribute("data-has-draft", "false");
   });
 
   it("空闲会话不展示状态并区分待回复与失败", () => {

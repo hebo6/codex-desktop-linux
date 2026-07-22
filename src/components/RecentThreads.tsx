@@ -698,6 +698,7 @@ function ThreadRow({
         aria-current={current ? "page" : undefined}
         className={styles.threadRow}
         data-current={current}
+        data-has-draft={hasDraft}
         data-thread-row
         data-thread-id={thread.id}
         disabled={disabled}
@@ -734,16 +735,17 @@ function ThreadRow({
         title={`${title}\n${thread.cwd}`}
         type="button"
       >
-        <span
-          aria-hidden={hasDraft ? undefined : "true"}
-          aria-label={hasDraft ? "存在未发送草稿" : undefined}
-          className={styles.draftIndicator}
-          data-present={hasDraft}
-          role={hasDraft ? "img" : undefined}
-          title={hasDraft ? "存在未发送草稿" : undefined}
-        >
-          {hasDraft ? <DraftIcon /> : null}
-        </span>
+        {hasDraft ? (
+          <span
+            aria-label="存在未发送草稿"
+            className={styles.draftIndicator}
+            data-present="true"
+            role="img"
+            title="存在未发送草稿"
+          >
+            <DraftIcon />
+          </span>
+        ) : null}
         <span className={styles.threadTitle}>{title}</span>
         {status === null ? null : (
           <span
