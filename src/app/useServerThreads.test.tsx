@@ -158,6 +158,7 @@ function resumeResponse(
     initialTurnsPage: { data: descendingTurns, nextCursor },
     model: "gpt-5",
     modelProvider: "openai",
+    reasoningEffort: "medium",
     sandbox: { type: "readOnly" },
     thread: { ...THREAD_ONE, turns: descendingTurns },
   };
@@ -170,6 +171,7 @@ function startResponse(thread: ThreadListResponse["data"][number]): ThreadStartR
     cwd: thread.cwd,
     model: "gpt-5",
     modelProvider: "openai",
+    reasoningEffort: "medium",
     sandbox: { type: "readOnly" },
     thread,
   };
@@ -222,6 +224,48 @@ describe("useServerThreads", () => {
       TURN_TWO.id,
     ]);
     expect(result.current.restoredThread?.nextCursor).toBe("older");
+    expect(result.current.restoredThread?.modelSettings).toEqual({
+      effort: "medium",
+      model: "gpt-5",
+    });
+  });
+
+  it("使用线程设置通知更新当前会话的模型和思考程度", async () => {
+    const client = new FakeThreadClient();
+    client.listResults.push(Promise.resolve({ data: [THREAD_ONE] }));
+    client.resumeResults.push(Promise.resolve(resumeResponse([], null)));
+    const { result } = renderHook(() => useServerThreads(client, THREAD_ONE.id));
+    await waitFor(() => expect(result.current.threadRestorePhase).toBe("ready"));
+
+    act(() => {
+      client.emit({
+        method: "thread/settings/updated",
+        params: {
+          threadId: THREAD_ONE.id,
+          threadSettings: {
+            approvalPolicy: "on-request",
+            approvalsReviewer: "user",
+            collaborationMode: {
+              mode: "default",
+              settings: {
+                model: "gpt-5-pro",
+                reasoning_effort: "high",
+              },
+            },
+            cwd: THREAD_ONE.cwd,
+            effort: "high",
+            model: "gpt-5-pro",
+            modelProvider: "openai",
+            sandboxPolicy: { type: "readOnly" },
+          },
+        },
+      });
+    });
+
+    expect(result.current.restoredThread?.modelSettings).toEqual({
+      effort: "high",
+      model: "gpt-5-pro",
+    });
   });
 
   it("最近会话页不含当前会话时仍将其加入列表", async () => {
@@ -281,6 +325,7 @@ describe("useServerThreads", () => {
     ]);
     expect(result.current.restoredThread).toMatchObject({
       metadata: startedThread,
+      modelSettings: { effort: "medium", model: "gpt-5" },
       nextCursor: null,
       turns: [],
     });

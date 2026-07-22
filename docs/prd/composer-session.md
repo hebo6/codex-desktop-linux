@@ -165,9 +165,13 @@ Enter 发送，Shift+Enter 换行，输入法合成期间 Enter 不触发发送
 
 输入区底栏显示当前模型短名称和思考程度，点击打开模型设置浮层
 
-没有显式选择模型时，根据 `model/list` 中的 `isDefault` 展示 `默认 · {模型名称}`，服务端没有明确标记目录默认模型时仅显示服务器默认模型
+新建会话没有显式选择模型时，优先展示 `config/read` 根据当前工作目录解析的 `model`，配置未指定模型时回退到 `model/list` 中的 `isDefault` 项，模型目录没有明确默认项时仅显示服务器默认模型
 
-没有显式选择思考程度时，展示当前目录模型的 `defaultReasoningEffort`，并保留服务端原始编码，例如 `medium`、`high` 或 `xhigh`
+新建会话没有显式选择思考程度时，优先展示 `config/read` 返回的 `model_reasoning_effort`，配置未指定思考程度时回退到当前模型的 `defaultReasoningEffort`
+
+已有会话使用 `thread/start` 或 `thread/resume` 返回的模型与思考程度，并通过 `thread/settings/updated` 跟踪后续变化；线程没有明确思考程度时回退到当前模型的 `defaultReasoningEffort`
+
+默认值保留服务端原始编码，例如 `medium`、`high` 或 `xhigh`，并以低强调文案区分目录配置、当前会话和模型目录默认来源
 
 模型列表展示名称、说明、支持能力和推荐标记，当前项使用选中图标
 

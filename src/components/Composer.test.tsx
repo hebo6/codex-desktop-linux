@@ -329,6 +329,61 @@ describe("Composer", () => {
     ));
   });
 
+  it("展示目录配置中的默认模型和思考程度但不作为请求覆盖发送", async () => {
+    const models: NonNullable<ComponentProps<typeof Composer>["models"]> = [
+      {
+        defaultReasoningEffort: "medium",
+        description: "目录推荐模型",
+        displayName: "GPT-5",
+        hidden: false,
+        id: "gpt-5",
+        isDefault: true,
+        model: "gpt-5",
+        supportedReasoningEfforts: [
+          { description: "平衡速度与质量", reasoningEffort: "medium" },
+        ],
+      },
+      {
+        defaultReasoningEffort: "medium",
+        description: "当前项目配置模型",
+        displayName: "GPT-5 Pro",
+        hidden: false,
+        id: "gpt-5-pro",
+        isDefault: false,
+        model: "gpt-5-pro",
+        supportedReasoningEfforts: [
+          { description: "平衡速度与质量", reasoningEffort: "medium" },
+          { description: "更深入推理", reasoningEffort: "high" },
+        ],
+      },
+    ];
+    const user = userEvent.setup();
+    const { onSend } = renderComposer({
+      defaultEffort: "high",
+      defaultModel: "gpt-5-pro",
+      defaultModelSource: "config",
+      models,
+    });
+
+    const trigger = screen.getByRole("button", { name: "模型" });
+    expect(trigger).toHaveTextContent("配置 · GPT-5 Pro · high");
+    await user.click(trigger);
+    expect(screen.getByRole("option", { name: /✓ 目录配置 · GPT-5 Pro/u })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("combobox", { name: "思考程度" })).toHaveDisplayValue(
+      "目录配置 · high",
+    );
+
+    await user.type(screen.getByRole("textbox", { name: "任务输入" }), "沿用目录配置");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith(
+      [{ type: "text", text: "沿用目录配置" }],
+      { cwd: "/workspace/project" },
+    ));
+  });
+
   it("未选择会话参数时完全沿用服务器默认值", async () => {
     const user = userEvent.setup();
     const { onSend } = renderComposer({ cwd: null });

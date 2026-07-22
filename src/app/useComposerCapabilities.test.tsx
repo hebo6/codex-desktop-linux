@@ -20,6 +20,48 @@ function completed<T>(value: T): RequestHandle<T> {
 }
 
 describe("useComposerCapabilities", () => {
+  it("读取当前目录配置中的默认模型和思考程度并保留隐藏模型元数据", async () => {
+    const listModels = vi.fn(() => completed({
+      data: [{
+        defaultReasoningEffort: "medium",
+        description: "项目配置模型",
+        displayName: "Configured Model",
+        hidden: true,
+        id: "configured-model",
+        isDefault: false,
+        model: "configured-model",
+        supportedReasoningEfforts: [
+          { description: "深入推理", reasoningEffort: "high" },
+        ],
+      }],
+      nextCursor: null,
+    }));
+    const client = {
+      listApps: () => completed({ data: [], nextCursor: null }),
+      listModels,
+      listPermissionProfiles: () => completed({ data: [], nextCursor: null }),
+      listPlugins: () => completed({ marketplaces: [] }),
+      listSkills: () => completed({ data: [] }),
+      readConfig: () => completed({
+        config: {
+          model: "configured-model",
+          model_reasoning_effort: "high",
+        },
+        origins: {},
+      }),
+      readConfigRequirements: () => completed({ requirements: null }),
+      searchFiles: () => completed({ files: [] }),
+    } satisfies CapabilityClient;
+
+    const { result } = renderHook(() => useComposerCapabilities(client, "/workspace"));
+
+    await waitFor(() => expect(result.current.defaultsLoading).toBe(false));
+    expect(result.current.defaultModel).toBe("configured-model");
+    expect(result.current.defaultEffort).toBe("high");
+    expect(result.current.models).toHaveLength(1);
+    expect(listModels).toHaveBeenCalledWith({ includeHidden: true, limit: 100 });
+  });
+
   it("分页读取应用并只保留可用应用和已启用插件引用", async () => {
     const listApps = vi.fn((params: AppsListParams = {}) => completed<AppsListResponse>(
       params.cursor === "apps-page-2"

@@ -258,6 +258,17 @@ export function App({
     connection.capabilityClient,
     composerCwd,
   );
+  const composerThreadSettings = serverThreads.restoredThread?.modelSettings ?? null;
+  const composerDefaultModel = composerThreadSettings?.model
+    ?? composerCapabilities.defaultModel;
+  const composerDefaultEffort = composerThreadSettings === null
+    ? composerCapabilities.defaultEffort
+    : composerThreadSettings.effort;
+  const composerDefaultModelSource = composerThreadSettings !== null
+    ? "thread" as const
+    : composerCapabilities.defaultModel !== null || composerCapabilities.defaultEffort !== null
+      ? "config" as const
+      : "catalog" as const;
   const serverInteractions = useServerInteractions(connection.interactionClient);
   const accountRateLimits = useAccountRateLimits(connection.accountClient);
   const accountTokenUsage = useAccountTokenUsage(connection.accountClient);
@@ -1327,7 +1338,14 @@ export function App({
                     />
                   }
                   models={composerCapabilities.models}
-                  modelsLoading={composerCapabilities.modelsLoading}
+                  modelsLoading={
+                    composerCapabilities.modelsLoading || (
+                      composerThreadSettings === null && composerCapabilities.defaultsLoading
+                    )
+                  }
+                  defaultModel={composerDefaultModel}
+                  defaultEffort={composerDefaultEffort}
+                  defaultModelSource={composerDefaultModelSource}
                   defaultPermission={composerCapabilities.defaultPermission}
                   mentionReferences={composerCapabilities.mentionReferences}
                   mentionsError={composerCapabilities.mentionsError}

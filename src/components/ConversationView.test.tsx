@@ -146,6 +146,7 @@ const RESTORED = {
     turns: [TURN],
     updatedAt: 200,
   },
+  modelSettings: { effort: "medium", model: "gpt-5" },
   nextCursor: "older",
   turns: [TURN],
 } satisfies RestoredThread;

@@ -108,6 +108,9 @@ export interface ComposerProps {
   readonly error: string | null;
   readonly models?: readonly Model[];
   readonly modelsLoading?: boolean;
+  readonly defaultModel?: string | null;
+  readonly defaultEffort?: string | null;
+  readonly defaultModelSource?: "catalog" | "config" | "thread";
   readonly defaultPermission?: string | null;
   readonly permissions?: readonly PermissionProfileSummary[];
   readonly permissionsLoading?: boolean;
@@ -148,6 +151,9 @@ export function Composer({
   error,
   models = [],
   modelsLoading = false,
+  defaultModel: defaultModelId = null,
+  defaultEffort = null,
+  defaultModelSource = "catalog",
   defaultPermission = null,
   permissions = [],
   permissionsLoading = false,
@@ -218,7 +224,10 @@ export function Composer({
   const savedPrompts = useSavedPrompts(savedPromptStore);
   currentDraftRef.current = { text, tokens };
   const normalized = text.trim();
-  const defaultModel = models.find(({ isDefault }) => isDefault) ?? null;
+  const catalogDefaultModel = models.find(({ isDefault }) => isDefault) ?? null;
+  const defaultModel = defaultModelId === null
+    ? catalogDefaultModel
+    : models.find(({ model }) => model === defaultModelId) ?? null;
   const activeModel = models.find(({ model }) => model === selectedModel)
     ?? defaultModel;
   const selectedModelRejectsImages = activeModel !== null
@@ -1034,6 +1043,10 @@ export function Composer({
           </div>
           <ModelPicker
             activeModel={activeModel}
+            defaultEffort={defaultEffort}
+            defaultModel={defaultModel}
+            defaultModelId={defaultModelId}
+            defaultModelSource={defaultModelSource}
             disabled={modelsLoading || models.length === 0 || activeTurn}
             loading={modelsLoading}
             models={models}
@@ -1238,6 +1251,10 @@ function ProjectPicker({
 
 function ModelPicker({
   activeModel,
+  defaultEffort,
+  defaultModel,
+  defaultModelId,
+  defaultModelSource,
   disabled,
   loading,
   models,
@@ -1247,6 +1264,10 @@ function ModelPicker({
   selectedModel,
 }: {
   readonly activeModel: Model | null;
+  readonly defaultEffort: string | null;
+  readonly defaultModel: Model | null;
+  readonly defaultModelId: string | null;
+  readonly defaultModelSource: "catalog" | "config" | "thread";
   readonly disabled: boolean;
   readonly loading: boolean;
   readonly models: readonly Model[];
@@ -1259,11 +1280,15 @@ function ModelPicker({
   const containerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(0);
+  const visibleModels = useMemo(
+    () => models.filter(({ hidden }) => !hidden),
+    [models],
+  );
 
   useEffect(() => {
-    const selectedIndex = models.findIndex(({ model }) => model === selectedModel);
+    const selectedIndex = visibleModels.findIndex(({ model }) => model === selectedModel);
     setFocusedIndex(selectedModel === null || selectedIndex < 0 ? 0 : selectedIndex + 1);
-  }, [models, selectedModel]);
+  }, [selectedModel, visibleModels]);
 
   useEffect(() => {
     if (!open) return;
@@ -1287,7 +1312,7 @@ function ModelPicker({
     if (index === 0) {
       onSelectModel(null);
     } else {
-      const model = models[index - 1];
+      const model = visibleModels[index - 1];
       if (model === undefined) return;
       onSelectModel(model.model);
     }
@@ -1295,22 +1320,36 @@ function ModelPicker({
     setOpen(false);
   };
   const move = (direction: 1 | -1) => {
-    const optionCount = models.length + 1;
+    const optionCount = visibleModels.length + 1;
     setFocusedIndex((current) =>
       (current + direction + optionCount) % optionCount,
     );
   };
-  const defaultModel = models.find(({ isDefault }) => isDefault) ?? null;
-  const displayedEffort = selectedEffort ?? activeModel?.defaultReasoningEffort ?? null;
+  const displayedEffort = selectedEffort
+    ?? defaultEffort
+    ?? activeModel?.defaultReasoningEffort
+    ?? null;
   const effortDescription = activeModel?.supportedReasoningEfforts.find(
     ({ reasoningEffort }) => reasoningEffort === displayedEffort,
   )?.description;
-  const modelLabel = activeModel === null
-    ? loading ? "加载模型" : "服务器默认模型"
-    : `${selectedModel === null ? "默认 · " : ""}${activeModel.displayName}`;
+  const defaultLabel = defaultModelSource === "config"
+    ? "配置"
+    : defaultModelSource === "thread" ? "会话" : "默认";
+  const defaultOptionLabel = defaultModelSource === "config"
+    ? "目录配置"
+    : defaultModelSource === "thread" ? "当前会话" : "服务器默认";
+  const activeModelLabel = activeModel?.displayName
+    ?? (selectedModel ?? defaultModelId);
+  const modelLabel = loading && selectedModel === null
+    ? "加载模型"
+    : activeModelLabel === null
+      ? "服务器默认模型"
+      : `${selectedModel === null ? `${defaultLabel} · ` : ""}${activeModelLabel}`;
   const effortLabel = displayedEffort === null
     ? ""
-    : ` · ${selectedEffort === null && selectedModel !== null ? "默认 " : ""}${displayedEffort}`;
+    : ` · ${selectedEffort === null && selectedModel !== null
+      ? `${defaultEffort === null ? "默认" : defaultLabel} `
+      : ""}${displayedEffort}`;
 
   return (
     <div className={styles.modelPicker} ref={containerRef}>
@@ -1336,7 +1375,7 @@ function ModelPicker({
         }}
         title={activeModel === null
           ? undefined
-          : `${selectedModel === null ? "服务器默认 · " : ""}${activeModel.description}${displayedEffort === null ? "" : ` · 思考程度 ${displayedEffort}`}`}
+          : `${selectedModel === null ? `${defaultOptionLabel} · ` : ""}${activeModel.description}${displayedEffort === null ? "" : ` · 思考程度 ${displayedEffort}`}`}
         type="button"
       >
         {modelLabel}{effortLabel}
@@ -1360,13 +1399,15 @@ function ModelPicker({
             >
               <span>
                 <strong>
-                  {selectedModel === null ? "✓ " : ""}服务器默认
-                  {defaultModel === null ? "" : ` · ${defaultModel.displayName}`}
+                  {selectedModel === null ? "✓ " : ""}{defaultOptionLabel}
+                  {defaultModel === null
+                    ? defaultModelId === null ? "" : ` · ${defaultModelId}`
+                    : ` · ${defaultModel.displayName}`}
                 </strong>
               </span>
               <small>不覆盖服务器的模型与思考程度配置</small>
             </button>
-            {models.map((model, index) => (
+            {visibleModels.map((model, index) => (
               <button
                 aria-selected={model.model === selectedModel}
                 data-focused={index + 1 === focusedIndex}
@@ -1397,7 +1438,9 @@ function ModelPicker({
                 value={selectedEffort ?? ""}
               >
                 <option value="">
-                  服务器默认 · {activeModel.defaultReasoningEffort}
+                  {defaultEffort === null
+                    ? `服务器默认 · ${activeModel.defaultReasoningEffort}`
+                    : `${defaultOptionLabel} · ${defaultEffort}`}
                 </option>
                 {activeModel.supportedReasoningEfforts.map((effort) => (
                   <option key={effort.reasoningEffort} value={effort.reasoningEffort}>

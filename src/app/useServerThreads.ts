@@ -19,8 +19,14 @@ export type ServerThreadsPhase = "idle" | "loading" | "ready" | "error";
 export type ThreadSummary = ThreadListResponse["data"][number];
 export type ThreadTurn = ThreadTurnsListResponse["data"][number];
 
+export interface ThreadModelSettings {
+  readonly model: string;
+  readonly effort: string | null;
+}
+
 export interface RestoredThread {
   readonly metadata: ThreadResumeResponse["thread"];
+  readonly modelSettings: ThreadModelSettings;
   readonly turns: readonly ThreadTurn[];
   readonly nextCursor: string | null;
 }
@@ -162,6 +168,7 @@ export function useServerThreads(
       client,
       restoredThread: Object.freeze({
         metadata: response.thread,
+        modelSettings: modelSettingsFrom(response),
         turns: Object.freeze([]),
         nextCursor: null,
       }),
@@ -366,6 +373,25 @@ export function useServerThreads(
                 }),
               ),
             );
+            break;
+          case "thread/settings/updated":
+            setState((current) => {
+              if (
+                current.restoredThread?.metadata.id !== notification.params.threadId
+              ) {
+                return current;
+              }
+              return {
+                ...current,
+                restoredThread: Object.freeze({
+                  ...current.restoredThread,
+                  modelSettings: Object.freeze({
+                    effort: notification.params.threadSettings.effort ?? null,
+                    model: notification.params.threadSettings.model,
+                  }),
+                }),
+              };
+            });
             break;
           case "thread/archived":
             removeExternalThread(notification.params.threadId, false);
@@ -1010,6 +1036,7 @@ function restoredThreadFrom(response: ThreadResumeResponse): RestoredThread {
   }
   const restoredThread = Object.freeze({
     metadata: response.thread,
+    modelSettings: modelSettingsFrom(response),
     turns: Object.freeze([...initialPage.data].reverse()),
     nextCursor: initialPage.nextCursor ?? null,
   });
@@ -1018,6 +1045,15 @@ function restoredThreadFrom(response: ThreadResumeResponse): RestoredThread {
     performance.now() - projectionStartedAt,
   );
   return restoredThread;
+}
+
+function modelSettingsFrom(
+  response: Pick<ThreadStartResponse | ThreadResumeResponse, "model" | "reasoningEffort">,
+): ThreadModelSettings {
+  return Object.freeze({
+    effort: response.reasoningEffort ?? null,
+    model: response.model,
+  });
 }
 
 function mergeUniqueById<T extends { readonly id: string }>(

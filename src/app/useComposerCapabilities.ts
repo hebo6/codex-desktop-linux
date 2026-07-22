@@ -20,6 +20,9 @@ export interface ComposerMentionReference {
 export interface ComposerCapabilities {
   readonly models: readonly Model[];
   readonly modelsLoading: boolean;
+  readonly defaultModel: string | null;
+  readonly defaultEffort: string | null;
+  readonly defaultsLoading: boolean;
   readonly defaultPermission: string | null;
   readonly permissions: readonly PermissionProfileSummary[];
   readonly permissionsLoading: boolean;
@@ -42,6 +45,8 @@ export function useComposerCapabilities(
 ): ComposerCapabilities {
   const [models, setModels] = useState<readonly Model[]>([]);
   const [permissions, setPermissions] = useState<readonly PermissionProfileSummary[]>([]);
+  const [defaultModel, setDefaultModel] = useState<string | null>(null);
+  const [defaultEffort, setDefaultEffort] = useState<string | null>(null);
   const [defaultPermission, setDefaultPermission] = useState<string | null>(null);
   const [skills, setSkills] = useState<readonly SkillMetadata[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -64,6 +69,8 @@ export function useComposerCapabilities(
     let disposed = false;
     setModels([]);
     setPermissions([]);
+    setDefaultModel(null);
+    setDefaultEffort(null);
     setDefaultPermission(null);
     setSkills([]);
     setSkillsLoaded(false);
@@ -96,9 +103,16 @@ export function useComposerCapabilities(
 
     setPermissionsLoading(true);
     void readPermissionCapabilities(client, cwd).then(
-      ({ defaultPermission: nextDefaultPermission, permissions: data }) => {
+      ({
+        defaultEffort: nextDefaultEffort,
+        defaultModel: nextDefaultModel,
+        defaultPermission: nextDefaultPermission,
+        permissions: data,
+      }) => {
         if (!disposed) {
           setPermissions(data);
+          setDefaultModel(nextDefaultModel);
+          setDefaultEffort(nextDefaultEffort);
           setDefaultPermission(nextDefaultPermission);
           setPermissionsLoading(false);
         }
@@ -197,6 +211,9 @@ export function useComposerCapabilities(
   return {
     models,
     modelsLoading,
+    defaultModel,
+    defaultEffort,
+    defaultsLoading: permissionsLoading,
     defaultPermission,
     permissions,
     permissionsLoading,
@@ -271,7 +288,7 @@ async function readAllModels(client: CapabilityClient): Promise<readonly Model[]
   do {
     const response = await client.listModels({
       ...(cursor === undefined ? {} : { cursor }),
-      includeHidden: false,
+      includeHidden: true,
       limit: 100,
     }).result;
     data.push(...response.data);
@@ -302,6 +319,8 @@ async function readPermissionCapabilities(
   client: CapabilityClient,
   cwd: string | null,
 ): Promise<{
+  readonly defaultEffort: string | null;
+  readonly defaultModel: string | null;
   readonly defaultPermission: string | null;
   readonly permissions: readonly PermissionProfileSummary[];
 }> {
@@ -317,6 +336,12 @@ async function readPermissionCapabilities(
   const configuredDefault = configResult.status === "fulfilled"
     ? nonEmptyString(configResult.value.config.default_permissions)
     : null;
+  const defaultModel = configResult.status === "fulfilled"
+    ? nonEmptyString(configResult.value.config.model)
+    : null;
+  const defaultEffort = configResult.status === "fulfilled"
+    ? nonEmptyString(configResult.value.config.model_reasoning_effort)
+    : null;
   const requirements = requirementsResult.status === "fulfilled"
     ? requirementsResult.value.requirements
     : null;
@@ -330,6 +355,8 @@ async function readPermissionCapabilities(
   );
 
   return {
+    defaultEffort,
+    defaultModel,
     defaultPermission: configuredAllowed
       ? configuredDefault
       : managedAllowed ? managedDefault : null,
