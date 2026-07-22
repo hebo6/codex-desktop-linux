@@ -354,7 +354,10 @@ export function ConnectionShell({
               <button
                 className={styles.newTaskButton}
                 disabled={phase !== "ready" || onNewTask === undefined}
-                onClick={onNewTask}
+                onClick={() => {
+                  onNewTask?.();
+                  setIsSidebarOpen(false);
+                }}
                 title="新建任务（Ctrl+N）"
                 type="button"
               >

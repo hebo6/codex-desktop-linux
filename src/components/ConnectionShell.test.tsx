@@ -128,6 +128,24 @@ describe("ConnectionShell", () => {
     expect(onNewTask).toHaveBeenCalledTimes(1);
   });
 
+  it("新建任务后关闭覆盖式侧栏", () => {
+    const onNewTask = vi.fn();
+    render(
+      <ConnectionShell
+        onNewTask={onNewTask}
+        phase="ready"
+        threadListPhase="ready"
+      />,
+    );
+
+    const menuButton = screen.getByLabelText("打开侧栏");
+    fireEvent.click(menuButton);
+    fireEvent.click(screen.getByRole("button", { name: "新建任务" }));
+
+    expect(onNewTask).toHaveBeenCalledOnce();
+    expect(menuButton).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("从项目组新建任务后关闭覆盖式侧栏", () => {
     const onNewTaskInProject = vi.fn();
     const thread = {
