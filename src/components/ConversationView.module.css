@@ -115,33 +115,10 @@
 }
 
 .userMessage p,
-.stickyQuestionMessage p,
 .agentMessage p,
 .activityDetail p,
 .timeline p {
   margin: 0;
-  line-height: 1.65;
-}
-
-.stickyQuestion {
-  position: absolute;
-  z-index: 4;
-  top: 0;
-  right: 0;
-  left: 0;
-  box-sizing: border-box;
-  width: min(100%, 880px);
-  padding: 0 24px var(--space-3);
-  margin: 0 auto;
-  background: var(--color-content-bg);
-  pointer-events: none;
-}
-
-.stickyQuestionMessage {
-  width: fit-content;
-  max-width: min(76%, 680px);
-  margin-left: auto;
-  color: var(--color-text-primary);
   line-height: 1.65;
 }
 
@@ -348,7 +325,7 @@
 .activityGroup[data-expanded="true"] > .activityGroupHeader {
   position: sticky;
   z-index: 3;
-  top: var(--conversation-sticky-question-height, 0px);
+  top: 0;
   background: var(--color-content-bg);
 }
 
@@ -471,12 +448,12 @@ button.activityRowHeader {
 .activityDisclosure[data-expanded="true"] > .activityRowHeader {
   position: sticky;
   z-index: 2;
-  top: var(--conversation-sticky-question-height, 0px);
+  top: 0;
   background: var(--color-content-bg);
 }
 
 .activityGroupContent > .activityDisclosure[data-expanded="true"] > .activityRowHeader {
-  top: calc(var(--conversation-sticky-question-height, 0px) + 36px);
+  top: 36px;
 }
 
 .activityDetailSize {
@@ -764,10 +741,6 @@ button.fileChangeRow {
   .messageColumnWithQuestionNavigation {
     padding-left: 64px;
   }
-
-  .stickyQuestionWithNavigation {
-    padding-left: 64px;
-  }
 }
 
 @media (max-width: 720px) {
@@ -776,15 +749,6 @@ button.fileChangeRow {
   }
 
   .userMessage {
-    max-width: 88%;
-  }
-
-  .stickyQuestion {
-    padding-right: 12px;
-    padding-left: 12px;
-  }
-
-  .stickyQuestionMessage {
     max-width: 88%;
   }
 

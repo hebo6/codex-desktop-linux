@@ -1,4 +1,13 @@
-import { act, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  createEvent,
+  fireEvent,
+  render as testingLibraryRender,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import type { ReactElement, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { RestoredThread, ThreadTurn } from "../app/useServerThreads";
@@ -14,6 +23,49 @@ const OriginalScrollWidth = Object.getOwnPropertyDescriptor(
   HTMLElement.prototype,
   "scrollWidth",
 );
+
+function TestConversationWorkspace({ children }: { readonly children: ReactNode }) {
+  return (
+    <ConversationWorkspace
+      composer={(
+        <div
+          aria-label="问题输入区边界"
+          data-conversation-composer
+          ref={(element) => {
+            if (element === null) {
+              return;
+            }
+            element.getBoundingClientRect = () => {
+              const scroller = element.closest("[data-conversation-workspace]")
+                ?.querySelector<HTMLElement>("[aria-label='会话消息']");
+              const top = scroller === undefined || scroller === null
+                ? 0
+                : scroller.getBoundingClientRect().top +
+                  scroller.clientHeight - 96;
+              return {
+                bottom: top + 96,
+                height: 96,
+                left: 0,
+                right: 0,
+                toJSON: () => ({}),
+                top,
+                width: 0,
+                x: 0,
+                y: top,
+              };
+            };
+          }}
+        />
+      )}
+    >
+      {children}
+    </ConversationWorkspace>
+  );
+}
+
+function render(ui: ReactElement) {
+  return testingLibraryRender(ui, { wrapper: TestConversationWorkspace });
+}
 
 function mockOverflowingTitle(text: string) {
   Object.defineProperties(HTMLElement.prototype, {
@@ -35,23 +87,6 @@ function mockOverflowingTitle(text: string) {
 function mockElementBottom(element: HTMLElement, bottom: () => number) {
   element.getBoundingClientRect = () => {
     const edge = bottom();
-    return {
-      bottom: edge,
-      height: 0,
-      left: 0,
-      right: 0,
-      toJSON: () => ({}),
-      top: edge,
-      width: 0,
-      x: 0,
-      y: edge,
-    };
-  };
-}
-
-function mockElementTop(element: HTMLElement, top: () => number) {
-  element.getBoundingClientRect = () => {
-    const edge = top();
     return {
       bottom: edge,
       height: 0,
@@ -232,8 +267,7 @@ describe("ConversationView", () => {
     await waitFor(() => {
       for (const activityGroup of activityGroups) {
         expect(getComputedStyle(activityGroup).position).toBe("sticky");
-        expect(getComputedStyle(activityGroup).top)
-          .toBe("var(--conversation-sticky-question-height, 0px)");
+        expect(getComputedStyle(activityGroup).top).toBe("0px");
       }
     });
     await waitFor(() => expect(screen.getByText("Hook 提示")).toBeVisible());
@@ -241,8 +275,7 @@ describe("ConversationView", () => {
     const commandHeading = screen.getByRole("button", { name: "Ran pnpm test" });
     await waitFor(() => {
       expect(getComputedStyle(commandHeading).position).toBe("sticky");
-      expect(getComputedStyle(commandHeading).top)
-        .toBe("calc(var(--conversation-sticky-question-height, 0px) + 36px)");
+      expect(getComputedStyle(commandHeading).top).toBe("36px");
     });
     await waitFor(() => expect(screen.getByText("全部通过")).toBeVisible());
 
@@ -278,7 +311,7 @@ describe("ConversationView", () => {
     await waitFor(() => expect(screen.getByText(/••••••/u)).toBeVisible());
   });
 
-  it("虚拟行使用 top 定位以支持原生粘性标题", async () => {
+  it("虚拟行使用 top 定位以支持活动粘性标题", async () => {
     render(
       <ConversationView
         hasOlderTurns={false}
@@ -300,24 +333,7 @@ describe("ConversationView", () => {
     await waitFor(() => expect(getComputedStyle(groupHeading).position).toBe("sticky"));
   });
 
-  it("活动粘性标题依次排列在动态高度的问题下方", async () => {
-    vi.spyOn(
-      HTMLElement.prototype,
-      "getBoundingClientRect",
-    ).mockImplementation(function (this: HTMLElement) {
-      const height = this.matches("[data-sticky-question]") ? 80 : 0;
-      return {
-        bottom: height,
-        height,
-        left: 0,
-        right: 0,
-        toJSON: () => ({}),
-        top: 0,
-        width: 0,
-        x: 0,
-        y: 0,
-      };
-    });
+  it("活动粘性标题从内容区顶部依次排列", async () => {
     render(
       <ConversationView
         hasOlderTurns={false}
@@ -326,28 +342,11 @@ describe("ConversationView", () => {
         restoredThread={{ ...RESTORED, nextCursor: null }}
       />,
     );
-    const scroller = screen.getByLabelText("会话消息");
-    scroller.scrollTop = 24;
-    fireEvent.scroll(scroller);
-    const conversation = scroller.closest<HTMLElement>("section");
-    if (conversation === null) {
-      throw new Error("缺少对话容器");
-    }
-
-    await waitFor(() => {
-      expect(conversation.style.getPropertyValue(
-        "--conversation-sticky-question-height",
-      )).toBe("80px");
-    });
-    expect(conversation.querySelector("[data-sticky-question]"))
-      .toHaveTextContent("请检查项目");
-
     const activityGroup = screen.getByRole("button", { name: /已运行/u });
     fireEvent.click(activityGroup);
     await waitFor(() => {
       expect(getComputedStyle(activityGroup).position).toBe("sticky");
-      expect(getComputedStyle(activityGroup).top)
-        .toBe("var(--conversation-sticky-question-height, 0px)");
+      expect(getComputedStyle(activityGroup).top).toBe("0px");
     });
 
     const commandHeading = await screen.findByRole("button", {
@@ -356,8 +355,7 @@ describe("ConversationView", () => {
     fireEvent.click(commandHeading);
     await waitFor(() => {
       expect(getComputedStyle(commandHeading).position).toBe("sticky");
-      expect(getComputedStyle(commandHeading).top)
-        .toBe("calc(var(--conversation-sticky-question-height, 0px) + 36px)");
+      expect(getComputedStyle(commandHeading).top).toBe("36px");
     });
   });
 
@@ -824,14 +822,10 @@ describe("ConversationView", () => {
     scroller.scrollTop = 100;
     fireEvent.wheel(scroller);
     fireEvent.scroll(scroller);
-    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
-      .toHaveAttribute("data-sticky-question", "user-bottom-1");
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
 
     act(() => vi.advanceTimersByTime(300));
-    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
-      .toHaveAttribute("data-sticky-question", "user-bottom-1");
     expect(scroller.scrollTop).toBe(100);
 
     tailDocumentBottom = 850;
@@ -858,8 +852,6 @@ describe("ConversationView", () => {
     );
 
     expect(scroller.scrollTop).toBe(480);
-    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
-      .toHaveAttribute("data-sticky-question", "user-bottom-2");
   });
 
   it("思考项目没有摘要时显示占位，工具到达后不保留占位", async () => {
@@ -991,24 +983,22 @@ describe("ConversationView", () => {
     scroller.scrollTop = 900;
     fireEvent.click(firstMarker);
     expect(scroller.scrollTop).toBe(24);
-    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
-      .toHaveAttribute("data-sticky-question", "user-question-1");
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });
 
-  it("滚动回答时按回合切换粘性置顶的问题", () => {
+  it("滚动回答时不渲染问题的粘性副本", () => {
     const turns = Array.from({ length: 3 }, (_, index) => ({
       id: `turn-sticky-${index + 1}`,
       items: [
         {
-          content: [{ text: `置顶问题 ${index + 1}`, type: "text" as const }],
+          content: [{ text: `历史问题 ${index + 1}`, type: "text" as const }],
           id: `user-sticky-${index + 1}`,
           type: "userMessage" as const,
         },
         {
           id: `answer-sticky-${index + 1}`,
           phase: "final_answer" as const,
-          text: `置顶回答 ${index + 1}`,
+          text: `历史回答 ${index + 1}`,
           type: "agentMessage" as const,
         },
       ],
@@ -1024,46 +1014,14 @@ describe("ConversationView", () => {
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
-    const boundingRect = vi.spyOn(
-      HTMLElement.prototype,
-      "getBoundingClientRect",
-    ).mockImplementation(function (this: HTMLElement) {
-      const height = this.matches("[data-sticky-question]") ? 80 : 0;
-      return {
-        bottom: height,
-        height,
-        left: 0,
-        right: 0,
-        toJSON: () => ({}),
-        top: 0,
-        width: 0,
-        x: 0,
-        y: 0,
-      };
-    });
-
     scroller.scrollTop = 100;
     fireEvent.scroll(scroller);
-    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
-      .toHaveAttribute("data-sticky-question", "user-sticky-1");
-    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
-      .toHaveTextContent("置顶问题 1");
-
-    scroller.scrollTop = 245;
-    fireEvent.scroll(scroller);
-    expect(scroller.parentElement?.querySelector<HTMLElement>("[data-sticky-question]")?.style.transform)
-      .toBe("translateY(-25px)");
-
     scroller.scrollTop = 320;
     fireEvent.scroll(scroller);
+    expect(screen.getAllByText("历史问题 1")).toHaveLength(1);
+    expect(screen.getAllByText("历史问题 2")).toHaveLength(1);
     expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
-      .toHaveAttribute("data-sticky-question", "user-sticky-2");
-
-    scroller.scrollTop = 100;
-    fireEvent.scroll(scroller);
-    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
-      .toHaveAttribute("data-sticky-question", "user-sticky-1");
-    boundingRect.mockRestore();
+      .not.toBeInTheDocument();
   });
 
   it("已有可读空白时首个流式回答不应将新问题滚动到顶部", () => {
@@ -1214,7 +1172,7 @@ describe("ConversationView", () => {
       clientHeight: { configurable: true, value: 500 },
       scrollHeight: { configurable: true, value: 1_500 },
     });
-    let tailDocumentBottom = 560;
+    let tailDocumentBottom = 460;
     mockElementBottom(
       conversationTail,
       () => tailDocumentBottom - scroller.scrollTop,
@@ -1238,7 +1196,7 @@ describe("ConversationView", () => {
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
 
-    tailDocumentBottom = 630;
+    tailDocumentBottom = 510;
     rerender(
       <ConversationView
         hasOlderTurns={false}
@@ -1283,6 +1241,7 @@ describe("ConversationView", () => {
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
+    const composer = screen.getByLabelText("问题输入区边界");
     const conversationTail = scroller.querySelector<HTMLElement>(
       "[data-conversation-tail]",
     );
@@ -1304,7 +1263,11 @@ describe("ConversationView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "回到底部" }));
 
-    expect(scroller.scrollTop).toBe(800);
+    expect(scroller.scrollTop).toBe(920);
+    expect(
+      composer.getBoundingClientRect().top -
+        conversationTail.getBoundingClientRect().bottom,
+    ).toBe(24);
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /正在运行/u })).toBeVisible();
@@ -1323,7 +1286,11 @@ describe("ConversationView", () => {
       />,
     );
 
-    expect(scroller.scrollTop).toBe(870);
+    expect(scroller.scrollTop).toBe(990);
+    expect(
+      composer.getBoundingClientRect().top -
+        conversationTail.getBoundingClientRect().bottom,
+    ).toBe(44);
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
   });
@@ -1347,16 +1314,12 @@ describe("ConversationView", () => {
       status: "inProgress" as const,
     } satisfies ThreadTurn;
     render(
-      <ConversationWorkspace
-        composer={<div aria-label="问题输入区边界" />}
-      >
-        <ConversationView
-          hasOlderTurns={false}
-          loadingOlderTurns={false}
-          onLoadOlderTurns={vi.fn(async () => undefined)}
-          restoredThread={{ ...RESTORED, nextCursor: null, turns: [activeTurn] }}
-        />
-      </ConversationWorkspace>,
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...RESTORED, nextCursor: null, turns: [activeTurn] }}
+      />,
     );
     const scroller = screen.getByLabelText("会话消息");
     const composer = screen.getByLabelText("问题输入区边界");
@@ -1375,7 +1338,6 @@ describe("ConversationView", () => {
       conversationTail,
       () => tailDocumentBottom - scroller.scrollTop,
     );
-    mockElementTop(composer, () => 500);
     scroller.scrollTop = 100;
     fireEvent.wheel(scroller, { deltaY: -120 });
     fireEvent.scroll(scroller);
@@ -1385,7 +1347,7 @@ describe("ConversationView", () => {
     const contentBottom = conversationTail.getBoundingClientRect().bottom;
     const composerTop = composer.getBoundingClientRect().top;
     expect(scroller.scrollTop).toBe(920);
-    expect(composerTop - contentBottom).toBe(120);
+    expect(composerTop - contentBottom).toBe(24);
     expect(screen.getByText("输入区上方的最新 AI 回答")).toBeVisible();
   });
 
@@ -1603,8 +1565,6 @@ describe("ConversationView", () => {
     );
 
     expect(scroller.scrollTop).toBe(300);
-    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
-      .toHaveAttribute("data-sticky-question", "user-page-2");
 
     tailDocumentBottom = 850;
     rerender(
@@ -1778,9 +1738,6 @@ describe("ConversationView", () => {
       />,
     );
 
-    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
-      .toHaveAttribute("data-sticky-question", "user-position-1");
-
     maximumScrollTop = 1_000;
     rerender(
       <ConversationView
@@ -1809,8 +1766,6 @@ describe("ConversationView", () => {
     );
 
     expect(scroller.scrollTop).toBe(300);
-    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
-      .toHaveAttribute("data-sticky-question", "user-position-2");
   });
 
   it("从回答所在 turn 发起分叉并标记最新回合", () => {

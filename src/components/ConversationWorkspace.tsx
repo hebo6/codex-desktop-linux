@@ -10,7 +10,7 @@ export function ConversationWorkspace({
   readonly composer: ReactNode;
 }) {
   return (
-    <div className={styles.workspace}>
+    <div className={styles.workspace} data-conversation-workspace>
       <div className={styles.content}>{children}</div>
       {composer}
     </div>

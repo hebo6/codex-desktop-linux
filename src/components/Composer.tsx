@@ -874,7 +874,7 @@ export function Composer({
   };
 
   return (
-    <section className={styles.composer}>
+    <section className={styles.composer} data-conversation-composer>
       {interactionPanel}
       {error === null ? null : <div className={styles.error} role="alert">{error}</div>}
       {capabilitiesError === null ? null : <div className={styles.capabilityError} role="status">{capabilitiesError}</div>}

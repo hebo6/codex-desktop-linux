@@ -67,7 +67,7 @@ type FileUpdateChange = FileChangeItem["changes"][number];
 type ReasoningItem = Extract<ThreadItem, { type: "reasoning" }>;
 
 const PANEL_TRANSITION_MS = 210;
-const ANSWER_BOTTOM_INSET = 120;
+const COMPOSER_CONTENT_GAP = 24;
 const ACTIVITY_BOTTOM_GAP = 20;
 const FIRST_TURN_ROW_PADDING = 24;
 const MANUAL_SCROLL_SETTLE_MS = 300;
@@ -141,11 +141,6 @@ interface HistoryQuestion {
   readonly rowKey: string;
 }
 
-interface StickyQuestionState {
-  readonly itemId: string;
-  readonly translateY: number;
-}
-
 type ConversationRow =
   | { readonly key: "action-error"; readonly type: "actionError" }
   | { readonly key: "load-older"; readonly type: "loadOlder" }
@@ -170,7 +165,6 @@ export function ConversationView({
   restoredThread,
 }: ConversationViewProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const stickyQuestionRef = useRef<HTMLDivElement>(null);
   const conversationTailRef = useRef<HTMLDivElement>(null);
   const pageFollowingRef = useRef(false);
   const manualScrollRef = useRef(false);
@@ -190,9 +184,7 @@ export function ConversationView({
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [preservePageEndSpace, setPreservePageEndSpace] = useState(false);
   const [scrollerHeight, setScrollerHeight] = useState(0);
-  const [stickyQuestionHeight, setStickyQuestionHeight] = useState(0);
-  const [stickyQuestionState, setStickyQuestionState] =
-    useState<StickyQuestionState | null>(null);
+  const [contentBottomInset, setContentBottomInset] = useState(0);
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
   const [loadingAnchorKey, setLoadingAnchorKey] = useState<string | null>(null);
   useLayoutEffect(() => {
@@ -305,37 +297,6 @@ export function ConversationView({
     [historyQuestions, rows, virtual],
   );
 
-  const updateStickyQuestion = useCallback(
-    (scroller: HTMLDivElement) => {
-      const positionedQuestions = historyQuestions.flatMap((question) => {
-        const top = questionTop(question);
-        return top === null ? [] : [{ question, top }];
-      });
-      const currentIndex = positionedQuestions.findLastIndex(
-        ({ top }) => top <= scroller.scrollTop + 0.5,
-      );
-      if (currentIndex < 0) {
-        setStickyQuestionState(null);
-        return;
-      }
-      const current = positionedQuestions[currentIndex]!;
-      const next = positionedQuestions[currentIndex + 1];
-      const translateY = next === undefined
-        ? 0
-        : Math.min(
-            0,
-            next.top - scroller.scrollTop - stickyQuestionHeight,
-          );
-      setStickyQuestionState((previous) =>
-        previous?.itemId === current.question.itemId &&
-        Math.abs(previous.translateY - translateY) < 0.5
-          ? previous
-          : { itemId: current.question.itemId, translateY }
-      );
-    },
-    [historyQuestions, questionTop, stickyQuestionHeight],
-  );
-
   const conversationEndScrollTop = useCallback((scroller: HTMLDivElement) => {
     const tail = conversationTailRef.current;
     if (tail === null) {
@@ -343,7 +304,7 @@ export function ConversationView({
     }
     const maximumTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
     const targetTop = scroller.scrollTop + tail.getBoundingClientRect().bottom -
-      followingContentBottom(scroller, activeTurnRef.current);
+      conversationReadableBottom(scroller);
     return Math.min(maximumTop, Math.max(0, targetTop));
   }, []);
 
@@ -351,7 +312,7 @@ export function ConversationView({
     const tail = conversationTailRef.current;
     const atBottom = tail === null ||
       tail.getBoundingClientRect().bottom <=
-        followingContentBottom(scroller, activeTurnRef.current) + 0.5;
+        conversationReadableBottom(scroller) + 0.5;
     setShowJumpToBottom(!atBottom);
     return atBottom;
   }, []);
@@ -473,40 +434,27 @@ export function ConversationView({
     if (scroller === null) {
       return;
     }
-    const updateHeight = () => {
+    const updateLayout = () => {
       setScrollerHeight((current) =>
         current === scroller.clientHeight ? current : scroller.clientHeight
       );
-    };
-    updateHeight();
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(scroller);
-    return () => observer.disconnect();
-  }, []);
-
-  useLayoutEffect(() => {
-    const stickyQuestion = stickyQuestionRef.current;
-    if (stickyQuestion === null) {
-      setStickyQuestionHeight(0);
-      return;
-    }
-    const updateHeight = () => {
-      const height = stickyQuestion.getBoundingClientRect().height;
-      setStickyQuestionHeight((current) =>
-        Math.abs(current - height) < 0.5 ? current : height
+      const inset = conversationBottomInset(scroller);
+      setContentBottomInset((current) =>
+        Math.abs(current - inset) < 0.5 ? current : inset
       );
     };
-    updateHeight();
+    updateLayout();
     if (typeof ResizeObserver === "undefined") {
       return;
     }
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(stickyQuestion);
+    const observer = new ResizeObserver(updateLayout);
+    observer.observe(scroller);
+    const composer = conversationComposer(scroller);
+    if (composer !== null) {
+      observer.observe(composer);
+    }
     return () => observer.disconnect();
-  }, [stickyQuestionState?.itemId]);
+  }, []);
 
   useLayoutEffect(() => {
     const currentThreadId = restoredThread.metadata.id;
@@ -537,7 +485,6 @@ export function ConversationView({
     const top = questionTop(latestQuestion);
     if (scroller !== null && top !== null) {
       scroller.scrollTop = top;
-      updateStickyQuestion(scroller);
       if (Math.abs(scroller.scrollTop - top) < 0.5) {
         pendingQuestionPositionRef.current = null;
       }
@@ -549,7 +496,6 @@ export function ConversationView({
     restoredThread.metadata.id,
     setPageFollowingMode,
     updateConversationBottom,
-    updateStickyQuestion,
   ]);
 
   useLayoutEffect(() => {
@@ -585,13 +531,12 @@ export function ConversationView({
         return;
       }
       scroller.scrollTop = nextTop;
-      updateStickyQuestion(scroller);
       updateConversationBottom(scroller);
       return;
     }
     const pageHeight = Math.max(
       1,
-      scroller.clientHeight - ANSWER_BOTTOM_INSET - stickyQuestionHeight,
+      scroller.clientHeight - conversationBottomInset(scroller),
     );
     const maximumTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
     const nextTop = Math.min(maximumTop, scroller.scrollTop + pageHeight);
@@ -599,16 +544,13 @@ export function ConversationView({
       return;
     }
     scroller.scrollTop = nextTop;
-    updateStickyQuestion(scroller);
     updateConversationBottom(scroller);
   }, [
     activeTurn,
     conversationEndScrollTop,
     itemCount,
     scrollerHeight,
-    stickyQuestionHeight,
     updateConversationBottom,
-    updateStickyQuestion,
     virtual.totalSize,
   ]);
 
@@ -643,7 +585,6 @@ export function ConversationView({
     setPreservePageEndSpace(activeTurn !== undefined);
     setPageFollowingMode(activeTurn !== undefined);
     setShowJumpToBottom(false);
-    setStickyQuestionState(null);
   }, [cancelManualScrollDelay, restoredThread.metadata.id]);
 
   useLayoutEffect(() => {
@@ -655,10 +596,6 @@ export function ConversationView({
       return;
     }
     virtual.scrollToBottom();
-    const scroller = scrollerRef.current;
-    if (scroller !== null) {
-      updateStickyQuestion(scroller);
-    }
     if (typeof ResizeObserver === "undefined") {
       scrollState.pending = false;
       return;
@@ -674,10 +611,6 @@ export function ConversationView({
         return;
       }
       virtual.scrollToBottom();
-      const current = scrollerRef.current;
-      if (current !== null) {
-        updateStickyQuestion(current);
-      }
       scrollState.pending = false;
     });
     return () => window.cancelAnimationFrame(frame);
@@ -685,7 +618,6 @@ export function ConversationView({
     lastRowKey,
     lastRowVisible,
     restoredThread.metadata.id,
-    updateStickyQuestion,
     virtual.scrollToBottom,
     virtual.totalSize,
     visibleRowsMeasured,
@@ -736,7 +668,6 @@ export function ConversationView({
     ) {
       scroller.scrollTop = forwardLimit;
     }
-    updateStickyQuestion(scroller);
     updateConversationBottom(scroller);
     if (manualScroll) {
       startManualScroll();
@@ -746,27 +677,17 @@ export function ConversationView({
     }
   };
 
-  const stickyQuestion = stickyQuestionState === null
-    ? null
-    : historyQuestions.find(
-        ({ itemId }) => itemId === stickyQuestionState.itemId,
-      ) ?? null;
   const reservePageEndSpace =
     preservePageEndSpace || activeTurn !== undefined;
   const pageEndSpacerHeight = reservePageEndSpace
     ? Math.max(
         0,
-        scrollerHeight - ANSWER_BOTTOM_INSET - stickyQuestionHeight,
+        scrollerHeight - contentBottomInset,
       )
     : 0;
 
   return (
-    <section
-      className={styles.conversation}
-      style={{
-        "--conversation-sticky-question-height": `${stickyQuestionHeight}px`,
-      } as CSSProperties}
-    >
+    <section className={styles.conversation}>
       <div
         aria-label="会话消息"
         className={styles.scroller}
@@ -861,23 +782,6 @@ export function ConversationView({
           )}
         </div>
       </div>
-      {stickyQuestion === null || stickyQuestionState === null ? null : (
-        <div
-          aria-hidden="true"
-          className={`${styles.stickyQuestion}${
-            historyQuestions.length >= 4
-              ? ` ${styles.stickyQuestionWithNavigation}`
-              : ""
-          }`}
-          data-sticky-question={stickyQuestion.itemId}
-          ref={stickyQuestionRef}
-          style={{ transform: `translateY(${stickyQuestionState.translateY}px)` }}
-        >
-          <div className={styles.stickyQuestionMessage}>
-            <UserMessageBody item={stickyQuestion.item} variant="compact" />
-          </div>
-        </div>
-      )}
       {historyQuestions.length >= 4 ? (
         <HistoryQuestionNavigation
           onSelect={(question) => {
@@ -887,7 +791,6 @@ export function ConversationView({
             const top = questionTop(question);
             if (scroller !== null && top !== null) {
               scroller.scrollTop = top;
-              updateStickyQuestion(scroller);
               updateConversationBottom(scroller);
             }
           }}
@@ -912,7 +815,6 @@ export function ConversationView({
                     if (top !== null) {
                       current.scrollTop = top;
                     }
-                    updateStickyQuestion(current);
                     updateConversationBottom(current);
                   }
                 });
@@ -921,7 +823,6 @@ export function ConversationView({
                 if (top !== null) {
                   scroller.scrollTop = top;
                 }
-                updateStickyQuestion(scroller);
                 updateConversationBottom(scroller);
               }
             }
@@ -1978,18 +1879,27 @@ function conversationListTop(scroller: HTMLElement): number {
   return list.offsetTop;
 }
 
-function answerReadableBottom(scroller: HTMLElement): number {
-  return scroller.getBoundingClientRect().top + scroller.clientHeight -
-    ANSWER_BOTTOM_INSET;
+function conversationComposer(scroller: HTMLElement): HTMLElement | null {
+  return scroller.closest<HTMLElement>("[data-conversation-workspace]")
+    ?.querySelector<HTMLElement>("[data-conversation-composer]") ?? null;
 }
 
-function followingContentBottom(
-  scroller: HTMLElement,
-  activeTurn: ThreadTurn | undefined,
-): number {
-  return activeTurn !== undefined && isFollowingActivities(activeTurn)
-    ? scroller.getBoundingClientRect().top + scroller.clientHeight
-    : answerReadableBottom(scroller);
+function conversationReadableBottom(scroller: HTMLElement): number {
+  const scrollerBottom = scroller.getBoundingClientRect().top +
+    scroller.clientHeight;
+  const composer = conversationComposer(scroller);
+  return composer === null
+    ? scrollerBottom
+    : Math.min(
+        scrollerBottom,
+        composer.getBoundingClientRect().top - COMPOSER_CONTENT_GAP,
+      );
+}
+
+function conversationBottomInset(scroller: HTMLElement): number {
+  const scrollerBottom = scroller.getBoundingClientRect().top +
+    scroller.clientHeight;
+  return Math.max(0, scrollerBottom - conversationReadableBottom(scroller));
 }
 
 function isFollowingActivities(turn: ThreadTurn): boolean {
