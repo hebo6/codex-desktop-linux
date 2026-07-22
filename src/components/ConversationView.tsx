@@ -13,7 +13,7 @@ import {
 
 import type { RestoredThread, ThreadTurn } from "../app/useServerThreads";
 import { recordConversationFirstCommit } from "../diagnostics/conversationLoadDiagnostics";
-import { SafeMarkdown } from "./SafeMarkdown";
+import { markdownToPlainText, SafeMarkdown } from "./SafeMarkdown";
 import { useVirtualRows } from "./useVirtualRows";
 import styles from "./ConversationView.module.css";
 
@@ -779,7 +779,7 @@ export function ConversationView({
           style={{ transform: `translateY(${stickyQuestionState.translateY}px)` }}
         >
           <div className={styles.stickyQuestionMessage}>
-            <UserMessageBody item={stickyQuestion.item} />
+            <UserMessageBody item={stickyQuestion.item} variant="compact" />
           </div>
         </div>
       )}
@@ -968,6 +968,7 @@ function ItemView({
       return (
         <UserMessage
           item={item}
+          {...(onOpenLink === undefined ? {} : { onOpenLink })}
           {...(turnStartedAt === undefined ? {} : { turnStartedAt })}
         />
       );
@@ -1122,13 +1123,15 @@ function ItemView({
 
 function UserMessage({
   item,
+  onOpenLink,
   turnStartedAt,
 }: {
   readonly item: Extract<ThreadItem, { type: "userMessage" }>;
+  readonly onOpenLink?: (link: string) => void;
   readonly turnStartedAt?: number | null;
 }) {
   const [now, setNow] = useState(() => Date.now());
-  const plainText = item.content.map(userInputText).join("\n");
+  const markdownSource = item.content.map(userInputText).join("\n");
   const startedAt = typeof turnStartedAt === "number"
     ? new Date(turnStartedAt * 1_000)
     : null;
@@ -1140,7 +1143,7 @@ function UserMessage({
       tabIndex={0}
       onMouseEnter={() => setNow(Date.now())}
     >
-      <UserMessageBody item={item} />
+      <UserMessageBody item={item} {...(onOpenLink === undefined ? {} : { onOpenLink })} />
       <div className={styles.userActions}>
         {timestamp === null || startedAt === null ? null : (
           <time
@@ -1151,19 +1154,39 @@ function UserMessage({
             {timestamp}
           </time>
         )}
-        <CopyButton iconOnly label="复制用户消息" value={plainText} />
+        <CopyButton
+          alternateValue={markdownToPlainText(markdownSource)}
+          iconOnly
+          label="复制用户消息"
+          value={markdownSource}
+        />
       </div>
     </article>
   );
 }
 
-function UserMessageBody({ item }: { readonly item: UserMessageItem }) {
+function UserMessageBody({
+  item,
+  onOpenLink,
+  variant = "document",
+}: {
+  readonly item: UserMessageItem;
+  readonly onOpenLink?: (link: string) => void;
+  readonly variant?: "compact" | "document";
+}) {
   return (
     <div className={styles.userMessageBubble}>
       {item.content.map((input, index) => {
         switch (input.type) {
           case "text":
-            return <p key={index}>{input.text}</p>;
+            return (
+              <SafeMarkdown
+                key={index}
+                source={input.text}
+                variant={variant}
+                {...(onOpenLink === undefined ? {} : { onOpenLink })}
+              />
+            );
           case "skill":
             return <span className={styles.chip} key={index}>${input.name}</span>;
           case "mention":
@@ -1211,7 +1234,7 @@ function AgentMessage({
       {isFinalAnswer ? (
         <div className={styles.agentActions}>
           <CopyButton
-            alternateValue={markdownPlainText(item.text)}
+            alternateValue={markdownToPlainText(item.text)}
             iconOnly
             label="复制 AI 回答"
             value={item.text}
@@ -1737,15 +1760,6 @@ function ContinueInNewThreadIcon() {
   );
 }
 
-function markdownPlainText(source: string): string {
-  return source
-    .replace(/```[^\n]*\n?/gu, "")
-    .replace(/!\[([^\]]*)\]\([^)]*\)/gu, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/gu, "$1")
-    .replace(/[*_~`>#-]/gu, "")
-    .trim();
-}
-
 async function copyText(value: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(value);
@@ -1833,11 +1847,11 @@ function historyQuestionItems(
         (responseItem) => responseItem.phase === "final_answer",
       );
       const question = singleLinePreview(
-        item.content.map(userInputText).join(" "),
+        markdownToPlainText(item.content.map(userInputText).join(" ")),
       );
       const answer = finalAnswer === undefined
         ? null
-        : singleLinePreview(markdownPlainText(finalAnswer.text));
+        : singleLinePreview(markdownToPlainText(finalAnswer.text));
       questions.push({
         answer: answer === null || answer.length === 0 ? null : answer,
         item,
@@ -2081,7 +2095,7 @@ function reasoningParts(parts: readonly string[] | undefined): readonly string[]
 
 function reasoningAccessibleLabel(parts: readonly string[]): string {
   return parts
-    .map((part) => markdownPlainText(part).replace(/\s+/gu, " "))
+    .map((part) => markdownToPlainText(part).replace(/\s+/gu, " "))
     .filter((part) => part.length > 0)
     .join(" ");
 }

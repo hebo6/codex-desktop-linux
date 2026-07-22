@@ -31,6 +31,7 @@ import {
   type SavedPrompt,
   type SavedPromptStore,
 } from "../transport/savedPrompts";
+import { SafeMarkdown } from "./SafeMarkdown";
 import { SavedPromptManagerDialog } from "./SavedPromptManagerDialog";
 import styles from "./Composer.module.css";
 
@@ -208,7 +209,9 @@ export function Composer({
   const [serviceTierUpdating, setServiceTierUpdating] = useState(false);
   const [selectedPermission, setSelectedPermission] = useState<string | null>(null);
   const [preparingAttachments, setPreparingAttachments] = useState(false);
+  const [markdownPreview, setMarkdownPreview] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const markdownPreviewHeightRef = useRef<number | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [loadedDraftKey, setLoadedDraftKey] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -305,13 +308,17 @@ export function Composer({
     }
     textarea.style.height = "0";
     textarea.style.height = `${Math.min(textarea.scrollHeight, window.innerHeight * 0.4)}px`;
-  }, [text]);
+  }, [markdownPreview, text]);
 
   useEffect(() => {
     setCwdInput(cwd ?? "");
     setEditingCwd(false);
     setCwdError(null);
   }, [cwd]);
+
+  useEffect(() => {
+    setMarkdownPreview(false);
+  }, [draftKey]);
 
   useEffect(() => {
     if (
@@ -603,6 +610,7 @@ export function Composer({
         setAttachments([]);
         setSelectedTokenIndex(null);
         setTrigger(null);
+        setMarkdownPreview(false);
       } else if (showProjectPicker) {
         releaseDraftPreservationIfUnchanged();
       }
@@ -911,6 +919,28 @@ export function Composer({
         onDragOver={(event) => event.preventDefault()}
         onDrop={handleDrop}
       >
+        <button
+          aria-label={markdownPreview ? "编辑 Markdown" : "预览 Markdown"}
+          aria-pressed={markdownPreview}
+          className={styles.markdownModeButton}
+          disabled={!markdownPreview && normalized.length === 0}
+          onClick={() => {
+            if (markdownPreview) {
+              setMarkdownPreview(false);
+              restoreComposerSelection();
+            } else {
+              const editorHeight = textareaRef.current?.getBoundingClientRect().height ?? 0;
+              markdownPreviewHeightRef.current = editorHeight > 0 ? editorHeight : null;
+              rememberComposerSelection();
+              setTrigger(null);
+              setMarkdownPreview(true);
+            }
+          }}
+          onPointerDown={rememberComposerSelection}
+          type="button"
+        >
+          {markdownPreview ? "编辑" : "预览"}
+        </button>
         {trigger === null ? null : (
           <SuggestionMenu
             items={suggestions}
@@ -920,33 +950,46 @@ export function Composer({
             selectedIndex={selectedIndex}
           />
         )}
-        <textarea
-          aria-label="任务输入"
-          data-composer-input
-          disabled={submitting || preparingAttachments}
-          onChange={handleChange}
-          onClick={(event) => updateTrigger(text, event.currentTarget.selectionStart)}
-          onCompositionStart={() => {
-            composingRef.current = true;
-            setTrigger(null);
-          }}
-          onCompositionEnd={(event) => {
-            composingRef.current = false;
-            updateTrigger(event.currentTarget.value, event.currentTarget.selectionStart);
-          }}
-          onKeyDown={handleKeyDown}
-          onKeyUp={(event) => {
-            if (!event.nativeEvent.isComposing && !["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) {
-              updateTrigger(text, event.currentTarget.selectionStart);
-            }
-          }}
-          placeholder={activeTurn ? "输入要追加的内容" : "向 Codex 描述任务"}
-          onPaste={handlePaste}
-          onSelect={rememberComposerSelection}
-          ref={textareaRef}
-          rows={1}
-          value={text}
-        />
+        {markdownPreview ? (
+          <div
+            aria-label="Markdown 预览"
+            className={styles.markdownPreview}
+            role="region"
+            {...(markdownPreviewHeightRef.current === null
+              ? {}
+              : { style: { height: `${markdownPreviewHeightRef.current}px` } })}
+          >
+            <SafeMarkdown source={text} />
+          </div>
+        ) : (
+          <textarea
+            aria-label="任务输入"
+            data-composer-input
+            disabled={submitting || preparingAttachments}
+            onChange={handleChange}
+            onClick={(event) => updateTrigger(text, event.currentTarget.selectionStart)}
+            onCompositionStart={() => {
+              composingRef.current = true;
+              setTrigger(null);
+            }}
+            onCompositionEnd={(event) => {
+              composingRef.current = false;
+              updateTrigger(event.currentTarget.value, event.currentTarget.selectionStart);
+            }}
+            onKeyDown={handleKeyDown}
+            onKeyUp={(event) => {
+              if (!event.nativeEvent.isComposing && !["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) {
+                updateTrigger(text, event.currentTarget.selectionStart);
+              }
+            }}
+            placeholder={activeTurn ? "输入要追加的内容" : "向 Codex 描述任务"}
+            onPaste={handlePaste}
+            onSelect={rememberComposerSelection}
+            ref={textareaRef}
+            rows={1}
+            value={text}
+          />
+        )}
         <input
           accept={IMAGE_ACCEPT}
           aria-label="选择图片附件"

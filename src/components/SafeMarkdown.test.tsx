@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { resolveLink } from "../content/linkResolver";
-import { SafeMarkdown } from "./SafeMarkdown";
+import { markdownToPlainText, SafeMarkdown } from "./SafeMarkdown";
 
 describe("SafeMarkdown", () => {
   it("渲染 GFM 常用块并忽略原始 HTML", () => {
@@ -22,6 +22,17 @@ describe("SafeMarkdown", () => {
     fireEvent.click(screen.getByRole("button", { name: "图片：图片" }));
     expect(onOpenLink).toHaveBeenNthCalledWith(1, "https://example.com");
     expect(onOpenLink).toHaveBeenNthCalledWith(2, "./a.png");
+  });
+
+  it("未提供链接处理器时只展示静态链接", () => {
+    render(<SafeMarkdown source="[网页](https://example.com)" />);
+    expect(screen.getByText("网页")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "网页" })).not.toBeInTheDocument();
+  });
+
+  it("从同一 Markdown 结构生成渲染后的纯文本", () => {
+    expect(markdownToPlainText("# 标题\n\n- [x] **完成**\n\n| 文件 | 状态 |\n| --- | --- |\n| foo-bar.ts | [通过](https://example.com) |"))
+      .toBe("标题\n• ☑ 完成\n文件\t状态\nfoo-bar.ts\t通过");
   });
 
   it("将尖括号包裹的带空格文件链接交给统一解析器", () => {

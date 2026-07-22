@@ -33,6 +33,42 @@ export function SafeMarkdown({
   );
 }
 
+export function markdownToPlainText(source: string): string {
+  return parseBlocks(source).map(blockPlainText).filter(Boolean).join("\n").trim();
+}
+
+function blockPlainText(block: Block): string {
+  switch (block.type) {
+    case "paragraph":
+    case "quote":
+    case "heading":
+      return inlinePlainText(block.text);
+    case "code":
+      return block.text;
+    case "list":
+      return block.items.map((item, index) => {
+        const marker = block.ordered ? `${index + 1}.` : "•";
+        const checked = item.checked === null ? "" : item.checked ? " ☑" : " ☐";
+        return `${marker}${checked} ${inlinePlainText(item.text)}`;
+      }).join("\n");
+    case "table":
+      return [block.header, ...block.rows]
+        .map((row) => row.map(inlinePlainText).join("\t"))
+        .join("\n");
+    case "rule":
+      return "—";
+  }
+}
+
+function inlinePlainText(source: string): string {
+  return source
+    .replace(/!\[([^\]]*)\]\([^)]*\)/gu, "图片：$1")
+    .replace(/\[([^\]]*)\]\([^)]*\)/gu, "$1")
+    .replace(/`([^`]*)`/gu, "$1")
+    .replace(/\*\*([^*]+)\*\*|__([^_]+)__|~~([^~]+)~~|\*([^*]+)\*|_([^_]+)_/gu, "$1$2$3$4$5")
+    .replace(/<(https?:\/\/[^>]+)>/giu, "$1");
+}
+
 function CompactMarkdownBlock({
   block,
   leading,
@@ -107,7 +143,7 @@ function MarkdownBlock({
   readonly block: Block;
   readonly onOpenLink?: (link: string) => void;
 }) {
-  const inline = (text: string) => renderInline(text, onOpenLink);
+  const inline = (text: string) => renderInline(text, onOpenLink, onOpenLink !== undefined);
   switch (block.type) {
     case "paragraph":
       return <p>{inline(block.text)}</p>;

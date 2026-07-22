@@ -153,6 +153,45 @@ const RESTORED = {
 } satisfies RestoredThread;
 
 describe("ConversationView", () => {
+  it("安全渲染用户问题 Markdown 并保留结构化输入", () => {
+    const onOpenLink = vi.fn();
+    const markdownTurn = {
+      ...TURN,
+      items: [
+        {
+          content: [
+            {
+              text: "# 检查范围\n\n**重点** [源码](src/App.tsx) <script>危险</script>",
+              type: "text" as const,
+            },
+            { name: "README", path: "/workspace/README.md", type: "mention" as const },
+          ],
+          id: "user-markdown",
+          type: "userMessage" as const,
+        },
+        { id: "answer-markdown", phase: "final_answer" as const, text: "收到", type: "agentMessage" as const },
+      ],
+    } satisfies ThreadTurn;
+
+    render(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        onOpenLink={onOpenLink}
+        restoredThread={{ ...RESTORED, nextCursor: null, turns: [markdownTurn] }}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "检查范围" })).toBeVisible();
+    expect(screen.getByText("重点")).toBeVisible();
+    expect(screen.getByText("危险")).toBeVisible();
+    expect(document.querySelector("script")).toBeNull();
+    expect(screen.getByText("@README")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "源码" }));
+    expect(onOpenLink).toHaveBeenCalledWith("src/App.tsx");
+  });
+
   it("覆盖全部持久化 ThreadItem 的稳定展示", async () => {
     render(
       <ConversationView

@@ -111,6 +111,33 @@ describe("Composer", () => {
     await waitFor(() => expect(editor).toHaveValue(""));
   });
 
+  it("在保留 Markdown 源文和选区的前提下切换安全预览", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+    fireEvent.change(editor, {
+      target: { value: "# 标题\n\n**重点** [链接](https://example.com)" },
+    });
+    editor.setSelectionRange(3, 5, "forward");
+    fireEvent.select(editor);
+
+    await user.click(screen.getByRole("button", { name: "预览 Markdown" }));
+
+    expect(screen.queryByRole("textbox", { name: "任务输入" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Markdown 预览" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "标题" })).toBeVisible();
+    expect(screen.getByText("重点")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "链接" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "编辑 Markdown" }));
+
+    const restoredEditor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+    expect(restoredEditor).toHaveValue("# 标题\n\n**重点** [链接](https://example.com)");
+    await waitFor(() => expect(restoredEditor).toHaveFocus());
+    expect(restoredEditor.selectionStart).toBe(3);
+    expect(restoredEditor.selectionEnd).toBe(5);
+  });
+
   it("新会话创建后发送失败时将草稿迁移到服务端会话", async () => {
     const draftStore = {
       listKeys: vi.fn(async () => []),

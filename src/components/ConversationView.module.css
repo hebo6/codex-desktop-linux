@@ -112,7 +112,6 @@
   padding: var(--space-3) var(--space-4);
   border-radius: 16px 16px 4px;
   background: var(--color-fill-subtle);
-  white-space: pre-wrap;
 }
 
 .userMessage p,
@@ -143,6 +142,7 @@
   max-width: min(76%, 680px);
   margin-left: auto;
   color: var(--color-text-primary);
+  line-height: 1.65;
 }
 
 .agentMessage {

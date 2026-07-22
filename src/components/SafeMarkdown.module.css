@@ -96,6 +96,11 @@
   text-decoration: none;
 }
 
+span.link,
+span.imageReference {
+  cursor: text;
+}
+
 .codeBlock {
   overflow: hidden;
   margin: var(--space-4) 0;
