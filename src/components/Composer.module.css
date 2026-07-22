@@ -335,6 +335,7 @@
 }
 
 .context {
+  position: relative;
   display: flex;
   min-width: 0;
   flex: 1;
@@ -450,9 +451,12 @@
 }
 
 .projectPicker,
-.modelPicker,
-.permissionPicker {
+.modelPicker {
   position: relative;
+  min-width: 0;
+}
+
+.permissionPicker {
   min-width: 0;
 }
 
@@ -578,11 +582,6 @@
 .modelMenu {
   grid-template-rows: minmax(0, 1fr) auto;
   overflow: hidden;
-}
-
-.permissionMenu {
-  right: 0;
-  left: auto;
 }
 
 .modelMenu {
