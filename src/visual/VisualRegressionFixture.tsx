@@ -107,7 +107,7 @@ const VISUAL_TURNS = [...HISTORY_TURNS, TURN];
 
 const RESTORED_THREAD = {
   metadata: createThread("thread-visual-1", "修复测试失败", 0, VISUAL_TURNS),
-  modelSettings: { effort: "medium", model: "gpt-5" },
+  modelSettings: { effort: "medium", model: "gpt-5", serviceTier: null },
   nextCursor: null,
   turns: VISUAL_TURNS,
 } satisfies RestoredThread;

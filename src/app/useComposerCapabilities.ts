@@ -22,6 +22,7 @@ export interface ComposerCapabilities {
   readonly modelsLoading: boolean;
   readonly defaultModel: string | null;
   readonly defaultEffort: string | null;
+  readonly defaultServiceTier: string | null;
   readonly defaultsLoading: boolean;
   readonly defaultPermission: string | null;
   readonly permissions: readonly PermissionProfileSummary[];
@@ -47,6 +48,7 @@ export function useComposerCapabilities(
   const [permissions, setPermissions] = useState<readonly PermissionProfileSummary[]>([]);
   const [defaultModel, setDefaultModel] = useState<string | null>(null);
   const [defaultEffort, setDefaultEffort] = useState<string | null>(null);
+  const [defaultServiceTier, setDefaultServiceTier] = useState<string | null>(null);
   const [defaultPermission, setDefaultPermission] = useState<string | null>(null);
   const [skills, setSkills] = useState<readonly SkillMetadata[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -71,6 +73,7 @@ export function useComposerCapabilities(
     setPermissions([]);
     setDefaultModel(null);
     setDefaultEffort(null);
+    setDefaultServiceTier(null);
     setDefaultPermission(null);
     setSkills([]);
     setSkillsLoaded(false);
@@ -107,6 +110,7 @@ export function useComposerCapabilities(
         defaultEffort: nextDefaultEffort,
         defaultModel: nextDefaultModel,
         defaultPermission: nextDefaultPermission,
+        defaultServiceTier: nextDefaultServiceTier,
         permissions: data,
       }) => {
         if (!disposed) {
@@ -114,6 +118,7 @@ export function useComposerCapabilities(
           setDefaultModel(nextDefaultModel);
           setDefaultEffort(nextDefaultEffort);
           setDefaultPermission(nextDefaultPermission);
+          setDefaultServiceTier(nextDefaultServiceTier);
           setPermissionsLoading(false);
         }
       },
@@ -213,6 +218,7 @@ export function useComposerCapabilities(
     modelsLoading,
     defaultModel,
     defaultEffort,
+    defaultServiceTier,
     defaultsLoading: permissionsLoading,
     defaultPermission,
     permissions,
@@ -322,6 +328,7 @@ async function readPermissionCapabilities(
   readonly defaultEffort: string | null;
   readonly defaultModel: string | null;
   readonly defaultPermission: string | null;
+  readonly defaultServiceTier: string | null;
   readonly permissions: readonly PermissionProfileSummary[];
 }> {
   const [permissionsResult, configResult, requirementsResult] = await Promise.allSettled([
@@ -342,6 +349,9 @@ async function readPermissionCapabilities(
   const defaultEffort = configResult.status === "fulfilled"
     ? nonEmptyString(configResult.value.config.model_reasoning_effort)
     : null;
+  const defaultServiceTier = configResult.status === "fulfilled"
+    ? nonEmptyString(configResult.value.config.service_tier)
+    : null;
   const requirements = requirementsResult.status === "fulfilled"
     ? requirementsResult.value.requirements
     : null;
@@ -357,6 +367,7 @@ async function readPermissionCapabilities(
   return {
     defaultEffort,
     defaultModel,
+    defaultServiceTier,
     defaultPermission: configuredAllowed
       ? configuredDefault
       : managedAllowed ? managedDefault : null,

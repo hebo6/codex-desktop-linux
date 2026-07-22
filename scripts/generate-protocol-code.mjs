@@ -102,6 +102,15 @@ const schemaDeclarations = [
     schemaPath: "v2/ThreadStartResponse.json",
     validatorName: "validateThreadStartResponse",
   },
+  {
+    typeName: "ThreadSettingsUpdateParams",
+    schemaPath: "v2/ThreadSettingsUpdateParams.json",
+  },
+  {
+    typeName: "ThreadSettingsUpdateResponse",
+    schemaPath: "v2/ThreadSettingsUpdateResponse.json",
+    validatorName: "validateThreadSettingsUpdateResponse",
+  },
   { typeName: "TurnStartParams", schemaPath: "v2/TurnStartParams.json" },
   {
     typeName: "TurnStartResponse",

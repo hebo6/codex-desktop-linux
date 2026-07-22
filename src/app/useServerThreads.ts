@@ -22,6 +22,7 @@ export type ThreadTurn = ThreadTurnsListResponse["data"][number];
 export interface ThreadModelSettings {
   readonly model: string;
   readonly effort: string | null;
+  readonly serviceTier: string | null;
 }
 
 export interface RestoredThread {
@@ -388,6 +389,7 @@ export function useServerThreads(
                   modelSettings: Object.freeze({
                     effort: notification.params.threadSettings.effort ?? null,
                     model: notification.params.threadSettings.model,
+                    serviceTier: notification.params.threadSettings.serviceTier ?? null,
                   }),
                 }),
               };
@@ -1048,11 +1050,15 @@ function restoredThreadFrom(response: ThreadResumeResponse): RestoredThread {
 }
 
 function modelSettingsFrom(
-  response: Pick<ThreadStartResponse | ThreadResumeResponse, "model" | "reasoningEffort">,
+  response: Pick<
+    ThreadStartResponse | ThreadResumeResponse,
+    "model" | "reasoningEffort" | "serviceTier"
+  >,
 ): ThreadModelSettings {
   return Object.freeze({
     effort: response.reasoningEffort ?? null,
     model: response.model,
+    serviceTier: response.serviceTier ?? null,
   });
 }
 

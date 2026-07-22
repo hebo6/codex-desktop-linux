@@ -280,9 +280,17 @@ export function App({
   const composerDefaultEffort = composerThreadSettings === null
     ? composerCapabilities.defaultEffort
     : composerThreadSettings.effort;
+  const composerDefaultServiceTier = composerThreadSettings === null
+    ? composerCapabilities.defaultServiceTier
+    : composerThreadSettings.serviceTier;
   const composerDefaultModelSource = composerThreadSettings !== null
     ? "thread" as const
     : composerCapabilities.defaultModel !== null || composerCapabilities.defaultEffort !== null
+      ? "config" as const
+      : "catalog" as const;
+  const composerDefaultServiceTierSource = composerThreadSettings !== null
+    ? "thread" as const
+    : composerCapabilities.defaultServiceTier !== null
       ? "config" as const
       : "catalog" as const;
   const serverInteractions = useServerInteractions(connection.interactionClient);
@@ -1429,6 +1437,8 @@ export function App({
                   defaultModel={composerDefaultModel}
                   defaultEffort={composerDefaultEffort}
                   defaultModelSource={composerDefaultModelSource}
+                  defaultServiceTier={composerDefaultServiceTier}
+                  defaultServiceTierSource={composerDefaultServiceTierSource}
                   defaultPermission={composerCapabilities.defaultPermission}
                   mentionReferences={composerCapabilities.mentionReferences}
                   mentionsError={composerCapabilities.mentionsError}
@@ -1443,6 +1453,7 @@ export function App({
                   onRunImmediateCommand={conversation.runImmediateCommand}
                   onOpenSettings={() => setSettingsSection("appearance")}
                   onSearchFiles={composerCapabilities.searchFiles}
+                  onServiceTierChange={conversation.setServiceTier}
                   onSend={conversation.sendInput}
                   onStop={conversation.stop}
                   permissions={composerCapabilities.permissions}

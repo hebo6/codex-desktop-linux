@@ -31,7 +31,12 @@ describe("AppServerConversationClient", () => {
     const input = [{ type: "text" as const, text: "继续" }];
 
     client.startThread({ cwd: "/workspace" });
-    client.startTurn("thread-1", { clientUserMessageId: "message-1", input });
+    client.startTurn("thread-1", {
+      clientUserMessageId: "message-1",
+      input,
+      serviceTier: "priority",
+    });
+    client.setServiceTier("thread-1", "priority");
     client.steerTurn("thread-1", "turn-1", {
       clientUserMessageId: "message-2",
       input,
@@ -42,7 +47,16 @@ describe("AppServerConversationClient", () => {
       { method: "thread/start", params: { cwd: "/workspace" } },
       {
         method: "turn/start",
-        params: { threadId: "thread-1", clientUserMessageId: "message-1", input },
+        params: {
+          threadId: "thread-1",
+          clientUserMessageId: "message-1",
+          input,
+          serviceTier: "priority",
+        },
+      },
+      {
+        method: "thread/settings/update",
+        params: { threadId: "thread-1", serviceTier: "priority" },
       },
       {
         method: "turn/steer",

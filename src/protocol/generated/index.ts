@@ -27,6 +27,8 @@ export type { ThreadDeleteParams } from "./types/ThreadDeleteParams";
 export type { ThreadDeleteResponse } from "./types/ThreadDeleteResponse";
 export type { ThreadStartParams } from "./types/ThreadStartParams";
 export type { ThreadStartResponse } from "./types/ThreadStartResponse";
+export type { ThreadSettingsUpdateParams } from "./types/ThreadSettingsUpdateParams";
+export type { ThreadSettingsUpdateResponse } from "./types/ThreadSettingsUpdateResponse";
 export type { TurnStartParams } from "./types/TurnStartParams";
 export type { TurnStartResponse } from "./types/TurnStartResponse";
 export type { TurnSteerParams } from "./types/TurnSteerParams";

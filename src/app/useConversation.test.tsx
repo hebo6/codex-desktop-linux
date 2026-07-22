@@ -6,6 +6,7 @@ import type {
   ServerNotification,
   ThreadStartParams,
   ThreadStartResponse,
+  ThreadSettingsUpdateResponse,
   TurnInterruptResponse,
   TurnStartResponse,
   TurnSteerResponse,
@@ -32,6 +33,7 @@ class FakeConversationClient implements ConversationClient {
     options: StartTurnOptions;
   }> = [];
   readonly interruptCalls: Array<{ threadId: string; turnId: string }> = [];
+  readonly serviceTierCalls: Array<{ threadId: string; serviceTier: string }> = [];
   threadStartResponse!: ThreadStartResponse;
   turnStartResponse!: TurnStartResponse;
   notificationHandler: ((notification: ServerNotification) => void) | null = null;
@@ -44,6 +46,11 @@ class FakeConversationClient implements ConversationClient {
   startTurn(threadId: string, options: StartTurnOptions) {
     this.startTurnCalls.push({ threadId, options });
     return handle(Promise.resolve(this.turnStartResponse));
+  }
+
+  setServiceTier(threadId: string, serviceTier: string) {
+    this.serviceTierCalls.push({ threadId, serviceTier });
+    return handle(Promise.resolve({} satisfies ThreadSettingsUpdateResponse));
   }
 
   steerTurn(threadId: string, turnId: string, options: StartTurnOptions) {
@@ -92,7 +99,7 @@ function restored(turns: readonly ThreadTurn[]): RestoredThread {
       turns: [...turns],
       updatedAt: 200,
     },
-    modelSettings: { effort: "medium", model: "gpt-5" },
+    modelSettings: { effort: "medium", model: "gpt-5", serviceTier: null },
     turns,
     nextCursor: null,
   };
@@ -194,6 +201,53 @@ describe("useConversation", () => {
       { type: "text", text: "新任务" },
     ]);
     expect(result.current.activeTurnId).toBe(RUNNING_TURN.id);
+  });
+
+  it("新会话把显式 Fast 速率传给 thread 和首个 turn", async () => {
+    const client = new FakeConversationClient();
+    client.threadStartResponse = {
+      thread: restored([]).metadata,
+    } as ThreadStartResponse;
+    client.turnStartResponse = { turn: RUNNING_TURN };
+    const { result } = renderHook(() =>
+      useConversation({
+        client,
+        currentThreadId: null,
+        restoredThread: null,
+        onThreadCreated: vi.fn(async () => undefined),
+      }),
+    );
+
+    await act(async () => {
+      expect(await result.current.sendInput(
+        [{ type: "text", text: "快速处理" }],
+        { serviceTier: "priority" },
+      )).toBe(true);
+    });
+
+    expect(client.startThreadCalls[0]).toMatchObject({ serviceTier: "priority" });
+    expect(client.startTurnCalls[0]?.options).toMatchObject({ serviceTier: "priority" });
+  });
+
+  it("已有会话只通过线程设置更新 Fast 速率", async () => {
+    const client = new FakeConversationClient();
+    const { result } = renderHook(() =>
+      useConversation({
+        client,
+        currentThreadId: "thread-1",
+        restoredThread: restored([]),
+        onThreadCreated: vi.fn(async () => undefined),
+      }),
+    );
+
+    await waitFor(() => expect(result.current.activeTurnId).toBeNull());
+    await act(async () => {
+      expect(await result.current.setServiceTier("priority")).toBe(true);
+    });
+
+    expect(client.serviceTierCalls).toEqual([
+      { threadId: "thread-1", serviceTier: "priority" },
+    ]);
   });
 
   it("新建线程的空恢复快照不会覆盖首个回合", async () => {

@@ -111,6 +111,8 @@ export interface ComposerProps {
   readonly defaultModel?: string | null;
   readonly defaultEffort?: string | null;
   readonly defaultModelSource?: "catalog" | "config" | "thread";
+  readonly defaultServiceTier?: string | null;
+  readonly defaultServiceTierSource?: "catalog" | "config" | "thread";
   readonly defaultPermission?: string | null;
   readonly permissions?: readonly PermissionProfileSummary[];
   readonly permissionsLoading?: boolean;
@@ -131,6 +133,7 @@ export interface ComposerProps {
   readonly onRunImmediateCommand?: (command: "compact" | "review") => Promise<boolean>;
   readonly onOpenSettings?: () => void;
   readonly onSearchFiles?: (query: string) => Promise<readonly FuzzyFileSearchResult[]>;
+  readonly onServiceTierChange?: (serviceTier: string) => Promise<boolean>;
   readonly onSend: (
     input: TurnStartParams["input"],
     configuration?: ConversationTurnConfiguration,
@@ -155,6 +158,8 @@ export function Composer({
   defaultModel: defaultModelId = null,
   defaultEffort = null,
   defaultModelSource = "catalog",
+  defaultServiceTier = null,
+  defaultServiceTierSource = "catalog",
   defaultPermission = null,
   permissions = [],
   permissionsLoading = false,
@@ -175,6 +180,7 @@ export function Composer({
   onRunImmediateCommand,
   onOpenSettings,
   onSearchFiles,
+  onServiceTierChange,
   onSend,
   onStop,
   stopping,
@@ -198,6 +204,8 @@ export function Composer({
   const [fileSearchError, setFileSearchError] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [selectedEffort, setSelectedEffort] = useState<string | null>(null);
+  const [selectedServiceTier, setSelectedServiceTier] = useState<string | null>(null);
+  const [serviceTierUpdating, setServiceTierUpdating] = useState(false);
   const [selectedPermission, setSelectedPermission] = useState<string | null>(null);
   const [preparingAttachments, setPreparingAttachments] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -237,6 +245,32 @@ export function Composer({
     : models.find(({ model }) => model === defaultModelId) ?? null;
   const activeModel = models.find(({ model }) => model === selectedModel)
     ?? defaultModel;
+  const fastTier = useMemo(() => findFastServiceTier(activeModel), [activeModel]);
+  const knownFastServiceTiers = useMemo(
+    () => new Set([
+      "fast",
+      ...models.flatMap((model) => {
+        const tier = findFastServiceTier(model);
+        return tier === null ? [] : [tier.id];
+      }),
+    ]),
+    [models],
+  );
+  const inheritedServiceTier = defaultServiceTier ?? (
+    defaultServiceTierSource === "thread" ? null : activeModel?.defaultServiceTier ?? null
+  );
+  const activeServiceTier = selectedServiceTier ?? inheritedServiceTier;
+  const fastEnabled = fastTier !== null && isFastServiceTier(
+    activeServiceTier,
+    knownFastServiceTiers,
+  );
+  const serviceTierForTurn = selectedServiceTier !== null
+    ? isFastServiceTier(selectedServiceTier, knownFastServiceTiers)
+      ? fastTier?.id ?? "default"
+      : selectedServiceTier
+    : selectedModel !== null && isFastServiceTier(inheritedServiceTier, knownFastServiceTiers)
+      ? fastTier?.id ?? "default"
+      : null;
   const selectedModelRejectsImages = activeModel !== null
     && !(activeModel.inputModalities ?? ["text"]).includes("image");
   const hasInvalidAttachment = (selectedModelRejectsImages && attachments.length > 0)
@@ -245,7 +279,8 @@ export function Composer({
     normalized.length > 0 ||
     tokens.length > 0 ||
     attachments.some(({ blob }) => blob !== null)
-  ) && !hasInvalidAttachment && !preparingAttachments && !submitting && !stopping;
+  ) && !hasInvalidAttachment && !preparingAttachments && !serviceTierUpdating &&
+    !submitting && !stopping;
   const normalizedSavedPromptQuery = savedPromptQuery.trim().toLocaleLowerCase();
   const filteredSavedPrompts = useMemo(() => normalizedSavedPromptQuery.length === 0
     ? savedPrompts.prompts
@@ -351,6 +386,8 @@ export function Composer({
     }
     setSelectedModel(null);
     setSelectedEffort(null);
+    setSelectedServiceTier(null);
+    setServiceTierUpdating(false);
     setSelectedPermission(null);
     setAttachments([]);
     if (draftKey === null) {
@@ -482,7 +519,35 @@ export function Composer({
     ...(selectedModel === null ? {} : { model: selectedModel }),
     ...(selectedEffort === null ? {} : { effort: selectedEffort }),
     ...(selectedPermission === null ? {} : { permissions: selectedPermission }),
+    ...(serviceTierForTurn === null ? {} : { serviceTier: serviceTierForTurn }),
   });
+
+  const toggleFast = async () => {
+    if (
+      fastTier === null ||
+      activeTurn ||
+      submitting ||
+      stopping ||
+      serviceTierUpdating
+    ) {
+      return;
+    }
+    const previous = selectedServiceTier;
+    const next = fastEnabled ? "default" : fastTier.id;
+    setSelectedServiceTier(next);
+    if (
+      showProjectPicker ||
+      onServiceTierChange === undefined
+    ) {
+      return;
+    }
+    setServiceTierUpdating(true);
+    const updated = await onServiceTierChange(next);
+    if (!updated) {
+      setSelectedServiceTier(previous);
+    }
+    setServiceTierUpdating(false);
+  };
 
   const releaseDraftPreservationIfUnchanged = () => {
     window.setTimeout(() => {
@@ -1107,6 +1172,24 @@ export function Composer({
             selectedEffort={selectedEffort}
             selectedModel={selectedModel}
           />
+          {fastTier === null ? null : (
+            <button
+              aria-checked={fastEnabled}
+              aria-label="当前会话 Fast 模式"
+              className={styles.fastToggle}
+              data-active={fastEnabled}
+              disabled={activeTurn || submitting || stopping || serviceTierUpdating}
+              onClick={() => void toggleFast()}
+              role="switch"
+              title={`${fastTier.description} · 仅影响当前会话`}
+              type="button"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="m13.5 2-8 12h6l-1 8 8-12h-6Z" />
+              </svg>
+              <span>Fast</span>
+            </button>
+          )}
           <div className={styles.actions}>
             {activeTurn && canSend ? (
               <button
@@ -1296,6 +1379,19 @@ function ProjectPicker({
       ) : null}
     </div>
   );
+}
+
+function findFastServiceTier(model: Model | null) {
+  return model?.serviceTiers?.find(
+    ({ name }) => name.trim().toLocaleLowerCase() === "fast",
+  ) ?? null;
+}
+
+function isFastServiceTier(
+  serviceTier: string | null,
+  knownFastServiceTiers: ReadonlySet<string>,
+): boolean {
+  return serviceTier !== null && knownFastServiceTiers.has(serviceTier);
 }
 
 function ModelPicker({

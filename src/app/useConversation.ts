@@ -22,6 +22,7 @@ export interface ConversationControls extends ConversationState {
     configuration?: ConversationTurnConfiguration,
   ) => Promise<boolean>;
   readonly sendText: (text: string) => Promise<boolean>;
+  readonly setServiceTier: (serviceTier: string) => Promise<boolean>;
   readonly stop: () => Promise<boolean>;
   readonly runImmediateCommand: (command: "compact" | "review") => Promise<boolean>;
 }
@@ -31,6 +32,7 @@ export interface ConversationTurnConfiguration {
   readonly effort?: string | null;
   readonly model?: string | null;
   readonly permissions?: string | null;
+  readonly serviceTier?: string | null;
 }
 
 export interface UseConversationOptions {
@@ -68,6 +70,7 @@ export function useConversation({
   });
   const submissionRef = useRef<symbol | null>(null);
   const stopRef = useRef<symbol | null>(null);
+  const serviceTierRef = useRef<symbol | null>(null);
   currentThreadIdRef.current = currentThreadId;
   clientRef.current = client;
 
@@ -168,6 +171,9 @@ export function useConversation({
             ...(configuration.permissions === undefined
               ? {}
               : { permissions: configuration.permissions }),
+            ...(configuration.serviceTier === undefined
+              ? {}
+              : { serviceTier: configuration.serviceTier }),
           }).result;
           if (
             submissionRef.current !== operation ||
@@ -245,6 +251,41 @@ export function useConversation({
     },
     [sendInput],
   );
+
+  const setServiceTier = useCallback(async (serviceTier: string): Promise<boolean> => {
+    const threadId = currentThreadIdRef.current;
+    if (
+      client === null ||
+      threadId === null ||
+      state.activeTurnId !== null ||
+      state.submitting ||
+      state.stopping ||
+      serviceTierRef.current !== null
+    ) {
+      return false;
+    }
+    const operation = Symbol("conversation-service-tier");
+    serviceTierRef.current = operation;
+    setState((current) => ({ ...current, error: null }));
+    try {
+      await client.setServiceTier(threadId, serviceTier).result;
+      return serviceTierRef.current === operation &&
+        clientRef.current === client &&
+        currentThreadIdRef.current === threadId;
+    } catch {
+      if (serviceTierRef.current === operation) {
+        setState((current) => ({
+          ...current,
+          error: "无法更新当前会话的 Fast 模式",
+        }));
+      }
+      return false;
+    } finally {
+      if (serviceTierRef.current === operation) {
+        serviceTierRef.current = null;
+      }
+    }
+  }, [client, state.activeTurnId, state.stopping, state.submitting]);
 
   const stop = useCallback(async (): Promise<boolean> => {
     const threadId = currentThreadIdRef.current;
@@ -327,7 +368,7 @@ export function useConversation({
     }
   }, [client, state.activeTurnId, state.submitting]);
 
-  return { ...state, sendInput, sendText, stop, runImmediateCommand };
+  return { ...state, sendInput, sendText, setServiceTier, stop, runImmediateCommand };
 }
 
 export function reduceConversationNotification(

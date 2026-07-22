@@ -46,6 +46,7 @@ describe("useComposerCapabilities", () => {
         config: {
           model: "configured-model",
           model_reasoning_effort: "high",
+          service_tier: "priority",
         },
         origins: {},
       }),
@@ -58,6 +59,7 @@ describe("useComposerCapabilities", () => {
     await waitFor(() => expect(result.current.defaultsLoading).toBe(false));
     expect(result.current.defaultModel).toBe("configured-model");
     expect(result.current.defaultEffort).toBe("high");
+    expect(result.current.defaultServiceTier).toBe("priority");
     expect(result.current.models).toHaveLength(1);
     expect(listModels).toHaveBeenCalledWith({ includeHidden: true, limit: 100 });
   });

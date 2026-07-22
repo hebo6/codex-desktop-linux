@@ -442,6 +442,47 @@ describe("Composer", () => {
     ));
   });
 
+  it("只为当前会话切换 Fast 并将目录返回的 tier id 传给服务端", async () => {
+    const onServiceTierChange = vi.fn(async () => true);
+    const user = userEvent.setup();
+    const { onSend } = renderComposer({
+      models: [{
+        defaultReasoningEffort: "medium",
+        defaultServiceTier: null,
+        description: "通用模型",
+        displayName: "GPT-5",
+        hidden: false,
+        id: "gpt-5",
+        isDefault: true,
+        model: "gpt-5",
+        serviceTiers: [{
+          description: "响应更快，使用量消耗更高",
+          id: "priority",
+          name: "Fast",
+        }],
+        supportedReasoningEfforts: [
+          { description: "平衡速度与质量", reasoningEffort: "medium" },
+        ],
+      }],
+      onServiceTierChange,
+      showProjectPicker: false,
+    });
+
+    const fastSwitch = screen.getByRole("switch", { name: "当前会话 Fast 模式" });
+    expect(fastSwitch).toHaveAttribute("aria-checked", "false");
+    expect(fastSwitch).toHaveAttribute("title", expect.stringContaining("仅影响当前会话"));
+    await user.click(fastSwitch);
+    await waitFor(() => expect(onServiceTierChange).toHaveBeenCalledWith("priority"));
+    expect(fastSwitch).toHaveAttribute("aria-checked", "true");
+
+    await user.type(screen.getByRole("textbox", { name: "任务输入" }), "快速处理");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith(
+      [{ type: "text", text: "快速处理" }],
+      { cwd: "/workspace/project", serviceTier: "priority" },
+    ));
+  });
+
   it("权限菜单解释策略并明确警告高风险配置", async () => {
     const user = userEvent.setup();
     const { onSend } = renderComposer({

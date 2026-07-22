@@ -421,6 +421,47 @@
   min-width: 0;
 }
 
+.fastToggle {
+  display: inline-flex;
+  min-height: 32px;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.fastToggle:hover:not(:disabled) {
+  background: var(--color-fill-hover);
+}
+
+.fastToggle[data-active="true"] {
+  border-color: var(--color-divider-strong);
+  color: var(--color-text-primary);
+  background: var(--color-fill-subtle);
+}
+
+.fastToggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.fastToggle svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
 .projectPicker > button,
 .modelPicker > button,
 .permissionPicker > button {
@@ -749,6 +790,10 @@
   }
 
   .context > label {
+    display: none;
+  }
+
+  .fastToggle span {
     display: none;
   }
 }

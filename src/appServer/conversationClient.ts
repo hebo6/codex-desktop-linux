@@ -2,6 +2,8 @@ import type {
   ServerNotification,
   ThreadStartParams,
   ThreadStartResponse,
+  ThreadSettingsUpdateParams,
+  ThreadSettingsUpdateResponse,
   TurnInterruptParams,
   TurnInterruptResponse,
   TurnStartParams,
@@ -18,6 +20,7 @@ import type {
 } from "../protocol/rpc";
 import {
   validateThreadStartResponse,
+  validateThreadSettingsUpdateResponse,
   validateTurnInterruptResponse,
   validateTurnStartResponse,
   validateTurnSteerResponse,
@@ -38,11 +41,16 @@ export interface StartTurnOptions {
   readonly effort?: TurnStartParams["effort"];
   readonly model?: TurnStartParams["model"];
   readonly permissions?: TurnStartParams["permissions"];
+  readonly serviceTier?: TurnStartParams["serviceTier"];
 }
 
 export interface ConversationClient {
   startThread(params?: ThreadStartParams): RequestHandle<ThreadStartResponse>;
   startTurn(threadId: string, options: StartTurnOptions): RequestHandle<TurnStartResponse>;
+  setServiceTier(
+    threadId: string,
+    serviceTier: string,
+  ): RequestHandle<ThreadSettingsUpdateResponse>;
   steerTurn(
     threadId: string,
     expectedTurnId: string,
@@ -74,11 +82,24 @@ export class AppServerConversationClient implements ConversationClient {
       ...(options.effort === undefined ? {} : { effort: options.effort }),
       ...(options.model === undefined ? {} : { model: options.model }),
       ...(options.permissions === undefined ? {} : { permissions: options.permissions }),
+      ...(options.serviceTier === undefined ? {} : { serviceTier: options.serviceTier }),
     };
     return this.session.sendRequest({
       method: "turn/start",
       params,
       validateResult: turnStartResponseValidator,
+    });
+  }
+
+  setServiceTier(
+    threadId: string,
+    serviceTier: string,
+  ): RequestHandle<ThreadSettingsUpdateResponse> {
+    const params: ThreadSettingsUpdateParams = { threadId, serviceTier };
+    return this.session.sendRequest({
+      method: "thread/settings/update",
+      params,
+      validateResult: threadSettingsUpdateResponseValidator,
     });
   }
 
@@ -133,6 +154,8 @@ export class AppServerConversationClient implements ConversationClient {
 
 const threadStartResponseValidator: ResultValidator<ThreadStartResponse> =
   validateThreadStartResponse;
+const threadSettingsUpdateResponseValidator: ResultValidator<ThreadSettingsUpdateResponse> =
+  validateThreadSettingsUpdateResponse;
 const turnStartResponseValidator: ResultValidator<TurnStartResponse> =
   validateTurnStartResponse;
 const turnSteerResponseValidator: ResultValidator<TurnSteerResponse> =

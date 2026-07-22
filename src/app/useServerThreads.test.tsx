@@ -227,6 +227,7 @@ describe("useServerThreads", () => {
     expect(result.current.restoredThread?.modelSettings).toEqual({
       effort: "medium",
       model: "gpt-5",
+      serviceTier: null,
     });
   });
 
@@ -257,6 +258,7 @@ describe("useServerThreads", () => {
             model: "gpt-5-pro",
             modelProvider: "openai",
             sandboxPolicy: { type: "readOnly" },
+            serviceTier: "priority",
           },
         },
       });
@@ -265,6 +267,7 @@ describe("useServerThreads", () => {
     expect(result.current.restoredThread?.modelSettings).toEqual({
       effort: "high",
       model: "gpt-5-pro",
+      serviceTier: "priority",
     });
   });
 
@@ -325,7 +328,7 @@ describe("useServerThreads", () => {
     ]);
     expect(result.current.restoredThread).toMatchObject({
       metadata: startedThread,
-      modelSettings: { effort: "medium", model: "gpt-5" },
+      modelSettings: { effort: "medium", model: "gpt-5", serviceTier: null },
       nextCursor: null,
       turns: [],
     });
