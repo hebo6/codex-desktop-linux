@@ -379,10 +379,28 @@ export function ConversationView({
       }
       const atBottom = updateConversationBottom(scroller);
       if (activeTurnRef.current !== undefined && atBottom) {
+        if (latestQuestion !== null) {
+          const top = questionTop(latestQuestion);
+          if (top !== null && top > scroller.scrollTop + 0.5) {
+            scroller.scrollTop = top;
+            pendingQuestionPositionRef.current =
+              Math.abs(scroller.scrollTop - top) < 0.5
+                ? null
+                : latestQuestion.itemId;
+          }
+          updateStickyQuestion(scroller);
+          updateConversationBottom(scroller);
+        }
         setPageFollowingMode(true);
       }
     }, MANUAL_SCROLL_SETTLE_MS);
-  }, [setPageFollowingMode, updateConversationBottom]);
+  }, [
+    latestQuestion,
+    questionTop,
+    setPageFollowingMode,
+    updateConversationBottom,
+    updateStickyQuestion,
+  ]);
 
   const startManualScroll = useCallback(() => {
     stopPageFollowing();

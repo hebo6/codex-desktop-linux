@@ -700,6 +700,104 @@ describe("ConversationView", () => {
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });
 
+  it("运行中滚动到内容末尾后将最近问题置顶", () => {
+    vi.useFakeTimers();
+    const earlierTurn = {
+      id: "turn-bottom-1",
+      items: [
+        {
+          content: [{ text: "第一条问题", type: "text" as const }],
+          id: "user-bottom-1",
+          type: "userMessage" as const,
+        },
+        {
+          id: "answer-bottom-1",
+          phase: "final_answer" as const,
+          text: "第一条回答",
+          type: "agentMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "completed" as const,
+    } satisfies ThreadTurn;
+    const activeTurn = {
+      id: "turn-bottom-2",
+      items: [
+        {
+          content: [{ text: "最近一个问题", type: "text" as const }],
+          id: "user-bottom-2",
+          type: "userMessage" as const,
+        },
+        {
+          id: "answer-bottom-2",
+          text: "正在回答",
+          type: "agentMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "inProgress" as const,
+    } satisfies ThreadTurn;
+    const activeThread = {
+      ...RESTORED,
+      nextCursor: null,
+      turns: [earlierTurn, activeTurn],
+    } satisfies RestoredThread;
+    const { rerender } = render(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={activeThread}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    const tail = scroller.querySelector<HTMLElement>("[data-conversation-tail]");
+    if (tail === null) {
+      throw new Error("缺少会话内容末尾标记");
+    }
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 500 },
+      scrollHeight: { configurable: true, value: 1_600 },
+    });
+    mockElementBottom(tail, () => 500);
+
+    scroller.scrollTop = 100;
+    fireEvent.wheel(scroller);
+    fireEvent.scroll(scroller);
+    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
+      .toHaveAttribute("data-sticky-question", "user-bottom-1");
+    expect(screen.queryByRole("button", { name: "回到底部" }))
+      .not.toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(300));
+    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
+      .toHaveAttribute("data-sticky-question", "user-bottom-2");
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{
+          ...activeThread,
+          turns: [
+            earlierTurn,
+            {
+              ...activeTurn,
+              items: activeTurn.items.map((item) =>
+                item.id === "answer-bottom-2"
+                  ? { ...item, text: "正在回答，内容继续增长" }
+                  : item
+              ),
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
+      .toHaveAttribute("data-sticky-question", "user-bottom-2");
+  });
+
   it("思考项目没有摘要时显示占位，工具到达后不保留占位", async () => {
     const thinkingTurn = {
       id: "turn-thinking",
