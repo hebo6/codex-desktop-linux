@@ -336,6 +336,17 @@ export function ConversationView({
     [historyQuestions, questionTop, stickyQuestionHeight],
   );
 
+  const conversationEndScrollTop = useCallback((scroller: HTMLDivElement) => {
+    const tail = conversationTailRef.current;
+    if (tail === null) {
+      return null;
+    }
+    const maximumTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    const targetTop = scroller.scrollTop + tail.getBoundingClientRect().bottom -
+      followingContentBottom(scroller, activeTurnRef.current);
+    return Math.min(maximumTop, Math.max(0, targetTop));
+  }, []);
+
   const updateConversationBottom = useCallback((scroller: HTMLDivElement) => {
     const tail = conversationTailRef.current;
     const atBottom = tail === null ||
@@ -382,27 +393,12 @@ export function ConversationView({
       }
       const atBottom = updateConversationBottom(scroller);
       if (activeTurnRef.current !== undefined && atBottom) {
-        if (latestQuestion !== null) {
-          const top = questionTop(latestQuestion);
-          if (top !== null && top > scroller.scrollTop + 0.5) {
-            scroller.scrollTop = top;
-            pendingQuestionPositionRef.current =
-              Math.abs(scroller.scrollTop - top) < 0.5
-                ? null
-                : latestQuestion.itemId;
-          }
-          updateStickyQuestion(scroller);
-          updateConversationBottom(scroller);
-        }
         setPageFollowingMode(true);
       }
     }, MANUAL_SCROLL_SETTLE_MS);
   }, [
-    latestQuestion,
-    questionTop,
     setPageFollowingMode,
     updateConversationBottom,
-    updateStickyQuestion,
   ]);
 
   const startManualScroll = useCallback(() => {
@@ -412,16 +408,32 @@ export function ConversationView({
 
   const captureManualForwardScrollLimit = useCallback(() => {
     const scroller = scrollerRef.current;
-    const tail = conversationTailRef.current;
-    if (scroller === null || tail === null) {
+    if (scroller === null) {
       manualForwardScrollLimitRef.current = null;
       return;
     }
-    const distanceToTail = tail.getBoundingClientRect().bottom -
-      followingContentBottom(scroller, activeTurnRef.current);
-    manualForwardScrollLimitRef.current = scroller.scrollTop +
-      Math.max(0, distanceToTail);
-  }, []);
+    manualForwardScrollLimitRef.current = conversationEndScrollTop(scroller);
+  }, [conversationEndScrollTop]);
+
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    if (scroller === null) {
+      return;
+    }
+    const preventForwardWheelAtEnd = (event: WheelEvent) => {
+      if (event.ctrlKey || event.deltaY <= 0) {
+        return;
+      }
+      const endTop = conversationEndScrollTop(scroller);
+      if (endTop !== null && endTop <= scroller.scrollTop + 0.5) {
+        event.preventDefault();
+      }
+    };
+    scroller.addEventListener("wheel", preventForwardWheelAtEnd, {
+      passive: false,
+    });
+    return () => scroller.removeEventListener("wheel", preventForwardWheelAtEnd);
+  }, [conversationEndScrollTop]);
 
   const prepareManualScroll = useCallback(() => {
     captureManualForwardScrollLimit();
@@ -557,13 +569,8 @@ export function ConversationView({
     const followingActivities = activeTurn !== undefined &&
       isFollowingActivities(activeTurn);
     if (followingActivities) {
-      const tail = conversationTailRef.current;
-      if (tail === null) {
-        return;
-      }
-      const overflow = tail.getBoundingClientRect().bottom -
-        followingContentBottom(scroller, activeTurn);
-      if (overflow <= 0.5) {
+      const endTop = conversationEndScrollTop(scroller);
+      if (endTop === null || endTop <= scroller.scrollTop + 0.5) {
         return;
       }
       const maximumTop = Math.max(
@@ -572,7 +579,7 @@ export function ConversationView({
       );
       const nextTop = Math.min(
         maximumTop,
-        scroller.scrollTop + overflow + ACTIVITY_BOTTOM_GAP,
+        endTop + ACTIVITY_BOTTOM_GAP,
       );
       if (nextTop <= scroller.scrollTop + 0.5) {
         return;
@@ -596,6 +603,7 @@ export function ConversationView({
     updateConversationBottom(scroller);
   }, [
     activeTurn,
+    conversationEndScrollTop,
     itemCount,
     scrollerHeight,
     stickyQuestionHeight,
@@ -772,7 +780,11 @@ export function ConversationView({
         onPointerUp={finishPointerScroll}
         onScroll={handleScroll}
         onTouchMove={prepareManualScroll}
-        onWheel={prepareManualScroll}
+        onWheel={(event) => {
+          if (!event.defaultPrevented) {
+            prepareManualScroll();
+          }
+        }}
         ref={scrollerRef}
       >
         <div
@@ -896,13 +908,19 @@ export function ConversationView({
                 requestAnimationFrame(() => {
                   const current = scrollerRef.current;
                   if (current !== null) {
-                    current.scrollTop = current.scrollHeight;
+                    const top = conversationEndScrollTop(current);
+                    if (top !== null) {
+                      current.scrollTop = top;
+                    }
                     updateStickyQuestion(current);
                     updateConversationBottom(current);
                   }
                 });
               } else {
-                scroller.scrollTop = scroller.scrollHeight;
+                const top = conversationEndScrollTop(scroller);
+                if (top !== null) {
+                  scroller.scrollTop = top;
+                }
                 updateStickyQuestion(scroller);
                 updateConversationBottom(scroller);
               }
