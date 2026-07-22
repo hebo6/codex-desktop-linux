@@ -215,7 +215,7 @@ describe("ConversationView", () => {
     expect(getComputedStyle(groupHeading).position).toBe("sticky");
   });
 
-  it("优先使用全部可识别的 commandActions 生成命令标题", async () => {
+  it("优先使用 commandActions 生成命令标题", async () => {
     mockOverflowingTitle("Ran pnpm test");
     const commandTurn = {
       durationMs: 2_000,
@@ -249,7 +249,7 @@ describe("ConversationView", () => {
           type: "commandExecution" as const,
         },
         {
-          command: "pnpm test",
+          command: "/usr/bin/bash -lc 'pnpm test'",
           commandActions: [{ command: "pnpm test", type: "unknown" as const }],
           cwd: "/workspace/project",
           id: "command-unknown",

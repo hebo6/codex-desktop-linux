@@ -44,7 +44,7 @@
 
 命令活动标题根据执行状态使用进行中、已完成、失败或拒绝语义
 
-`commandActions` 非空且全部为 `read`、`listFiles` 或 `search` 时，标题按服务端顺序组合语义化操作摘要
+`commandActions` 非空时，标题按服务端顺序组合操作摘要
 
 多个语义化操作摘要使用 ` · ` 分隔，操作动词按状态显示如下
 
@@ -54,9 +54,11 @@
 | `listFiles` | `Listing` | `Listed` | `Failed to list` | `Did not list` |
 | `search` | `Searching` | `Searched` | `Failed to search` | `Did not search` |
 
-`read` 显示目标名称，`listFiles` 显示目录，`search` 显示查询词和搜索路径，可选语义字段缺失时显示该 action 的原始命令
+`read` 显示目标名称，`listFiles` 显示目录，`search` 显示查询词和搜索路径，`unknown` 以及可选语义字段缺失的 action 显示该 action 的原始命令
 
-`commandActions` 为空或包含 `unknown` 时，标题直接使用完整原始命令，分别以 `Running`、`Ran`、`Failed to run` 或 `Did not run` 表示状态
+`commandActions` 为空时，标题使用完整执行命令
+
+显示原始命令时，分别以 `Running`、`Ran`、`Failed to run` 或 `Did not run` 表示状态
 
 存在展开箭头时点击命令行或箭头切换展开状态，展开或收起不得影响命令继续执行
 

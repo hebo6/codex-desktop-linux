@@ -1521,10 +1521,7 @@ function pathName(path: string): string {
 }
 
 function commandActivityTitle(item: CommandExecutionItem): string {
-  if (
-    item.commandActions.length === 0 ||
-    item.commandActions.some((action) => action.type === "unknown")
-  ) {
+  if (item.commandActions.length === 0) {
     return rawCommandTitle(item.status, item.command);
   }
   return item.commandActions
@@ -1756,4 +1753,3 @@ function formatRelativeTime(completedAt: Date, nowMs: number): string {
     return `${completedAt.getFullYear()}-${pad(completedAt.getMonth() + 1)}-${pad(completedAt.getDate())} ${pad(completedAt.getHours())}:${pad(completedAt.getMinutes())}`;
   }
 }
-
