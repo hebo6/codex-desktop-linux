@@ -25,6 +25,12 @@ pub(crate) struct DraftKeyRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct DraftKeyPrefixRequest {
+    key_prefix: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct SaveDraftRequest {
     draft_key: String,
     draft: Value,
@@ -105,6 +111,29 @@ impl DraftRepository {
             .transpose()
     }
 
+    async fn list_keys(
+        &self,
+        request: DraftKeyPrefixRequest,
+    ) -> Result<Vec<String>, DraftError> {
+        validate_draft_key(&request.key_prefix)?;
+        sqlx::query_scalar(
+            "SELECT draft_key FROM drafts
+             WHERE substr(draft_key, 1, length(?)) = ?
+               AND (
+                 (json_type(draft_json, '$.text') = 'text'
+                   AND length(json_extract(draft_json, '$.text')) > 0)
+                 OR (json_type(draft_json, '$.tokens') = 'array'
+                   AND json_array_length(draft_json, '$.tokens') > 0)
+               )
+             ORDER BY updated_at_ms DESC",
+        )
+        .bind(&request.key_prefix)
+        .bind(request.key_prefix)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(DraftError::Database)
+    }
+
     async fn save(&self, request: SaveDraftRequest) -> Result<(), DraftError> {
         validate_draft_key(&request.draft_key)?;
         if !request.draft.is_object() {
@@ -155,6 +184,14 @@ fn now_ms() -> Result<i64, DraftError> {
 }
 
 #[tauri::command]
+pub(crate) async fn list_draft_keys(
+    repository: State<'_, DraftRepository>,
+    request: DraftKeyPrefixRequest,
+) -> Result<Vec<String>, DraftCommandError> {
+    repository.list_keys(request).await.map_err(Into::into)
+}
+
+#[tauri::command]
 pub(crate) async fn load_draft(
     repository: State<'_, DraftRepository>,
     request: DraftKeyRequest,
@@ -183,7 +220,9 @@ mod tests {
     use serde_json::json;
     use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
-    use super::{DraftError, DraftKeyRequest, DraftRepository, SaveDraftRequest};
+    use super::{
+        DraftError, DraftKeyPrefixRequest, DraftKeyRequest, DraftRepository, SaveDraftRequest,
+    };
 
     async fn repository() -> DraftRepository {
         let pool = SqlitePoolOptions::new()
@@ -209,6 +248,29 @@ mod tests {
             })
             .await
             .unwrap();
+        repository
+            .save(SaveDraftRequest {
+                draft_key: "other:server:draft".to_owned(),
+                draft: json!({"text":"其他窗口","tokens":[]}),
+            })
+            .await
+            .unwrap();
+        repository
+            .save(SaveDraftRequest {
+                draft_key: "window:server:empty".to_owned(),
+                draft: json!({"text":"","tokens":[]}),
+            })
+            .await
+            .unwrap();
+        assert_eq!(
+            repository
+                .list_keys(DraftKeyPrefixRequest {
+                    key_prefix: "window:server:".to_owned(),
+                })
+                .await
+                .unwrap(),
+            vec!["window:server:draft"],
+        );
         assert_eq!(
             repository
                 .load(DraftKeyRequest {

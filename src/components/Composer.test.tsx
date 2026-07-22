@@ -74,6 +74,7 @@ describe("Composer", () => {
   it("从 SQLite 草稿存储恢复并在停止输入后保存", async () => {
     const user = userEvent.setup();
     const draftStore = {
+      listKeys: vi.fn(async () => []),
       load: vi.fn(async () => ({
         text: "恢复内容",
         tokens: [{ type: "mention" as const, name: "README", path: "/workspace/README.md" }],
@@ -108,6 +109,49 @@ describe("Composer", () => {
       { cwd: "/workspace/project" },
     ));
     await waitFor(() => expect(editor).toHaveValue(""));
+  });
+
+  it("新会话创建后发送失败时将草稿迁移到服务端会话", async () => {
+    const draftStore = {
+      listKeys: vi.fn(async () => []),
+      load: vi.fn(async (key: string) => key === "window:server:draft"
+        ? { text: "需要保留", tokens: [] }
+        : null),
+      save: vi.fn(async () => undefined),
+      delete: vi.fn(async () => undefined),
+    };
+
+    function Harness() {
+      const [draftKey, setDraftKey] = useState("window:server:draft");
+      return (
+        <Composer
+          activeTurn={false}
+          cwd="/workspace/project"
+          draftKey={draftKey}
+          draftStore={draftStore}
+          error={null}
+          onSend={async () => {
+            setDraftKey("window:server:thread");
+            return false;
+          }}
+          onStop={async () => true}
+          showProjectPicker
+          stopping={false}
+          submitting={false}
+        />
+      );
+    }
+
+    render(<Harness />);
+    const editor = await screen.findByRole("textbox", { name: "任务输入" });
+    await waitFor(() => expect(editor).toHaveValue("需要保留"));
+    fireEvent.keyDown(editor, { key: "Enter" });
+
+    await waitFor(() => expect(editor).toHaveValue("需要保留"));
+    await waitFor(() => expect(draftStore.save).toHaveBeenCalledWith(
+      "window:server:thread",
+      { text: "需要保留", tokens: [] },
+    ));
   });
 
   it("从底栏添加入口打开图片选择器", async () => {
@@ -153,6 +197,7 @@ describe("Composer", () => {
     const user = userEvent.setup();
     const promptStore = savedPromptStore();
     const draftStore = {
+      listKeys: vi.fn(async () => []),
       load: vi.fn(async (key: string) => key === "window:server:draft"
         ? { text: "需要稍后发送", tokens: [] }
         : null),

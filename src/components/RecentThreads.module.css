@@ -200,7 +200,7 @@
   display: grid;
   width: 100%;
   height: 40px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
   padding: 0 var(--space-2);
@@ -210,6 +210,24 @@
   cursor: pointer;
   text-align: left;
   transition: padding-right 120ms ease;
+}
+
+.draftIndicator {
+  display: grid;
+  width: 16px;
+  height: 18px;
+  place-items: center;
+  color: var(--color-text-tertiary);
+}
+
+.draftIndicator svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
 }
 
 .threadRowContainer {

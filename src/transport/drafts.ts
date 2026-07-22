@@ -12,6 +12,7 @@ export interface StoredDraft {
 }
 
 export interface DraftStore {
+  listKeys(keyPrefix: string): Promise<readonly string[]>;
   load(draftKey: string): Promise<StoredDraft | null>;
   save(draftKey: string, draft: StoredDraft): Promise<void>;
   delete(draftKey: string): Promise<void>;
@@ -21,6 +22,11 @@ export function createDraftStore(
   ipc: Pick<TauriIpc, "invoke"> = tauriIpc,
 ): DraftStore {
   return {
+    async listKeys(keyPrefix) {
+      return parseDraftKeys(await ipc.invoke<unknown>("list_draft_keys", {
+        request: { keyPrefix },
+      }));
+    },
     async load(draftKey) {
       return parseStoredDraft(await ipc.invoke<unknown>("load_draft", {
         request: { draftKey },
@@ -40,6 +46,16 @@ export function createDraftStore(
 }
 
 export const draftStore = createDraftStore();
+
+export function parseDraftKeys(value: unknown): readonly string[] {
+  if (
+    !Array.isArray(value) ||
+    !value.every((key): key is string => typeof key === "string")
+  ) {
+    throw new TypeError("invalid draft keys");
+  }
+  return Object.freeze([...value]);
+}
 
 export function parseStoredDraft(value: unknown): StoredDraft | null {
   if (value === null) return null;

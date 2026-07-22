@@ -11,6 +11,7 @@ commands.allow = [
     "save_remote_file",
     "load_thread_cache",
     "save_thread_cache",
+    "list_draft_keys",
     "load_draft",
     "save_draft",
     "delete_draft",

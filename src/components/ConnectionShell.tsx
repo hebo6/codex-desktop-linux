@@ -28,6 +28,7 @@ interface ConnectionShellProps {
   threadListPhase?: ServerThreadsPhase;
   threadListError?: string | null;
   currentThreadId?: string | null;
+  draftThreadIds?: ReadonlySet<string>;
   hasMoreThreads?: boolean;
   loadingMoreThreads?: boolean;
   refreshingThreads?: boolean;
@@ -221,6 +222,7 @@ export function ConnectionShell({
   threadListPhase = "idle",
   threadListError = null,
   currentThreadId = null,
+  draftThreadIds = EMPTY_THREAD_IDS,
   hasMoreThreads = false,
   loadingMoreThreads = false,
   refreshingThreads = false,
@@ -396,6 +398,7 @@ export function ConnectionShell({
         <RecentThreads
           archivedThread={archivedThread}
           currentThreadId={currentThreadId}
+          draftThreadIds={draftThreadIds}
           error={threadListError}
           grouped={groupThreads}
           hasMore={hasMoreThreads}
@@ -755,3 +758,5 @@ export function ConnectionShell({
     </div>
   );
 }
+
+const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();

@@ -126,6 +126,7 @@ export interface ComposerProps {
   readonly onLoadSkills?: (forceReload?: boolean) => Promise<void>;
   readonly onLoadMentions?: (forceReload?: boolean) => Promise<void>;
   readonly onCwdChange?: (cwd: string) => void;
+  readonly onDraftPresenceChange?: (draftKey: string, present: boolean) => void;
   readonly onPickCwd?: () => Promise<string | null>;
   readonly onRunImmediateCommand?: (command: "compact" | "review") => Promise<boolean>;
   readonly onOpenSettings?: () => void;
@@ -169,6 +170,7 @@ export function Composer({
   onLoadSkills,
   onLoadMentions,
   onCwdChange,
+  onDraftPresenceChange,
   onPickCwd,
   onRunImmediateCommand,
   onOpenSettings,
@@ -214,6 +216,11 @@ export function Composer({
   const composingRef = useRef(false);
   const sendingRef = useRef(false);
   const previousDraftKeyRef = useRef(draftKey);
+  const loadedDraftKeyRef = useRef<string | null>(null);
+  const reportedDraftPresenceRef = useRef<{
+    readonly draftKey: string;
+    readonly present: boolean;
+  } | null>(null);
   const preserveDraftForNextKeyRef = useRef(false);
   const currentDraftRef = useRef({ text, tokens });
   const composerSelectionRef = useRef<{
@@ -311,18 +318,36 @@ export function Composer({
   useEffect(() => {
     let disposed = false;
     const previousDraftKey = previousDraftKeyRef.current;
+    const previousDraftWasLoaded = loadedDraftKeyRef.current === previousDraftKey;
     previousDraftKeyRef.current = draftKey;
+    loadedDraftKeyRef.current = null;
     setLoadedDraftKey(null);
     if (preserveDraftForNextKeyRef.current && previousDraftKey !== draftKey) {
       preserveDraftForNextKeyRef.current = false;
+      loadedDraftKeyRef.current = draftKey;
       setLoadedDraftKey(draftKey);
       const preserved = currentDraftRef.current;
       if (draftKey !== null) {
-        void draftStore.save(draftKey, preserved).then(
+        const persistence = preserved.text.length === 0 && preserved.tokens.length === 0
+          ? draftStore.delete(draftKey)
+          : draftStore.save(draftKey, preserved);
+        void persistence.then(
           () => previousDraftKey === null ? undefined : draftStore.delete(previousDraftKey),
         ).catch(() => undefined);
       }
       return () => { disposed = true; };
+    }
+    if (
+      previousDraftKey !== null &&
+      previousDraftKey !== draftKey &&
+      previousDraftWasLoaded &&
+      !sendingRef.current
+    ) {
+      const previous = currentDraftRef.current;
+      const persistence = previous.text.length === 0 && previous.tokens.length === 0
+        ? draftStore.delete(previousDraftKey)
+        : draftStore.save(previousDraftKey, previous);
+      void persistence.catch(() => undefined);
     }
     setSelectedModel(null);
     setSelectedEffort(null);
@@ -343,12 +368,14 @@ export function Composer({
           setText(stored.text);
           setTokens(stored.tokens);
         }
+        loadedDraftKeyRef.current = draftKey;
         setLoadedDraftKey(draftKey);
       },
       () => {
         if (disposed) return;
         setText("");
         setTokens([]);
+        loadedDraftKeyRef.current = draftKey;
         setLoadedDraftKey(draftKey);
       },
     );
@@ -367,6 +394,23 @@ export function Composer({
     }, 500);
     return () => window.clearTimeout(timeout);
   }, [draftKey, draftStore, loadedDraftKey, text, tokens]);
+
+  useEffect(() => {
+    if (
+      draftKey === null ||
+      loadedDraftKey !== draftKey ||
+      onDraftPresenceChange === undefined
+    ) {
+      return;
+    }
+    const present = text.length > 0 || tokens.length > 0;
+    const reported = reportedDraftPresenceRef.current;
+    if (reported?.draftKey === draftKey && reported.present === present) {
+      return;
+    }
+    reportedDraftPresenceRef.current = { draftKey, present };
+    onDraftPresenceChange(draftKey, present);
+  }, [draftKey, loadedDraftKey, onDraftPresenceChange, text, tokens]);
 
   useEffect(() => {
     if (trigger?.kind !== "$" || onLoadSkills === undefined) {
@@ -440,6 +484,14 @@ export function Composer({
     ...(selectedPermission === null ? {} : { permissions: selectedPermission }),
   });
 
+  const releaseDraftPreservationIfUnchanged = () => {
+    window.setTimeout(() => {
+      if (previousDraftKeyRef.current === draftKey) {
+        preserveDraftForNextKeyRef.current = false;
+      }
+    }, 0);
+  };
+
   const send = async () => {
     if (!canSend || sendingRef.current) {
       return;
@@ -476,12 +528,15 @@ export function Composer({
           url === null ? [] : [{ type: "image" as const, url }],
         ),
       ];
+      if (showProjectPicker) preserveDraftForNextKeyRef.current = true;
       if (await onSend(input, turnConfiguration())) {
         setText("");
         setTokens([]);
         setAttachments([]);
         setSelectedTokenIndex(null);
         setTrigger(null);
+      } else if (showProjectPicker) {
+        releaseDraftPreservationIfUnchanged();
       }
     } finally {
       sendingRef.current = false;
@@ -656,13 +711,7 @@ export function Composer({
       if (sent) {
         setSavedPromptPickerOpen(false);
       } else {
-        if (showProjectPicker) {
-          window.setTimeout(() => {
-            if (previousDraftKeyRef.current === draftKey) {
-              preserveDraftForNextKeyRef.current = false;
-            }
-          }, 0);
-        }
+        if (showProjectPicker) releaseDraftPreservationIfUnchanged();
         setSavedPromptSendError("未能发送常用提示词，当前草稿未受影响");
       }
     } finally {

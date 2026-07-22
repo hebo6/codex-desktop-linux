@@ -21,6 +21,7 @@ import styles from "./RecentThreads.module.css";
 
 export interface RecentThreadsProps {
   readonly currentThreadId: string | null;
+  readonly draftThreadIds: ReadonlySet<string>;
   readonly error: string | null;
   readonly grouped: boolean;
   readonly headerActions?: ReactNode;
@@ -100,6 +101,7 @@ const GROUP_THREAD_PAGE_SIZE = 3;
 
 export function RecentThreads({
   currentThreadId,
+  draftThreadIds,
   error,
   grouped,
   headerActions,
@@ -511,6 +513,7 @@ export function RecentThreads({
                     <ThreadRow
                       current={entry.thread.id === currentThreadId}
                       disabled={pendingThreadIds.includes(entry.thread.id)}
+                      hasDraft={draftThreadIds.has(entry.thread.id)}
                       operationDisabled={
                         readOnly || pendingThreadIds.includes(entry.thread.id)
                       }
@@ -665,6 +668,7 @@ function GroupHeading({
 function ThreadRow({
   current,
   disabled,
+  hasDraft,
   operationDisabled,
   onArchive,
   onDelete,
@@ -676,6 +680,7 @@ function ThreadRow({
 }: {
   readonly current: boolean;
   readonly disabled: boolean;
+  readonly hasDraft: boolean;
   readonly operationDisabled: boolean;
   readonly onArchive: () => void;
   readonly onDelete: () => void;
@@ -729,6 +734,16 @@ function ThreadRow({
         title={`${title}\n${thread.cwd}`}
         type="button"
       >
+        <span
+          aria-hidden={hasDraft ? undefined : "true"}
+          aria-label={hasDraft ? "存在未发送草稿" : undefined}
+          className={styles.draftIndicator}
+          data-present={hasDraft}
+          role={hasDraft ? "img" : undefined}
+          title={hasDraft ? "存在未发送草稿" : undefined}
+        >
+          {hasDraft ? <DraftIcon /> : null}
+        </span>
         <span className={styles.threadTitle}>{title}</span>
         {status === null ? null : (
           <span
@@ -785,6 +800,15 @@ function DeleteIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
       <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" />
+    </svg>
+  );
+}
+
+function DraftIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M14 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <path d="m13 14 7-7-3-3-7 7-1 4 4-1Z" />
     </svg>
   );
 }

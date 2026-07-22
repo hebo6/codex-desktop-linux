@@ -45,6 +45,7 @@ import type {
 } from "./transport/windowState";
 import type { DeepLinkTargetSubscriber } from "./transport/deepLink";
 import type { ConfiguredServerStatusSubscriber } from "./transport/configuredServerStatuses";
+import type { DraftStore } from "./transport/drafts";
 
 const SERVER_ID = "11111111-1111-4111-8111-111111111111" as ServerId;
 const SECOND_SERVER_ID = "33333333-3333-4333-8333-333333333333" as ServerId;
@@ -151,6 +152,7 @@ function renderApp(
     readonly windowReferenceSubscriber?: WindowServerReferenceSubscriber;
     readonly deepLinkSubscriber?: DeepLinkTargetSubscriber;
     readonly configuredServerStatusSubscriber?: ConfiguredServerStatusSubscriber;
+    readonly draftStore?: DraftStore;
   } = {},
 ) {
   const testStore = createTestStore();
@@ -215,6 +217,9 @@ function renderApp(
           options.configuredServerStatusSubscriber ??
           (async () => () => undefined)
         }
+        {...(options.draftStore === undefined
+          ? {}
+          : { draftStore: options.draftStore })}
         windowStateOptions={windowStateOptions}
       />
     </Provider>,
@@ -356,8 +361,17 @@ describe("App", () => {
       },
       async close() {},
     });
+    const draftStore: DraftStore = {
+      listKeys: vi.fn(async (keyPrefix) => [`${keyPrefix}${thread.id}`]),
+      load: vi.fn(async (draftKey) => draftKey.endsWith(thread.id)
+        ? { text: "未发送草稿", tokens: [] }
+        : null),
+      save: vi.fn(async () => undefined),
+      delete: vi.fn(async () => undefined),
+    };
 
     renderApp(() => ({ servers: [localServer()], proxies: [] }), {
+      draftStore,
       sessionFactory,
       windowStateOptions: {
         loader: vi.fn(async () => ({
@@ -372,6 +386,7 @@ describe("App", () => {
     });
 
     await screen.findByText("这个会话还没有回合");
+    expect(screen.getByRole("img", { name: "存在未发送草稿" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "项目" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "最近会话操作" }));
     await user.click(screen.getByRole("menuitem", { name: /搜索会话/u }));

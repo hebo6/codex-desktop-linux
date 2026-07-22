@@ -230,6 +230,7 @@ pub fn run() {
             dialogs::open_external_url,
             dialogs::save_remote_file,
             deep_link::take_pending_deep_link,
+            drafts::list_draft_keys,
             drafts::load_draft,
             drafts::save_draft,
             drafts::delete_draft,

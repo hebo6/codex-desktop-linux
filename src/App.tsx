@@ -101,6 +101,10 @@ import {
   type ConfiguredServerStatusSubscriber,
 } from "./transport/configuredServerStatuses";
 import { getCredentialStorageStatus } from "./transport/configuration";
+import {
+  draftStore as persistentDraftStore,
+  type DraftStore,
+} from "./transport/drafts";
 
 export type AppWindowOpener = typeof openAppWindow;
 export type CredentialStorageStatusLoader = () => Promise<CredentialStorageStatus>;
@@ -119,6 +123,17 @@ export interface AppProps {
   readonly notificationService?: DesktopNotificationService;
   readonly deepLinkSubscriber?: DeepLinkTargetSubscriber;
   readonly configuredServerStatusSubscriber?: ConfiguredServerStatusSubscriber;
+  readonly draftStore?: DraftStore;
+}
+
+interface DraftThreadPresence {
+  readonly keyPrefix: string | null;
+  readonly threadIds: ReadonlySet<string>;
+}
+
+interface DraftPresenceOverrides {
+  readonly keyPrefix: string | null;
+  readonly entries: Map<string, boolean>;
 }
 
 interface ActiveServerEditor {
@@ -211,6 +226,7 @@ export function App({
   notificationService = desktopNotificationService,
   deepLinkSubscriber = subscribeDeepLinkTargets,
   configuredServerStatusSubscriber = subscribeConfiguredServerStatuses,
+  draftStore = persistentDraftStore,
 }: AppProps = {}) {
   const configuration = useAppSelector(selectConfiguration);
   const windowState = useWindowState(windowStateOptions);
@@ -306,6 +322,8 @@ export function App({
   const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
   const [recentConnectionError, setRecentConnectionError] = useState<string | null>(null);
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
+  const [draftThreadPresence, setDraftThreadPresence] =
+    useState<DraftThreadPresence>({ keyPrefix: null, threadIds: new Set() });
   const [shortcutStatus, setShortcutStatus] = useState<string | null>(null);
   const [notificationPermission, setNotificationPermission] = useState(
     () => notificationService.permission(),
@@ -328,6 +346,10 @@ export function App({
   ] = useState(0);
   const editorSequenceRef = useRef(0);
   const recordedProxyTestRef = useRef<string | null>(null);
+  const draftPresenceOverridesRef = useRef<DraftPresenceOverrides>({
+    keyPrefix: null,
+    entries: new Map(),
+  });
   const persistedProxyTestRef = useRef<ProxyProfile | null>(null);
   const conversationActivityRef = useRef<{
     readonly threadId: string | null;
@@ -362,6 +384,10 @@ export function App({
   );
   const boundServerId = windowState.windowState?.serverId ?? null;
   const windowId = windowState.windowState?.windowId ?? null;
+  const draftKeyPrefix = composerDraftKeyPrefix(windowId, boundServerId);
+  const draftThreadIds = draftThreadPresence.keyPrefix === draftKeyPrefix
+    ? draftThreadPresence.threadIds
+    : EMPTY_THREAD_IDS;
   const deletingServer =
     deletingServerId === null
       ? null
@@ -392,6 +418,61 @@ export function App({
         }),
     [conversation.turns, restoredThread],
   );
+
+  useEffect(() => {
+    let disposed = false;
+    draftPresenceOverridesRef.current = {
+      keyPrefix: draftKeyPrefix,
+      entries: new Map(),
+    };
+    setDraftThreadPresence({ keyPrefix: draftKeyPrefix, threadIds: new Set() });
+    if (draftKeyPrefix === null) {
+      return () => { disposed = true; };
+    }
+    void draftStore.listKeys(draftKeyPrefix).then(
+      (draftKeys) => {
+        if (disposed) return;
+        const threadIds = new Set<string>();
+        for (const draftKey of draftKeys) {
+          const threadId = draftThreadId(draftKeyPrefix, draftKey);
+          if (threadId !== null) threadIds.add(threadId);
+        }
+        const overrides = draftPresenceOverridesRef.current;
+        if (overrides.keyPrefix === draftKeyPrefix) {
+          for (const [threadId, present] of overrides.entries) {
+            if (present) threadIds.add(threadId);
+            else threadIds.delete(threadId);
+          }
+        }
+        setDraftThreadPresence({ keyPrefix: draftKeyPrefix, threadIds });
+      },
+      () => undefined,
+    );
+    return () => { disposed = true; };
+  }, [draftKeyPrefix, draftStore]);
+
+  const updateDraftPresence = useCallback((draftKey: string, present: boolean) => {
+    if (draftKeyPrefix === null) return;
+    const threadId = draftThreadId(draftKeyPrefix, draftKey);
+    if (threadId === null) return;
+    const overrides = draftPresenceOverridesRef.current;
+    if (overrides.keyPrefix !== draftKeyPrefix) {
+      draftPresenceOverridesRef.current = {
+        keyPrefix: draftKeyPrefix,
+        entries: new Map([[threadId, present]]),
+      };
+    } else {
+      overrides.entries.set(threadId, present);
+    }
+    setDraftThreadPresence((current) => {
+      const threadIds = new Set(
+        current.keyPrefix === draftKeyPrefix ? current.threadIds : [],
+      );
+      if (present) threadIds.add(threadId);
+      else threadIds.delete(threadId);
+      return { keyPrefix: draftKeyPrefix, threadIds };
+    });
+  }, [draftKeyPrefix]);
 
   useEffect(() => {
     let disposed = false;
@@ -1306,6 +1387,7 @@ export function App({
         contentSubtitle={contentSubtitle}
         contentTitle={contentTitle}
         currentThreadId={windowState.windowState?.currentThreadId ?? null}
+        draftThreadIds={draftThreadIds}
         hasMoreThreads={serverThreads.nextThreadCursor !== null}
         loadingMoreThreads={serverThreads.loadingMoreThreads}
         mainContent={
@@ -1328,6 +1410,7 @@ export function App({
                     windowState.windowState?.draftKey ?? null,
                     windowState.windowState?.currentThreadId ?? null,
                   )}
+                  draftStore={draftStore}
                   error={conversation.error}
                   interactionPanel={
                     <ApprovalPanel
@@ -1353,6 +1436,7 @@ export function App({
                   onLoadMentions={composerCapabilities.loadMentions}
                   onLoadSkills={composerCapabilities.loadSkills}
                   onCwdChange={setDraftCwd}
+                  onDraftPresenceChange={updateDraftPresence}
                   {...(boundServer?.configuration.type === "localStdio"
                     ? { onPickCwd: pickLocalDirectory }
                     : {})}
@@ -1745,10 +1829,28 @@ function composerDraftKey(
   draftKey: string | null,
   threadId: string | null,
 ): string | null {
-  if (windowId === null || serverId === null) {
+  const keyPrefix = composerDraftKeyPrefix(windowId, serverId);
+  return keyPrefix === null
+    ? null
+    : `${keyPrefix}${draftKey ?? threadId ?? "new"}`;
+}
+
+const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();
+
+function composerDraftKeyPrefix(
+  windowId: string | null,
+  serverId: string | null,
+): string | null {
+  return windowId === null || serverId === null
+    ? null
+    : `${windowId}:${serverId}:`;
+}
+
+function draftThreadId(keyPrefix: string, draftKey: string): string | null {
+  if (!draftKey.startsWith(keyPrefix) || draftKey.length === keyPrefix.length) {
     return null;
   }
-  return `${windowId}:${serverId}:${draftKey ?? threadId ?? "new"}`;
+  return draftKey.slice(keyPrefix.length);
 }
 
 function getBasename(path: string): string {

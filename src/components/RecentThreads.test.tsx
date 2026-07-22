@@ -60,6 +60,7 @@ function renderThreads(
   const props: ComponentProps<typeof RecentThreads> = {
     archivedThread: null,
     currentThreadId: THREAD_ONE.id,
+    draftThreadIds: new Set(),
     error: null,
     grouped: false,
     hasMore: false,
@@ -116,6 +117,18 @@ describe("RecentThreads", () => {
     );
     expect(screen.getByRole("img", { name: "正在运行" })).toBeVisible();
     expect(screen.getByRole("img", { name: "等待审批" })).toBeVisible();
+  });
+
+  it("在固定槽位展示可与运行状态并存的草稿标识", () => {
+    renderThreads({ draftThreadIds: new Set([THREAD_ONE.id]) });
+
+    const draft = screen.getByRole("img", { name: "存在未发送草稿" });
+    expect(draft).toHaveAttribute("title", "存在未发送草稿");
+    expect(draft).toHaveAttribute("data-present", "true");
+    expect(draft.closest("button")).toContainElement(
+      screen.getByRole("img", { name: "正在运行" }),
+    );
+    expect(document.querySelectorAll("[data-present]")).toHaveLength(2);
   });
 
   it("空闲会话不展示状态并区分待回复与失败", () => {
