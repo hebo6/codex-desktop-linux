@@ -5,6 +5,14 @@ import type { ThreadSummary } from "../app/useServerThreads";
 import { ConnectionShell } from "./ConnectionShell";
 
 describe("ConnectionShell", () => {
+  it("顶部栏使用深层窗口拖拽区域", () => {
+    const { container } = render(<ConnectionShell phase="ready" />);
+
+    expect(
+      container.querySelector("header[data-tauri-drag-region]"),
+    ).toHaveAttribute("data-tauri-drag-region", "deep");
+  });
+
   it("以可访问状态展示初始化进度", () => {
     render(<ConnectionShell phase="initializing" />);
 

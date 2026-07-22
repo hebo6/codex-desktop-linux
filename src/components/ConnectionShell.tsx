@@ -618,7 +618,7 @@ export function ConnectionShell({
       </aside>
 
       <main className={styles.main}>
-        <header className={styles.topbar} data-tauri-drag-region>
+        <header className={styles.topbar} data-tauri-drag-region="deep">
           <WindowControls side="left" />
           {isSidebarCollapsed && (
             <button
