@@ -670,7 +670,7 @@ describe("ConversationView", () => {
     expect(scroller.scrollTop).toBe(800);
   });
 
-  it("只按会话内容末尾判断是否已在底部", () => {
+  it("按会话内容末尾和回答可读区判断是否已在底部", () => {
     render(
       <ConversationView
         hasOlderTurns={false}
@@ -684,7 +684,7 @@ describe("ConversationView", () => {
     if (tail === null) {
       throw new Error("缺少会话内容末尾标记");
     }
-    let tailBottom = 500;
+    let tailBottom = 380;
     Object.defineProperties(scroller, {
       clientHeight: { configurable: true, value: 500 },
       scrollHeight: { configurable: true, value: 1_500 },
@@ -695,7 +695,7 @@ describe("ConversationView", () => {
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
 
-    tailBottom = 501;
+    tailBottom = 381;
     fireEvent.scroll(scroller);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });
@@ -725,12 +725,12 @@ describe("ConversationView", () => {
     fireEvent.wheel(scroller);
     scroller.scrollTop = 600;
     fireEvent.scroll(scroller);
-    expect(scroller.scrollTop).toBe(400);
+    expect(scroller.scrollTop).toBe(520);
 
     fireEvent.wheel(scroller);
-    scroller.scrollTop = 500;
+    scroller.scrollTop = 620;
     fireEvent.scroll(scroller);
-    expect(scroller.scrollTop).toBe(400);
+    expect(scroller.scrollTop).toBe(520);
 
     fireEvent.wheel(scroller);
     scroller.scrollTop = 300;
@@ -797,7 +797,7 @@ describe("ConversationView", () => {
       clientHeight: { configurable: true, value: 500 },
       scrollHeight: { configurable: true, value: 1_600 },
     });
-    mockElementBottom(tail, () => 500);
+    mockElementBottom(tail, () => 380);
 
     scroller.scrollTop = 100;
     fireEvent.wheel(scroller);
@@ -1070,7 +1070,7 @@ describe("ConversationView", () => {
     const scroller = screen.getByLabelText("会话消息");
     Object.defineProperties(scroller, {
       clientHeight: { configurable: true, value: 500 },
-      scrollHeight: { configurable: true, value: 1_600 },
+      scrollHeight: { configurable: true, value: 1_720 },
     });
     const activeTurn = {
       id: "turn-page-2",
@@ -1144,7 +1144,7 @@ describe("ConversationView", () => {
     expect(scroller.scrollTop).toBe(100);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
 
-    scroller.scrollTop = 350;
+    scroller.scrollTop = 470;
     fireEvent.wheel(scroller);
     fireEvent.scroll(scroller);
     expect(screen.queryByRole("button", { name: "回到底部" }))
@@ -1159,7 +1159,7 @@ describe("ConversationView", () => {
         restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
       />,
     );
-    expect(scroller.scrollTop).toBe(350);
+    expect(scroller.scrollTop).toBe(470);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
 
     act(() => vi.advanceTimersByTime(300));
@@ -1171,7 +1171,7 @@ describe("ConversationView", () => {
         restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
       />,
     );
-    expect(scroller.scrollTop).toBe(350);
+    expect(scroller.scrollTop).toBe(470);
 
     scroller.scrollTop = 700;
     fireEvent.wheel(scroller);
@@ -1193,7 +1193,7 @@ describe("ConversationView", () => {
     expect(scroller.scrollTop).toBe(700);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
 
-    scroller.scrollTop = 1_050;
+    scroller.scrollTop = 1_170;
     fireEvent.wheel(scroller);
     fireEvent.scroll(scroller);
     act(() => vi.advanceTimersByTime(300));
@@ -1207,7 +1207,7 @@ describe("ConversationView", () => {
         restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
       />,
     );
-    expect(scroller.scrollTop).toBe(1_100);
+    expect(scroller.scrollTop).toBe(1_220);
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
   });

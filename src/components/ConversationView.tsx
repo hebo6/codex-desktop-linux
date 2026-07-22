@@ -337,10 +337,9 @@ export function ConversationView({
 
   const updateConversationBottom = useCallback((scroller: HTMLDivElement) => {
     const tail = conversationTailRef.current;
-    const viewportBottom = scroller.getBoundingClientRect().top +
-      scroller.clientHeight;
     const atBottom = tail === null ||
-      tail.getBoundingClientRect().bottom <= viewportBottom + 0.5;
+      tail.getBoundingClientRect().bottom <=
+        answerReadableBottom(scroller) + 0.5;
     setShowJumpToBottom(!atBottom);
     return atBottom;
   }, []);
@@ -417,9 +416,8 @@ export function ConversationView({
       manualForwardScrollLimitRef.current = null;
       return;
     }
-    const viewportBottom = scroller.getBoundingClientRect().top +
-      scroller.clientHeight;
-    const distanceToTail = tail.getBoundingClientRect().bottom - viewportBottom;
+    const distanceToTail = tail.getBoundingClientRect().bottom -
+      answerReadableBottom(scroller);
     manualForwardScrollLimitRef.current = scroller.scrollTop +
       Math.max(0, distanceToTail);
   }, []);
@@ -1927,6 +1925,11 @@ function conversationListTop(scroller: HTMLElement): number {
     return scroller.scrollTop + listRect.top - scroller.getBoundingClientRect().top;
   }
   return list.offsetTop;
+}
+
+function answerReadableBottom(scroller: HTMLElement): number {
+  return scroller.getBoundingClientRect().top + scroller.clientHeight -
+    ANSWER_BOTTOM_INSET;
 }
 
 function isScrollKey(key: string): boolean {
