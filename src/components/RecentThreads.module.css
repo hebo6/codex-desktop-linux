@@ -346,8 +346,8 @@
 
 .loadMore {
   width: 100%;
-  min-height: 36px;
-  margin-top: var(--space-2);
+  height: 32px;
+  margin: 4px 0;
   border-radius: var(--radius-sm);
   color: var(--color-text-tertiary);
   background: transparent;

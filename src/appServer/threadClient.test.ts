@@ -68,6 +68,7 @@ describe("AppServerThreadClient", () => {
 
     client.listRecentThreads();
     client.listRecentThreads({ archived: true, cursor: "next-page" });
+    client.listRecentThreads({ cwd: "/workspace/project", limit: 6 });
 
     expect(
       session.requests.map(({ method, params }) => ({ method, params })),
@@ -87,6 +88,16 @@ describe("AppServerThreadClient", () => {
           archived: true,
           cursor: "next-page",
           limit: RECENT_THREAD_PAGE_SIZE,
+          sortDirection: "desc",
+          sortKey: "updated_at",
+        },
+      },
+      {
+        method: "thread/list",
+        params: {
+          archived: false,
+          cwd: "/workspace/project",
+          limit: 6,
           sortDirection: "desc",
           sortKey: "updated_at",
         },

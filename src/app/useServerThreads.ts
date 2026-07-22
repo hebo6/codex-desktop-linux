@@ -45,11 +45,19 @@ export interface ServerThreadsState {
 export interface ServerThreadsControls extends ServerThreadsState {
   readonly prepareStartedThread: (response: ThreadStartResponse) => () => void;
   readonly loadMoreThreads: () => Promise<void>;
+  readonly loadProjectThreads: (
+    cwd: string,
+    limit: number,
+  ) => Promise<ProjectThreadPage>;
   readonly refreshThreads: () => Promise<void>;
   readonly loadOlderTurns: () => Promise<void>;
   readonly archiveThread: (threadId: string) => Promise<boolean>;
   readonly undoArchive: () => Promise<boolean>;
   readonly deleteThread: (threadId: string) => Promise<boolean>;
+}
+
+export interface ProjectThreadPage {
+  readonly hasMore: boolean;
 }
 
 interface ThreadRequest<T> {
@@ -61,7 +69,12 @@ export interface ServerThreadsClient {
     handler: (notification: ServerNotification) => void,
   ): () => void;
   listRecentThreads(
-    options?: { readonly archived?: boolean; readonly cursor?: string | null },
+    options?: {
+      readonly archived?: boolean;
+      readonly cursor?: string | null;
+      readonly cwd?: string;
+      readonly limit?: number;
+    },
   ): ThreadRequest<ThreadListResponse>;
   readThread(threadId: string): ThreadRequest<ThreadReadResponse>;
   resumeThread(threadId: string): ThreadRequest<ThreadResumeResponse>;
@@ -400,11 +413,15 @@ export function useServerThreads(
           const currentThreadWasDeleted =
             source.currentThreadId !== null &&
             removedThreadIds.has(source.currentThreadId);
+          const listedThreads = list.data.filter(
+            ({ id }) => !removedThreadIds.has(id),
+          );
           setState({
             phase: "ready",
-            threads: Object.freeze(
-              list.data.filter(({ id }) => !removedThreadIds.has(id)),
-            ),
+            threads:
+              currentThreadWasDeleted || restoredThread === null
+                ? Object.freeze(listedThreads)
+                : insertThreadByRecency(listedThreads, restoredThread.metadata),
             nextThreadCursor: list.nextCursor ?? null,
             restoredThread: currentThreadWasDeleted ? null : restoredThread,
             loadingMoreThreads: false,
@@ -513,6 +530,25 @@ export function useServerThreads(
       }
     }
   }, [state.nextThreadCursor, state.phase]);
+
+  const loadProjectThreads = useCallback(async (
+    cwd: string,
+    limit: number,
+  ): Promise<ProjectThreadPage> => {
+    const source = sourceRef.current;
+    if (source === null || state.phase !== "ready" || state.offline) {
+      throw new Error("project threads are unavailable");
+    }
+    const page = await source.client.listRecentThreads({ cwd, limit }).result;
+    if (sourceRef.current !== source) {
+      throw new Error("project thread request is stale");
+    }
+    setState((current) => ({
+      ...current,
+      threads: mergeUniqueById(current.threads, page.data),
+    }));
+    return { hasMore: page.nextCursor !== null && page.nextCursor !== undefined };
+  }, [state.offline, state.phase]);
 
   const refreshThreads = useCallback(async (): Promise<void> => {
     const source = sourceRef.current;
@@ -783,6 +819,7 @@ export function useServerThreads(
     ...state,
     prepareStartedThread,
     loadMoreThreads,
+    loadProjectThreads,
     refreshThreads,
     loadOlderTurns,
     archiveThread,

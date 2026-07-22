@@ -7,7 +7,11 @@ import {
   type ReactNode,
 } from "react";
 
-import type { ServerThreadsPhase, ThreadSummary } from "../app/useServerThreads";
+import type {
+  ProjectThreadPage,
+  ServerThreadsPhase,
+  ThreadSummary,
+} from "../app/useServerThreads";
 import type { ReconnectViewState } from "../app/useConfiguredServerConnection";
 import type { ConnectionPhase } from "../store/connectionSlice";
 import { RecentThreads } from "./RecentThreads";
@@ -33,6 +37,10 @@ interface ConnectionShellProps {
   onArchiveThread?: (threadId: string) => void;
   onDeleteThread?: (threadId: string) => void;
   onLoadMoreThreads?: () => void;
+  onLoadProjectThreads?: (
+    cwd: string,
+    limit: number,
+  ) => Promise<ProjectThreadPage>;
   onRefreshThreads?: () => void;
   onSearchThreads?: () => void;
   onNewTask?: () => void;
@@ -221,6 +229,7 @@ export function ConnectionShell({
   onArchiveThread,
   onDeleteThread,
   onLoadMoreThreads,
+  onLoadProjectThreads,
   onRefreshThreads,
   onSearchThreads,
   onNewTask,
@@ -500,6 +509,9 @@ export function ConnectionShell({
           onArchiveThread={(threadId) => onArchiveThread?.(threadId)}
           onDeleteThread={(threadId) => onDeleteThread?.(threadId)}
           onLoadMore={() => onLoadMoreThreads?.()}
+          {...(onLoadProjectThreads === undefined
+            ? {}
+            : { onLoadProjectThreads })}
           onOpenThread={(threadId) => {
             onOpenThread?.(threadId);
             setIsSidebarOpen(false);

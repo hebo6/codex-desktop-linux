@@ -43,6 +43,8 @@ export const HISTORY_TURN_PAGE_SIZE = 30;
 export interface RecentThreadPageOptions {
   readonly archived?: boolean;
   readonly cursor?: string | null;
+  readonly cwd?: string;
+  readonly limit?: number;
 }
 
 export class AppServerThreadClient {
@@ -65,10 +67,11 @@ export class AppServerThreadClient {
   ): RequestHandle<ThreadListResponse> {
     const params: ThreadListParams = {
       archived: options.archived ?? false,
-      limit: RECENT_THREAD_PAGE_SIZE,
+      limit: options.limit ?? RECENT_THREAD_PAGE_SIZE,
       sortDirection: "desc",
       sortKey: "updated_at",
       ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+      ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
     };
     return this.session.sendRequest({
       method: "thread/list",

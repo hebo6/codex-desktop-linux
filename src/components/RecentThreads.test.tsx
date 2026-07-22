@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -46,37 +52,42 @@ function renderThreads(
   const onOpenThread = vi.fn();
   const onOpenThreadInNewWindow = vi.fn();
   const onLoadMore = vi.fn();
+  const onLoadProjectThreads = vi.fn(async () => ({ hasMore: false }));
   const onArchiveThread = vi.fn();
   const onDeleteThread = vi.fn();
   const onUndoArchive = vi.fn();
-  render(
-    <RecentThreads
-      archivedThread={null}
-      currentThreadId={THREAD_ONE.id}
-      error={null}
-      grouped={false}
-      hasMore={false}
-      loadingMore={false}
-      onArchiveThread={onArchiveThread}
-      onDeleteThread={onDeleteThread}
-      onLoadMore={onLoadMore}
-      onOpenThread={onOpenThread}
-      onOpenThreadInNewWindow={onOpenThreadInNewWindow}
-      onUndoArchive={onUndoArchive}
-      pendingThreadIds={[]}
-      removingThreadIds={[]}
-      phase="ready"
-      threads={[THREAD_ONE, THREAD_TWO]}
-      {...overrides}
-    />,
-  );
+  const props: ComponentProps<typeof RecentThreads> = {
+    archivedThread: null,
+    currentThreadId: THREAD_ONE.id,
+    error: null,
+    grouped: false,
+    hasMore: false,
+    loadingMore: false,
+    onArchiveThread,
+    onDeleteThread,
+    onLoadMore,
+    onLoadProjectThreads,
+    onOpenThread,
+    onOpenThreadInNewWindow,
+    onUndoArchive,
+    pendingThreadIds: [],
+    removingThreadIds: [],
+    phase: "ready",
+    threads: [THREAD_ONE, THREAD_TWO],
+    ...overrides,
+  };
+  const rendered = render(<RecentThreads {...props} />);
   return {
     onArchiveThread,
     onDeleteThread,
     onLoadMore,
+    onLoadProjectThreads,
     onOpenThread,
     onOpenThreadInNewWindow,
     onUndoArchive,
+    rerenderThreads(next: Partial<ComponentProps<typeof RecentThreads>>) {
+      rendered.rerender(<RecentThreads {...props} {...next} />);
+    },
   };
 }
 
@@ -163,7 +174,7 @@ describe("RecentThreads", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("按工作目录分组并提供分页操作", () => {
+  it("按工作目录分组并提供全局分页操作", () => {
     const { onLoadMore } = renderThreads({ grouped: true, hasMore: true });
 
     expect(screen.getByRole("button", { name: "alpha" })).toHaveAttribute(
@@ -178,8 +189,126 @@ describe("RecentThreads", () => {
     expect(
       screen.queryByRole("button", { name: "服务端标题 正在运行" }),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "加载更多" }));
+    fireEvent.click(screen.getByRole("button", { name: "加载更早会话" }));
     expect(onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it("每个项目初始显示三个会话并独立加载更多", () => {
+    const threads = Array.from({ length: 7 }, (_, index) => ({
+      ...THREAD_ONE,
+      id: `thread-${index + 1}`,
+      name: `会话 ${index + 1}`,
+      sessionId: `session-${index + 1}`,
+      status: { type: "idle" } as const,
+      updatedAt: 300 - index,
+    }));
+    renderThreads({ currentThreadId: null, grouped: true, threads });
+
+    expect(screen.getByRole("button", { name: "会话 3" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "会话 4" })).not.toBeInTheDocument();
+    const loadMore = screen.getByRole("button", {
+      name: "加载“alpha”的更多会话",
+    });
+    fireEvent.click(loadMore);
+    expect(screen.getByRole("button", { name: "会话 6" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "会话 7" })).not.toBeInTheDocument();
+
+    const group = screen.getByRole("button", { name: "alpha" });
+    fireEvent.click(group);
+    fireEvent.click(group);
+    expect(screen.getByRole("button", { name: "会话 6" })).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "加载“alpha”的更多会话",
+    }));
+    expect(screen.getByRole("button", { name: "会话 7" })).toBeVisible();
+    expect(screen.queryByRole("button", {
+      name: "加载“alpha”的更多会话",
+    })).not.toBeInTheDocument();
+  });
+
+  it("自动显示项目内排序靠后的当前会话", () => {
+    const threads = Array.from({ length: 7 }, (_, index) => ({
+      ...THREAD_ONE,
+      id: `thread-${index + 1}`,
+      name: `会话 ${index + 1}`,
+      sessionId: `session-${index + 1}`,
+      status: { type: "idle" } as const,
+      updatedAt: 300 - index,
+    }));
+
+    renderThreads({
+      currentThreadId: "thread-7",
+      grouped: true,
+      threads,
+    });
+
+    expect(screen.getByRole("button", { name: "会话 7" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("移除会话后从项目内未显示会话自动补足", () => {
+    const threads = Array.from({ length: 5 }, (_, index) => ({
+      ...THREAD_ONE,
+      id: `thread-${index + 1}`,
+      name: `会话 ${index + 1}`,
+      sessionId: `session-${index + 1}`,
+      status: { type: "idle" } as const,
+      updatedAt: 300 - index,
+    }));
+    const { rerenderThreads } = renderThreads({
+      currentThreadId: null,
+      grouped: true,
+      threads,
+    });
+    expect(screen.queryByRole("button", { name: "会话 4" })).not.toBeInTheDocument();
+
+    rerenderThreads({ threads: threads.slice(1) });
+
+    expect(screen.getByRole("button", { name: "会话 4" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "会话 5" })).not.toBeInTheDocument();
+  });
+
+  it("在项目组内展示加载失败并允许重试", async () => {
+    const onLoadProjectThreads = vi.fn()
+      .mockRejectedValueOnce(new Error("failed"))
+      .mockResolvedValueOnce({ hasMore: false });
+    const threads = Array.from({ length: 3 }, (_, index) => ({
+      ...THREAD_ONE,
+      id: `thread-${index + 1}`,
+      name: `会话 ${index + 1}`,
+      sessionId: `session-${index + 1}`,
+      status: { type: "idle" } as const,
+      updatedAt: 300 - index,
+    }));
+    renderThreads({
+      currentThreadId: null,
+      grouped: true,
+      hasMore: true,
+      onLoadProjectThreads,
+      threads,
+    });
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "加载“alpha”的更多会话",
+    }));
+    const retry = await screen.findByRole("button", {
+      name: "重试加载“alpha”的更多会话",
+    });
+    expect(retry).toHaveTextContent("加载失败，点击重试");
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(onLoadProjectThreads).toHaveBeenCalledTimes(2));
+    expect(onLoadProjectThreads).toHaveBeenNthCalledWith(
+      1,
+      THREAD_ONE.cwd,
+      6,
+    );
+    await waitFor(() => expect(screen.queryByRole("button", {
+      name: "重试加载“alpha”的更多会话",
+    })).not.toBeInTheDocument());
   });
 
   it("滚动时仅置顶已展开的当前分组并由下一分组顶替", () => {
@@ -268,6 +397,7 @@ describe("RecentThreads", () => {
     });
     const threads = Array.from({ length: 1_000 }, (_, index) => ({
       ...THREAD_ONE,
+      cwd: `/workspace/project-${Math.floor(index / 3)}`,
       id: `thread-${index}`,
       name: `会话 ${index}`,
       sessionId: `session-${index}`,
@@ -279,9 +409,5 @@ describe("RecentThreads", () => {
     scroller.scrollTop = 5_000;
     fireEvent.scroll(scroller);
     expect(scroller.querySelector("[data-sticky-group-heading]")).not.toBeNull();
-    expect(screen.getByRole("button", { name: "alpha" })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
   });
 });

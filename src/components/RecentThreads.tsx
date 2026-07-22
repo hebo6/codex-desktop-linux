@@ -11,7 +11,11 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import type { ThreadSummary, ServerThreadsPhase } from "../app/useServerThreads";
+import type {
+  ProjectThreadPage,
+  ThreadSummary,
+  ServerThreadsPhase,
+} from "../app/useServerThreads";
 import { useVirtualRows } from "./useVirtualRows";
 import styles from "./RecentThreads.module.css";
 
@@ -29,6 +33,10 @@ export interface RecentThreadsProps {
   readonly onArchiveThread: (threadId: string) => void;
   readonly onDeleteThread: (threadId: string) => void;
   readonly onLoadMore: () => void;
+  readonly onLoadProjectThreads?: (
+    cwd: string,
+    limit: number,
+  ) => Promise<ProjectThreadPage>;
   readonly onOpenThread: (threadId: string) => void;
   readonly onOpenThreadInNewWindow?: (threadId: string) => void;
   readonly onUndoArchive: () => void;
@@ -66,7 +74,16 @@ type RecentThreadEntry =
     }
   | {
       readonly key: string;
-      readonly type: "loadMore";
+      readonly type: "loadProject";
+      readonly groupKey: string;
+      readonly groupLabel: string;
+      readonly cwd: string;
+      readonly error: boolean;
+      readonly loading: boolean;
+    }
+  | {
+      readonly key: string;
+      readonly type: "loadMoreThreads";
     };
 
 type RecentThreadGroupEntry = Extract<RecentThreadEntry, { type: "group" }>;
@@ -77,6 +94,8 @@ interface StickyGroupHeadingState {
 }
 
 const GROUP_HEADING_HEIGHT = 32;
+const INITIAL_GROUP_THREAD_COUNT = 3;
+const GROUP_THREAD_PAGE_SIZE = 3;
 
 export function RecentThreads({
   currentThreadId,
@@ -92,6 +111,7 @@ export function RecentThreads({
   onArchiveThread,
   onDeleteThread,
   onLoadMore,
+  onLoadProjectThreads,
   onOpenThread,
   onOpenThreadInNewWindow,
   onUndoArchive,
@@ -103,13 +123,45 @@ export function RecentThreads({
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  const [visibleGroupThreadCounts, setVisibleGroupThreadCounts] = useState<
+    ReadonlyMap<string, number>
+  >(() => new Map());
+  const [projectGroupHasMore, setProjectGroupHasMore] = useState<
+    ReadonlyMap<string, boolean>
+  >(() => new Map());
+  const [loadingProjectGroupKeys, setLoadingProjectGroupKeys] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const [failedProjectGroupKeys, setFailedProjectGroupKeys] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
   const [contextMenu, setContextMenu] = useState<ThreadContextMenuState | null>(null);
   const [stickyGroupHeading, setStickyGroupHeading] =
     useState<StickyGroupHeadingState | null>(null);
   const groups = useMemo(() => groupThreads(threads, grouped), [grouped, threads]);
   const entries = useMemo(
-    () => recentThreadEntries(groups, grouped, collapsedGroupKeys, hasMore),
-    [collapsedGroupKeys, grouped, groups, hasMore],
+    () => recentThreadEntries({
+      collapsedGroupKeys,
+      currentThreadId,
+      failedProjectGroupKeys,
+      grouped,
+      groups,
+      hasMore,
+      loadingProjectGroupKeys,
+      projectGroupHasMore,
+      visibleGroupThreadCounts,
+    }),
+    [
+      collapsedGroupKeys,
+      currentThreadId,
+      failedProjectGroupKeys,
+      grouped,
+      groups,
+      hasMore,
+      loadingProjectGroupKeys,
+      projectGroupHasMore,
+      visibleGroupThreadCounts,
+    ],
   );
   const pinnedKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -156,6 +208,84 @@ export function RecentThreads({
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    if (phase !== "loading") {
+      return;
+    }
+    setVisibleGroupThreadCounts(new Map());
+    setProjectGroupHasMore(new Map());
+    setLoadingProjectGroupKeys(new Set());
+    setFailedProjectGroupKeys(new Set());
+  }, [phase]);
+
+  useEffect(() => {
+    if (!grouped || currentThreadId === null) {
+      return;
+    }
+    for (const group of groups) {
+      const currentIndex = group.threads.findIndex(
+        ({ id }) => id === currentThreadId,
+      );
+      if (currentIndex < 0) {
+        continue;
+      }
+      const requiredCount = currentIndex + 1;
+      setVisibleGroupThreadCounts((current) => {
+        if ((current.get(group.key) ?? INITIAL_GROUP_THREAD_COUNT) >= requiredCount) {
+          return current;
+        }
+        const next = new Map(current);
+        next.set(group.key, requiredCount);
+        return next;
+      });
+      break;
+    }
+  }, [currentThreadId, grouped, groups]);
+
+  const loadMoreProjectThreads = useCallback(async (
+    groupKey: string,
+    cwd: string,
+  ) => {
+    const group = groups.find(({ key }) => key === groupKey);
+    if (group === undefined || loadingProjectGroupKeys.has(groupKey)) {
+      return;
+    }
+    const configuredCount = visibleGroupThreadCounts.get(groupKey)
+      ?? INITIAL_GROUP_THREAD_COUNT;
+    const currentIndex = currentThreadId === null
+      ? -1
+      : group.threads.findIndex(({ id }) => id === currentThreadId);
+    const visibleCount = Math.min(
+      group.threads.length,
+      Math.max(configuredCount, currentIndex + 1),
+    );
+    const nextCount = visibleCount + GROUP_THREAD_PAGE_SIZE;
+    setFailedProjectGroupKeys((current) => withoutKey(current, groupKey));
+    if (group.threads.length > visibleCount) {
+      setVisibleGroupThreadCounts((current) => mapWith(current, groupKey, nextCount));
+      return;
+    }
+    if (onLoadProjectThreads === undefined) {
+      return;
+    }
+    setLoadingProjectGroupKeys((current) => withKey(current, groupKey));
+    try {
+      const page = await onLoadProjectThreads(cwd, nextCount);
+      setVisibleGroupThreadCounts((current) => mapWith(current, groupKey, nextCount));
+      setProjectGroupHasMore((current) => mapWith(current, groupKey, page.hasMore));
+    } catch {
+      setFailedProjectGroupKeys((current) => withKey(current, groupKey));
+    } finally {
+      setLoadingProjectGroupKeys((current) => withoutKey(current, groupKey));
+    }
+  }, [
+    currentThreadId,
+    groups,
+    loadingProjectGroupKeys,
+    onLoadProjectThreads,
+    visibleGroupThreadCounts,
+  ]);
 
   const updateStickyGroupHeading = useCallback((element: HTMLDivElement | null) => {
     if (!grouped || element === null) {
@@ -397,6 +527,27 @@ export function RecentThreads({
                           })}
                       thread={entry.thread}
                     />
+                  ) : entry.type === "loadProject" ? (
+                    <button
+                      aria-label={
+                        entry.error
+                          ? `重试加载“${entry.groupLabel}”的更多会话`
+                          : `加载“${entry.groupLabel}”的更多会话`
+                      }
+                      className={styles.loadMore}
+                      disabled={entry.loading}
+                      onClick={() => void loadMoreProjectThreads(
+                        entry.groupKey,
+                        entry.cwd,
+                      )}
+                      type="button"
+                    >
+                      {entry.loading
+                        ? "正在加载"
+                        : entry.error
+                          ? "加载失败，点击重试"
+                          : "加载更多"}
+                    </button>
                   ) : (
                     <button
                       className={styles.loadMore}
@@ -404,7 +555,11 @@ export function RecentThreads({
                       onClick={onLoadMore}
                       type="button"
                     >
-                      {loadingMore ? "正在加载" : "加载更多"}
+                      {loadingMore
+                        ? "正在加载"
+                        : grouped
+                          ? "加载更早会话"
+                          : "加载更多"}
                     </button>
                   )}
                 </div>
@@ -668,12 +823,27 @@ function pathLabel(path: string): string {
   return label === undefined || label.length === 0 ? path : label;
 }
 
-function recentThreadEntries(
-  groups: readonly ThreadGroup[],
-  grouped: boolean,
-  collapsedGroupKeys: ReadonlySet<string>,
-  hasMore: boolean,
-): readonly RecentThreadEntry[] {
+function recentThreadEntries({
+  collapsedGroupKeys,
+  currentThreadId,
+  failedProjectGroupKeys,
+  grouped,
+  groups,
+  hasMore,
+  loadingProjectGroupKeys,
+  projectGroupHasMore,
+  visibleGroupThreadCounts,
+}: {
+  readonly collapsedGroupKeys: ReadonlySet<string>;
+  readonly currentThreadId: string | null;
+  readonly failedProjectGroupKeys: ReadonlySet<string>;
+  readonly grouped: boolean;
+  readonly groups: readonly ThreadGroup[];
+  readonly hasMore: boolean;
+  readonly loadingProjectGroupKeys: ReadonlySet<string>;
+  readonly projectGroupHasMore: ReadonlyMap<string, boolean>;
+  readonly visibleGroupThreadCounts: ReadonlyMap<string, number>;
+}): readonly RecentThreadEntry[] {
   const entries: RecentThreadEntry[] = [];
   for (const group of groups) {
     if (grouped) {
@@ -690,14 +860,67 @@ function recentThreadEntries(
         continue;
       }
     }
-    for (const thread of group.threads) {
+    const currentIndex = currentThreadId === null
+      ? -1
+      : group.threads.findIndex(({ id }) => id === currentThreadId);
+    const visibleCount = grouped
+      ? Math.max(
+          visibleGroupThreadCounts.get(group.key) ?? INITIAL_GROUP_THREAD_COUNT,
+          currentIndex + 1,
+        )
+      : group.threads.length;
+    for (const thread of group.threads.slice(0, visibleCount)) {
       entries.push({ key: `thread:${thread.id}`, type: "thread", thread });
+    }
+    const projectHasMore = projectGroupHasMore.get(group.key)
+      ?? (hasMore && group.threads.length >= INITIAL_GROUP_THREAD_COUNT);
+    if (
+      grouped &&
+      (group.threads.length > visibleCount || projectHasMore)
+    ) {
+      entries.push({
+        key: `load-project:${group.key}`,
+        type: "loadProject",
+        groupKey: group.key,
+        groupLabel: group.label,
+        cwd: group.path ?? "",
+        error: failedProjectGroupKeys.has(group.key),
+        loading: loadingProjectGroupKeys.has(group.key),
+      });
     }
   }
   if (hasMore) {
-    entries.push({ key: "load-more", type: "loadMore" });
+    entries.push({ key: "load-more-threads", type: "loadMoreThreads" });
   }
   return entries;
+}
+
+function mapWith<T>(
+  current: ReadonlyMap<string, T>,
+  key: string,
+  value: T,
+): ReadonlyMap<string, T> {
+  const next = new Map(current);
+  next.set(key, value);
+  return next;
+}
+
+function withKey(current: ReadonlySet<string>, key: string): ReadonlySet<string> {
+  const next = new Set(current);
+  next.add(key);
+  return next;
+}
+
+function withoutKey(
+  current: ReadonlySet<string>,
+  key: string,
+): ReadonlySet<string> {
+  if (!current.has(key)) {
+    return current;
+  }
+  const next = new Set(current);
+  next.delete(key);
+  return next;
 }
 
 function threadRowButtons(container: HTMLDivElement | null): HTMLButtonElement[] {

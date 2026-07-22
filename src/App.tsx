@@ -1417,6 +1417,7 @@ export function App({
         onArchiveThread={(threadId) => void serverThreads.archiveThread(threadId)}
         onDeleteThread={setDeletingThreadId}
         onLoadMoreThreads={() => void serverThreads.loadMoreThreads()}
+        onLoadProjectThreads={serverThreads.loadProjectThreads}
         onNewTask={() => void openNewTask()}
         onRefreshThreads={() => void serverThreads.refreshThreads()}
         onSearchThreads={() => setQuickSwitcherOpen(true)}

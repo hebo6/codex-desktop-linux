@@ -217,6 +217,29 @@ describe("useServerThreads", () => {
     expect(result.current.restoredThread?.nextCursor).toBe("older");
   });
 
+  it("最近会话页不含当前会话时仍将其加入列表", async () => {
+    const client = new FakeThreadClient();
+    client.listResults.push(
+      Promise.resolve({ data: [THREAD_ONE], nextCursor: "next" }),
+    );
+    client.resumeResults.push(
+      Promise.resolve({
+        ...resumeResponse([], null),
+        thread: { ...THREAD_THREE, turns: [] },
+      }),
+    );
+    const { result } = renderHook(() =>
+      useServerThreads(client, THREAD_THREE.id),
+    );
+
+    await waitFor(() => expect(result.current.phase).toBe("ready"));
+
+    expect(result.current.threads.map(({ id }) => id)).toEqual([
+      THREAD_ONE.id,
+      THREAD_THREE.id,
+    ]);
+  });
+
   it("新建线程直接采用 thread/start 响应而不重新恢复", async () => {
     const client = new FakeThreadClient();
     client.listResults.push(
@@ -391,6 +414,32 @@ describe("useServerThreads", () => {
       TURN_ZERO.id,
       TURN_ONE.id,
       TURN_TWO.id,
+    ]);
+  });
+
+  it("按项目独立加载指定数量的会话", async () => {
+    const client = new FakeThreadClient();
+    client.listResults.push(
+      Promise.resolve({ data: [THREAD_ONE, THREAD_TWO], nextCursor: "next" }),
+      Promise.resolve({ data: [THREAD_ONE, THREAD_TWO, THREAD_THREE] }),
+    );
+    const { result } = renderHook(() => useServerThreads(client, null));
+    await waitFor(() => expect(result.current.phase).toBe("ready"));
+
+    let page;
+    await act(async () => {
+      page = await result.current.loadProjectThreads("/workspace/one", 5);
+    });
+
+    expect(client.listCalls).toEqual([
+      {},
+      { cwd: "/workspace/one", limit: 5 },
+    ]);
+    expect(page).toEqual({ hasMore: false });
+    expect(result.current.threads.map(({ id }) => id)).toEqual([
+      THREAD_ONE.id,
+      THREAD_TWO.id,
+      THREAD_THREE.id,
     ]);
   });
 
