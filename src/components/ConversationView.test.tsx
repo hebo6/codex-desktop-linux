@@ -663,8 +663,189 @@ describe("ConversationView", () => {
     Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 200 });
     scroller.scrollTop = 900;
     fireEvent.click(firstMarker);
-    expect(scroller.scrollTop).toBe(0);
+    expect(scroller.scrollTop).toBe(24);
+    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
+      .toHaveAttribute("data-sticky-question", "user-question-1");
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+  });
+
+  it("滚动回答时按回合切换粘性置顶的问题", () => {
+    const turns = Array.from({ length: 3 }, (_, index) => ({
+      id: `turn-sticky-${index + 1}`,
+      items: [
+        {
+          content: [{ text: `置顶问题 ${index + 1}`, type: "text" as const }],
+          id: `user-sticky-${index + 1}`,
+          type: "userMessage" as const,
+        },
+        {
+          id: `answer-sticky-${index + 1}`,
+          phase: "final_answer" as const,
+          text: `置顶回答 ${index + 1}`,
+          type: "agentMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "completed" as const,
+    })) satisfies ThreadTurn[];
+    render(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...RESTORED, nextCursor: null, turns }}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    const boundingRect = vi.spyOn(
+      HTMLElement.prototype,
+      "getBoundingClientRect",
+    ).mockImplementation(function (this: HTMLElement) {
+      const height = this.matches("[data-sticky-question]") ? 80 : 0;
+      return {
+        bottom: height,
+        height,
+        left: 0,
+        right: 0,
+        toJSON: () => ({}),
+        top: 0,
+        width: 0,
+        x: 0,
+        y: 0,
+      };
+    });
+
+    scroller.scrollTop = 100;
+    fireEvent.scroll(scroller);
+    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
+      .toHaveAttribute("data-sticky-question", "user-sticky-1");
+    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
+      .toHaveTextContent("置顶问题 1");
+
+    scroller.scrollTop = 245;
+    fireEvent.scroll(scroller);
+    expect(scroller.parentElement?.querySelector<HTMLElement>("[data-sticky-question]")?.style.transform)
+      .toBe("translateY(-25px)");
+
+    scroller.scrollTop = 320;
+    fireEvent.scroll(scroller);
+    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
+      .toHaveAttribute("data-sticky-question", "user-sticky-2");
+
+    scroller.scrollTop = 100;
+    fireEvent.scroll(scroller);
+    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
+      .toHaveAttribute("data-sticky-question", "user-sticky-1");
+    boundingRect.mockRestore();
+  });
+
+  it("新问题定位到顶部并在流式内容越界时离散翻页", () => {
+    const firstTurn = {
+      id: "turn-page-1",
+      items: [
+        {
+          content: [{ text: "分页问题 1", type: "text" as const }],
+          id: "user-page-1",
+          type: "userMessage" as const,
+        },
+        {
+          id: "answer-page-1",
+          phase: "final_answer" as const,
+          text: "分页回答 1",
+          type: "agentMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "completed" as const,
+    } satisfies ThreadTurn;
+    const { rerender } = render(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...RESTORED, nextCursor: null, turns: [firstTurn] }}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 500 },
+      scrollHeight: { configurable: true, value: 1_200 },
+    });
+    const activeTurn = {
+      id: "turn-page-2",
+      items: [
+        {
+          content: [{ text: "分页问题 2", type: "text" as const }],
+          id: "user-page-2",
+          type: "userMessage" as const,
+        },
+        {
+          id: "answer-page-2",
+          text: "正在流式回答",
+          type: "agentMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "inProgress" as const,
+    } satisfies ThreadTurn;
+    const activeThread = {
+      ...RESTORED,
+      nextCursor: null,
+      turns: [firstTurn, activeTurn],
+    } satisfies RestoredThread;
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={activeThread}
+      />,
+    );
+
+    expect(scroller.scrollTop).toBe(300);
+    expect(scroller.parentElement?.querySelector("[data-sticky-question]"))
+      .toHaveAttribute("data-sticky-question", "user-page-2");
+
+    const activeTail = screen.getByText("正在流式回答")
+      .closest<HTMLElement>("[data-turn-id]");
+    if (activeTail === null) {
+      throw new Error("缺少活跃回答行");
+    }
+    activeTail.getBoundingClientRect = () => ({
+      bottom: 450,
+      height: 180,
+      left: 0,
+      right: 0,
+      toJSON: () => ({}),
+      top: 270,
+      width: 0,
+      x: 0,
+      y: 270,
+    });
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
+      />,
+    );
+
+    expect(scroller.scrollTop).toBe(680);
+
+    scroller.scrollTop = 500;
+    fireEvent.wheel(scroller);
+    fireEvent.scroll(scroller);
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        loadingOlderTurns={false}
+        onLoadOlderTurns={vi.fn(async () => undefined)}
+        restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
+      />,
+    );
+    expect(scroller.scrollTop).toBe(500);
+    expect(screen.getByRole("button", { name: "继续跟随" })).toBeVisible();
   });
 
   it("从回答所在 turn 发起分叉并标记最新回合", () => {

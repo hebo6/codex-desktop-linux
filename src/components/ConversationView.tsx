@@ -59,18 +59,28 @@ export function ConversationPlaceholder({
 }
 
 type ThreadItem = ThreadTurn["items"][number];
+type UserMessageItem = Extract<ThreadItem, { type: "userMessage" }>;
 type CommandExecutionItem = Extract<ThreadItem, { type: "commandExecution" }>;
 type FileChangeItem = Extract<ThreadItem, { type: "fileChange" }>;
 type FileUpdateChange = FileChangeItem["changes"][number];
 type ReasoningItem = Extract<ThreadItem, { type: "reasoning" }>;
 
 const PANEL_TRANSITION_MS = 210;
+const ANSWER_BOTTOM_INSET = 120;
+const FIRST_TURN_ROW_PADDING = 24;
 
 interface HistoryQuestion {
   readonly answer: string | null;
+  readonly item: UserMessageItem;
   readonly itemId: string;
   readonly question: string;
   readonly rowIndex: number;
+  readonly rowKey: string;
+}
+
+interface StickyQuestionState {
+  readonly itemId: string;
+  readonly translateY: number;
 }
 
 type ConversationRow =
@@ -97,9 +107,17 @@ export function ConversationView({
   restoredThread,
 }: ConversationViewProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const stickToBottomRef = useRef(true);
+  const stickyQuestionRef = useRef<HTMLDivElement>(null);
+  const pageFollowingRef = useRef(false);
   const loadingAnchorRef = useRef(false);
+  const observedThreadIdRef = useRef(restoredThread.metadata.id);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+  const [pageFollowing, setPageFollowing] = useState(false);
+  const [preservePageEndSpace, setPreservePageEndSpace] = useState(false);
+  const [scrollerHeight, setScrollerHeight] = useState(0);
+  const [stickyQuestionHeight, setStickyQuestionHeight] = useState(0);
+  const [stickyQuestionState, setStickyQuestionState] =
+    useState<StickyQuestionState | null>(null);
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
   const [loadingAnchorKey, setLoadingAnchorKey] = useState<string | null>(null);
   const itemCount = restoredThread.turns.reduce(
@@ -114,6 +132,16 @@ export function ConversationView({
     () => historyQuestionItems(restoredThread.turns, rows),
     [restoredThread.turns, rows],
   );
+  const latestQuestion = historyQuestions.at(-1) ?? null;
+  const observedQuestionIdRef = useRef(latestQuestion?.itemId ?? null);
+  const activeTurn = restoredThread.turns.findLast(
+    ({ status }) => status === "inProgress",
+  );
+  const previousActiveTurnIdRef = useRef(activeTurn?.id ?? null);
+  const questionIndexByRow = useMemo(
+    () => new Map(historyQuestions.map((question, index) => [question.rowIndex, index])),
+    [historyQuestions],
+  );
   const pinnedKeys = useMemo(() => {
     const keys = new Set<string>();
     if (focusedRowKey !== null) {
@@ -122,9 +150,6 @@ export function ConversationView({
     if (loadingAnchorKey !== null) {
       keys.add(loadingAnchorKey);
     }
-    const activeTurn = restoredThread.turns.findLast(
-      ({ status }) => status === "inProgress",
-    );
     if (activeTurn !== undefined) {
       const activeRows = rows.filter(
         (row) => row.type === "segment" && row.turn.id === activeTurn.id,
@@ -132,9 +157,16 @@ export function ConversationView({
       for (const row of activeRows.slice(-2)) {
         keys.add(row.key);
       }
+      const activeQuestion = historyQuestions.findLast((question) => {
+        const row = rows[question.rowIndex];
+        return row?.type === "segment" && row.turn.id === activeTurn.id;
+      });
+      if (activeQuestion !== undefined) {
+        keys.add(activeQuestion.rowKey);
+      }
     }
     return keys;
-  }, [focusedRowKey, loadingAnchorKey, restoredThread.turns, rows]);
+  }, [activeTurn, focusedRowKey, historyQuestions, loadingAnchorKey, rows]);
   const getRowKey = useCallback(
     (index: number) => rows[index]?.key ?? `missing:${index}`,
     [rows],
@@ -152,23 +184,232 @@ export function ConversationView({
     overscan: 720,
     threshold: 30,
   });
+  const setPageFollowingMode = useCallback((following: boolean) => {
+    pageFollowingRef.current = following;
+    setPageFollowing(following);
+  }, []);
+
+  const questionTop = useCallback(
+    (question: HistoryQuestion): number | null => {
+      const scroller = scrollerRef.current;
+      const rowStart = virtual.offsetForIndex(question.rowIndex);
+      if (scroller === null || rowStart === null) {
+        return null;
+      }
+      const questionIndex = historyQuestions.indexOf(question);
+      const source = scroller.querySelector<HTMLElement>(
+        `[data-question-index="${questionIndex}"] [data-user-message]`,
+      );
+      if (source !== null) {
+        const sourceRect = source.getBoundingClientRect();
+        if (sourceRect.height > 0) {
+          const scrollerRect = scroller.getBoundingClientRect();
+          return scroller.scrollTop + sourceRect.top - scrollerRect.top;
+        }
+      }
+      const listTop = conversationListTop(scroller);
+      const row = rows[question.rowIndex];
+      return listTop + rowStart + (
+        row?.type === "segment" && row.firstInTurn ? FIRST_TURN_ROW_PADDING : 0
+      );
+    },
+    [historyQuestions, rows, virtual],
+  );
+
+  const updateStickyQuestion = useCallback(
+    (scroller: HTMLDivElement) => {
+      const positionedQuestions = historyQuestions.flatMap((question) => {
+        const top = questionTop(question);
+        return top === null ? [] : [{ question, top }];
+      });
+      const currentIndex = positionedQuestions.findLastIndex(
+        ({ top }) => top <= scroller.scrollTop + 0.5,
+      );
+      if (currentIndex < 0) {
+        setStickyQuestionState(null);
+        return;
+      }
+      const current = positionedQuestions[currentIndex]!;
+      const next = positionedQuestions[currentIndex + 1];
+      const translateY = next === undefined
+        ? 0
+        : Math.min(
+            0,
+            next.top - scroller.scrollTop - stickyQuestionHeight,
+          );
+      setStickyQuestionState((previous) =>
+        previous?.itemId === current.question.itemId &&
+        Math.abs(previous.translateY - translateY) < 0.5
+          ? previous
+          : { itemId: current.question.itemId, translateY }
+      );
+    },
+    [historyQuestions, questionTop, stickyQuestionHeight],
+  );
+
+  const updateJumpToBottom = useCallback((scroller: HTMLDivElement) => {
+    const distanceFromBottom =
+      scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
+    setShowJumpToBottom(
+      !pageFollowingRef.current && distanceFromBottom > ANSWER_BOTTOM_INSET,
+    );
+  }, []);
+
+  const stopPageFollowing = useCallback(() => {
+    const scroller = scrollerRef.current;
+    if (pageFollowingRef.current) {
+      setPageFollowingMode(false);
+    }
+    if (scroller !== null) {
+      updateJumpToBottom(scroller);
+    }
+  }, [setPageFollowingMode, updateJumpToBottom]);
+
   const handleActivityExpandedChange = useCallback((expanded: boolean) => {
     if (expanded) {
-      stickToBottomRef.current = false;
+      stopPageFollowing();
     }
-  }, []);
+  }, [stopPageFollowing]);
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
-    if (scroller !== null && stickToBottomRef.current) {
-      scroller.scrollTop = scroller.scrollHeight;
+    if (scroller === null) {
+      return;
     }
-  }, [itemCount, restoredThread.turns.length, virtual.totalSize]);
+    const updateHeight = () => {
+      setScrollerHeight((current) =>
+        current === scroller.clientHeight ? current : scroller.clientHeight
+      );
+    };
+    updateHeight();
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    const stickyQuestion = stickyQuestionRef.current;
+    if (stickyQuestion === null) {
+      setStickyQuestionHeight(0);
+      return;
+    }
+    const updateHeight = () => {
+      const height = stickyQuestion.getBoundingClientRect().height;
+      setStickyQuestionHeight((current) =>
+        Math.abs(current - height) < 0.5 ? current : height
+      );
+    };
+    updateHeight();
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(stickyQuestion);
+    return () => observer.disconnect();
+  }, [stickyQuestionState?.itemId]);
+
+  useLayoutEffect(() => {
+    const currentThreadId = restoredThread.metadata.id;
+    if (observedThreadIdRef.current !== currentThreadId) {
+      observedThreadIdRef.current = currentThreadId;
+      observedQuestionIdRef.current = latestQuestion?.itemId ?? null;
+      return;
+    }
+    const latestQuestionId = latestQuestion?.itemId ?? null;
+    if (
+      latestQuestion === null ||
+      observedQuestionIdRef.current === latestQuestionId
+    ) {
+      return;
+    }
+    observedQuestionIdRef.current = latestQuestionId;
+    setPreservePageEndSpace(true);
+    setPageFollowingMode(true);
+    setShowJumpToBottom(false);
+    const scroller = scrollerRef.current;
+    const top = questionTop(latestQuestion);
+    if (scroller !== null && top !== null) {
+      scroller.scrollTop = top;
+      updateStickyQuestion(scroller);
+    }
+  }, [
+    latestQuestion,
+    questionTop,
+    restoredThread.metadata.id,
+    setPageFollowingMode,
+    updateStickyQuestion,
+  ]);
+
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    const pagingTurnId = activeTurn?.id ?? previousActiveTurnIdRef.current;
+    if (
+      scroller === null ||
+      pagingTurnId === null ||
+      !pageFollowingRef.current
+    ) {
+      return;
+    }
+    const tailRows = Array.from(
+      scroller.querySelectorAll<HTMLElement>("[data-turn-id]"),
+    ).filter((element) => element.dataset.turnId === pagingTurnId);
+    const tail = tailRows.at(-1);
+    if (tail === undefined) {
+      return;
+    }
+    const scrollerRect = scroller.getBoundingClientRect();
+    const tailRect = tail.getBoundingClientRect();
+    const contentBottom = scroller.scrollTop + tailRect.bottom - scrollerRect.top;
+    const readableBottom =
+      scroller.scrollTop + scroller.clientHeight - ANSWER_BOTTOM_INSET;
+    if (contentBottom <= readableBottom + 0.5) {
+      return;
+    }
+    const pageHeight = Math.max(
+      1,
+      scroller.clientHeight - ANSWER_BOTTOM_INSET - stickyQuestionHeight,
+    );
+    const maximumTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    const nextTop = Math.min(maximumTop, scroller.scrollTop + pageHeight);
+    if (nextTop <= scroller.scrollTop + 0.5) {
+      return;
+    }
+    scroller.scrollTop = nextTop;
+    updateStickyQuestion(scroller);
+  }, [
+    activeTurn,
+    itemCount,
+    stickyQuestionHeight,
+    updateStickyQuestion,
+    virtual.totalSize,
+  ]);
+
+  useEffect(() => {
+    const previousActiveTurnId = previousActiveTurnIdRef.current;
+    previousActiveTurnIdRef.current = activeTurn?.id ?? null;
+    if (previousActiveTurnId !== null && activeTurn === undefined) {
+      setPageFollowingMode(false);
+      const scroller = scrollerRef.current;
+      if (scroller !== null) {
+        updateJumpToBottom(scroller);
+      }
+    }
+  }, [activeTurn, setPageFollowingMode, updateJumpToBottom]);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
+    observedThreadIdRef.current = restoredThread.metadata.id;
+    observedQuestionIdRef.current = latestQuestion?.itemId ?? null;
+    setPreservePageEndSpace(activeTurn !== undefined);
+    setPageFollowingMode(activeTurn !== undefined);
+    setShowJumpToBottom(false);
+    setStickyQuestionState(null);
     if (scroller !== null && restoredThread.turns.length > 0) {
       scroller.scrollTop = scroller.scrollHeight;
+      updateStickyQuestion(scroller);
     }
   }, [restoredThread.metadata.id]);
 
@@ -208,21 +449,41 @@ export function ConversationView({
 
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     const scroller = event.currentTarget;
-    const distanceFromBottom =
-      scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
-    stickToBottomRef.current = distanceFromBottom <= 120;
-    setShowJumpToBottom(distanceFromBottom > 120);
+    updateStickyQuestion(scroller);
+    updateJumpToBottom(scroller);
     if (scroller.scrollTop <= 48) {
       void loadOlder();
     }
   };
+
+  const stickyQuestion = stickyQuestionState === null
+    ? null
+    : historyQuestions.find(
+        ({ itemId }) => itemId === stickyQuestionState.itemId,
+      ) ?? null;
+  const reservePageEndSpace =
+    preservePageEndSpace || activeTurn !== undefined;
+  const pageEndSpacerHeight = reservePageEndSpace
+    ? Math.max(
+        0,
+        scrollerHeight - ANSWER_BOTTOM_INSET - stickyQuestionHeight,
+      )
+    : 0;
 
   return (
     <section className={styles.conversation}>
       <div
         aria-label="会话消息"
         className={styles.scroller}
+        onKeyDown={(event) => {
+          if (isScrollKey(event.key)) {
+            stopPageFollowing();
+          }
+        }}
+        onPointerDown={stopPageFollowing}
         onScroll={handleScroll}
+        onTouchMove={stopPageFollowing}
+        onWheel={stopPageFollowing}
         ref={scrollerRef}
       >
         <div
@@ -235,6 +496,7 @@ export function ConversationView({
           <div
             aria-label="会话内容列表"
             className={styles.virtualConversation}
+            data-conversation-list
             onBlurCapture={(event) => {
               if (!event.currentTarget.contains(event.relatedTarget)) {
                 setFocusedRowKey(null);
@@ -264,6 +526,10 @@ export function ConversationView({
                   data-status={
                     row.type === "segment" ? row.turn.status : undefined
                   }
+                  data-question-index={questionIndexByRow.get(virtualRow.index)}
+                  data-turn-id={
+                    row.type === "segment" ? row.turn.id : undefined
+                  }
                   data-virtual-key={virtualRow.key}
                   key={virtualRow.key}
                   ref={virtual.measureElement(virtualRow.key)}
@@ -284,14 +550,43 @@ export function ConversationView({
               );
             })}
           </div>
+          {pageEndSpacerHeight <= 0 ? null : (
+            <div
+              aria-hidden="true"
+              className={styles.pageEndSpacer}
+              style={{ height: pageEndSpacerHeight }}
+            />
+          )}
         </div>
       </div>
+      {stickyQuestion === null || stickyQuestionState === null ? null : (
+        <div
+          aria-hidden="true"
+          className={`${styles.stickyQuestion}${
+            historyQuestions.length >= 4
+              ? ` ${styles.stickyQuestionWithNavigation}`
+              : ""
+          }`}
+          data-sticky-question={stickyQuestion.itemId}
+          ref={stickyQuestionRef}
+          style={{ transform: `translateY(${stickyQuestionState.translateY}px)` }}
+        >
+          <div className={styles.stickyQuestionMessage}>
+            <UserMessageBody item={stickyQuestion.item} />
+          </div>
+        </div>
+      )}
       {historyQuestions.length >= 4 ? (
         <HistoryQuestionNavigation
-          onSelect={(rowIndex) => {
-            stickToBottomRef.current = false;
-            virtual.scrollToIndex(rowIndex);
-            setShowJumpToBottom(true);
+          onSelect={(question) => {
+            stopPageFollowing();
+            const scroller = scrollerRef.current;
+            const top = questionTop(question);
+            if (scroller !== null && top !== null) {
+              scroller.scrollTop = top;
+              updateStickyQuestion(scroller);
+              setShowJumpToBottom(true);
+            }
           }}
           questions={historyQuestions}
         />
@@ -302,12 +597,26 @@ export function ConversationView({
           onClick={() => {
             const scroller = scrollerRef.current;
             if (scroller !== null) {
-              stickToBottomRef.current = true;
-              scroller.scrollTo({ behavior: "smooth", top: scroller.scrollHeight });
+              const resumeFollowing = activeTurn !== undefined;
+              setPageFollowingMode(resumeFollowing);
+              setShowJumpToBottom(false);
+              if (!resumeFollowing && preservePageEndSpace) {
+                setPreservePageEndSpace(false);
+                requestAnimationFrame(() => {
+                  const current = scrollerRef.current;
+                  if (current !== null) {
+                    current.scrollTop = current.scrollHeight;
+                    updateStickyQuestion(current);
+                  }
+                });
+              } else {
+                scroller.scrollTop = scroller.scrollHeight;
+                updateStickyQuestion(scroller);
+              }
             }
           }}
           type="button"
-          aria-label="回到底部"
+          aria-label={pageFollowing || activeTurn !== undefined ? "继续跟随" : "回到底部"}
         >
           <svg
             width="16"
@@ -397,7 +706,7 @@ function HistoryQuestionNavigation({
   onSelect,
   questions,
 }: {
-  readonly onSelect: (rowIndex: number) => void;
+  readonly onSelect: (question: HistoryQuestion) => void;
   readonly questions: readonly HistoryQuestion[];
 }) {
   return (
@@ -410,7 +719,7 @@ function HistoryQuestionNavigation({
             aria-label={`跳转到问题 ${index + 1}：${question.question}`}
             className={styles.questionMarker}
             key={question.itemId}
-            onClick={() => onSelect(question.rowIndex)}
+            onClick={() => onSelect(question)}
             type="button"
           >
             <span aria-hidden="true" className={styles.questionMarkerLine} />
@@ -617,25 +926,11 @@ function UserMessage({
   return (
     <article
       className={styles.userMessage}
+      data-user-message
       tabIndex={0}
       onMouseEnter={() => setNow(Date.now())}
     >
-      <div className={styles.userMessageBubble}>
-        {item.content.map((input, index) => {
-          switch (input.type) {
-            case "text":
-              return <p key={index}>{input.text}</p>;
-            case "skill":
-              return <span className={styles.chip} key={index}>${input.name}</span>;
-            case "mention":
-              return <span className={styles.chip} key={index}>@{input.name}</span>;
-            case "image":
-              return <span className={styles.attachment} key={index}>图片附件</span>;
-            case "localImage":
-              return <span className={styles.attachment} key={index}>{pathName(input.path)}</span>;
-          }
-        })}
-      </div>
+      <UserMessageBody item={item} />
       <div className={styles.userActions}>
         {timestamp === null || startedAt === null ? null : (
           <time
@@ -649,6 +944,27 @@ function UserMessage({
         <CopyButton iconOnly label="复制用户消息" value={plainText} />
       </div>
     </article>
+  );
+}
+
+function UserMessageBody({ item }: { readonly item: UserMessageItem }) {
+  return (
+    <div className={styles.userMessageBubble}>
+      {item.content.map((input, index) => {
+        switch (input.type) {
+          case "text":
+            return <p key={index}>{input.text}</p>;
+          case "skill":
+            return <span className={styles.chip} key={index}>${input.name}</span>;
+          case "mention":
+            return <span className={styles.chip} key={index}>@{input.name}</span>;
+          case "image":
+            return <span className={styles.attachment} key={index}>图片附件</span>;
+          case "localImage":
+            return <span className={styles.attachment} key={index}>{pathName(input.path)}</span>;
+        }
+      })}
+    </div>
   );
 }
 
@@ -1345,10 +1661,10 @@ function historyQuestionItems(
   turns: readonly ThreadTurn[],
   rows: readonly ConversationRow[],
 ): readonly HistoryQuestion[] {
-  const rowByItemId = new Map<string, number>();
+  const rowByItemId = new Map<string, { readonly index: number; readonly key: string }>();
   rows.forEach((row, rowIndex) => {
     if (row.type === "segment" && row.segment.type === "item") {
-      rowByItemId.set(row.segment.item.id, rowIndex);
+      rowByItemId.set(row.segment.item.id, { index: rowIndex, key: row.key });
     }
   });
 
@@ -1358,8 +1674,8 @@ function historyQuestionItems(
       if (item.type !== "userMessage") {
         return;
       }
-      const rowIndex = rowByItemId.get(item.id);
-      if (rowIndex === undefined) {
+      const row = rowByItemId.get(item.id);
+      if (row === undefined) {
         return;
       }
       const followingItems = turn.items.slice(itemIndex + 1);
@@ -1383,13 +1699,39 @@ function historyQuestionItems(
         : singleLinePreview(markdownPlainText(finalAnswer.text));
       questions.push({
         answer: answer === null || answer.length === 0 ? null : answer,
+        item,
         itemId: item.id,
         question,
-        rowIndex,
+        rowIndex: row.index,
+        rowKey: row.key,
       });
     });
   }
   return questions;
+}
+
+function conversationListTop(scroller: HTMLElement): number {
+  const list = scroller.querySelector<HTMLElement>("[data-conversation-list]");
+  if (list === null) {
+    return 0;
+  }
+  const listRect = list.getBoundingClientRect();
+  if (listRect.height > 0 || listRect.top !== 0) {
+    return scroller.scrollTop + listRect.top - scroller.getBoundingClientRect().top;
+  }
+  return list.offsetTop;
+}
+
+function isScrollKey(key: string): boolean {
+  return [
+    "ArrowDown",
+    "ArrowUp",
+    "End",
+    "Home",
+    "PageDown",
+    "PageUp",
+    " ",
+  ].includes(key);
 }
 
 function estimateConversationRow(row: ConversationRow | undefined): number {
