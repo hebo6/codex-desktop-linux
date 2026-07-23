@@ -322,13 +322,6 @@
   transform: rotate(90deg);
 }
 
-.activityGroup[data-expanded="true"] > .activityGroupHeader {
-  position: sticky;
-  z-index: 3;
-  top: 0;
-  background: var(--color-content-bg);
-}
-
 .activityGroupSize {
   display: grid;
   grid-template-rows: 0fr;
@@ -443,17 +436,6 @@ button.activityRowHeader {
 
 .activityDisclosure[data-expanded="true"] .activityRowChevron {
   transform: rotate(90deg);
-}
-
-.activityDisclosure[data-expanded="true"] > .activityRowHeader {
-  position: sticky;
-  z-index: 2;
-  top: 0;
-  background: var(--color-content-bg);
-}
-
-.activityGroupContent > .activityDisclosure[data-expanded="true"] > .activityRowHeader {
-  top: 36px;
 }
 
 .activityDetailSize {

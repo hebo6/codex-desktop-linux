@@ -266,16 +266,14 @@ describe("ConversationView", () => {
     }
     await waitFor(() => {
       for (const activityGroup of activityGroups) {
-        expect(getComputedStyle(activityGroup).position).toBe("sticky");
-        expect(getComputedStyle(activityGroup).top).toBe("0px");
+        expect(getComputedStyle(activityGroup).position).toBe("static");
       }
     });
     await waitFor(() => expect(screen.getByText("Hook 提示")).toBeVisible());
     fireEvent.click(screen.getByRole("button", { name: "Ran pnpm test" }));
     const commandHeading = screen.getByRole("button", { name: "Ran pnpm test" });
     await waitFor(() => {
-      expect(getComputedStyle(commandHeading).position).toBe("sticky");
-      expect(getComputedStyle(commandHeading).top).toBe("36px");
+      expect(getComputedStyle(commandHeading).position).toBe("static");
     });
     await waitFor(() => expect(screen.getByText("全部通过")).toBeVisible());
 
@@ -309,54 +307,6 @@ describe("ConversationView", () => {
       name: "MCP · docs / search · 完成",
     }));
     await waitFor(() => expect(screen.getByText(/••••••/u)).toBeVisible());
-  });
-
-  it("虚拟行使用 top 定位以支持活动粘性标题", async () => {
-    render(
-      <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null }}
-      />,
-    );
-    const groupHeading = screen.getByRole("button", { name: /已运行/u });
-    const virtualRow = groupHeading.closest<HTMLElement>("[data-virtual-key]");
-    if (virtualRow === null) {
-      throw new Error("缺少活动项虚拟行");
-    }
-
-    expect(virtualRow.style.top).toMatch(/^\d+px$/u);
-    expect(virtualRow.style.transform).toBe("");
-    fireEvent.click(groupHeading);
-    expect(screen.getAllByRole("button", { name: /已运行/u })).toHaveLength(1);
-    await waitFor(() => expect(getComputedStyle(groupHeading).position).toBe("sticky"));
-  });
-
-  it("活动粘性标题从内容区顶部依次排列", async () => {
-    render(
-      <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null }}
-      />,
-    );
-    const activityGroup = screen.getByRole("button", { name: /已运行/u });
-    fireEvent.click(activityGroup);
-    await waitFor(() => {
-      expect(getComputedStyle(activityGroup).position).toBe("sticky");
-      expect(getComputedStyle(activityGroup).top).toBe("0px");
-    });
-
-    const commandHeading = await screen.findByRole("button", {
-      name: "Ran pnpm test",
-    });
-    fireEvent.click(commandHeading);
-    await waitFor(() => {
-      expect(getComputedStyle(commandHeading).position).toBe("sticky");
-      expect(getComputedStyle(commandHeading).top).toBe("36px");
-    });
   });
 
   it("优先使用 commandActions 生成命令标题", async () => {
