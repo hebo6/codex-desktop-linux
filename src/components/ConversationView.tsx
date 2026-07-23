@@ -6,7 +6,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
   type UIEvent,
 } from "react";
@@ -14,13 +13,9 @@ import {
 import type { RestoredThread, ThreadTurn } from "../app/useServerThreads";
 import { recordConversationFirstCommit } from "../diagnostics/conversationLoadDiagnostics";
 import { markdownToPlainText, SafeMarkdown } from "./SafeMarkdown";
-import { useVirtualRows } from "./useVirtualRows";
 import styles from "./ConversationView.module.css";
 
 export interface ConversationViewProps {
-  readonly hasOlderTurns: boolean;
-  readonly loadingOlderTurns: boolean;
-  readonly onLoadOlderTurns: () => Promise<void>;
   readonly restoredThread: RestoredThread;
   readonly onForkTurn?: (turnId: string, isLatest: boolean) => void;
   readonly actionError?: string | null;
@@ -39,7 +34,7 @@ export function ConversationPlaceholder({
     kind === "blank"
       ? ["开始一个新任务", "发送第一条消息时才会创建服务端会话"]
       : kind === "loading"
-        ? ["正在恢复会话", "正在读取最近的回合和服务端状态"]
+        ? ["正在恢复会话", "正在读取全部回合和服务端状态"]
         : kind === "deleted"
           ? ["会话已被删除", "服务端已删除此会话，不能继续提交输入"]
           : ["无法恢复会话", "可从左侧重新选择会话或重试连接"];
@@ -141,7 +136,6 @@ interface HistoryQuestion {
 
 type ConversationRow =
   | { readonly key: "action-error"; readonly type: "actionError" }
-  | { readonly key: "load-older"; readonly type: "loadOlder" }
   | { readonly key: "empty"; readonly type: "empty" }
   | {
       readonly key: string;
@@ -153,9 +147,6 @@ type ConversationRow =
     };
 
 export function ConversationView({
-  hasOlderTurns,
-  loadingOlderTurns,
-  onLoadOlderTurns,
   onForkTurn,
   actionError = null,
   onOpenLink,
@@ -163,19 +154,10 @@ export function ConversationView({
   restoredThread,
 }: ConversationViewProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const followBottomRef = useRef(true);
-  const loadingAnchorRef = useRef(false);
-  const initialBottomScrollRef = useRef<{
-    pending: boolean;
-    threadId: string | null;
-  }>({
-    pending: false,
-    threadId: null,
-  });
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [scrollerHeight, setScrollerHeight] = useState(0);
-  const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
-  const [loadingAnchorKey, setLoadingAnchorKey] = useState<string | null>(null);
   useLayoutEffect(() => {
     recordConversationFirstCommit(restoredThread.metadata);
   }, [restoredThread.metadata]);
@@ -184,75 +166,22 @@ export function ConversationView({
     0,
   );
   const rows = useMemo(
-    () => conversationRows(restoredThread.turns, actionError !== null, hasOlderTurns),
-    [actionError, hasOlderTurns, restoredThread.turns],
+    () => conversationRows(restoredThread.turns, actionError !== null),
+    [actionError, restoredThread.turns],
   );
   const historyQuestions = useMemo(
     () => historyQuestionItems(restoredThread.turns, rows),
     [restoredThread.turns, rows],
   );
-  const activeTurn = restoredThread.turns.findLast(
-    ({ status }) => status === "inProgress",
-  );
   const questionIndexByRow = useMemo(
     () => new Map(historyQuestions.map((question, index) => [question.rowIndex, index])),
     [historyQuestions],
-  );
-  const pinnedKeys = useMemo(() => {
-    const keys = new Set<string>();
-    if (focusedRowKey !== null) {
-      keys.add(focusedRowKey);
-    }
-    if (loadingAnchorKey !== null) {
-      keys.add(loadingAnchorKey);
-    }
-    if (activeTurn !== undefined) {
-      const activeRows = rows.filter(
-        (row) => row.type === "segment" && row.turn.id === activeTurn.id,
-      );
-      for (const row of activeRows.slice(-2)) {
-        keys.add(row.key);
-      }
-      const activeQuestion = historyQuestions.findLast((question) => {
-        const row = rows[question.rowIndex];
-        return row?.type === "segment" && row.turn.id === activeTurn.id;
-      });
-      if (activeQuestion !== undefined) {
-        keys.add(activeQuestion.rowKey);
-      }
-    }
-    return keys;
-  }, [activeTurn, focusedRowKey, historyQuestions, loadingAnchorKey, rows]);
-  const getRowKey = useCallback(
-    (index: number) => rows[index]?.key ?? `missing:${index}`,
-    [rows],
-  );
-  const estimateRowSize = useCallback(
-    (index: number) => estimateConversationRow(rows[index]),
-    [rows],
-  );
-  const virtual = useVirtualRows({
-    count: rows.length,
-    estimateSize: estimateRowSize,
-    getKey: getRowKey,
-    pinnedKeys,
-    scrollerRef,
-    overscan: 720,
-    threshold: 30,
-  });
-  const lastRowKey = rows.at(-1)?.key ?? null;
-  const lastRowVisible = lastRowKey === null || virtual.rows.some(
-    ({ key }) => key === lastRowKey,
-  );
-  const visibleRowsMeasured = virtual.rows.every(
-    ({ key }) => virtual.isMeasured(key),
   );
 
   const questionTop = useCallback(
     (question: HistoryQuestion): number | null => {
       const scroller = scrollerRef.current;
-      const rowStart = virtual.offsetForIndex(question.rowIndex);
-      if (scroller === null || rowStart === null) {
+      if (scroller === null) {
         return null;
       }
       const questionIndex = historyQuestions.indexOf(question);
@@ -266,13 +195,18 @@ export function ConversationView({
           return scroller.scrollTop + sourceRect.top - scrollerRect.top;
         }
       }
-      const listTop = conversationListTop(scroller);
-      const row = rows[question.rowIndex];
-      return listTop + rowStart + (
-        row?.type === "segment" && row.firstInTurn ? FIRST_TURN_ROW_PADDING : 0
+      const rowElement = scroller.querySelector<HTMLElement>(
+        `[data-row-index="${question.rowIndex}"]`,
       );
+      if (rowElement === null) {
+        return null;
+      }
+      const rowPadding = rowElement.dataset.firstInTurn === "true"
+        ? FIRST_TURN_ROW_PADDING
+        : 0;
+      return conversationListTop(scroller) + rowElement.offsetTop + rowPadding;
     },
-    [historyQuestions, rows, virtual],
+    [historyQuestions],
   );
 
   const updateBottomState = useCallback((scroller: HTMLDivElement) => {
@@ -313,12 +247,29 @@ export function ConversationView({
   }, []);
 
   useLayoutEffect(() => {
+    const content = contentRef.current;
+    const scroller = scrollerRef.current;
+    if (
+      content === null ||
+      scroller === null ||
+      typeof ResizeObserver === "undefined"
+    ) {
+      return;
+    }
+    const observer = new ResizeObserver(() => {
+      if (followBottomRef.current) {
+        scrollToBottom(scroller);
+      }
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [scrollToBottom]);
+
+  useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     if (
       scroller === null ||
-      !followBottomRef.current ||
-      initialBottomScrollRef.current.pending ||
-      loadingAnchorRef.current
+      !followBottomRef.current
     ) {
       return;
     }
@@ -328,95 +279,24 @@ export function ConversationView({
     restoredThread.turns,
     scrollerHeight,
     scrollToBottom,
-    virtual.totalSize,
   ]);
 
   useLayoutEffect(() => {
-    initialBottomScrollRef.current = {
-      pending: true,
-      threadId: restoredThread.metadata.id,
-    };
+    const scroller = scrollerRef.current;
     followBottomRef.current = true;
     setShowJumpToBottom(false);
-  }, [restoredThread.metadata.id]);
-
-  useLayoutEffect(() => {
-    const scrollState = initialBottomScrollRef.current;
-    if (
-      !scrollState.pending ||
-      scrollState.threadId !== restoredThread.metadata.id
-    ) {
+    if (scroller === null) {
       return;
     }
-    virtual.scrollToBottom();
-    if (typeof ResizeObserver === "undefined") {
-      scrollState.pending = false;
-      return;
-    }
-    if (!lastRowVisible || !visibleRowsMeasured) {
-      return;
-    }
+    scrollToBottom(scroller);
     const frame = window.requestAnimationFrame(() => {
-      if (
-        !scrollState.pending ||
-        scrollState.threadId !== restoredThread.metadata.id
-      ) {
-        return;
-      }
-      virtual.scrollToBottom();
-      scrollState.pending = false;
+      scrollToBottom(scroller);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [
-    lastRowKey,
-    lastRowVisible,
-    restoredThread.metadata.id,
-    virtual.scrollToBottom,
-    virtual.totalSize,
-    visibleRowsMeasured,
-  ]);
-
-  const loadOlder = async () => {
-    const scroller = scrollerRef.current;
-    if (
-      scroller === null ||
-      loadingAnchorRef.current ||
-      loadingOlderTurns ||
-      !hasOlderTurns
-    ) {
-      return;
-    }
-    loadingAnchorRef.current = true;
-    setLoadingAnchorKey(virtual.keyAtOffset(scroller.scrollTop));
-    const previousHeight = scroller.scrollHeight;
-    const previousTop = scroller.scrollTop;
-    let restoreScheduled = false;
-    try {
-      await onLoadOlderTurns();
-      restoreScheduled = true;
-      requestAnimationFrame(() => {
-        const current = scrollerRef.current;
-        if (current !== null) {
-          current.scrollTop = previousTop + current.scrollHeight - previousHeight;
-          updateBottomState(current);
-        }
-        setLoadingAnchorKey(null);
-        loadingAnchorRef.current = false;
-      });
-    } finally {
-      if (!restoreScheduled) {
-        setLoadingAnchorKey(null);
-        loadingAnchorRef.current = false;
-      }
-    }
-  };
+  }, [restoredThread.metadata.id, scrollToBottom]);
 
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
-    const scroller = event.currentTarget;
-    updateBottomState(scroller);
-    if (scroller.scrollTop <= 48) {
-      void loadOlder();
-    }
+    updateBottomState(event.currentTarget);
   };
 
   return (
@@ -436,59 +316,39 @@ export function ConversationView({
         >
           <div
             aria-label="会话内容列表"
-            className={styles.virtualConversation}
+            className={styles.conversationList}
             data-conversation-list
-            onBlurCapture={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget)) {
-                setFocusedRowKey(null);
-              }
-            }}
-            onFocusCapture={(event) => {
-              const row = event.target instanceof HTMLElement
-                ? event.target.closest<HTMLElement>("[data-virtual-key]")
-                : null;
-              setFocusedRowKey(row?.dataset.virtualKey ?? null);
-            }}
+            ref={contentRef}
             role="list"
-            style={{ height: virtual.totalSize } as CSSProperties}
           >
-            {virtual.rows.map((virtualRow) => {
-              const row = rows[virtualRow.index];
-              if (row === undefined) {
-                return null;
-              }
-              return (
-                <div
-                  className={styles.virtualConversationRow}
-                  data-first-in-turn={
-                    row.type === "segment" && row.firstInTurn
-                  }
-                  data-row-type={row.type}
-                  data-status={
-                    row.type === "segment" ? row.turn.status : undefined
-                  }
-                  data-question-index={questionIndexByRow.get(virtualRow.index)}
-                  data-turn-id={
-                    row.type === "segment" ? row.turn.id : undefined
-                  }
-                  data-virtual-key={virtualRow.key}
-                  key={virtualRow.key}
-                  ref={virtual.measureElement(virtualRow.key)}
-                  role="listitem"
-                  style={{ top: virtualRow.start }}
-                >
-                  <ConversationRowView
-                    actionError={actionError}
-                    loadingOlderTurns={loadingOlderTurns}
-                    onLoadOlder={() => void loadOlder()}
-                    {...(onForkTurn === undefined ? {} : { onForkTurn })}
-                    {...(onOpenLink === undefined ? {} : { onOpenLink })}
-                    {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
-                    row={row}
-                  />
-                </div>
-              );
-            })}
+            {rows.map((row, rowIndex) => (
+              <div
+                className={styles.conversationRow}
+                data-first-in-turn={
+                  row.type === "segment" && row.firstInTurn
+                }
+                data-row-index={rowIndex}
+                data-row-key={row.key}
+                data-row-type={row.type}
+                data-status={
+                  row.type === "segment" ? row.turn.status : undefined
+                }
+                data-question-index={questionIndexByRow.get(rowIndex)}
+                data-turn-id={
+                  row.type === "segment" ? row.turn.id : undefined
+                }
+                key={row.key}
+                role="listitem"
+              >
+                <ConversationRowView
+                  actionError={actionError}
+                  {...(onForkTurn === undefined ? {} : { onForkTurn })}
+                  {...(onOpenLink === undefined ? {} : { onOpenLink })}
+                  {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
+                  row={row}
+                />
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -538,16 +398,12 @@ export function ConversationView({
 
 function ConversationRowView({
   actionError,
-  loadingOlderTurns,
-  onLoadOlder,
   onForkTurn,
   onOpenLink,
   onOpenDiff,
   row,
 }: {
   readonly actionError: string | null;
-  readonly loadingOlderTurns: boolean;
-  readonly onLoadOlder: () => void;
   readonly onForkTurn?: (turnId: string, isLatest: boolean) => void;
   readonly onOpenLink?: (link: string) => void;
   readonly onOpenDiff?: (path: string, diff: string) => void;
@@ -555,18 +411,6 @@ function ConversationRowView({
 }) {
   if (row.type === "actionError") {
     return <div className={styles.actionError} role="alert">{actionError}</div>;
-  }
-  if (row.type === "loadOlder") {
-    return (
-      <button
-        className={styles.loadOlder}
-        disabled={loadingOlderTurns}
-        onClick={onLoadOlder}
-        type="button"
-      >
-        {loadingOlderTurns ? "正在加载更早历史" : "加载更早历史"}
-      </button>
-    );
   }
   if (row.type === "empty") {
     return <div className={styles.empty}>这个会话还没有回合</div>;
@@ -1428,14 +1272,10 @@ type TurnSegment =
 function conversationRows(
   turns: readonly ThreadTurn[],
   hasActionError: boolean,
-  hasOlderTurns: boolean,
 ): readonly ConversationRow[] {
   const rows: ConversationRow[] = [];
   if (hasActionError) {
     rows.push({ key: "action-error", type: "actionError" });
-  }
-  if (hasOlderTurns) {
-    rows.push({ key: "load-older", type: "loadOlder" });
   }
   if (turns.length === 0) {
     rows.push({ key: "empty", type: "empty" });
@@ -1527,36 +1367,6 @@ function conversationListTop(scroller: HTMLElement): number {
     return scroller.scrollTop + listRect.top - scroller.getBoundingClientRect().top;
   }
   return list.offsetTop;
-}
-
-function estimateConversationRow(row: ConversationRow | undefined): number {
-  if (row === undefined) {
-    return 80;
-  }
-  switch (row.type) {
-    case "actionError":
-      return 72;
-    case "loadOlder":
-      return 54;
-    case "empty":
-      return 240;
-    case "segment": {
-      if (row.segment.type === "activities") {
-        return row.turn.status === "inProgress" ? 180 : 64;
-      }
-      switch (row.segment.item.type) {
-        case "userMessage":
-          return 96;
-        case "agentMessage":
-          return 180;
-        case "plan":
-        case "reasoning":
-          return 112;
-        default:
-          return 72;
-      }
-    }
-  }
 }
 
 function isWorkActivity(item: ThreadItem): boolean {

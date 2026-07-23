@@ -68,15 +68,7 @@ function handleMessage(message) {
     }
     case "thread/resume": {
       const thread = requireThread(params.threadId);
-      respond(id, {
-        ...threadContext(thread),
-        initialTurnsPage: { data: thread.turns, nextCursor: null },
-      });
-      break;
-    }
-    case "thread/turns/list": {
-      const thread = requireThread(params.threadId);
-      respond(id, { data: thread.turns, nextCursor: null });
+      respond(id, threadContext(thread));
       break;
     }
     case "thread/unsubscribe":

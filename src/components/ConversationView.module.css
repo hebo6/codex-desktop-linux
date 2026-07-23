@@ -53,36 +53,17 @@
   margin: 0 auto;
 }
 
-.virtualConversation {
-  position: relative;
+.conversationList {
   width: 100%;
 }
 
-.virtualConversationRow {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
+.conversationRow {
   box-sizing: border-box;
   padding-bottom: var(--space-3);
 }
 
-.virtualConversationRow[data-first-in-turn="true"] {
+.conversationRow[data-first-in-turn="true"] {
   padding-top: var(--space-6);
-}
-
-.loadOlder {
-  display: block;
-  min-height: 34px;
-  padding: 0 var(--space-3);
-  margin: 0 auto var(--space-5);
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-tertiary);
-  background: transparent;
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
 }
 
 .actionError {

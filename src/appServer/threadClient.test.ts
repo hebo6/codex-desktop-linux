@@ -8,7 +8,6 @@ import type {
 import type { ServerNotification } from "../protocol/generated";
 import {
   AppServerThreadClient,
-  HISTORY_TURN_PAGE_SIZE,
   RECENT_THREAD_PAGE_SIZE,
 } from "./threadClient";
 
@@ -126,42 +125,16 @@ describe("AppServerThreadClient", () => {
     ]);
   });
 
-  it("恢复时原子加载最近 10 个完整 turn", () => {
+  it("恢复时请求完整 turn 历史", () => {
     const session = new RecordingSession();
     const client = new AppServerThreadClient(session);
 
     client.resumeThread("thread-1");
 
-    expect(session.requests[0]).toMatchObject({
+    expect(session.requests.map(({ method, params }) => ({ method, params }))).toEqual([{
       method: "thread/resume",
-      params: {
-        threadId: "thread-1",
-        excludeTurns: true,
-        initialTurnsPage: {
-          itemsView: "full",
-          limit: HISTORY_TURN_PAGE_SIZE,
-          sortDirection: "desc",
-        },
-      },
-    });
-  });
-
-  it("使用服务端游标向更早历史分页", () => {
-    const session = new RecordingSession();
-    const client = new AppServerThreadClient(session);
-
-    client.listOlderTurns("thread-1", "older-page");
-
-    expect(session.requests[0]).toMatchObject({
-      method: "thread/turns/list",
-      params: {
-        threadId: "thread-1",
-        cursor: "older-page",
-        itemsView: "full",
-        limit: HISTORY_TURN_PAGE_SIZE,
-        sortDirection: "desc",
-      },
-    });
+      params: { threadId: "thread-1" },
+    }]);
   });
 
   it("取消当前会话的服务端订阅", () => {
@@ -199,7 +172,6 @@ describe("AppServerThreadClient", () => {
     client.listRecentThreads();
     client.readThread("thread-1");
     client.resumeThread("thread-1");
-    client.listOlderTurns("thread-1", "older-page");
     client.unsubscribeThread("thread-1");
     client.archiveThread("thread-1");
     client.unarchiveThread("thread-1");

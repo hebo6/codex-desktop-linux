@@ -153,7 +153,6 @@ const RESTORED = {
     updatedAt: 200,
   },
   modelSettings: { effort: "medium", model: "gpt-5", serviceTier: null },
-  nextCursor: "older",
   turns: [TURN],
 } satisfies RestoredThread;
 
@@ -180,11 +179,8 @@ describe("ConversationView", () => {
 
     render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         onOpenLink={onOpenLink}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [markdownTurn] }}
+        restoredThread={{ ...RESTORED, turns: [markdownTurn] }}
       />,
     );
 
@@ -200,9 +196,6 @@ describe("ConversationView", () => {
   it("覆盖全部持久化 ThreadItem 的稳定展示", async () => {
     render(
       <ConversationView
-        hasOlderTurns
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={RESTORED}
       />,
     );
@@ -314,10 +307,7 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [commandTurn] }}
+        restoredThread={{ ...RESTORED, turns: [commandTurn] }}
       />,
     );
 
@@ -381,11 +371,8 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         onOpenLink={onOpenLink}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [reasoningTurn] }}
+        restoredThread={{ ...RESTORED, turns: [reasoningTurn] }}
       />,
     );
 
@@ -465,11 +452,8 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
         onOpenDiff={onOpenDiff}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [fileTurn] }}
+        restoredThread={{ ...RESTORED, turns: [fileTurn] }}
       />,
     );
 
@@ -506,9 +490,6 @@ describe("ConversationView", () => {
     } satisfies RestoredThread;
     const { rerender } = render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={runningThread}
       />,
     );
@@ -523,10 +504,7 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [finalAnswerTurn] }}
+        restoredThread={{ ...RESTORED, turns: [finalAnswerTurn] }}
       />,
     );
 
@@ -544,10 +522,7 @@ describe("ConversationView", () => {
   it("位于底部时内容增长后继续跟随底部", () => {
     const { rerender } = render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null }}
+        restoredThread={RESTORED}
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
@@ -576,10 +551,7 @@ describe("ConversationView", () => {
     scrollHeight = 1_400;
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [expandedTurn] }}
+        restoredThread={{ ...RESTORED, turns: [expandedTurn] }}
       />,
     );
 
@@ -591,10 +563,7 @@ describe("ConversationView", () => {
   it("按原生滚动范围判断是否位于底部", () => {
     render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null }}
+        restoredThread={RESTORED}
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
@@ -633,14 +602,10 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     const activeThread = {
       ...RESTORED,
-      nextCursor: null,
       turns: [activeTurn],
     } satisfies RestoredThread;
     const { rerender } = render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={activeThread}
       />,
     );
@@ -656,9 +621,6 @@ describe("ConversationView", () => {
     scrollHeight = 1_900;
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={{
           ...activeThread,
           turns: [{
@@ -690,10 +652,7 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     const { rerender } = render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [thinkingTurn] }}
+        restoredThread={{ ...RESTORED, turns: [thinkingTurn] }}
       />,
     );
 
@@ -717,10 +676,7 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [commandTurn] }}
+        restoredThread={{ ...RESTORED, turns: [commandTurn] }}
       />,
     );
 
@@ -746,10 +702,7 @@ describe("ConversationView", () => {
 
     render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [interruptedTurn] }}
+        restoredThread={{ ...RESTORED, turns: [interruptedTurn] }}
       />,
     );
 
@@ -783,10 +736,7 @@ describe("ConversationView", () => {
     })) satisfies ThreadTurn[];
     render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns }}
+        restoredThread={{ ...RESTORED, turns }}
       />,
     );
 
@@ -828,10 +778,7 @@ describe("ConversationView", () => {
     })) satisfies ThreadTurn[];
     render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns }}
+        restoredThread={{ ...RESTORED, turns }}
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
@@ -866,10 +813,7 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     const { rerender } = render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [completedTurn] }}
+        restoredThread={{ ...RESTORED, turns: [completedTurn] }}
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
@@ -904,12 +848,8 @@ describe("ConversationView", () => {
 
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={{
           ...RESTORED,
-          nextCursor: null,
           turns: [completedTurn, activeQuestion],
         }}
       />,
@@ -920,12 +860,8 @@ describe("ConversationView", () => {
 
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={{
           ...RESTORED,
-          nextCursor: null,
           turns: [
             completedTurn,
             {
@@ -968,14 +904,10 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     const activeThread = {
       ...RESTORED,
-      nextCursor: null,
       turns: [activeTurn],
     } satisfies RestoredThread;
     const { rerender } = render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={activeThread}
       />,
     );
@@ -989,9 +921,6 @@ describe("ConversationView", () => {
 
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={{
           ...activeThread,
           turns: [{ ...activeTurn, durationMs: 2_000 }],
@@ -1004,9 +933,6 @@ describe("ConversationView", () => {
 
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={{
           ...activeThread,
           turns: [{ ...activeTurn, durationMs: 3_000 }],
@@ -1038,10 +964,7 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     const { rerender } = render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [activeTurn] }}
+        restoredThread={{ ...RESTORED, turns: [activeTurn] }}
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
@@ -1063,12 +986,8 @@ describe("ConversationView", () => {
     scrollHeight = 2_200;
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={{
           ...RESTORED,
-          nextCursor: null,
           turns: [{ ...activeTurn, durationMs: 1_000 }],
         }}
       />,
@@ -1099,10 +1018,7 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [activeTurn] }}
+        restoredThread={{ ...RESTORED, turns: [activeTurn] }}
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
@@ -1133,10 +1049,10 @@ describe("ConversationView", () => {
     const originalBoundingRect = HTMLElement.prototype.getBoundingClientRect;
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function (this: HTMLElement) {
-        if (!this.matches("[data-virtual-key]")) {
+        if (!this.matches("[data-row-key]")) {
           return originalBoundingRect.call(this);
         }
-        const height = this.dataset.virtualKey?.includes(":segment:user-")
+        const height = this.dataset.rowKey?.includes(":segment:user-")
           ? 96
           : 180;
         return {
@@ -1194,13 +1110,9 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={{
           ...RESTORED,
           metadata: { ...RESTORED.metadata, id: "thread-ai-scrolling" },
-          nextCursor: null,
           turns: [...historyTurns, activeTurn],
         }}
       />,
@@ -1226,7 +1138,7 @@ describe("ConversationView", () => {
       fireEvent.scroll(scroller);
       const answer = `历史 AI 回答 ${index}`;
       const answerRow = scroller.querySelector<HTMLElement>(
-        `[data-virtual-key="turn-ai-history-${index}:segment:answer-ai-history-${index}"]`,
+        `[data-row-key="turn-ai-history-${index}:segment:answer-ai-history-${index}"]`,
       );
       expect(answerRow).not.toBeNull();
       expect(within(answerRow!).getByText(answer)).toBeVisible();
@@ -1267,10 +1179,7 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     const { rerender } = render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [firstTurn] }}
+        restoredThread={{ ...RESTORED, turns: [firstTurn] }}
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
@@ -1301,15 +1210,11 @@ describe("ConversationView", () => {
     } satisfies ThreadTurn;
     const activeThread = {
       ...RESTORED,
-      nextCursor: null,
       turns: [firstTurn, activeTurn],
     } satisfies RestoredThread;
     scrollHeight = 2_000;
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={activeThread}
       />,
     );
@@ -1319,9 +1224,6 @@ describe("ConversationView", () => {
     scrollHeight = 2_300;
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
       />,
     );
@@ -1333,9 +1235,6 @@ describe("ConversationView", () => {
     scrollHeight = 2_600;
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
       />,
     );
@@ -1347,10 +1246,7 @@ describe("ConversationView", () => {
     const onForkTurn = vi.fn();
     render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
         onForkTurn={onForkTurn}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={RESTORED}
       />,
     );
@@ -1406,11 +1302,8 @@ describe("ConversationView", () => {
     ] satisfies ThreadTurn[];
     render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
         onForkTurn={vi.fn()}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns }}
+        restoredThread={{ ...RESTORED, turns }}
       />,
     );
 
@@ -1457,22 +1350,7 @@ describe("ConversationView", () => {
     expect(historicalAnswer).toHaveFocus();
   });
 
-  it("通过顶部入口加载更早回合", () => {
-    const onLoadOlderTurns = vi.fn(async () => undefined);
-    render(
-      <ConversationView
-        hasOlderTurns
-        loadingOlderTurns={false}
-        onLoadOlderTurns={onLoadOlderTurns}
-        restoredThread={RESTORED}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "加载更早历史" }));
-    expect(onLoadOlderTurns).toHaveBeenCalledTimes(1);
-  });
-
-  it("长消息流只挂载视口附近内容", () => {
+  it("长消息流挂载全部内容", () => {
     class FakeResizeObserver {
       constructor(_callback: ResizeObserverCallback) {}
       disconnect() {}
@@ -1494,23 +1372,19 @@ describe("ConversationView", () => {
     const longThread = {
       ...RESTORED,
       metadata: { ...RESTORED.metadata, turns: [longTurn] },
-      nextCursor: null,
       turns: [longTurn],
     } satisfies RestoredThread;
 
     render(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={longThread}
       />,
     );
 
-    expect(screen.getAllByText(/回答 \d+/u).length).toBeLessThan(100);
+    expect(screen.getAllByText(/回答 \d+/u)).toHaveLength(1_000);
   });
 
-  it("从侧边栏加载未虚拟化会话后等待真实行高再定位到底部", async () => {
+  it("从侧边栏加载会话后等待真实行高再定位到底部", async () => {
     class FakeResizeObserver {
       constructor(_callback: ResizeObserverCallback) {}
       disconnect() {}
@@ -1532,11 +1406,15 @@ describe("ConversationView", () => {
           return 0;
         }
         const list = this.querySelector<HTMLElement>("[data-conversation-list]");
-        return Number.parseFloat(list?.style.height ?? "0") + 148;
+        const rows = list?.querySelectorAll<HTMLElement>("[data-row-key]") ?? [];
+        return Array.from(rows).reduce(
+          (height, row) => height + row.getBoundingClientRect().height,
+          148,
+        );
       });
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function (this: HTMLElement) {
-        if (!this.matches("[data-virtual-key]")) {
+        if (!this.matches("[data-row-key]")) {
           return originalBoundingRect.call(this);
         }
         const height = this.textContent?.includes("很长的历史回答") ? 720 : 70;
@@ -1577,22 +1455,18 @@ describe("ConversationView", () => {
         id: "thread-short-loaded",
         turns: [turn],
       },
-      nextCursor: null,
       turns: [turn],
     } satisfies RestoredThread;
     const { rerender } = render(<ConversationPlaceholder kind="loading" />);
 
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={loadedThread}
       />,
     );
 
     const scroller = screen.getByLabelText("会话消息");
-    expect(scroller.querySelectorAll("[data-virtual-key]")).toHaveLength(2);
+    expect(scroller.querySelectorAll("[data-row-key]")).toHaveLength(2);
     await waitFor(() =>
       expect(scroller.scrollTop).toBe(
         scroller.scrollHeight - scroller.clientHeight,
@@ -1600,7 +1474,7 @@ describe("ConversationView", () => {
     );
   });
 
-  it("从侧边栏加载长会话后定位到已测量内容的底部", async () => {
+  it("从侧边栏加载完整长会话后定位到底部", async () => {
     class FakeResizeObserver {
       constructor(_callback: ResizeObserverCallback) {}
       disconnect() {}
@@ -1622,11 +1496,15 @@ describe("ConversationView", () => {
           return 0;
         }
         const list = this.querySelector<HTMLElement>("[data-conversation-list]");
-        return Number.parseFloat(list?.style.height ?? "0") + 148;
+        const rows = list?.querySelectorAll<HTMLElement>("[data-row-key]") ?? [];
+        return Array.from(rows).reduce(
+          (height, row) => height + row.getBoundingClientRect().height,
+          148,
+        );
       });
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function (this: HTMLElement) {
-        if (!this.matches("[data-virtual-key]")) {
+        if (!this.matches("[data-row-key]")) {
           return originalBoundingRect.call(this);
         }
         const height = this.textContent?.includes("历史回答 19") ? 420 : 70;
@@ -1663,16 +1541,12 @@ describe("ConversationView", () => {
     const loadedThread = {
       ...RESTORED,
       metadata: { ...RESTORED.metadata, id: "thread-loaded", turns },
-      nextCursor: null,
       turns,
     } satisfies RestoredThread;
     const { rerender } = render(<ConversationPlaceholder kind="loading" />);
 
     rerender(
       <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={loadedThread}
       />,
     );
@@ -1680,7 +1554,7 @@ describe("ConversationView", () => {
     const scroller = screen.getByLabelText("会话消息");
     await waitFor(() =>
       expect(scroller.querySelector(
-        '[data-virtual-key="turn-loaded-19:segment:answer-loaded-19"]',
+        '[data-row-key="turn-loaded-19:segment:answer-loaded-19"]',
       )).not.toBeNull(),
     );
     await waitFor(() =>

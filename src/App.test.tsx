@@ -326,10 +326,7 @@ describe("App", () => {
         const result = request.method === "thread/list"
           ? { data: [thread, otherThread], nextCursor: null }
           : request.method === "thread/resume"
-            ? {
-                initialTurnsPage: { data: [], nextCursor: null },
-                thread,
-              }
+            ? { thread }
             : {};
         return {
           cancel: () => undefined,

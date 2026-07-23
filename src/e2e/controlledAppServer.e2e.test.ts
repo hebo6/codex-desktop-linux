@@ -223,9 +223,11 @@ describe("受控 stdio app-server 端到端", () => {
       ).resolves.toEqual({});
 
       await expect(
-        threads.listOlderTurns(started.thread.id, "older-controlled").result,
+        threads.resumeThread(started.thread.id).result,
       ).resolves.toMatchObject({
-        data: [{ id: turn.turn.id, status: "completed" }],
+        thread: {
+          turns: [{ id: turn.turn.id, status: "completed" }],
+        },
       });
       const forked = await threads.forkThread(started.thread.id, turn.turn.id).result;
       expect(forked.thread).toMatchObject({

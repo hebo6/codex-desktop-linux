@@ -101,7 +101,6 @@ function restored(turns: readonly ThreadTurn[]): RestoredThread {
     },
     modelSettings: { effort: "medium", model: "gpt-5", serviceTier: null },
     turns,
-    nextCursor: null,
   };
 }
 

@@ -6,7 +6,6 @@ import type {
   ThreadReadResponse,
   ThreadResumeResponse,
   ThreadStartResponse,
-  ThreadTurnsListResponse,
   ThreadUnsubscribeResponse,
   ThreadArchiveResponse,
   ThreadUnarchiveResponse,
@@ -17,7 +16,7 @@ import { recordConversationProjection } from "../diagnostics/conversationLoadDia
 
 export type ServerThreadsPhase = "idle" | "loading" | "ready" | "error";
 export type ThreadSummary = ThreadListResponse["data"][number];
-export type ThreadTurn = ThreadTurnsListResponse["data"][number];
+export type ThreadTurn = ThreadResumeResponse["thread"]["turns"][number];
 
 export interface ThreadModelSettings {
   readonly model: string;
@@ -29,7 +28,6 @@ export interface RestoredThread {
   readonly metadata: ThreadResumeResponse["thread"];
   readonly modelSettings: ThreadModelSettings;
   readonly turns: readonly ThreadTurn[];
-  readonly nextCursor: string | null;
 }
 
 export interface ServerThreadsState {
@@ -40,7 +38,6 @@ export interface ServerThreadsState {
   readonly restoredThread: RestoredThread | null;
   readonly loadingMoreThreads: boolean;
   readonly refreshingThreads: boolean;
-  readonly loadingOlderTurns: boolean;
   readonly pendingThreadIds: readonly string[];
   readonly removingThreadIds: readonly string[];
   readonly currentThreadDeleted: boolean;
@@ -59,7 +56,6 @@ export interface ServerThreadsControls extends ServerThreadsState {
     limit: number,
   ) => Promise<ProjectThreadPage>;
   readonly refreshThreads: () => Promise<void>;
-  readonly loadOlderTurns: () => Promise<void>;
   readonly archiveThread: (threadId: string) => Promise<boolean>;
   readonly undoArchive: () => Promise<boolean>;
   readonly deleteThread: (threadId: string) => Promise<boolean>;
@@ -87,10 +83,6 @@ export interface ServerThreadsClient {
   ): ThreadRequest<ThreadListResponse>;
   readThread(threadId: string): ThreadRequest<ThreadReadResponse>;
   resumeThread(threadId: string): ThreadRequest<ThreadResumeResponse>;
-  listOlderTurns(
-    threadId: string,
-    cursor: string,
-  ): ThreadRequest<ThreadTurnsListResponse>;
   unsubscribeThread(threadId: string): ThreadRequest<ThreadUnsubscribeResponse>;
   archiveThread(threadId: string): ThreadRequest<ThreadArchiveResponse>;
   unarchiveThread(threadId: string): ThreadRequest<ThreadUnarchiveResponse>;
@@ -105,7 +97,6 @@ const IDLE_STATE = Object.freeze({
   restoredThread: null,
   loadingMoreThreads: false,
   refreshingThreads: false,
-  loadingOlderTurns: false,
   pendingThreadIds: Object.freeze([]),
   removingThreadIds: Object.freeze([]),
   currentThreadDeleted: false,
@@ -120,7 +111,6 @@ const THREAD_LIST_FAILED = "无法加载最近会话";
 const THREAD_RESTORE_FAILED = "无法恢复当前会话";
 const THREAD_PAGE_FAILED = "无法加载更多会话";
 const THREAD_REFRESH_FAILED = "无法刷新最近会话";
-const TURN_PAGE_FAILED = "无法加载更早历史";
 const THREAD_ARCHIVE_FAILED = "无法归档会话";
 const THREAD_UNARCHIVE_FAILED = "无法撤销归档";
 const THREAD_DELETE_FAILED = "无法删除会话";
@@ -156,7 +146,6 @@ export function useServerThreads(
   const sourceRef = useRef<ActiveSource | null>(null);
   const loadingThreadsRef = useRef<ActiveSource | null>(null);
   const refreshingThreadsRef = useRef<ActiveSource | null>(null);
-  const loadingTurnsRef = useRef<ActiveSource | null>(null);
   const preparedStartedThreadRef = useRef<PreparedStartedThread | null>(null);
   const retainedSelectionRef = useRef<RetainedSelection | null>(null);
   const retainedThreadListRef = useRef<RetainedThreadList | null>(null);
@@ -171,7 +160,6 @@ export function useServerThreads(
         metadata: response.thread,
         modelSettings: modelSettingsFrom(response),
         turns: Object.freeze([]),
-        nextCursor: null,
       }),
     });
     preparedStartedThreadRef.current = prepared;
@@ -185,7 +173,6 @@ export function useServerThreads(
   useEffect(() => {
     loadingThreadsRef.current = null;
     refreshingThreadsRef.current = null;
-    loadingTurnsRef.current = null;
     if (client === null) {
       sourceRef.current = null;
       const canRetainThreadList = matchesRetainedThreadList(
@@ -676,62 +663,6 @@ export function useServerThreads(
     }
   }, [state.offline, state.threadListPhase]);
 
-  const loadOlderTurns = useCallback(async (): Promise<void> => {
-    const source = sourceRef.current;
-    const restored = state.restoredThread;
-    if (
-      source === null ||
-      state.threadRestorePhase !== "ready" ||
-      state.offline ||
-      loadingTurnsRef.current !== null ||
-      restored === null ||
-      restored.nextCursor === null
-    ) {
-      return;
-    }
-    loadingTurnsRef.current = source;
-    const cursor = restored.nextCursor;
-    const threadId = restored.metadata.id;
-    setState((current) => ({
-      ...current,
-      loadingOlderTurns: true,
-      threadRestoreError: null,
-    }));
-    try {
-      const page = await source.client.listOlderTurns(threadId, cursor).result;
-      if (sourceRef.current !== source) {
-        return;
-      }
-      setState((current) => {
-        const active = current.restoredThread;
-        if (active === null || active.metadata.id !== threadId) {
-          return current;
-        }
-        return {
-          ...current,
-          restoredThread: Object.freeze({
-            ...active,
-            turns: prependOlderTurns(active.turns, page.data),
-            nextCursor: page.nextCursor ?? null,
-          }),
-          loadingOlderTurns: false,
-        };
-      });
-    } catch {
-      if (sourceRef.current === source) {
-        setState((current) => ({
-          ...current,
-          loadingOlderTurns: false,
-          threadRestoreError: TURN_PAGE_FAILED,
-        }));
-      }
-    } finally {
-      if (loadingTurnsRef.current === source) {
-        loadingTurnsRef.current = null;
-      }
-    }
-  }, [state.offline, state.restoredThread, state.threadRestorePhase]);
-
   const archiveThread = useCallback(
     async (threadId: string): Promise<boolean> => {
       const source = sourceRef.current;
@@ -914,7 +845,6 @@ export function useServerThreads(
     loadMoreThreads,
     loadProjectThreads,
     refreshThreads,
-    loadOlderTurns,
     archiveThread,
     undoArchive,
     deleteThread,
@@ -1032,15 +962,10 @@ function matchesRetainedThreadList(
 
 function restoredThreadFrom(response: ThreadResumeResponse): RestoredThread {
   const projectionStartedAt = performance.now();
-  const initialPage = response.initialTurnsPage;
-  if (initialPage === undefined || initialPage === null) {
-    throw new TypeError("missing initial turns page");
-  }
   const restoredThread = Object.freeze({
     metadata: response.thread,
     modelSettings: modelSettingsFrom(response),
-    turns: Object.freeze([...initialPage.data].reverse()),
-    nextCursor: initialPage.nextCursor ?? null,
+    turns: Object.freeze([...response.thread.turns]),
   });
   recordConversationProjection(
     response.thread,
@@ -1075,19 +1000,4 @@ function mergeUniqueById<T extends { readonly id: string }>(
     }
   }
   return Object.freeze(merged);
-}
-
-function prependOlderTurns(
-  existing: readonly ThreadTurn[],
-  descendingPage: readonly ThreadTurn[],
-): readonly ThreadTurn[] {
-  const known = new Set(existing.map(({ id }) => id));
-  const older: ThreadTurn[] = [];
-  for (const turn of descendingPage.toReversed()) {
-    if (!known.has(turn.id)) {
-      known.add(turn.id);
-      older.push(turn);
-    }
-  }
-  return Object.freeze([...older, ...existing]);
 }

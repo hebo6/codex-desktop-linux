@@ -6,8 +6,6 @@ import type {
   ThreadReadResponse,
   ThreadResumeParams,
   ThreadResumeResponse,
-  ThreadTurnsListParams,
-  ThreadTurnsListResponse,
   ThreadUnsubscribeParams,
   ThreadUnsubscribeResponse,
   ThreadArchiveParams,
@@ -28,7 +26,6 @@ import {
   validateThreadListResponse,
   validateThreadReadResponse,
   validateThreadResumeResponse,
-  validateThreadTurnsListResponse,
   validateThreadUnsubscribeResponse,
   validateThreadArchiveResponse,
   validateThreadUnarchiveResponse,
@@ -39,7 +36,6 @@ import type { AppServerSession } from "./session";
 import { beginConversationLoadMeasurement } from "../diagnostics/conversationLoadDiagnostics";
 
 export const RECENT_THREAD_PAGE_SIZE = 50;
-export const HISTORY_TURN_PAGE_SIZE = 10;
 
 export interface RecentThreadPageOptions {
   readonly archived?: boolean;
@@ -94,15 +90,7 @@ export class AppServerThreadClient {
   }
 
   resumeThread(threadId: string): RequestHandle<ThreadResumeResponse> {
-    const params: ThreadResumeParams = {
-      threadId,
-      excludeTurns: true,
-      initialTurnsPage: {
-        itemsView: "full",
-        limit: HISTORY_TURN_PAGE_SIZE,
-        sortDirection: "desc",
-      },
-    };
+    const params: ThreadResumeParams = { threadId };
     const measurement = beginConversationLoadMeasurement();
     try {
       const request = this.session.sendRequest({
@@ -120,24 +108,6 @@ export class AppServerThreadClient {
       measurement.recordFailure();
       throw error;
     }
-  }
-
-  listOlderTurns(
-    threadId: string,
-    cursor: string,
-  ): RequestHandle<ThreadTurnsListResponse> {
-    const params: ThreadTurnsListParams = {
-      threadId,
-      cursor,
-      itemsView: "full",
-      limit: HISTORY_TURN_PAGE_SIZE,
-      sortDirection: "desc",
-    };
-    return this.session.sendRequest({
-      method: "thread/turns/list",
-      params,
-      validateResult: threadTurnsListResponseValidator,
-    });
   }
 
   unsubscribeThread(threadId: string): RequestHandle<ThreadUnsubscribeResponse> {
@@ -196,8 +166,6 @@ const threadReadResponseValidator: ResultValidator<ThreadReadResponse> =
   validateThreadReadResponse;
 const threadResumeResponseValidator: ResultValidator<ThreadResumeResponse> =
   validateThreadResumeResponse;
-const threadTurnsListResponseValidator: ResultValidator<ThreadTurnsListResponse> =
-  validateThreadTurnsListResponse;
 const threadUnsubscribeResponseValidator: ResultValidator<ThreadUnsubscribeResponse> =
   validateThreadUnsubscribeResponse;
 const threadArchiveResponseValidator: ResultValidator<ThreadArchiveResponse> =

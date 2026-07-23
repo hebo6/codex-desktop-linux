@@ -74,7 +74,7 @@ export function beginConversationLoadMeasurement(): ConversationLoadMeasurement 
     },
     recordResponse(response) {
       const completedAt = performance.now();
-      const turns = response.initialTurnsPage?.data ?? [];
+      const turns = response.thread.turns;
       sample.status = "succeeded";
       sample.responseWaitMs = completedAt - startedAtMonotonicMs;
       sample.responseReceivedAtMonotonicMs = completedAt;

@@ -1473,9 +1473,6 @@ export function App({
                 actionError={
                   forkError ?? contentError ?? serverThreads.threadRestoreError
                 }
-                hasOlderTurns={displayedRestoredThread.nextCursor !== null}
-                loadingOlderTurns={serverThreads.loadingOlderTurns}
-                onLoadOlderTurns={serverThreads.loadOlderTurns}
                 onOpenDiff={openDiff}
                 onOpenLink={openContentLink}
                 {...(serverThreads.offline ? {} : { onForkTurn: (turnId: string, isLatest: boolean) => {

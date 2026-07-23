@@ -30,17 +30,13 @@ describe("conversation load diagnostics", () => {
       sessionId: "private-session-id",
       source: "appServer" as const,
       status: { type: "idle" as const },
-      turns: [],
+      turns: [{ id: "turn-1", items: [], itemsView: "full", status: "completed" }],
       updatedAt: 2,
-    };
+    } satisfies ThreadResumeResponse["thread"];
     const response = {
       approvalPolicy: "on-request",
       approvalsReviewer: "user",
       cwd: thread.cwd,
-      initialTurnsPage: {
-        data: [{ id: "turn-1", items: [], itemsView: "full", status: "completed" }],
-        nextCursor: null,
-      },
       model: "gpt-5",
       modelProvider: "openai",
       sandbox: { type: "readOnly" },

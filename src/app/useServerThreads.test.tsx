@@ -7,7 +7,6 @@ import type {
   ThreadReadResponse,
   ThreadResumeResponse,
   ThreadStartResponse,
-  ThreadTurnsListResponse,
   ThreadUnsubscribeResponse,
   ThreadArchiveResponse,
   ThreadUnarchiveResponse,
@@ -55,17 +54,17 @@ const TURN_ZERO = {
   items: [],
   itemsView: "full",
   status: "completed",
-} satisfies ThreadTurnsListResponse["data"][number];
+} satisfies ThreadResumeResponse["thread"]["turns"][number];
 
 const TURN_ONE = {
   ...TURN_ZERO,
   id: "turn-1",
-} satisfies ThreadTurnsListResponse["data"][number];
+} satisfies ThreadResumeResponse["thread"]["turns"][number];
 
 const TURN_TWO = {
   ...TURN_ZERO,
   id: "turn-2",
-} satisfies ThreadTurnsListResponse["data"][number];
+} satisfies ThreadResumeResponse["thread"]["turns"][number];
 
 class FakeThreadClient implements ServerThreadsClient {
   readonly notificationHandlers = new Set<
@@ -74,11 +73,9 @@ class FakeThreadClient implements ServerThreadsClient {
   readonly listCalls: unknown[] = [];
   readonly readCalls: string[] = [];
   readonly resumeCalls: string[] = [];
-  readonly turnsCalls: Array<{ threadId: string; cursor: string }> = [];
   readonly listResults: Array<Promise<ThreadListResponse>> = [];
   readonly readResults: Array<Promise<ThreadReadResponse>> = [];
   readonly resumeResults: Array<Promise<ThreadResumeResponse>> = [];
-  readonly turnsResults: Array<Promise<ThreadTurnsListResponse>> = [];
   readonly unsubscribeCalls: string[] = [];
   readonly archiveCalls: string[] = [];
   readonly unarchiveCalls: string[] = [];
@@ -109,11 +106,6 @@ class FakeThreadClient implements ServerThreadsClient {
   resumeThread(threadId: string) {
     this.resumeCalls.push(threadId);
     return { result: nextResult(this.resumeResults) };
-  }
-
-  listOlderTurns(threadId: string, cursor: string) {
-    this.turnsCalls.push({ threadId, cursor });
-    return { result: nextResult(this.turnsResults) };
   }
 
   unsubscribeThread(threadId: string) {
@@ -148,19 +140,17 @@ function nextResult<T>(queue: Array<Promise<T>>): Promise<T> {
 }
 
 function resumeResponse(
-  descendingTurns: ThreadTurnsListResponse["data"],
-  nextCursor: string | null,
+  turns: ThreadResumeResponse["thread"]["turns"],
 ): ThreadResumeResponse {
   return {
     approvalPolicy: "on-request",
     approvalsReviewer: "user",
     cwd: THREAD_ONE.cwd,
-    initialTurnsPage: { data: descendingTurns, nextCursor },
     model: "gpt-5",
     modelProvider: "openai",
     reasoningEffort: "medium",
     sandbox: { type: "readOnly" },
-    thread: { ...THREAD_ONE, turns: descendingTurns },
+    thread: { ...THREAD_ONE, turns },
   };
 }
 
@@ -200,7 +190,7 @@ describe("useServerThreads", () => {
       Promise.resolve({ data: [THREAD_ONE, THREAD_TWO], nextCursor: "next" }),
     );
     client.resumeResults.push(
-      Promise.resolve(resumeResponse([TURN_TWO, TURN_ONE], "older")),
+      Promise.resolve(resumeResponse([TURN_ONE, TURN_TWO])),
     );
     const { result } = renderHook(() =>
       useServerThreads(client, THREAD_ONE.id),
@@ -223,7 +213,6 @@ describe("useServerThreads", () => {
       TURN_ONE.id,
       TURN_TWO.id,
     ]);
-    expect(result.current.restoredThread?.nextCursor).toBe("older");
     expect(result.current.restoredThread?.modelSettings).toEqual({
       effort: "medium",
       model: "gpt-5",
@@ -234,7 +223,7 @@ describe("useServerThreads", () => {
   it("使用线程设置通知更新当前会话的模型和思考程度", async () => {
     const client = new FakeThreadClient();
     client.listResults.push(Promise.resolve({ data: [THREAD_ONE] }));
-    client.resumeResults.push(Promise.resolve(resumeResponse([], null)));
+    client.resumeResults.push(Promise.resolve(resumeResponse([])));
     const { result } = renderHook(() => useServerThreads(client, THREAD_ONE.id));
     await waitFor(() => expect(result.current.threadRestorePhase).toBe("ready"));
 
@@ -278,7 +267,7 @@ describe("useServerThreads", () => {
     );
     client.resumeResults.push(
       Promise.resolve({
-        ...resumeResponse([], null),
+        ...resumeResponse([]),
         thread: { ...THREAD_THREE, turns: [] },
       }),
     );
@@ -329,7 +318,6 @@ describe("useServerThreads", () => {
     expect(result.current.restoredThread).toMatchObject({
       metadata: startedThread,
       modelSettings: { effort: "medium", model: "gpt-5", serviceTier: null },
-      nextCursor: null,
       turns: [],
     });
   });
@@ -407,8 +395,8 @@ describe("useServerThreads", () => {
     );
     client.resumeResults.push(
       Promise.resolve({
-        ...resumeResponse([TURN_ONE], null),
-        thread: { ...THREAD_THREE, turns: [] },
+        ...resumeResponse([TURN_ONE]),
+        thread: { ...THREAD_THREE, turns: [TURN_ONE] },
       }),
     );
     const { result, rerender } = renderHook(
@@ -434,7 +422,7 @@ describe("useServerThreads", () => {
     expect(result.current.restoredThread?.turns).toEqual([TURN_ONE]);
   });
 
-  it("按游标追加会话并向前合并更早 turn，重复 ID 保持幂等", async () => {
+  it("按游标追加会话且保持恢复时取得的完整 turn", async () => {
     const client = new FakeThreadClient();
     client.listResults.push(
       Promise.resolve({ data: [THREAD_ONE, THREAD_TWO], nextCursor: "next" }),
@@ -444,10 +432,7 @@ describe("useServerThreads", () => {
       }),
     );
     client.resumeResults.push(
-      Promise.resolve(resumeResponse([TURN_TWO, TURN_ONE], "older")),
-    );
-    client.turnsResults.push(
-      Promise.resolve({ data: [TURN_ONE, TURN_ZERO, TURN_ZERO] }),
+      Promise.resolve(resumeResponse([TURN_ONE, TURN_TWO])),
     );
     const { result } = renderHook(() =>
       useServerThreads(client, THREAD_ONE.id),
@@ -458,19 +443,14 @@ describe("useServerThreads", () => {
     });
 
     await act(async () => result.current.loadMoreThreads());
-    await act(async () => result.current.loadOlderTurns());
 
     expect(client.listCalls).toEqual([{}, { cursor: "next" }]);
-    expect(client.turnsCalls).toEqual([
-      { threadId: THREAD_ONE.id, cursor: "older" },
-    ]);
     expect(result.current.threads.map(({ id }) => id)).toEqual([
       THREAD_ONE.id,
       THREAD_TWO.id,
       THREAD_THREE.id,
     ]);
     expect(result.current.restoredThread?.turns.map(({ id }) => id)).toEqual([
-      TURN_ZERO.id,
       TURN_ONE.id,
       TURN_TWO.id,
     ]);
@@ -562,7 +542,7 @@ describe("useServerThreads", () => {
     );
     const secondResume = deferred<ThreadResumeResponse>();
     client.resumeResults.push(
-      Promise.resolve(resumeResponse([], null)),
+      Promise.resolve(resumeResponse([])),
       secondResume.promise,
     );
     const { result, rerender } = renderHook(
@@ -587,7 +567,7 @@ describe("useServerThreads", () => {
     expect(client.unsubscribeCalls).toEqual([THREAD_ONE.id]);
 
     secondResume.resolve({
-      ...resumeResponse([], null),
+      ...resumeResponse([]),
       thread: { ...THREAD_TWO, turns: [] },
     });
     await waitFor(() =>
@@ -601,7 +581,7 @@ describe("useServerThreads", () => {
     client.listResults.push(
       Promise.resolve({ data: [THREAD_ONE, THREAD_TWO] }),
     );
-    client.resumeResults.push(Promise.resolve(resumeResponse([], null)));
+    client.resumeResults.push(Promise.resolve(resumeResponse([])));
     client.readResults.push(
       Promise.resolve({ thread: { ...THREAD_THREE, name: "外部恢复" } }),
     );
@@ -688,7 +668,7 @@ describe("useServerThreads", () => {
         params: { threadId: THREAD_ONE.id },
       });
       listResult.resolve({ data: [THREAD_ONE, THREAD_TWO] });
-      resumeResult.resolve(resumeResponse([], null));
+      resumeResult.resolve(resumeResponse([]));
     });
 
     await waitFor(() => {
@@ -774,7 +754,7 @@ describe("useServerThreads", () => {
   it("断线时保留当前进程已加载内容并保持只读", async () => {
     const client = new FakeThreadClient();
     client.listResults.push(Promise.resolve({ data: [THREAD_ONE] }));
-    client.resumeResults.push(Promise.resolve(resumeResponse([TURN_ONE], "older")));
+    client.resumeResults.push(Promise.resolve(resumeResponse([TURN_ONE])));
     const { result, rerender } = renderHook(
       ({ activeClient }) => useServerThreads(activeClient, THREAD_ONE.id, SERVER_ID),
       { initialProps: { activeClient: client as ServerThreadsClient | null } },
@@ -790,7 +770,6 @@ describe("useServerThreads", () => {
     expect(result.current.offline).toBe(true);
     expect(result.current.lastSyncedAt).toBe(syncedAt);
     expect(result.current.restoredThread?.turns[0]?.id).toBe(TURN_ONE.id);
-    expect(result.current.restoredThread?.nextCursor).toBe("older");
     await expect(result.current.archiveThread(THREAD_ONE.id)).resolves.toBe(false);
   });
 
@@ -808,7 +787,7 @@ describe("useServerThreads", () => {
   it("重连时保留只读内容并以服务端结果对账", async () => {
     const first = new FakeThreadClient();
     first.listResults.push(Promise.resolve({ data: [THREAD_ONE] }));
-    first.resumeResults.push(Promise.resolve(resumeResponse([TURN_ONE], null)));
+    first.resumeResults.push(Promise.resolve(resumeResponse([TURN_ONE])));
     const second = new FakeThreadClient();
     const listResult = deferred<ThreadListResponse>();
     const resumeResult = deferred<ThreadResumeResponse>();
@@ -838,7 +817,7 @@ describe("useServerThreads", () => {
 
     listResult.resolve({ data: [THREAD_TWO] });
     resumeResult.resolve({
-      ...resumeResponse([TURN_TWO], null),
+      ...resumeResponse([TURN_TWO]),
       thread: { ...THREAD_ONE, turns: [TURN_TWO], updatedAt: 300 },
     });
     await waitFor(() => expect(result.current.offline).toBe(false));
@@ -853,11 +832,11 @@ describe("useServerThreads", () => {
   it("重连列表对账失败时保留列表并采用已恢复正文", async () => {
     const first = new FakeThreadClient();
     first.listResults.push(Promise.resolve({ data: [THREAD_ONE] }));
-    first.resumeResults.push(Promise.resolve(resumeResponse([TURN_ONE], null)));
+    first.resumeResults.push(Promise.resolve(resumeResponse([TURN_ONE])));
     const second = new FakeThreadClient();
     const listResult = deferred<ThreadListResponse>();
     second.listResults.push(listResult.promise);
-    second.resumeResults.push(Promise.resolve(resumeResponse([TURN_TWO], null)));
+    second.resumeResults.push(Promise.resolve(resumeResponse([TURN_TWO])));
     const { result, rerender } = renderHook(
       ({ activeClient }) => useServerThreads(activeClient, THREAD_ONE.id, SERVER_ID),
       { initialProps: { activeClient: first as ServerThreadsClient | null } },
