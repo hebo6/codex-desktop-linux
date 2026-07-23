@@ -207,7 +207,7 @@ describe("Composer", () => {
 
     await user.click(screen.getByRole("button", { name: "添加内容" }));
     await user.click(screen.getByRole("menuitem", { name: /常用提示词/u }));
-    await user.click(await screen.findByRole("button", { name: "代码审查，立即发送" }));
+    await user.click(await screen.findByRole("button", { name: "发送 代码审查" }));
 
     await waitFor(() => expect(onSend).toHaveBeenCalledWith(
       [{ type: "text", text: "  审查当前修改  " }],
@@ -218,6 +218,26 @@ describe("Composer", () => {
     await waitFor(() => expect(editor).toHaveFocus());
     expect(editor.selectionStart).toBe(2);
     expect(editor.selectionEnd).toBe(6);
+  });
+
+  it("复制常用提示词且不发送或关闭浮层", async () => {
+    const user = userEvent.setup();
+    const { onSend } = renderComposer({ savedPromptStore: savedPromptStore() });
+    const writeText = vi.spyOn(navigator.clipboard, "writeText");
+
+    await user.click(screen.getByRole("button", { name: "添加内容" }));
+    await user.click(screen.getByRole("menuitem", { name: /常用提示词/u }));
+    const copy = await screen.findByRole("button", { name: "复制 代码审查" });
+    const send = screen.getByRole("button", { name: "发送 代码审查" });
+
+    expect(within(copy).getByText("复制")).not.toBeVisible();
+    expect(within(send).getByText("发送")).not.toBeVisible();
+    await user.click(copy);
+
+    expect(writeText).toHaveBeenCalledWith("  审查当前修改  ");
+    expect(onSend).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "选择常用提示词" })).toBeVisible();
+    expect(within(copy).getByText("已复制")).toBeInTheDocument();
   });
 
   it("在新会话首次发送常用提示词时迁移并保留原草稿", async () => {
@@ -260,7 +280,7 @@ describe("Composer", () => {
     await waitFor(() => expect(editor).toHaveValue("需要稍后发送"));
     await user.click(screen.getByRole("button", { name: "添加内容" }));
     await user.click(screen.getByRole("menuitem", { name: /常用提示词/u }));
-    await user.click(await screen.findByRole("button", { name: "代码审查，立即发送" }));
+    await user.click(await screen.findByRole("button", { name: "发送 代码审查" }));
 
     await waitFor(() => expect(editor).toHaveValue("需要稍后发送"));
     await waitFor(() => expect(draftStore.save).toHaveBeenCalledWith(

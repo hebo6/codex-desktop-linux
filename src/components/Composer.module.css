@@ -991,7 +991,7 @@
   font-size: 12px;
 }
 
-.savedPromptItems > button {
+.savedPromptItem {
   display: grid;
   width: 100%;
   min-height: 58px;
@@ -1004,50 +1004,107 @@
   color: var(--color-text-primary);
   background: transparent;
   text-align: left;
-  cursor: pointer;
 }
 
-.savedPromptItems > button:hover:not(:disabled),
-.savedPromptItems > button:focus-visible {
+.savedPromptItem:hover,
+.savedPromptItem:focus-within {
   background: var(--color-fill-hover);
 }
 
-.savedPromptItems > button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.savedPromptItems > button > span {
+.savedPromptItem > span {
   display: grid;
   min-width: 0;
   gap: 3px;
 }
 
-.savedPromptItems > button strong,
-.savedPromptItems > button small {
+.savedPromptItem > span strong,
+.savedPromptItem > span small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.savedPromptItems > button strong {
+.savedPromptItem > span strong {
   font-size: 13px;
   font-weight: 600;
 }
 
-.savedPromptItems > button small {
+.savedPromptItem > span small {
   color: var(--color-text-tertiary);
   font-size: 11px;
 }
 
-.savedPromptItems > button svg {
-  width: 18px;
-  height: 18px;
+.savedPromptActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.savedPromptAction {
+  position: relative;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  place-items: center;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.savedPromptAction:hover,
+.savedPromptAction:focus-visible {
+  color: var(--color-text-secondary);
+  background: var(--color-fill-hover);
+}
+
+.savedPromptAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.savedPromptAction svg {
+  width: 17px;
+  height: 17px;
   fill: none;
-  stroke: var(--color-text-tertiary);
+  stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.6;
+}
+
+.savedPromptActionTooltip {
+  position: absolute;
+  z-index: 4;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  padding: 5px 8px;
+  border: 1px solid var(--color-divider-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  box-shadow: 0 6px 18px rgb(20 20 18 / 16%);
+  font-size: 11px;
+  line-height: 1.2;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 2px);
+  transition:
+    opacity 100ms ease,
+    transform 100ms var(--ease-standard),
+    visibility 0s linear 100ms;
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+.savedPromptAction:hover .savedPromptActionTooltip,
+.savedPromptAction:focus-visible .savedPromptActionTooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  transition-delay: 0s;
+  visibility: visible;
 }
 
 .savedPromptEmpty {
@@ -1135,5 +1192,11 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .savedPromptActionTooltip {
+    transition: none;
   }
 }

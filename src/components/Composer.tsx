@@ -220,9 +220,11 @@ export function Composer({
   const [savedPromptManagerCreate, setSavedPromptManagerCreate] = useState(false);
   const [savedPromptQuery, setSavedPromptQuery] = useState("");
   const [sendingPromptId, setSendingPromptId] = useState<string | null>(null);
-  const [savedPromptSendError, setSavedPromptSendError] = useState<string | null>(null);
+  const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
+  const [savedPromptActionError, setSavedPromptActionError] = useState<string | null>(null);
   const plusMenuRef = useRef<HTMLDivElement>(null);
   const savedPromptSearchRef = useRef<HTMLInputElement>(null);
+  const copiedPromptTimeoutRef = useRef<number | null>(null);
   const fileSearchRef = useRef(0);
   const composingRef = useRef(false);
   const sendingRef = useRef(false);
@@ -358,6 +360,12 @@ export function Composer({
   useEffect(() => {
     if (savedPromptPickerOpen) savedPromptSearchRef.current?.focus();
   }, [savedPromptPickerOpen]);
+
+  useEffect(() => () => {
+    if (copiedPromptTimeoutRef.current !== null) {
+      window.clearTimeout(copiedPromptTimeoutRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -759,7 +767,7 @@ export function Composer({
     setSavedPromptManagerOpen(false);
     setSavedPromptPickerOpen(true);
     setSavedPromptQuery("");
-    setSavedPromptSendError(null);
+    setSavedPromptActionError(null);
     savedPrompts.clearError();
     void savedPrompts.reload();
   };
@@ -769,15 +777,32 @@ export function Composer({
     setSavedPromptPickerOpen(false);
     setSavedPromptManagerCreate(startCreating);
     setSavedPromptManagerOpen(true);
-    setSavedPromptSendError(null);
+    setSavedPromptActionError(null);
     void savedPrompts.reload();
+  };
+
+  const copySavedPrompt = async (prompt: SavedPrompt) => {
+    setSavedPromptActionError(null);
+    try {
+      await navigator.clipboard.writeText(prompt.content);
+      setCopiedPromptId(prompt.promptId);
+      if (copiedPromptTimeoutRef.current !== null) {
+        window.clearTimeout(copiedPromptTimeoutRef.current);
+      }
+      copiedPromptTimeoutRef.current = window.setTimeout(() => {
+        setCopiedPromptId(null);
+        copiedPromptTimeoutRef.current = null;
+      }, 1_500);
+    } catch {
+      setSavedPromptActionError("未能复制常用提示词");
+    }
   };
 
   const sendSavedPrompt = async (prompt: SavedPrompt) => {
     if (sendingRef.current || submitting || stopping || preparingAttachments) return;
     sendingRef.current = true;
     setSendingPromptId(prompt.promptId);
-    setSavedPromptSendError(null);
+    setSavedPromptActionError(null);
     if (showProjectPicker) preserveDraftForNextKeyRef.current = true;
     try {
       const sent = await onSend(
@@ -788,7 +813,7 @@ export function Composer({
         setSavedPromptPickerOpen(false);
       } else {
         if (showProjectPicker) releaseDraftPreservationIfUnchanged();
-        setSavedPromptSendError("未能发送常用提示词，当前草稿未受影响");
+        setSavedPromptActionError("未能发送常用提示词，当前草稿未受影响");
       }
     } finally {
       sendingRef.current = false;
@@ -1161,28 +1186,59 @@ export function Composer({
                         {savedPrompts.prompts.length === 0 ? <button onClick={() => openSavedPromptManager(true)} type="button">新建提示词</button> : null}
                       </div>
                     ) : null}
-                    {filteredSavedPrompts.map((prompt) => (
-                      <button
-                        aria-label={`${prompt.name}，${activeTurn ? "立即追加" : "立即发送"}`}
-                        disabled={sendingPromptId !== null || submitting || stopping}
-                        key={prompt.promptId}
-                        onClick={() => void sendSavedPrompt(prompt)}
-                        type="button"
-                      >
-                        <span>
-                          <strong>{prompt.name}</strong>
-                          <small>{prompt.content}</small>
-                        </span>
-                        <svg aria-hidden="true" viewBox="0 0 24 24">
-                          <path d="m5 12 14-7-4 14-3-6Z" />
-                          <path d="m12 13 7-8" />
-                        </svg>
-                      </button>
-                    ))}
+                    {filteredSavedPrompts.map((prompt) => {
+                      const copied = copiedPromptId === prompt.promptId;
+                      return (
+                        <div className={styles.savedPromptItem} key={prompt.promptId}>
+                          <span>
+                            <strong>{prompt.name}</strong>
+                            <small>{prompt.content}</small>
+                          </span>
+                          <div className={styles.savedPromptActions}>
+                            <button
+                              aria-label={`复制 ${prompt.name}`}
+                              className={styles.savedPromptAction}
+                              onClick={() => void copySavedPrompt(prompt)}
+                              type="button"
+                            >
+                              <svg aria-hidden="true" viewBox="0 0 24 24">
+                                {copied ? (
+                                  <path d="m6 12 4 4 8-9" />
+                                ) : (
+                                  <>
+                                    <rect height="12" rx="2" width="12" x="8" y="8" />
+                                    <path d="M16 6V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h1" />
+                                  </>
+                                )}
+                              </svg>
+                              <span aria-hidden="true" className={styles.savedPromptActionTooltip}>
+                                {copied ? "已复制" : "复制"}
+                              </span>
+                              <span aria-live="polite" className={styles.srOnly}>
+                                {copied ? `${prompt.name} 已复制` : ""}
+                              </span>
+                            </button>
+                            <button
+                              aria-label={`发送 ${prompt.name}`}
+                              className={styles.savedPromptAction}
+                              disabled={sendingPromptId !== null || submitting || stopping}
+                              onClick={() => void sendSavedPrompt(prompt)}
+                              type="button"
+                            >
+                              <svg aria-hidden="true" viewBox="0 0 24 24">
+                                <path d="m5 12 14-7-4 14-3-6Z" />
+                                <path d="m12 13 7-8" />
+                              </svg>
+                              <span aria-hidden="true" className={styles.savedPromptActionTooltip}>发送</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  {savedPrompts.error === null && savedPromptSendError === null ? null : (
+                  {savedPrompts.error === null && savedPromptActionError === null ? null : (
                     <div className={styles.savedPromptError} role="alert">
-                      {savedPromptSendError ?? savedPrompts.error}
+                      {savedPromptActionError ?? savedPrompts.error}
                       {savedPrompts.error === null ? null : <button disabled={savedPrompts.loading} onClick={() => void savedPrompts.reload()} type="button">重试</button>}
                     </div>
                   )}
