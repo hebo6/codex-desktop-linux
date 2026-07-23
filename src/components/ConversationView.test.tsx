@@ -1,6 +1,4 @@
 import {
-  act,
-  createEvent,
   fireEvent,
   render as testingLibraryRender,
   screen,
@@ -27,36 +25,7 @@ const OriginalScrollWidth = Object.getOwnPropertyDescriptor(
 function TestConversationWorkspace({ children }: { readonly children: ReactNode }) {
   return (
     <ConversationWorkspace
-      composer={(
-        <div
-          aria-label="问题输入区边界"
-          data-conversation-composer
-          ref={(element) => {
-            if (element === null) {
-              return;
-            }
-            element.getBoundingClientRect = () => {
-              const scroller = element.closest("[data-conversation-workspace]")
-                ?.querySelector<HTMLElement>("[aria-label='会话消息']");
-              const top = scroller === undefined || scroller === null
-                ? 0
-                : scroller.getBoundingClientRect().top +
-                  scroller.clientHeight - 96;
-              return {
-                bottom: top + 96,
-                height: 96,
-                left: 0,
-                right: 0,
-                toJSON: () => ({}),
-                top,
-                width: 0,
-                x: 0,
-                y: top,
-              };
-            };
-          }}
-        />
-      )}
+      composer={<div data-conversation-composer />}
     >
       {children}
     </ConversationWorkspace>
@@ -82,23 +51,6 @@ function mockOverflowingTitle(text: string) {
       },
     },
   });
-}
-
-function mockElementBottom(element: HTMLElement, bottom: () => number) {
-  element.getBoundingClientRect = () => {
-    const edge = bottom();
-    return {
-      bottom: edge,
-      height: 0,
-      left: 0,
-      right: 0,
-      toJSON: () => ({}),
-      top: edge,
-      width: 0,
-      x: 0,
-      y: edge,
-    };
-  };
 }
 
 afterEach(() => {
@@ -589,7 +541,7 @@ describe("ConversationView", () => {
     );
   });
 
-  it("在底部展开已完成活动组后不再因行高变化自动贴底", () => {
+  it("位于底部时内容增长后继续跟随底部", () => {
     const { rerender } = render(
       <ConversationView
         hasOlderTurns={false}
@@ -606,8 +558,6 @@ describe("ConversationView", () => {
     });
     scroller.scrollTop = 800;
     fireEvent.scroll(scroller);
-
-    fireEvent.click(screen.getByRole("button", { name: /已运行/u }));
 
     const expandedTurn = {
       ...TURN,
@@ -633,10 +583,12 @@ describe("ConversationView", () => {
       />,
     );
 
-    expect(scroller.scrollTop).toBe(800);
+    expect(scroller.scrollTop).toBe(1_200);
+    expect(screen.queryByRole("button", { name: "回到底部" }))
+      .not.toBeInTheDocument();
   });
 
-  it("按会话内容末尾和回答可读区判断是否已在底部", () => {
+  it("按原生滚动范围判断是否位于底部", () => {
     render(
       <ConversationView
         hasOlderTurns={false}
@@ -646,97 +598,32 @@ describe("ConversationView", () => {
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
-    const tail = scroller.querySelector<HTMLElement>("[data-conversation-tail]");
-    if (tail === null) {
-      throw new Error("缺少会话内容末尾标记");
-    }
-    let tailBottom = 380;
     Object.defineProperties(scroller, {
       clientHeight: { configurable: true, value: 500 },
       scrollHeight: { configurable: true, value: 1_500 },
     });
-    mockElementBottom(tail, () => tailBottom);
 
+    scroller.scrollTop = 1_000;
     fireEvent.scroll(scroller);
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
 
-    tailBottom = 381;
+    scroller.scrollTop = 900;
     fireEvent.scroll(scroller);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });
 
-  it("手动向末尾滚动时不越过实际会话内容末尾", () => {
-    render(
-      <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null }}
-      />,
-    );
-    const scroller = screen.getByLabelText("会话消息");
-    const tail = scroller.querySelector<HTMLElement>("[data-conversation-tail]");
-    if (tail === null) {
-      throw new Error("缺少会话内容末尾标记");
-    }
-    Object.defineProperties(scroller, {
-      clientHeight: { configurable: true, value: 500 },
-      scrollHeight: { configurable: true, value: 1_500 },
-    });
-    const tailDocumentBottom = 900;
-    mockElementBottom(tail, () => tailDocumentBottom - scroller.scrollTop);
-
-    scroller.scrollTop = 100;
-    fireEvent.wheel(scroller);
-    scroller.scrollTop = 600;
-    fireEvent.scroll(scroller);
-    expect(scroller.scrollTop).toBe(520);
-
-    const forwardWheel = createEvent.wheel(scroller, { deltaY: 120 });
-    fireEvent(scroller, forwardWheel);
-    expect(forwardWheel.defaultPrevented).toBe(true);
-
-    scroller.scrollTop = 620;
-    fireEvent.scroll(scroller);
-    expect(scroller.scrollTop).toBe(520);
-
-    fireEvent.wheel(scroller);
-    scroller.scrollTop = 300;
-    fireEvent.scroll(scroller);
-    expect(scroller.scrollTop).toBe(300);
-  });
-
-  it("手动滚动停止后保留位置并在后续内容越界时恢复跟随", () => {
-    vi.useFakeTimers();
-    const earlierTurn = {
-      id: "turn-bottom-1",
-      items: [
-        {
-          content: [{ text: "第一条问题", type: "text" as const }],
-          id: "user-bottom-1",
-          type: "userMessage" as const,
-        },
-        {
-          id: "answer-bottom-1",
-          phase: "final_answer" as const,
-          text: "第一条回答",
-          type: "agentMessage" as const,
-        },
-      ],
-      itemsView: "full" as const,
-      status: "completed" as const,
-    } satisfies ThreadTurn;
+  it("离开底部后内容增长保持当前滚动位置", () => {
     const activeTurn = {
-      id: "turn-bottom-2",
+      id: "turn-standard-scroll",
       items: [
         {
-          content: [{ text: "最近一个问题", type: "text" as const }],
-          id: "user-bottom-2",
+          content: [{ text: "标准滚动问题", type: "text" as const }],
+          id: "user-standard-scroll",
           type: "userMessage" as const,
         },
         {
-          id: "answer-bottom-2",
+          id: "answer-standard-scroll",
           text: "正在回答",
           type: "agentMessage" as const,
         },
@@ -747,7 +634,7 @@ describe("ConversationView", () => {
     const activeThread = {
       ...RESTORED,
       nextCursor: null,
-      turns: [earlierTurn, activeTurn],
+      turns: [activeTurn],
     } satisfies RestoredThread;
     const { rerender } = render(
       <ConversationView
@@ -758,27 +645,15 @@ describe("ConversationView", () => {
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
-    const tail = scroller.querySelector<HTMLElement>("[data-conversation-tail]");
-    if (tail === null) {
-      throw new Error("缺少会话内容末尾标记");
-    }
+    let scrollHeight = 1_500;
     Object.defineProperties(scroller, {
       clientHeight: { configurable: true, value: 500 },
-      scrollHeight: { configurable: true, value: 1_600 },
+      scrollHeight: { configurable: true, get: () => scrollHeight },
     });
-    let tailDocumentBottom = 480;
-    mockElementBottom(tail, () => tailDocumentBottom - scroller.scrollTop);
 
-    scroller.scrollTop = 100;
-    fireEvent.wheel(scroller);
+    scroller.scrollTop = 400;
     fireEvent.scroll(scroller);
-    expect(screen.queryByRole("button", { name: "回到底部" }))
-      .not.toBeInTheDocument();
-
-    act(() => vi.advanceTimersByTime(300));
-    expect(scroller.scrollTop).toBe(100);
-
-    tailDocumentBottom = 850;
+    scrollHeight = 1_900;
     rerender(
       <ConversationView
         hasOlderTurns={false}
@@ -786,22 +661,20 @@ describe("ConversationView", () => {
         onLoadOlderTurns={vi.fn(async () => undefined)}
         restoredThread={{
           ...activeThread,
-          turns: [
-            earlierTurn,
-            {
-              ...activeTurn,
-              items: activeTurn.items.map((item) =>
-                item.id === "answer-bottom-2"
-                  ? { ...item, text: "正在回答，内容继续增长" }
-                  : item
-              ),
-            },
-          ],
+          turns: [{
+            ...activeTurn,
+            items: activeTurn.items.map((item) =>
+              item.id === "answer-standard-scroll"
+                ? { ...item, text: "正在回答，内容继续增长" }
+                : item
+            ),
+          }],
         }}
       />,
     );
 
-    expect(scroller.scrollTop).toBe(480);
+    expect(scroller.scrollTop).toBe(400);
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });
 
   it("思考项目没有摘要时显示占位，工具到达后不保留占位", async () => {
@@ -924,12 +797,10 @@ describe("ConversationView", () => {
     expect(firstMarker).toHaveTextContent("回答 1");
 
     const scroller = screen.getByLabelText("会话消息");
-    Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 200 });
-    const tail = scroller.querySelector<HTMLElement>("[data-conversation-tail]");
-    if (tail === null) {
-      throw new Error("缺少会话内容末尾标记");
-    }
-    mockElementBottom(tail, () => 1_200 - scroller.scrollTop);
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 200 },
+      scrollHeight: { configurable: true, value: 1_200 },
+    });
     scroller.scrollTop = 900;
     fireEvent.click(firstMarker);
     expect(scroller.scrollTop).toBe(24);
@@ -974,7 +845,7 @@ describe("ConversationView", () => {
       .not.toBeInTheDocument();
   });
 
-  it("已有可读空白时首个流式回答不应将新问题滚动到顶部", () => {
+  it("短会话开始流式回答后保持底部跟随", () => {
     const completedTurn = {
       id: "turn-blank-space-1",
       items: [
@@ -1006,6 +877,10 @@ describe("ConversationView", () => {
     let maximumScrollTop = 0;
     Object.defineProperties(scroller, {
       clientHeight: { configurable: true, value: 800 },
+      scrollHeight: {
+        configurable: true,
+        get: () => maximumScrollTop + 800,
+      },
       scrollTop: {
         configurable: true,
         get: () => scrollTop,
@@ -1041,13 +916,6 @@ describe("ConversationView", () => {
     );
 
     expect(scroller.scrollTop).toBe(0);
-    const conversationTail = scroller.querySelector<HTMLElement>(
-      "[data-conversation-tail]",
-    );
-    if (conversationTail === null) {
-      throw new Error("缺少会话内容末尾标记");
-    }
-    mockElementBottom(conversationTail, () => 520 - scroller.scrollTop);
     maximumScrollTop = 1_000;
 
     rerender(
@@ -1076,10 +944,10 @@ describe("ConversationView", () => {
       />,
     );
 
-    expect(scroller.scrollTop).toBe(0);
+    expect(scroller.scrollTop).toBe(1_000);
   });
 
-  it("活动项更新先使用下方可见空白，实际越界后仅滚动溢出距离", () => {
+  it("离开底部后活动项更新不改变滚动位置", () => {
     const activeTurn = {
       durationMs: 1_000,
       id: "turn-activity-following",
@@ -1112,21 +980,10 @@ describe("ConversationView", () => {
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
-    const conversationTail = scroller.querySelector<HTMLElement>(
-      "[data-conversation-tail]",
-    );
-    if (conversationTail === null) {
-      throw new Error("缺少会话内容末尾标记");
-    }
     Object.defineProperties(scroller, {
       clientHeight: { configurable: true, value: 500 },
       scrollHeight: { configurable: true, value: 1_500 },
     });
-    let tailDocumentBottom = 460;
-    mockElementBottom(
-      conversationTail,
-      () => tailDocumentBottom - scroller.scrollTop,
-    );
     scroller.scrollTop = 100;
     fireEvent.scroll(scroller);
 
@@ -1143,10 +1000,8 @@ describe("ConversationView", () => {
     );
 
     expect(scroller.scrollTop).toBe(100);
-    expect(screen.queryByRole("button", { name: "回到底部" }))
-      .not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
 
-    tailDocumentBottom = 510;
     rerender(
       <ConversationView
         hasOlderTurns={false}
@@ -1159,12 +1014,11 @@ describe("ConversationView", () => {
       />,
     );
 
-    expect(scroller.scrollTop).toBe(150);
-    expect(screen.queryByRole("button", { name: "回到底部" }))
-      .not.toBeInTheDocument();
+    expect(scroller.scrollTop).toBe(100);
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });
 
-  it("进行中的活动回到底部时以实际内容末尾为目标", () => {
+  it("回到底部操作使用原生滚动范围并恢复跟随", () => {
     const activeTurn = {
       id: "turn-activity-jump",
       items: [
@@ -1191,38 +1045,22 @@ describe("ConversationView", () => {
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
-    const composer = screen.getByLabelText("问题输入区边界");
-    const conversationTail = scroller.querySelector<HTMLElement>(
-      "[data-conversation-tail]",
-    );
-    if (conversationTail === null) {
-      throw new Error("缺少会话内容末尾标记");
-    }
+    let scrollHeight = 2_000;
     Object.defineProperties(scroller, {
       clientHeight: { configurable: true, value: 500 },
-      scrollHeight: { configurable: true, value: 2_000 },
+      scrollHeight: { configurable: true, get: () => scrollHeight },
     });
-    let tailDocumentBottom = 1_300;
-    mockElementBottom(
-      conversationTail,
-      () => tailDocumentBottom - scroller.scrollTop,
-    );
     scroller.scrollTop = 100;
-    fireEvent.wheel(scroller, { deltaY: -120 });
     fireEvent.scroll(scroller);
 
     fireEvent.click(screen.getByRole("button", { name: "回到底部" }));
 
-    expect(scroller.scrollTop).toBe(920);
-    expect(
-      composer.getBoundingClientRect().top -
-        conversationTail.getBoundingClientRect().bottom,
-    ).toBe(24);
+    expect(scroller.scrollTop).toBe(1_500);
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /正在运行/u })).toBeVisible();
 
-    tailDocumentBottom = 1_350;
+    scrollHeight = 2_200;
     rerender(
       <ConversationView
         hasOlderTurns={false}
@@ -1236,16 +1074,12 @@ describe("ConversationView", () => {
       />,
     );
 
-    expect(scroller.scrollTop).toBe(990);
-    expect(
-      composer.getBoundingClientRect().top -
-        conversationTail.getBoundingClientRect().bottom,
-    ).toBe(44);
+    expect(scroller.scrollTop).toBe(1_700);
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
   });
 
-  it("进行中的回答回到底部后不被输入区遮挡", () => {
+  it("进行中的回答回到底部后保持可见", () => {
     const activeTurn = {
       id: "turn-answer-composer",
       items: [
@@ -1272,32 +1106,16 @@ describe("ConversationView", () => {
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
-    const composer = screen.getByLabelText("问题输入区边界");
-    const conversationTail = scroller.querySelector<HTMLElement>(
-      "[data-conversation-tail]",
-    );
-    if (conversationTail === null) {
-      throw new Error("缺少会话内容末尾标记");
-    }
     Object.defineProperties(scroller, {
       clientHeight: { configurable: true, value: 500 },
       scrollHeight: { configurable: true, value: 2_000 },
     });
-    const tailDocumentBottom = 1_300;
-    mockElementBottom(
-      conversationTail,
-      () => tailDocumentBottom - scroller.scrollTop,
-    );
     scroller.scrollTop = 100;
-    fireEvent.wheel(scroller, { deltaY: -120 });
     fireEvent.scroll(scroller);
 
     fireEvent.click(screen.getByRole("button", { name: "回到底部" }));
 
-    const contentBottom = conversationTail.getBoundingClientRect().bottom;
-    const composerTop = composer.getBoundingClientRect().top;
-    expect(scroller.scrollTop).toBe(920);
-    expect(composerTop - contentBottom).toBe(24);
+    expect(scroller.scrollTop).toBe(1_500);
     expect(screen.getByText("输入区上方的最新 AI 回答")).toBeVisible();
   });
 
@@ -1388,12 +1206,6 @@ describe("ConversationView", () => {
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
-    const conversationTail = scroller.querySelector<HTMLElement>(
-      "[data-conversation-tail]",
-    );
-    if (conversationTail === null) {
-      throw new Error("缺少会话内容末尾标记");
-    }
     let scrollTop = 0;
     Object.defineProperties(scroller, {
       clientHeight: { configurable: true, value: 240 },
@@ -1406,14 +1218,8 @@ describe("ConversationView", () => {
         },
       },
     });
-    const tailDocumentBottom = 6_000;
-    mockElementBottom(
-      conversationTail,
-      () => tailDocumentBottom - scroller.scrollTop,
-    );
 
     await waitFor(() => expect(scroller.scrollTop).toBe(6_760));
-    fireEvent.wheel(scroller, { deltaY: -120 });
     const visibleHistoryAnswers = new Set<string>();
     historyTurns.forEach((_turn, index) => {
       scroller.scrollTop = index * 276;
@@ -1431,7 +1237,7 @@ describe("ConversationView", () => {
     scroller.scrollTop = 0;
     fireEvent.scroll(scroller);
     fireEvent.click(screen.getByRole("button", { name: "回到底部" }));
-    expect(scroller.scrollTop).toBe(5_880);
+    expect(scroller.scrollTop).toBe(6_760);
     fireEvent.scroll(scroller);
 
     expect(screen.getByText("当前 AI 进度")).toBeVisible();
@@ -1440,19 +1246,19 @@ describe("ConversationView", () => {
       .not.toBeInTheDocument();
   });
 
-  it("新问题离散翻页并在手动滚动延时后重新判断跟随", () => {
+  it("新问题和流式内容仅在原本位于底部时自动跟随", () => {
     const firstTurn = {
-      id: "turn-page-1",
+      id: "turn-follow-1",
       items: [
         {
-          content: [{ text: "分页问题 1", type: "text" as const }],
-          id: "user-page-1",
+          content: [{ text: "历史问题", type: "text" as const }],
+          id: "user-follow-1",
           type: "userMessage" as const,
         },
         {
-          id: "answer-page-1",
+          id: "answer-follow-1",
           phase: "final_answer" as const,
-          text: "分页回答 1",
+          text: "历史回答",
           type: "agentMessage" as const,
         },
       ],
@@ -1468,31 +1274,24 @@ describe("ConversationView", () => {
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
+    let scrollHeight = 1_720;
     Object.defineProperties(scroller, {
       clientHeight: { configurable: true, value: 500 },
-      scrollHeight: { configurable: true, value: 1_720 },
+      scrollHeight: { configurable: true, get: () => scrollHeight },
     });
-    const conversationTail = scroller.querySelector<HTMLElement>(
-      "[data-conversation-tail]",
-    );
-    if (conversationTail === null) {
-      throw new Error("缺少会话内容末尾标记");
-    }
-    let tailDocumentBottom = 600;
-    mockElementBottom(
-      conversationTail,
-      () => tailDocumentBottom - scroller.scrollTop,
-    );
+    scroller.scrollTop = 1_220;
+    fireEvent.scroll(scroller);
+
     const activeTurn = {
-      id: "turn-page-2",
+      id: "turn-follow-2",
       items: [
         {
-          content: [{ text: "分页问题 2", type: "text" as const }],
-          id: "user-page-2",
+          content: [{ text: "新问题", type: "text" as const }],
+          id: "user-follow-2",
           type: "userMessage" as const,
         },
         {
-          id: "answer-page-2",
+          id: "answer-follow-2",
           text: "正在流式回答",
           type: "agentMessage" as const,
         },
@@ -1505,6 +1304,7 @@ describe("ConversationView", () => {
       nextCursor: null,
       turns: [firstTurn, activeTurn],
     } satisfies RestoredThread;
+    scrollHeight = 2_000;
     rerender(
       <ConversationView
         hasOlderTurns={false}
@@ -1514,9 +1314,9 @@ describe("ConversationView", () => {
       />,
     );
 
-    expect(scroller.scrollTop).toBe(300);
+    expect(scroller.scrollTop).toBe(1_500);
 
-    tailDocumentBottom = 850;
+    scrollHeight = 2_300;
     rerender(
       <ConversationView
         hasOlderTurns={false}
@@ -1526,12 +1326,11 @@ describe("ConversationView", () => {
       />,
     );
 
-    expect(scroller.scrollTop).toBe(680);
+    expect(scroller.scrollTop).toBe(1_800);
 
-    vi.useFakeTimers();
-    scroller.scrollTop = 100;
-    fireEvent.wheel(scroller);
+    scroller.scrollTop = 600;
     fireEvent.scroll(scroller);
+    scrollHeight = 2_600;
     rerender(
       <ConversationView
         hasOlderTurns={false}
@@ -1540,182 +1339,8 @@ describe("ConversationView", () => {
         restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
       />,
     );
-    expect(scroller.scrollTop).toBe(100);
+    expect(scroller.scrollTop).toBe(600);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
-
-    scroller.scrollTop = 470;
-    fireEvent.wheel(scroller);
-    fireEvent.scroll(scroller);
-    expect(screen.queryByRole("button", { name: "回到底部" }))
-      .not.toBeInTheDocument();
-
-    tailDocumentBottom = 1_200;
-    rerender(
-      <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
-      />,
-    );
-    expect(scroller.scrollTop).toBe(470);
-    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
-
-    act(() => vi.advanceTimersByTime(300));
-    rerender(
-      <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
-      />,
-    );
-    expect(scroller.scrollTop).toBe(470);
-
-    scroller.scrollTop = 700;
-    fireEvent.wheel(scroller);
-    fireEvent.scroll(scroller);
-    act(() => vi.advanceTimersByTime(200));
-    fireEvent.wheel(scroller);
-    fireEvent.scroll(scroller);
-    act(() => vi.advanceTimersByTime(100));
-
-    tailDocumentBottom = 1_550;
-    rerender(
-      <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
-      />,
-    );
-    expect(scroller.scrollTop).toBe(700);
-    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
-
-    scroller.scrollTop = 1_170;
-    fireEvent.wheel(scroller);
-    fireEvent.scroll(scroller);
-    act(() => vi.advanceTimersByTime(300));
-
-    tailDocumentBottom = 1_600;
-    rerender(
-      <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
-      />,
-    );
-    expect(scroller.scrollTop).toBe(1_220);
-    expect(screen.queryByRole("button", { name: "回到底部" }))
-      .not.toBeInTheDocument();
-  });
-
-  it("新问题首次定位受限时在回答到达后重试", () => {
-    const firstTurn = {
-      id: "turn-position-1",
-      items: [
-        {
-          content: [{ text: "较早问题", type: "text" as const }],
-          id: "user-position-1",
-          type: "userMessage" as const,
-        },
-        {
-          id: "answer-position-1",
-          phase: "final_answer" as const,
-          text: "较早回答",
-          type: "agentMessage" as const,
-        },
-      ],
-      itemsView: "full" as const,
-      status: "completed" as const,
-    } satisfies ThreadTurn;
-    const { rerender } = render(
-      <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{ ...RESTORED, nextCursor: null, turns: [firstTurn] }}
-      />,
-    );
-    const scroller = screen.getByLabelText("会话消息");
-    let scrollTop = 0;
-    let maximumScrollTop = 250;
-    Object.defineProperty(scroller, "scrollTop", {
-      configurable: true,
-      get: () => scrollTop,
-      set: (value: number) => {
-        scrollTop = Math.min(value, maximumScrollTop);
-      },
-    });
-    Object.defineProperty(scroller, "clientHeight", {
-      configurable: true,
-      value: 500,
-    });
-    const conversationTail = scroller.querySelector<HTMLElement>(
-      "[data-conversation-tail]",
-    );
-    if (conversationTail === null) {
-      throw new Error("缺少会话内容末尾标记");
-    }
-    mockElementBottom(
-      conversationTail,
-      () => 650 - scroller.scrollTop,
-    );
-    const activeQuestion = {
-      id: "turn-position-2",
-      items: [
-        {
-          content: [{ text: "正在回答的问题", type: "text" as const }],
-          id: "user-position-2",
-          type: "userMessage" as const,
-        },
-      ],
-      itemsView: "full" as const,
-      status: "inProgress" as const,
-    } satisfies ThreadTurn;
-
-    rerender(
-      <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{
-          ...RESTORED,
-          nextCursor: null,
-          turns: [firstTurn, activeQuestion],
-        }}
-      />,
-    );
-
-    maximumScrollTop = 1_000;
-    rerender(
-      <ConversationView
-        hasOlderTurns={false}
-        loadingOlderTurns={false}
-        onLoadOlderTurns={vi.fn(async () => undefined)}
-        restoredThread={{
-          ...RESTORED,
-          nextCursor: null,
-          turns: [
-            firstTurn,
-            {
-              ...activeQuestion,
-              items: [
-                ...activeQuestion.items,
-                {
-                  id: "answer-position-2",
-                  text: "回答开始生成",
-                  type: "agentMessage" as const,
-                },
-              ],
-            },
-          ],
-        }}
-      />,
-    );
-
-    expect(scroller.scrollTop).toBe(300);
   });
 
   it("从回答所在 turn 发起分叉并标记最新回合", () => {

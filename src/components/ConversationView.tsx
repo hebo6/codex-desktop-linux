@@ -67,10 +67,8 @@ type FileUpdateChange = FileChangeItem["changes"][number];
 type ReasoningItem = Extract<ThreadItem, { type: "reasoning" }>;
 
 const PANEL_TRANSITION_MS = 210;
-const COMPOSER_CONTENT_GAP = 24;
-const ACTIVITY_BOTTOM_GAP = 20;
 const FIRST_TURN_ROW_PADDING = 24;
-const MANUAL_SCROLL_SETTLE_MS = 300;
+const BOTTOM_THRESHOLD = 1;
 
 function useCollapsibleContent(initiallyExpanded: boolean) {
   const [expanded, setExpanded] = useState(initiallyExpanded);
@@ -165,15 +163,8 @@ export function ConversationView({
   restoredThread,
 }: ConversationViewProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const conversationTailRef = useRef<HTMLDivElement>(null);
-  const pageFollowingRef = useRef(false);
-  const manualScrollRef = useRef(false);
-  const manualScrollTimerRef = useRef<number | null>(null);
-  const manualForwardScrollLimitRef = useRef<number | null>(null);
-  const pointerScrollRef = useRef(false);
-  const pendingQuestionPositionRef = useRef<string | null>(null);
+  const followBottomRef = useRef(true);
   const loadingAnchorRef = useRef(false);
-  const observedThreadIdRef = useRef(restoredThread.metadata.id);
   const initialBottomScrollRef = useRef<{
     pending: boolean;
     threadId: string | null;
@@ -182,9 +173,7 @@ export function ConversationView({
     threadId: null,
   });
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
-  const [preservePageEndSpace, setPreservePageEndSpace] = useState(false);
   const [scrollerHeight, setScrollerHeight] = useState(0);
-  const [contentBottomInset, setContentBottomInset] = useState(0);
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
   const [loadingAnchorKey, setLoadingAnchorKey] = useState<string | null>(null);
   useLayoutEffect(() => {
@@ -202,14 +191,9 @@ export function ConversationView({
     () => historyQuestionItems(restoredThread.turns, rows),
     [restoredThread.turns, rows],
   );
-  const latestQuestion = historyQuestions.at(-1) ?? null;
-  const observedQuestionIdRef = useRef(latestQuestion?.itemId ?? null);
   const activeTurn = restoredThread.turns.findLast(
     ({ status }) => status === "inProgress",
   );
-  const activeTurnRef = useRef(activeTurn);
-  activeTurnRef.current = activeTurn;
-  const previousActiveTurnIdRef = useRef(activeTurn?.id ?? null);
   const questionIndexByRow = useMemo(
     () => new Map(historyQuestions.map((question, index) => [question.rowIndex, index])),
     [historyQuestions],
@@ -263,12 +247,6 @@ export function ConversationView({
   const visibleRowsMeasured = virtual.rows.every(
     ({ key }) => virtual.isMeasured(key),
   );
-  const setPageFollowingMode = useCallback((following: boolean) => {
-    if (!following) {
-      pendingQuestionPositionRef.current = null;
-    }
-    pageFollowingRef.current = following;
-  }, []);
 
   const questionTop = useCallback(
     (question: HistoryQuestion): number | null => {
@@ -297,137 +275,23 @@ export function ConversationView({
     [historyQuestions, rows, virtual],
   );
 
-  const conversationEndScrollTop = useCallback((scroller: HTMLDivElement) => {
-    const tail = conversationTailRef.current;
-    if (tail === null) {
-      return null;
-    }
-    const maximumTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-    const targetTop = scroller.scrollTop + tail.getBoundingClientRect().bottom -
-      conversationReadableBottom(scroller);
-    return Math.min(maximumTop, Math.max(0, targetTop));
-  }, []);
-
-  const updateConversationBottom = useCallback((scroller: HTMLDivElement) => {
-    const tail = conversationTailRef.current;
-    const atBottom = tail === null ||
-      tail.getBoundingClientRect().bottom <=
-        conversationReadableBottom(scroller) + 0.5;
+  const updateBottomState = useCallback((scroller: HTMLDivElement) => {
+    const atBottom =
+      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <=
+        BOTTOM_THRESHOLD;
+    followBottomRef.current = atBottom;
     setShowJumpToBottom(!atBottom);
     return atBottom;
   }, []);
 
-  const stopPageFollowing = useCallback(() => {
-    const scroller = scrollerRef.current;
-    if (pageFollowingRef.current) {
-      setPageFollowingMode(false);
-    }
-    if (scroller !== null) {
-      updateConversationBottom(scroller);
-    }
-  }, [setPageFollowingMode, updateConversationBottom]);
-
-  const cancelManualScrollDelay = useCallback(() => {
-    if (manualScrollTimerRef.current !== null) {
-      window.clearTimeout(manualScrollTimerRef.current);
-      manualScrollTimerRef.current = null;
-    }
-    manualScrollRef.current = false;
-    manualForwardScrollLimitRef.current = null;
+  const scrollToBottom = useCallback((scroller: HTMLDivElement) => {
+    scroller.scrollTop = Math.max(
+      0,
+      scroller.scrollHeight - scroller.clientHeight,
+    );
+    followBottomRef.current = true;
+    setShowJumpToBottom(false);
   }, []);
-
-  const restartManualScrollDelay = useCallback(() => {
-    if (manualScrollTimerRef.current !== null) {
-      window.clearTimeout(manualScrollTimerRef.current);
-    }
-    manualScrollRef.current = true;
-    manualScrollTimerRef.current = window.setTimeout(() => {
-      manualScrollTimerRef.current = null;
-      if (pointerScrollRef.current) {
-        return;
-      }
-      manualScrollRef.current = false;
-      manualForwardScrollLimitRef.current = null;
-      const scroller = scrollerRef.current;
-      if (scroller === null) {
-        return;
-      }
-      const atBottom = updateConversationBottom(scroller);
-      if (activeTurnRef.current !== undefined && atBottom) {
-        setPageFollowingMode(true);
-      }
-    }, MANUAL_SCROLL_SETTLE_MS);
-  }, [
-    setPageFollowingMode,
-    updateConversationBottom,
-  ]);
-
-  const startManualScroll = useCallback(() => {
-    stopPageFollowing();
-    restartManualScrollDelay();
-  }, [restartManualScrollDelay, stopPageFollowing]);
-
-  const captureManualForwardScrollLimit = useCallback(() => {
-    const scroller = scrollerRef.current;
-    if (scroller === null) {
-      manualForwardScrollLimitRef.current = null;
-      return;
-    }
-    manualForwardScrollLimitRef.current = conversationEndScrollTop(scroller);
-  }, [conversationEndScrollTop]);
-
-  useLayoutEffect(() => {
-    const scroller = scrollerRef.current;
-    if (scroller === null) {
-      return;
-    }
-    const preventForwardWheelAtEnd = (event: WheelEvent) => {
-      if (event.ctrlKey || event.deltaY <= 0) {
-        return;
-      }
-      const endTop = conversationEndScrollTop(scroller);
-      if (endTop !== null && endTop <= scroller.scrollTop + 0.5) {
-        event.preventDefault();
-      }
-    };
-    scroller.addEventListener("wheel", preventForwardWheelAtEnd, {
-      passive: false,
-    });
-    return () => scroller.removeEventListener("wheel", preventForwardWheelAtEnd);
-  }, [conversationEndScrollTop]);
-
-  const prepareManualScroll = useCallback(() => {
-    captureManualForwardScrollLimit();
-    startManualScroll();
-  }, [captureManualForwardScrollLimit, startManualScroll]);
-
-  const preparePointerScroll = useCallback(() => {
-    pointerScrollRef.current = true;
-    captureManualForwardScrollLimit();
-  }, [captureManualForwardScrollLimit]);
-
-  const finishPointerScroll = useCallback(() => {
-    pointerScrollRef.current = false;
-    if (!manualScrollRef.current) {
-      manualForwardScrollLimitRef.current = null;
-      return;
-    }
-    if (manualScrollTimerRef.current === null) {
-      restartManualScrollDelay();
-    }
-  }, [restartManualScrollDelay]);
-
-  const handleActivityExpandedChange = useCallback((expanded: boolean) => {
-    if (expanded) {
-      cancelManualScrollDelay();
-      stopPageFollowing();
-    }
-  }, [cancelManualScrollDelay, stopPageFollowing]);
-
-  useEffect(
-    () => () => cancelManualScrollDelay(),
-    [cancelManualScrollDelay],
-  );
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
@@ -438,10 +302,6 @@ export function ConversationView({
       setScrollerHeight((current) =>
         current === scroller.clientHeight ? current : scroller.clientHeight
       );
-      const inset = conversationBottomInset(scroller);
-      setContentBottomInset((current) =>
-        Math.abs(current - inset) < 0.5 ? current : inset
-      );
     };
     updateLayout();
     if (typeof ResizeObserver === "undefined") {
@@ -449,127 +309,26 @@ export function ConversationView({
     }
     const observer = new ResizeObserver(updateLayout);
     observer.observe(scroller);
-    const composer = conversationComposer(scroller);
-    if (composer !== null) {
-      observer.observe(composer);
-    }
     return () => observer.disconnect();
   }, []);
 
   useLayoutEffect(() => {
-    const currentThreadId = restoredThread.metadata.id;
-    if (observedThreadIdRef.current !== currentThreadId) {
-      observedThreadIdRef.current = currentThreadId;
-      observedQuestionIdRef.current = latestQuestion?.itemId ?? null;
-      return;
-    }
-    const latestQuestionId = latestQuestion?.itemId ?? null;
-    if (latestQuestion === null) {
-      return;
-    }
     const scroller = scrollerRef.current;
-    if (observedQuestionIdRef.current !== latestQuestionId) {
-      observedQuestionIdRef.current = latestQuestionId;
-      pendingQuestionPositionRef.current =
-        scroller !== null && !updateConversationBottom(scroller)
-          ? latestQuestionId
-          : null;
-      cancelManualScrollDelay();
-      setPreservePageEndSpace(true);
-      setPageFollowingMode(true);
-      setShowJumpToBottom(false);
-    }
-    if (pendingQuestionPositionRef.current !== latestQuestionId) {
-      return;
-    }
-    const top = questionTop(latestQuestion);
-    if (scroller !== null && top !== null) {
-      scroller.scrollTop = top;
-      if (Math.abs(scroller.scrollTop - top) < 0.5) {
-        pendingQuestionPositionRef.current = null;
-      }
-    }
-  }, [
-    cancelManualScrollDelay,
-    latestQuestion,
-    questionTop,
-    restoredThread.metadata.id,
-    setPageFollowingMode,
-    updateConversationBottom,
-  ]);
-
-  useLayoutEffect(() => {
-    const scroller = scrollerRef.current;
-    const pagingTurnId = activeTurn?.id ?? previousActiveTurnIdRef.current;
-    if (scroller === null) {
-      return;
-    }
-    const atBottom = updateConversationBottom(scroller);
     if (
-      atBottom ||
-      pagingTurnId === null ||
-      !pageFollowingRef.current
+      scroller === null ||
+      !followBottomRef.current ||
+      initialBottomScrollRef.current.pending ||
+      loadingAnchorRef.current
     ) {
       return;
     }
-    const followingActivities = activeTurn !== undefined &&
-      isFollowingActivities(activeTurn);
-    if (followingActivities) {
-      const endTop = conversationEndScrollTop(scroller);
-      if (endTop === null || endTop <= scroller.scrollTop + 0.5) {
-        return;
-      }
-      const maximumTop = Math.max(
-        0,
-        scroller.scrollHeight - scroller.clientHeight,
-      );
-      const nextTop = Math.min(
-        maximumTop,
-        endTop + ACTIVITY_BOTTOM_GAP,
-      );
-      if (nextTop <= scroller.scrollTop + 0.5) {
-        return;
-      }
-      scroller.scrollTop = nextTop;
-      updateConversationBottom(scroller);
-      return;
-    }
-    const pageHeight = Math.max(
-      1,
-      scroller.clientHeight - conversationBottomInset(scroller),
-    );
-    const maximumTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-    const nextTop = Math.min(maximumTop, scroller.scrollTop + pageHeight);
-    if (nextTop <= scroller.scrollTop + 0.5) {
-      return;
-    }
-    scroller.scrollTop = nextTop;
-    updateConversationBottom(scroller);
+    scrollToBottom(scroller);
   }, [
-    activeTurn,
-    conversationEndScrollTop,
     itemCount,
+    restoredThread.turns,
     scrollerHeight,
-    updateConversationBottom,
+    scrollToBottom,
     virtual.totalSize,
-  ]);
-
-  useEffect(() => {
-    const previousActiveTurnId = previousActiveTurnIdRef.current;
-    previousActiveTurnIdRef.current = activeTurn?.id ?? null;
-    if (previousActiveTurnId !== null && activeTurn === undefined) {
-      cancelManualScrollDelay();
-      setPageFollowingMode(false);
-      const scroller = scrollerRef.current;
-      if (scroller !== null) {
-        updateConversationBottom(scroller);
-      }
-    }
-  }, [
-    activeTurn,
-    cancelManualScrollDelay,
-    setPageFollowingMode,
-    updateConversationBottom,
   ]);
 
   useLayoutEffect(() => {
@@ -577,15 +336,9 @@ export function ConversationView({
       pending: true,
       threadId: restoredThread.metadata.id,
     };
-    observedThreadIdRef.current = restoredThread.metadata.id;
-    observedQuestionIdRef.current = latestQuestion?.itemId ?? null;
-    pendingQuestionPositionRef.current = null;
-    cancelManualScrollDelay();
-    pointerScrollRef.current = false;
-    setPreservePageEndSpace(activeTurn !== undefined);
-    setPageFollowingMode(activeTurn !== undefined);
+    followBottomRef.current = true;
     setShowJumpToBottom(false);
-  }, [cancelManualScrollDelay, restoredThread.metadata.id]);
+  }, [restoredThread.metadata.id]);
 
   useLayoutEffect(() => {
     const scrollState = initialBottomScrollRef.current;
@@ -645,6 +398,7 @@ export function ConversationView({
         const current = scrollerRef.current;
         if (current !== null) {
           current.scrollTop = previousTop + current.scrollHeight - previousHeight;
+          updateBottomState(current);
         }
         setLoadingAnchorKey(null);
         loadingAnchorRef.current = false;
@@ -659,53 +413,18 @@ export function ConversationView({
 
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     const scroller = event.currentTarget;
-    const manualScroll = pointerScrollRef.current || manualScrollRef.current;
-    const forwardLimit = manualForwardScrollLimitRef.current;
-    if (
-      manualScroll &&
-      forwardLimit !== null &&
-      scroller.scrollTop > forwardLimit + 0.5
-    ) {
-      scroller.scrollTop = forwardLimit;
-    }
-    updateConversationBottom(scroller);
-    if (manualScroll) {
-      startManualScroll();
-    }
+    updateBottomState(scroller);
     if (scroller.scrollTop <= 48) {
       void loadOlder();
     }
   };
-
-  const reservePageEndSpace =
-    preservePageEndSpace || activeTurn !== undefined;
-  const pageEndSpacerHeight = reservePageEndSpace
-    ? Math.max(
-        0,
-        scrollerHeight - contentBottomInset,
-      )
-    : 0;
 
   return (
     <section className={styles.conversation}>
       <div
         aria-label="会话消息"
         className={styles.scroller}
-        onKeyDown={(event) => {
-          if (isScrollKey(event.key)) {
-            prepareManualScroll();
-          }
-        }}
-        onPointerCancel={finishPointerScroll}
-        onPointerDown={preparePointerScroll}
-        onPointerUp={finishPointerScroll}
         onScroll={handleScroll}
-        onTouchMove={prepareManualScroll}
-        onWheel={(event) => {
-          if (!event.defaultPrevented) {
-            prepareManualScroll();
-          }
-        }}
         ref={scrollerRef}
       >
         <div
@@ -761,7 +480,6 @@ export function ConversationView({
                   <ConversationRowView
                     actionError={actionError}
                     loadingOlderTurns={loadingOlderTurns}
-                    onActivityExpandedChange={handleActivityExpandedChange}
                     onLoadOlder={() => void loadOlder()}
                     {...(onForkTurn === undefined ? {} : { onForkTurn })}
                     {...(onOpenLink === undefined ? {} : { onOpenLink })}
@@ -772,26 +490,16 @@ export function ConversationView({
               );
             })}
           </div>
-          <div aria-hidden="true" data-conversation-tail ref={conversationTailRef} />
-          {pageEndSpacerHeight <= 0 ? null : (
-            <div
-              aria-hidden="true"
-              className={styles.pageEndSpacer}
-              style={{ height: pageEndSpacerHeight }}
-            />
-          )}
         </div>
       </div>
       {historyQuestions.length >= 4 ? (
         <HistoryQuestionNavigation
           onSelect={(question) => {
-            cancelManualScrollDelay();
-            stopPageFollowing();
             const scroller = scrollerRef.current;
             const top = questionTop(question);
             if (scroller !== null && top !== null) {
               scroller.scrollTop = top;
-              updateConversationBottom(scroller);
+              updateBottomState(scroller);
             }
           }}
           questions={historyQuestions}
@@ -803,28 +511,7 @@ export function ConversationView({
           onClick={() => {
             const scroller = scrollerRef.current;
             if (scroller !== null) {
-              cancelManualScrollDelay();
-              const resumeFollowing = activeTurn !== undefined;
-              setPageFollowingMode(resumeFollowing);
-              if (!resumeFollowing && preservePageEndSpace) {
-                setPreservePageEndSpace(false);
-                requestAnimationFrame(() => {
-                  const current = scrollerRef.current;
-                  if (current !== null) {
-                    const top = conversationEndScrollTop(current);
-                    if (top !== null) {
-                      current.scrollTop = top;
-                    }
-                    updateConversationBottom(current);
-                  }
-                });
-              } else {
-                const top = conversationEndScrollTop(scroller);
-                if (top !== null) {
-                  scroller.scrollTop = top;
-                }
-                updateConversationBottom(scroller);
-              }
+              scrollToBottom(scroller);
             }
           }}
           type="button"
@@ -852,7 +539,6 @@ export function ConversationView({
 function ConversationRowView({
   actionError,
   loadingOlderTurns,
-  onActivityExpandedChange,
   onLoadOlder,
   onForkTurn,
   onOpenLink,
@@ -861,7 +547,6 @@ function ConversationRowView({
 }: {
   readonly actionError: string | null;
   readonly loadingOlderTurns: boolean;
-  readonly onActivityExpandedChange: (expanded: boolean) => void;
   readonly onLoadOlder: () => void;
   readonly onForkTurn?: (turnId: string, isLatest: boolean) => void;
   readonly onOpenLink?: (link: string) => void;
@@ -890,7 +575,6 @@ function ConversationRowView({
     <ItemView
       item={row.segment.item}
       isLatestTurn={row.isLatestTurn}
-      onActivityExpandedChange={onActivityExpandedChange}
       {...(row.turn.completedAt === undefined
         ? {}
         : { turnCompletedAt: row.turn.completedAt })}
@@ -906,7 +590,6 @@ function ConversationRowView({
   ) : (
     <ActivityGroup
       items={row.segment.items}
-      onExpandedChange={onActivityExpandedChange}
       turn={row.turn}
       {...(onOpenLink === undefined ? {} : { onOpenLink })}
       {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
@@ -949,7 +632,6 @@ function HistoryQuestionNavigation({
 function ItemView({
   item,
   isLatestTurn = false,
-  onActivityExpandedChange,
   onFork,
   onOpenLink,
   onOpenDiff,
@@ -958,7 +640,6 @@ function ItemView({
 }: {
   readonly item: ThreadItem;
   readonly isLatestTurn?: boolean;
-  readonly onActivityExpandedChange: (expanded: boolean) => void;
   readonly onFork?: () => void;
   readonly onOpenLink?: (link: string) => void;
   readonly onOpenDiff?: (path: string, diff: string) => void;
@@ -978,7 +659,6 @@ function ItemView({
       return (
         <ActivityDisclosure
           label="Hook 提示"
-          onExpandedChange={onActivityExpandedChange}
           status="notice"
         >
           {item.fragments.map(({ hookRunId, text }) => (
@@ -1000,7 +680,6 @@ function ItemView({
       return (
         <ActivityDisclosure
           label="计划"
-          onExpandedChange={onActivityExpandedChange}
           status="notice"
         >
           <pre>{item.text}</pre>
@@ -1010,7 +689,6 @@ function ItemView({
       return (
         <ReasoningActivity
           item={item}
-          onExpandedChange={onActivityExpandedChange}
           {...(onOpenLink === undefined ? {} : { onOpenLink })}
         />
       );
@@ -1018,7 +696,6 @@ function ItemView({
       return (
         <CommandActivity
           item={item}
-          onExpandedChange={onActivityExpandedChange}
         />
       );
     case "fileChange":
@@ -1036,7 +713,6 @@ function ItemView({
             item.status,
             item.durationMs,
           )}
-          onExpandedChange={onActivityExpandedChange}
           status={item.status}
         >
           <JsonBlock value={item.arguments} />
@@ -1052,7 +728,6 @@ function ItemView({
             item.status,
             item.durationMs,
           )}
-          onExpandedChange={onActivityExpandedChange}
           status={item.status}
         >
           <JsonBlock value={item.arguments} />
@@ -1065,7 +740,6 @@ function ItemView({
       return (
         <ActivityDisclosure
           label={toolActivityLabel(`协作代理 · ${item.tool}`, item.status)}
-          onExpandedChange={onActivityExpandedChange}
           status={item.status}
         >
           {item.prompt === undefined || item.prompt === null ? null : <p>{item.prompt}</p>}
@@ -1100,7 +774,6 @@ function ItemView({
       return (
         <ActivityDisclosure
           label={toolActivityLabel("图片生成", item.status)}
-          onExpandedChange={onActivityExpandedChange}
           status={item.status}
         >
           <p>{item.result}</p>
@@ -1114,12 +787,7 @@ function ItemView({
     case "contextCompaction":
       return <TimelineRecord label="上下文已压缩" />;
     default:
-      return (
-        <UnknownItem
-          item={item}
-          onExpandedChange={onActivityExpandedChange}
-        />
-      );
+      return <UnknownItem item={item} />;
   }
 }
 
@@ -1265,13 +933,11 @@ function AgentMessage({
 
 function ActivityGroup({
   items,
-  onExpandedChange,
   onOpenDiff,
   onOpenLink,
   turn,
 }: {
   readonly items: readonly ThreadItem[];
-  readonly onExpandedChange: (expanded: boolean) => void;
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenLink?: (link: string) => void;
   readonly turn: ThreadTurn;
@@ -1299,7 +965,6 @@ function ActivityGroup({
 
   const toggle = () => {
     const nextExpanded = !transition.targetExpandedRef.current;
-    onExpandedChange(nextExpanded);
     transition.setOpen(nextExpanded);
   };
 
@@ -1324,7 +989,6 @@ function ActivityGroup({
                 <ItemView
                   item={item}
                   key={item.id}
-                  onActivityExpandedChange={onExpandedChange}
                   {...(onOpenLink === undefined ? {} : { onOpenLink })}
                   {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
                 />
@@ -1348,10 +1012,8 @@ function ActivityGroup({
 
 function CommandActivity({
   item,
-  onExpandedChange,
 }: {
   readonly item: CommandExecutionItem;
-  readonly onExpandedChange: (expanded: boolean) => void;
 }) {
   const output = item.aggregatedOutput?.trim().length === 0
     ? null
@@ -1359,7 +1021,6 @@ function CommandActivity({
   return (
     <ActivityDisclosure
       label={commandActivityTitle(item)}
-      onExpandedChange={onExpandedChange}
       status={item.status}
     >
       {output === null ? null : <pre>{output}</pre>}
@@ -1369,11 +1030,9 @@ function CommandActivity({
 
 function ReasoningActivity({
   item,
-  onExpandedChange,
   onOpenLink,
 }: {
   readonly item: ReasoningItem;
-  readonly onExpandedChange: (expanded: boolean) => void;
   readonly onOpenLink?: (link: string) => void;
 }) {
   const summary = reasoningParts(item.summary);
@@ -1382,7 +1041,6 @@ function ReasoningActivity({
     <ActivityDisclosure
       ariaLabel={summary.length === 0 ? "Thinking" : reasoningAccessibleLabel(summary)}
       label={summary.length === 0 ? "Thinking" : <ReasoningTitle parts={summary} />}
-      onExpandedChange={onExpandedChange}
       status="notice"
     >
       {content.length === 0
@@ -1472,13 +1130,11 @@ function ActivityDisclosure({
   ariaLabel,
   children,
   label,
-  onExpandedChange,
   status,
 }: {
   readonly ariaLabel?: string;
   readonly children?: ReactNode;
   readonly label: ReactNode;
-  readonly onExpandedChange: (expanded: boolean) => void;
   readonly status: string;
 }) {
   const transition = useCollapsibleContent(false);
@@ -1528,7 +1184,6 @@ function ActivityDisclosure({
 
   const toggle = () => {
     const nextExpanded = !transition.targetExpandedRef.current;
-    onExpandedChange(nextExpanded);
     transition.setOpen(nextExpanded);
   };
 
@@ -1653,18 +1308,13 @@ function TimelineRecord({ label, detail }: { readonly label: string; readonly de
   return <div className={styles.timeline}><span>{label}</span>{detail ? <p>{detail}</p> : null}</div>;
 }
 
-function UnknownItem({
-  item,
-  onExpandedChange,
-}: {
+function UnknownItem({ item }: {
   readonly item: never;
-  readonly onExpandedChange: (expanded: boolean) => void;
 }) {
   const serialized = JSON.stringify(item, null, 2);
   return (
     <ActivityDisclosure
       label="未知活动"
-      onExpandedChange={onExpandedChange}
       status="notice"
     >
       <CopyButton label="复制原始 JSON" value={serialized} />
@@ -1877,51 +1527,6 @@ function conversationListTop(scroller: HTMLElement): number {
     return scroller.scrollTop + listRect.top - scroller.getBoundingClientRect().top;
   }
   return list.offsetTop;
-}
-
-function conversationComposer(scroller: HTMLElement): HTMLElement | null {
-  return scroller.closest<HTMLElement>("[data-conversation-workspace]")
-    ?.querySelector<HTMLElement>("[data-conversation-composer]") ?? null;
-}
-
-function conversationReadableBottom(scroller: HTMLElement): number {
-  const scrollerBottom = scroller.getBoundingClientRect().top +
-    scroller.clientHeight;
-  const composer = conversationComposer(scroller);
-  return composer === null
-    ? scrollerBottom
-    : Math.min(
-        scrollerBottom,
-        composer.getBoundingClientRect().top - COMPOSER_CONTENT_GAP,
-      );
-}
-
-function conversationBottomInset(scroller: HTMLElement): number {
-  const scrollerBottom = scroller.getBoundingClientRect().top +
-    scroller.clientHeight;
-  return Math.max(0, scrollerBottom - conversationReadableBottom(scroller));
-}
-
-function isFollowingActivities(turn: ThreadTurn): boolean {
-  if (turn.items.some(isFinalAnswer)) {
-    return false;
-  }
-  const latestResponseItem = turn.items.findLast(
-    (item) => item.type !== "userMessage",
-  );
-  return latestResponseItem !== undefined && isWorkActivity(latestResponseItem);
-}
-
-function isScrollKey(key: string): boolean {
-  return [
-    "ArrowDown",
-    "ArrowUp",
-    "End",
-    "Home",
-    "PageDown",
-    "PageUp",
-    " ",
-  ].includes(key);
 }
 
 function estimateConversationRow(row: ConversationRow | undefined): number {

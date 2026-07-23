@@ -58,11 +58,6 @@
   width: 100%;
 }
 
-.pageEndSpacer {
-  width: 100%;
-  pointer-events: none;
-}
-
 .virtualConversationRow {
   position: absolute;
   top: 0;
