@@ -15,6 +15,16 @@ import {
 } from "../content/contentProcessing";
 import { sanitizeSvg } from "../content/sanitizeSvg";
 import {
+  syntaxHighlighter as sharedSyntaxHighlighter,
+  type HighlightedLines,
+  type HighlightedToken,
+  type SyntaxHighlighter,
+} from "../content/syntaxHighlighting";
+import {
+  sourceLanguageForPath,
+  type SyntaxLanguage,
+} from "../content/syntaxLanguages";
+import {
   browserBlobUrls,
   useBlobUrl,
   type BlobUrlFactory,
@@ -49,6 +59,7 @@ export function FilePreviewDialog({
   defaultWrap = false,
   blobUrlFactory = browserBlobUrls,
   contentProcessor = sharedContentProcessor,
+  syntaxHighlighter = sharedSyntaxHighlighter,
 }: {
   readonly client: FileClient | null;
   readonly onClose: () => void;
@@ -59,6 +70,7 @@ export function FilePreviewDialog({
   readonly defaultWrap?: boolean;
   readonly blobUrlFactory?: BlobUrlFactory;
   readonly contentProcessor?: ContentProcessor;
+  readonly syntaxHighlighter?: SyntaxHighlighter;
 }) {
   const titleId = useId();
   const dialogRef = useRef<HTMLElement>(null);
@@ -90,6 +102,11 @@ export function FilePreviewDialog({
     new Set(),
   );
   const [searchingText, setSearchingText] = useState(false);
+  const [highlightedSource, setHighlightedSource] = useState<{
+    readonly language: SyntaxLanguage;
+    readonly lines: HighlightedLines;
+    readonly source: string;
+  } | null>(null);
   const isTopmostModal = useModalLayer(request !== null);
 
   useEffect(() => {
@@ -225,6 +242,39 @@ export function FilePreviewDialog({
   }, [contentProcessor, request, sourceText]);
 
   const displayedText = formattedText ?? sourceText;
+  const sourceLanguage =
+    request === null ? null : sourceLanguageForPath(request.path);
+
+  useEffect(() => {
+    setHighlightedSource(null);
+    if (
+      displayedText === null ||
+      sourceLanguage === null ||
+      (request?.diff !== undefined && request.diff !== null)
+    ) {
+      return;
+    }
+    let disposed = false;
+    const lineCount = displayedText.split(/\r?\n/u).length;
+    void Promise.resolve()
+      .then(() => syntaxHighlighter.highlight(displayedText, sourceLanguage.id))
+      .then(
+        (lines) => {
+          if (!disposed && lines.length === lineCount) {
+            setHighlightedSource({
+              language: sourceLanguage.id,
+              lines,
+              source: displayedText,
+            });
+          }
+        },
+        () => {},
+      );
+    return () => {
+      disposed = true;
+    };
+  }, [displayedText, request?.diff, sourceLanguage, syntaxHighlighter]);
+
   useEffect(() => {
     setMatchingLines(new Set());
     setSearchingText(false);
@@ -288,6 +338,11 @@ export function FilePreviewDialog({
   const name = fileName(request.path);
   const relativePath = relativeRemotePath(request.path, workspacePath);
   const language = languageForPath(request.path);
+  const highlightedLines =
+    highlightedSource?.source === displayedText &&
+    highlightedSource.language === sourceLanguage?.id
+      ? highlightedSource.lines
+      : null;
   const textLineCount = displayedText?.split(/\r?\n/u).length ?? 0;
   const jumpToLine = () => {
     const line = Number(jumpLine);
@@ -424,7 +479,7 @@ export function FilePreviewDialog({
           ) : displayedText !== null && isMarkdown(request.path) && markdownView ? (
             <article className={styles.markdownPreview}><SafeMarkdown {...(onOpenLink === undefined ? {} : { onOpenLink })} source={displayedText} /></article>
           ) : displayedText !== null ? (
-            <TextSource column={activeLine === request.line ? request.column ?? null : null} endLine={activeEndLine} line={activeLine} matchingLines={matchingLines} query={search} text={displayedText} wrap={wrap} />
+            <TextSource column={activeLine === request.line ? request.column ?? null : null} endLine={activeEndLine} highlightedLines={highlightedLines} line={activeLine} matchingLines={matchingLines} query={search} text={displayedText} wrap={wrap} />
           ) : null}
         </main>
       </section>
@@ -464,11 +519,11 @@ function decodePreview(path: string, dataBase64: string): DecodedPreview {
   }
 }
 
-function TextSource({ column, endLine, line, matchingLines, query, text, wrap }: { readonly column: number | null; readonly endLine: number | null; readonly line: number | null; readonly matchingLines: ReadonlySet<number>; readonly query: string; readonly text: string; readonly wrap: boolean }) {
+function TextSource({ column, endLine, highlightedLines, line, matchingLines, query, text, wrap }: { readonly column: number | null; readonly endLine: number | null; readonly highlightedLines: HighlightedLines | null; readonly line: number | null; readonly matchingLines: ReadonlySet<number>; readonly query: string; readonly text: string; readonly wrap: boolean }) {
   return <ol className={styles.source} data-wrapped={wrap}>{text.split(/\r?\n/u).map((value, index) => {
     const lineNumber = index + 1;
     const highlighted = line !== null && lineNumber >= line && lineNumber <= (endLine ?? line);
-    return <li data-highlighted={highlighted} id={`preview-line-${lineNumber}`} key={lineNumber}><code>{matchingLines.has(lineNumber) ? highlightQuery(value, query) : value}{line === lineNumber && column !== null ? <span className={styles.columnHint}> · 列 {column}</span> : null}</code></li>;
+    return <li data-highlighted={highlighted} id={`preview-line-${lineNumber}`} key={lineNumber}><code>{highlightLine(value, highlightedLines?.[index], matchingLines.has(lineNumber) ? query : "")}{line === lineNumber && column !== null ? <span className={styles.columnHint}> · 列 {column}</span> : null}</code></li>;
   })}</ol>;
 }
 
@@ -518,6 +573,47 @@ function highlightQuery(value: string, query: string): React.ReactNode {
   return index < 0 ? value : <>{value.slice(0, index)}<mark>{value.slice(index, index + query.length)}</mark>{value.slice(index + query.length)}</>;
 }
 
+function highlightLine(
+  value: string,
+  tokens: readonly HighlightedToken[] | undefined,
+  query: string,
+): React.ReactNode {
+  if (
+    tokens === undefined ||
+    tokens.map((token) => token.content).join("") !== value
+  ) {
+    return highlightQuery(value, query);
+  }
+  const matchStart = query.length === 0
+    ? -1
+    : value.toLocaleLowerCase().indexOf(query.toLocaleLowerCase());
+  const matchEnd = matchStart + query.length;
+  let offset = 0;
+  return tokens.map((token, index) => {
+    const tokenStart = offset;
+    offset += token.content.length;
+    const matchStartsBeforeTokenEnd = matchStart < offset;
+    const matchEndsAfterTokenStart = matchEnd > tokenStart;
+    const content = matchStart >= 0 &&
+      matchStartsBeforeTokenEnd &&
+      matchEndsAfterTokenStart
+      ? highlightTokenQuery(token.content, tokenStart, matchStart, matchEnd)
+      : token.content;
+    return <span key={`${tokenStart}-${index}`} style={token.style}>{content}</span>;
+  });
+}
+
+function highlightTokenQuery(
+  content: string,
+  tokenStart: number,
+  matchStart: number,
+  matchEnd: number,
+): React.ReactNode {
+  const start = Math.max(0, matchStart - tokenStart);
+  const end = Math.min(content.length, matchEnd - tokenStart);
+  return <>{content.slice(0, start)}<mark>{content.slice(start, end)}</mark>{content.slice(end)}</>;
+}
+
 function decodeUtf8(dataBase64: string): string {
   return new TextDecoder("utf-8", { fatal: true }).decode(decodeBytes(dataBase64));
 }
@@ -543,16 +639,12 @@ function relativeRemotePath(path: string, workspacePath?: string | null): string
   return path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path;
 }
 function languageForPath(path: string): string {
+  const sourceLanguage = sourceLanguageForPath(path);
+  if (sourceLanguage !== null) return sourceLanguage.label;
   const extension = path.split(".").at(-1)?.toLocaleLowerCase() ?? "";
-  const languages: Readonly<Record<string, string>> = {
-    bash: "Shell", c: "C", cc: "C++", cpp: "C++", css: "CSS", go: "Go",
-    h: "C/C++", hpp: "C++", html: "HTML", java: "Java", js: "JavaScript",
-    json: "JSON", jsonc: "JSONC", jsx: "JavaScript JSX", kt: "Kotlin",
-    md: "Markdown", markdown: "Markdown", py: "Python", rb: "Ruby", rs: "Rust",
-    sh: "Shell", sql: "SQL", swift: "Swift", toml: "TOML", ts: "TypeScript",
-    tsx: "TypeScript JSX", txt: "纯文本", xml: "XML", yaml: "YAML", yml: "YAML",
-  };
-  return languages[extension] ?? (extension.length === 0 ? "纯文本" : extension.toLocaleUpperCase());
+  return extension.length === 0 || extension === "txt"
+    ? "纯文本"
+    : extension.toLocaleUpperCase();
 }
 function isMarkdown(path: string): boolean { return /\.(?:md|markdown|mdx)$/iu.test(path); }
 function isJson(path: string): boolean { return /\.(?:json|jsonc)$/iu.test(path); }

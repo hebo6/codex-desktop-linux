@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FileClient } from "../appServer";
 import type { ContentProcessor } from "../content/contentProcessing";
+import type { SyntaxHighlighter } from "../content/syntaxHighlighting";
 import type { RequestHandle } from "../protocol/rpc";
 import { FilePreviewDialog } from "./FilePreviewDialog";
 
@@ -121,6 +122,43 @@ describe("FilePreviewDialog", () => {
     );
     await waitFor(() => expect(screen.getByText("1 行匹配")).toBeVisible());
     expect(screen.getByText("matched").closest("mark")).not.toBeNull();
+  });
+
+  it("使用语法 Worker 的浅色和深色 token 渲染源码", async () => {
+    const highlighter: SyntaxHighlighter = {
+      highlight: vi.fn(async () => [[
+        {
+          content: "const",
+          style: {
+            "--shiki-dark": "#ff7b72",
+            "--shiki-light": "#cf222e",
+          } as React.CSSProperties,
+        },
+        {
+          content: " value = 1;",
+          style: {
+            "--shiki-dark": "#c9d1d9",
+            "--shiki-light": "#24292f",
+          } as React.CSSProperties,
+        },
+      ]]),
+    };
+    render(
+      <FilePreviewDialog
+        client={clientFor("const value = 1;")}
+        onClose={vi.fn()}
+        request={{ path: "/remote/source.ts" }}
+        serverName="服务器"
+        syntaxHighlighter={highlighter}
+      />,
+    );
+    const token = await screen.findByText("const", { exact: true });
+    expect(highlighter.highlight).toHaveBeenCalledWith(
+      "const value = 1;",
+      "typescript",
+    );
+    expect(token.style.getPropertyValue("--shiki-light")).toBe("#cf222e");
+    expect(token.style.getPropertyValue("--shiki-dark")).toBe("#ff7b72");
   });
 
   it("图片预览使用 Blob URL 并在关闭时立即释放", async () => {
