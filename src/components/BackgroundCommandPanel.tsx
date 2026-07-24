@@ -17,6 +17,8 @@ interface RunningCommand {
   readonly processId: string | null;
 }
 
+const COMMAND_PANEL_DELAY_MS = 3_000;
+
 export interface BackgroundCommandPanelProps {
   readonly error: string | null;
   readonly loaded: boolean;
@@ -39,7 +41,7 @@ export function BackgroundCommandPanel({
   const [expanded, setExpanded] = useState(false);
   const [now, setNow] = useState(Date.now());
   const fallbackObservedAtRef = useRef(new Map<string, number>());
-  const commands = useMemo(
+  const running = useMemo(
     () => runningCommands(
       terminals,
       turns,
@@ -49,15 +51,18 @@ export function BackgroundCommandPanel({
     ),
     [loaded, now, terminals, turns],
   );
+  const commands = running.filter(
+    ({ durationMs }) => durationMs >= COMMAND_PANEL_DELAY_MS,
+  );
 
   useEffect(() => {
-    if (commands.length === 0) {
+    if (running.length === 0) {
       setExpanded(false);
       return;
     }
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
-  }, [commands.length]);
+  }, [running.length]);
 
   if (commands.length === 0) {
     return null;

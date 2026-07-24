@@ -1,6 +1,13 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -569,6 +576,185 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getByRole("button", { name: "发送" })).toBeVisible());
     expect(screen.getByText("首次问题")).toBeVisible();
+  });
+
+  it("已完成回合终止后台命令时不显示停止按钮", async () => {
+    const user = userEvent.setup();
+    const commandItem = {
+      id: "command-running",
+      type: "commandExecution",
+      command: "sleep 60",
+      commandActions: [],
+      cwd: "/workspace/project",
+      durationMs: 3_000,
+      processId: "42",
+      status: "inProgress",
+    } as const;
+    const thread = {
+      cliVersion: "1.0.0",
+      createdAt: 100,
+      cwd: "/workspace/project",
+      ephemeral: false,
+      id: "thread-completed-with-background-command",
+      modelProvider: "openai",
+      name: "后台命令会话",
+      preview: "运行后台命令",
+      sessionId: "session-background-command",
+      source: "appServer",
+      status: { type: "idle" },
+      turns: [{
+        id: "turn-completed",
+        items: [commandItem],
+        itemsView: "full",
+        status: "completed",
+        durationMs: 1_000,
+      }],
+      updatedAt: 200,
+    } as const;
+    const requests: {
+      readonly method: string;
+      readonly params?: unknown;
+    }[] = [];
+    const notificationHandlers = new Set<
+      (notification: ServerNotification) => void
+    >();
+    let finishTermination:
+      | ((response: { readonly terminated: boolean }) => void)
+      | undefined;
+    const terminationResult = new Promise<{ readonly terminated: boolean }>(
+      (resolve) => {
+        finishTermination = resolve;
+      },
+    );
+    const requestSession = {
+      sendRequest(request: {
+        readonly method: string;
+        readonly params?: unknown;
+      }) {
+        requests.push(request);
+        const result = request.method === "thread/list"
+          ? Promise.resolve({ data: [thread], nextCursor: null })
+          : request.method === "thread/resume"
+            ? Promise.resolve({
+                approvalPolicy: "on-request",
+                approvalsReviewer: "user",
+                cwd: thread.cwd,
+                model: "gpt-5",
+                modelProvider: "openai",
+                sandbox: { type: "readOnly" },
+                thread,
+              })
+            : request.method === "thread/backgroundTerminals/list"
+              ? Promise.resolve({
+                  data: [{
+                    command: commandItem.command,
+                    cwd: commandItem.cwd,
+                    itemId: commandItem.id,
+                    processId: commandItem.processId,
+                  }],
+                  nextCursor: null,
+                })
+              : request.method === "thread/backgroundTerminals/terminate"
+                ? terminationResult
+                : Promise.resolve({});
+        return {
+          cancel: () => undefined,
+          id: `request:${request.method}`,
+          result,
+        };
+      },
+      subscribeNotifications(handler: (notification: ServerNotification) => void) {
+        notificationHandlers.add(handler);
+        return () => notificationHandlers.delete(handler);
+      },
+    };
+    const sessionFactory: ConfiguredServerSessionFactory = (options) => ({
+      threadClient: new AppServerThreadClient(requestSession as never),
+      conversationClient: new AppServerConversationClient(requestSession as never),
+      async start() {
+        options.onStateChange({
+          phase: "ready",
+          connectionStage: null,
+          initializeResponse: null,
+          errorCode: null,
+        });
+      },
+      async close() {},
+    });
+    const draftStore: DraftStore = {
+      listKeys: vi.fn(async () => []),
+      load: vi.fn(async () => null),
+      save: vi.fn(async () => undefined),
+      delete: vi.fn(async () => undefined),
+    };
+
+    renderApp(() => ({ servers: [localServer()], proxies: [] }), {
+      draftStore,
+      sessionFactory,
+      windowStateOptions: {
+        loader: vi.fn(async () => ({
+          windowId: "main",
+          version: 1,
+          serverId: SERVER_ID,
+          currentThreadId: thread.id,
+          updatedAtMs: 1,
+        })),
+      },
+    });
+
+    await screen.findByRole("textbox", { name: "任务输入" });
+    const backgroundCommands = await screen.findByRole("region", {
+      name: "运行中命令",
+    });
+    expect(screen.queryByRole("button", { name: /停止/u })).not.toBeInTheDocument();
+
+    await user.click(within(backgroundCommands).getByRole("button", {
+      name: /1 个命令正在运行/u,
+    }));
+    await user.click(screen.getByRole("button", { name: "终止" }));
+
+    expect(await screen.findByRole("button", { name: "正在终止" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /停止/u })).not.toBeInTheDocument();
+    expect(requests).toContainEqual(expect.objectContaining({
+      method: "thread/backgroundTerminals/terminate",
+      params: {
+        threadId: thread.id,
+        processId: commandItem.processId,
+      },
+    }));
+
+    await act(async () => {
+      finishTermination?.({ terminated: true });
+      await terminationResult;
+    });
+
+    await waitFor(() => expect(
+      screen.queryByRole("region", { name: "运行中命令" }),
+    ).not.toBeInTheDocument());
+
+    act(() => {
+      const completed = {
+        method: "item/completed",
+        params: {
+          completedAtMs: 2,
+          item: {
+            ...commandItem,
+            aggregatedOutput: "",
+            durationMs: 3_500,
+            exitCode: -1,
+            status: "failed",
+          },
+          threadId: thread.id,
+          turnId: "turn-completed",
+        },
+      } as ServerNotification;
+      for (const handler of notificationHandlers) handler(completed);
+    });
+
+    await waitFor(() => expect(
+      screen.queryByRole("button", { name: /1 个命令正在运行/u }),
+    ).not.toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /停止/u })).not.toBeInTheDocument();
   });
 
   it("没有已打开会话时默认选择最近项目", async () => {

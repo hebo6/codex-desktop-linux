@@ -510,7 +510,7 @@ function updateItem(
   return {
     ...state,
     turns: Object.freeze(turns),
-    activeTurnId: state.activeTurnId ?? turnId,
+    activeTurnId: activeTurnId(turns),
   };
 }
 
