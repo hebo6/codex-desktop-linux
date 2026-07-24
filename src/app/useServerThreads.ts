@@ -33,6 +33,7 @@ export interface RestoredThread {
 export interface ServerThreadsState {
   readonly threadListPhase: ServerThreadsPhase;
   readonly threadRestorePhase: ServerThreadsPhase;
+  readonly resumedThreadId: string | null;
   readonly threads: readonly ThreadSummary[];
   readonly nextThreadCursor: string | null;
   readonly restoredThread: RestoredThread | null;
@@ -92,6 +93,7 @@ export interface ServerThreadsClient {
 const IDLE_STATE = Object.freeze({
   threadListPhase: "idle",
   threadRestorePhase: "idle",
+  resumedThreadId: null,
   threads: Object.freeze([]),
   nextThreadCursor: null,
   restoredThread: null,
@@ -234,6 +236,7 @@ export function useServerThreads(
         return {
           ...current,
           restoredThread: currentDeleted ? null : current.restoredThread,
+          resumedThreadId: currentDeleted ? null : current.resumedThreadId,
           currentThreadDeleted:
             current.currentThreadDeleted || currentDeleted,
           pendingThreadIds: addPendingThread(
@@ -524,6 +527,7 @@ export function useServerThreads(
                       restoredThread.metadata,
                     ),
               restoredThread: currentThreadWasDeleted ? null : restoredThread,
+              resumedThreadId: currentThreadWasDeleted ? null : currentThreadId,
               currentThreadDeleted: currentThreadWasDeleted,
               threadRestoreError: null,
               offline: isReconcilingRetainedState(),

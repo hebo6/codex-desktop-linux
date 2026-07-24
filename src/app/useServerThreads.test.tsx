@@ -205,6 +205,7 @@ describe("useServerThreads", () => {
 
     expect(client.listCalls).toEqual([{}]);
     expect(client.resumeCalls).toEqual([THREAD_ONE.id]);
+    expect(result.current.resumedThreadId).toBe(THREAD_ONE.id);
     expect(result.current.threads.map(({ id }) => id)).toEqual([
       THREAD_ONE.id,
       THREAD_TWO.id,
@@ -310,6 +311,7 @@ describe("useServerThreads", () => {
     );
     expect(client.listCalls).toEqual([{}]);
     expect(client.resumeCalls).toEqual([]);
+    expect(result.current.resumedThreadId).toBeNull();
     expect(result.current.threads.map(({ id }) => id)).toEqual([
       startedThread.id,
       THREAD_ONE.id,

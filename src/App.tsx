@@ -266,9 +266,14 @@ export function App({
       }
     },
   });
+  const currentThreadId = windowState.windowState?.currentThreadId ?? null;
+  const resumedThreadId = serverThreads.resumedThreadId === currentThreadId
+    ? currentThreadId
+    : null;
   const backgroundTerminals = useBackgroundTerminals(
     connection.conversationClient,
-    windowState.windowState?.currentThreadId ?? null,
+    currentThreadId,
+    resumedThreadId,
   );
   const [draftCwd, setDraftCwd] = useState<string | null>(null);
   const selectedServerId = windowState.windowState?.serverId ?? null;

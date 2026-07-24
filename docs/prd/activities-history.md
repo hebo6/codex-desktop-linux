@@ -80,7 +80,15 @@
 
 终止操作只作用于所选后台终端，不复用停止当前回合操作
 
-连接或切换会话后使用 `thread/backgroundTerminals/list` 恢复运行状态，终止时使用 `thread/backgroundTerminals/terminate`
+恢复会话完成后使用一次 `thread/backgroundTerminals/list` 恢复运行状态
+
+携带 `processId` 的 `item/started` 直接加入运行中命令，不请求 `thread/backgroundTerminals/list`
+
+不携带 `processId` 的 `item/started` 不视为后台进程
+
+收到 `item/completed` 后直接移除对应命令，不请求 `thread/backgroundTerminals/list`
+
+终止时使用 `thread/backgroundTerminals/terminate`
 
 展开后完整显示命令活动标题，标题下方只按事件顺序展示聚合输出，不重复显示原始命令
 

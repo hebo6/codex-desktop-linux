@@ -20,6 +20,10 @@ interface BackgroundTerminalState {
   readonly terminatingKeys: ReadonlySet<string>;
 }
 
+interface PendingRefresh {
+  readonly notifications: ServerNotification[];
+}
+
 const EMPTY_STATE = Object.freeze({
   byThread: new Map<string, readonly ObservedBackgroundTerminal[]>(),
   errorsByThread: new Map<string, string>(),
@@ -30,12 +34,19 @@ const EMPTY_STATE = Object.freeze({
 export function useBackgroundTerminals(
   client: BackgroundTerminalClient | null,
   currentThreadId: string | null,
+  resumedThreadId: string | null,
 ) {
   const [state, setState] = useState<BackgroundTerminalState>(EMPTY_STATE);
   const clientRef = useRef(client);
   const currentThreadIdRef = useRef(currentThreadId);
+  const generationClientRef = useRef<BackgroundTerminalClient | null>(null);
   const connectionGenerationRef = useRef(0);
+  const snapshotSourceRef = useRef<{
+    readonly client: BackgroundTerminalClient;
+    readonly threadId: string;
+  } | null>(null);
   const refreshSequencesRef = useRef(new Map<string, number>());
+  const pendingRefreshesRef = useRef(new Map<string, PendingRefresh>());
   clientRef.current = client;
   currentThreadIdRef.current = currentThreadId;
 
@@ -46,6 +57,10 @@ export function useBackgroundTerminals(
   ) => {
     const sequence = (refreshSequencesRef.current.get(threadId) ?? 0) + 1;
     refreshSequencesRef.current.set(threadId, sequence);
+    const pendingRefresh: PendingRefresh = {
+      notifications: [],
+    };
+    pendingRefreshesRef.current.set(threadId, pendingRefresh);
     void listAllBackgroundTerminals(target, threadId).then(
       (terminals) => {
         if (
@@ -55,9 +70,14 @@ export function useBackgroundTerminals(
         ) {
           return;
         }
-        setState((current) =>
-          replaceThreadTerminals(current, threadId, terminals),
-        );
+        pendingRefreshesRef.current.delete(threadId);
+        setState((current) => {
+          let next = replaceThreadTerminals(current, threadId, terminals);
+          for (const notification of pendingRefresh.notifications) {
+            next = reduceBackgroundTerminalNotification(next, notification);
+          }
+          return next;
+        });
       },
       () => {
         if (
@@ -67,6 +87,7 @@ export function useBackgroundTerminals(
         ) {
           return;
         }
+        pendingRefreshesRef.current.delete(threadId);
         setState((current) =>
           withThreadError(
             current,
@@ -79,33 +100,29 @@ export function useBackgroundTerminals(
   }, []);
 
   useEffect(() => {
-    const generation = ++connectionGenerationRef.current;
-    refreshSequencesRef.current.clear();
-    setState(EMPTY_STATE);
+    if (generationClientRef.current !== client) {
+      generationClientRef.current = client;
+      connectionGenerationRef.current += 1;
+      refreshSequencesRef.current.clear();
+      pendingRefreshesRef.current.clear();
+      snapshotSourceRef.current = null;
+      setState(EMPTY_STATE);
+    }
     if (client === null) {
       return;
     }
-    const retryTimers = new Set<number>();
+    const generation = connectionGenerationRef.current;
     const release = client.subscribeNotifications((notification) => {
       if (generation !== connectionGenerationRef.current) {
         return;
       }
-      const changedThreadId = terminalSnapshotThreadId(notification);
+      const changedThreadId = terminalNotificationThreadId(notification);
       if (changedThreadId !== null) {
-        refreshThread(client, changedThreadId, generation);
-        if (
-          notification.method === "item/started" &&
-          notification.params.item.type === "commandExecution"
-        ) {
-          const timer = window.setTimeout(() => {
-            retryTimers.delete(timer);
-            if (generation === connectionGenerationRef.current) {
-              refreshThread(client, changedThreadId, generation);
-            }
-          }, 250);
-          retryTimers.add(timer);
-        }
-      } else if (
+        pendingRefreshesRef.current
+          .get(changedThreadId)
+          ?.notifications.push(notification);
+      }
+      if (
         notification.method === "thread/deleted" ||
         notification.method === "thread/closed"
       ) {
@@ -113,31 +130,35 @@ export function useBackgroundTerminals(
           notification.params.threadId,
           (refreshSequencesRef.current.get(notification.params.threadId) ?? 0) + 1,
         );
+        pendingRefreshesRef.current.delete(notification.params.threadId);
       }
       setState((current) => reduceBackgroundTerminalNotification(
         current,
         notification,
       ));
     });
-    return () => {
-      release();
-      for (const timer of retryTimers) {
-        window.clearTimeout(timer);
-      }
-      retryTimers.clear();
-    };
-  }, [client, refreshThread]);
+    return release;
+  }, [client]);
 
   useEffect(() => {
-    if (client === null || currentThreadId === null) {
+    if (client === null || resumedThreadId === null) {
+      snapshotSourceRef.current = null;
       return;
     }
+    const previous = snapshotSourceRef.current;
+    if (
+      previous?.client === client &&
+      previous.threadId === resumedThreadId
+    ) {
+      return;
+    }
+    snapshotSourceRef.current = { client, threadId: resumedThreadId };
     refreshThread(
       client,
-      currentThreadId,
+      resumedThreadId,
       connectionGenerationRef.current,
     );
-  }, [client, currentThreadId, refreshThread]);
+  }, [client, refreshThread, resumedThreadId]);
 
   const terminate = useCallback(async (processId: string): Promise<boolean> => {
     const target = clientRef.current;
@@ -299,20 +320,13 @@ function reduceBackgroundTerminalNotification(
   }
 }
 
-function terminalSnapshotThreadId(
+function terminalNotificationThreadId(
   notification: ServerNotification,
 ): string | null {
   switch (notification.method) {
     case "item/started":
     case "item/completed":
       return notification.params.item.type === "commandExecution"
-        ? notification.params.threadId
-        : null;
-    case "turn/completed":
-      return notification.params.turn.items.some(
-        (item) =>
-          item.type === "commandExecution" && item.status === "inProgress",
-      )
         ? notification.params.threadId
         : null;
     default:

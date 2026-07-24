@@ -607,7 +607,7 @@ describe("App", () => {
       command: "sleep 60",
       commandActions: [] as never[],
       cwd: "/workspace/project",
-      durationMs: 3_000,
+      durationMs: 4_000,
       processId: "42",
       status: "inProgress",
     } as const;
@@ -727,12 +727,20 @@ describe("App", () => {
     const backgroundCommands = await screen.findByRole("region", {
       name: "运行中命令",
     });
+    expect(requests.filter(
+      ({ method }) => method === "thread/backgroundTerminals/list",
+    )).toHaveLength(1);
+    expect(requests.findIndex(
+      ({ method }) => method === "thread/backgroundTerminals/list",
+    )).toBeGreaterThan(requests.findIndex(
+      ({ method }) => method === "thread/resume",
+    ));
     expect(screen.queryByRole("button", { name: /停止/u })).not.toBeInTheDocument();
 
     await user.click(within(backgroundCommands).getByRole("button", {
       name: /1 个命令正在运行/u,
     }));
-    await user.click(screen.getByRole("button", { name: "终止" }));
+    await user.click(await screen.findByRole("button", { name: "终止" }));
 
     expect(await screen.findByRole("button", { name: "正在终止" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /停止/u })).not.toBeInTheDocument();
@@ -775,6 +783,9 @@ describe("App", () => {
     await waitFor(() => expect(
       screen.queryByRole("button", { name: /1 个命令正在运行/u }),
     ).not.toBeInTheDocument());
+    expect(requests.filter(
+      ({ method }) => method === "thread/backgroundTerminals/list",
+    )).toHaveLength(1);
     expect(screen.queryByRole("button", { name: /停止/u })).not.toBeInTheDocument();
   });
 
