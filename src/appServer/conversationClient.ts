@@ -4,6 +4,10 @@ import type {
   ThreadStartResponse,
   ThreadSettingsUpdateParams,
   ThreadSettingsUpdateResponse,
+  ThreadBackgroundTerminalsListParams,
+  ThreadBackgroundTerminalsListResponse,
+  ThreadBackgroundTerminalsTerminateParams,
+  ThreadBackgroundTerminalsTerminateResponse,
   TurnInterruptParams,
   TurnInterruptResponse,
   TurnStartParams,
@@ -21,6 +25,8 @@ import type {
 import {
   validateThreadStartResponse,
   validateThreadSettingsUpdateResponse,
+  validateThreadBackgroundTerminalsListResponse,
+  validateThreadBackgroundTerminalsTerminateResponse,
   validateTurnInterruptResponse,
   validateTurnStartResponse,
   validateTurnSteerResponse,
@@ -62,7 +68,20 @@ export interface ConversationClient {
   subscribeNotifications(handler: (notification: ServerNotification) => void): () => void;
 }
 
-export class AppServerConversationClient implements ConversationClient {
+export interface BackgroundTerminalClient {
+  listBackgroundTerminals(
+    threadId: string,
+    cursor?: string | null,
+  ): RequestHandle<ThreadBackgroundTerminalsListResponse>;
+  terminateBackgroundTerminal(
+    threadId: string,
+    processId: string,
+  ): RequestHandle<ThreadBackgroundTerminalsTerminateResponse>;
+  subscribeNotifications(handler: (notification: ServerNotification) => void): () => void;
+}
+
+export class AppServerConversationClient
+  implements ConversationClient, BackgroundTerminalClient {
   constructor(private readonly session: ConversationSession) {}
 
   startThread(params: ThreadStartParams = {}): RequestHandle<ThreadStartResponse> {
@@ -100,6 +119,37 @@ export class AppServerConversationClient implements ConversationClient {
       method: "thread/settings/update",
       params,
       validateResult: threadSettingsUpdateResponseValidator,
+    });
+  }
+
+  listBackgroundTerminals(
+    threadId: string,
+    cursor?: string | null,
+  ): RequestHandle<ThreadBackgroundTerminalsListResponse> {
+    const params: ThreadBackgroundTerminalsListParams = {
+      threadId,
+      limit: 100,
+      ...(cursor === undefined ? {} : { cursor }),
+    };
+    return this.session.sendRequest({
+      method: "thread/backgroundTerminals/list",
+      params,
+      validateResult: threadBackgroundTerminalsListResponseValidator,
+    });
+  }
+
+  terminateBackgroundTerminal(
+    threadId: string,
+    processId: string,
+  ): RequestHandle<ThreadBackgroundTerminalsTerminateResponse> {
+    const params: ThreadBackgroundTerminalsTerminateParams = {
+      threadId,
+      processId,
+    };
+    return this.session.sendRequest({
+      method: "thread/backgroundTerminals/terminate",
+      params,
+      validateResult: threadBackgroundTerminalsTerminateResponseValidator,
     });
   }
 
@@ -156,6 +206,10 @@ const threadStartResponseValidator: ResultValidator<ThreadStartResponse> =
   validateThreadStartResponse;
 const threadSettingsUpdateResponseValidator: ResultValidator<ThreadSettingsUpdateResponse> =
   validateThreadSettingsUpdateResponse;
+const threadBackgroundTerminalsListResponseValidator: ResultValidator<ThreadBackgroundTerminalsListResponse> =
+  validateThreadBackgroundTerminalsListResponse;
+const threadBackgroundTerminalsTerminateResponseValidator: ResultValidator<ThreadBackgroundTerminalsTerminateResponse> =
+  validateThreadBackgroundTerminalsTerminateResponse;
 const turnStartResponseValidator: ResultValidator<TurnStartResponse> =
   validateTurnStartResponse;
 const turnSteerResponseValidator: ResultValidator<TurnSteerResponse> =

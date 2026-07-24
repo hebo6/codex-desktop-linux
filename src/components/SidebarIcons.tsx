@@ -62,6 +62,25 @@ export function ComposeIcon() {
   );
 }
 
+export function TerminalIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height="16"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+      width="16"
+    >
+      <rect height="16" rx="2.5" width="18" x="3" y="4" />
+      <path d="m7 9 3 3-3 3M13 15h4" />
+    </svg>
+  );
+}
+
 export function GroupIcon() {
   return (
     <svg

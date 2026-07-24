@@ -45,6 +45,7 @@ interface ConnectionShellProps {
   pendingThreadIds?: readonly string[];
   removingThreadIds?: readonly string[];
   archivedThread?: ThreadSummary | null;
+  backgroundCommandCounts?: ReadonlyMap<string, number>;
   onArchiveThread?: (threadId: string) => void;
   onDeleteThread?: (threadId: string) => void;
   onLoadMoreThreads?: () => void;
@@ -158,6 +159,7 @@ export function ConnectionShell({
   pendingThreadIds = [],
   removingThreadIds = [],
   archivedThread = null,
+  backgroundCommandCounts,
   onArchiveThread,
   onDeleteThread,
   onLoadMoreThreads,
@@ -363,6 +365,9 @@ export function ConnectionShell({
       >
         <RecentThreads
           archivedThread={archivedThread}
+          {...(backgroundCommandCounts === undefined
+            ? {}
+            : { backgroundCommandCounts })}
           currentThreadId={currentThreadId}
           draftThreadIds={draftThreadIds}
           error={threadListError}

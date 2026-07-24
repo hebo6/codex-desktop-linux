@@ -327,6 +327,11 @@
   visibility: visible;
 }
 
+.activityDisclosure[data-command-item-id]:focus-within {
+  border-radius: var(--radius-sm);
+  background: var(--color-fill-subtle);
+}
+
 .thinking,
 .activityProgress {
   padding: var(--space-1) var(--space-2);

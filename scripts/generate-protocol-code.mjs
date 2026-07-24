@@ -259,6 +259,24 @@ const schemaDeclarations = [
     schemaPath: "v2/GetAccountTokenUsageResponse.json",
     validatorName: "validateGetAccountTokenUsageResponse",
   },
+  {
+    typeName: "ThreadBackgroundTerminalsListParams",
+    schemaPath: "v2/ThreadBackgroundTerminalsListParams.json",
+  },
+  {
+    typeName: "ThreadBackgroundTerminalsListResponse",
+    schemaPath: "v2/ThreadBackgroundTerminalsListResponse.json",
+    validatorName: "validateThreadBackgroundTerminalsListResponse",
+  },
+  {
+    typeName: "ThreadBackgroundTerminalsTerminateParams",
+    schemaPath: "v2/ThreadBackgroundTerminalsTerminateParams.json",
+  },
+  {
+    typeName: "ThreadBackgroundTerminalsTerminateResponse",
+    schemaPath: "v2/ThreadBackgroundTerminalsTerminateResponse.json",
+    validatorName: "validateThreadBackgroundTerminalsTerminateResponse",
+  },
 ];
 
 const validatorDeclarations = schemaDeclarations.filter(

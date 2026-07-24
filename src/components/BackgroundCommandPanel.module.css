@@ -1,0 +1,150 @@
+.panel {
+  margin-bottom: var(--space-2);
+  overflow: hidden;
+  border: 1px solid var(--color-divider-strong);
+  border-radius: 16px;
+  color: var(--color-text-secondary);
+  background: var(--color-content-bg);
+  box-shadow: 0 10px 28px rgb(20 20 18 / 10%);
+  pointer-events: auto;
+}
+
+.summary {
+  display: grid;
+  width: 100%;
+  min-height: 42px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.summary:hover,
+.summary:focus-visible {
+  background: var(--color-fill-hover);
+}
+
+.summary strong {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runningDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-status-progress);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-status-progress) 12%, transparent);
+  animation: running-pulse 1.6s ease-in-out infinite;
+}
+
+.chevron {
+  color: var(--color-text-tertiary);
+  transition: transform var(--duration-panel) var(--ease-standard);
+}
+
+.panel[data-expanded="true"] .chevron {
+  transform: rotate(90deg);
+}
+
+.commandList {
+  display: grid;
+  gap: var(--space-1);
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.command {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-fill-subtle);
+}
+
+.commandCopy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.commandCopy code,
+.commandCopy small,
+.commandCopy samp {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commandCopy code {
+  color: var(--color-text-primary);
+  font-size: 12px;
+}
+
+.commandCopy small,
+.commandCopy samp {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.actions button {
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-content-bg);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.actions button:hover:not(:disabled),
+.actions button:focus-visible:not(:disabled) {
+  color: var(--color-text-primary);
+  background: var(--color-fill-hover);
+}
+
+.actions button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.error {
+  margin: var(--space-1) var(--space-2);
+  color: var(--color-status-danger);
+  font-size: 11px;
+}
+
+@keyframes running-pulse {
+  50% {
+    opacity: 0.42;
+  }
+}
+
+@media (max-width: 560px) {
+  .command {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actions {
+    justify-content: flex-end;
+  }
+}

@@ -15,8 +15,14 @@ import { recordConversationFirstCommit } from "../diagnostics/conversationLoadDi
 import { markdownToPlainText, SafeMarkdown } from "./SafeMarkdown";
 import styles from "./ConversationView.module.css";
 
+export interface CommandLocationRequest {
+  readonly itemId: string;
+  readonly requestId: number;
+}
+
 export interface ConversationViewProps {
   readonly restoredThread: RestoredThread;
+  readonly commandLocationRequest?: CommandLocationRequest | null;
   readonly onForkTurn?: (turnId: string, isLatest: boolean) => void;
   readonly actionError?: string | null;
   readonly onOpenLink?: (link: string) => void;
@@ -147,6 +153,7 @@ type ConversationRow =
     };
 
 export function ConversationView({
+  commandLocationRequest = null,
   onForkTurn,
   actionError = null,
   onOpenLink,
@@ -295,6 +302,53 @@ export function ConversationView({
     return () => window.cancelAnimationFrame(frame);
   }, [restoredThread.metadata.id, scrollToBottom]);
 
+  useEffect(() => {
+    if (commandLocationRequest === null) {
+      return;
+    }
+    const scroller = scrollerRef.current;
+    if (scroller === null) {
+      return;
+    }
+    let timer: number | null = null;
+    const locate = () => {
+      const command = Array.from(
+        scroller.querySelectorAll<HTMLElement>("[data-command-item-id]"),
+      ).find(
+        (element) =>
+          element.dataset.commandItemId === commandLocationRequest.itemId,
+      );
+      if (command === undefined) {
+        return false;
+      }
+      const scrollerRect = scroller.getBoundingClientRect();
+      const commandRect = command.getBoundingClientRect();
+      scroller.scrollTop = Math.max(
+        0,
+        scroller.scrollTop +
+          commandRect.top -
+          scrollerRect.top -
+          Math.max(24, (scroller.clientHeight - commandRect.height) / 2),
+      );
+      updateBottomState(scroller);
+      command.querySelector<HTMLElement>("button, [tabindex]")?.focus({
+        preventScroll: true,
+      });
+      return true;
+    };
+    const frame = window.requestAnimationFrame(() => {
+      if (!locate()) {
+        timer = window.setTimeout(locate, PANEL_TRANSITION_MS + 40);
+      }
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [commandLocationRequest, updateBottomState]);
+
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     updateBottomState(event.currentTarget);
   };
@@ -342,6 +396,7 @@ export function ConversationView({
               >
                 <ConversationRowView
                   actionError={actionError}
+                  commandLocationRequest={commandLocationRequest}
                   {...(onForkTurn === undefined ? {} : { onForkTurn })}
                   {...(onOpenLink === undefined ? {} : { onOpenLink })}
                   {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
@@ -398,12 +453,14 @@ export function ConversationView({
 
 function ConversationRowView({
   actionError,
+  commandLocationRequest,
   onForkTurn,
   onOpenLink,
   onOpenDiff,
   row,
 }: {
   readonly actionError: string | null;
+  readonly commandLocationRequest: CommandLocationRequest | null;
   readonly onForkTurn?: (turnId: string, isLatest: boolean) => void;
   readonly onOpenLink?: (link: string) => void;
   readonly onOpenDiff?: (path: string, diff: string) => void;
@@ -433,6 +490,7 @@ function ConversationRowView({
     />
   ) : (
     <ActivityGroup
+      commandLocationRequest={commandLocationRequest}
       items={row.segment.items}
       turn={row.turn}
       {...(onOpenLink === undefined ? {} : { onOpenLink })}
@@ -776,23 +834,33 @@ function AgentMessage({
 }
 
 function ActivityGroup({
+  commandLocationRequest,
   items,
   onOpenDiff,
   onOpenLink,
   turn,
 }: {
+  readonly commandLocationRequest: CommandLocationRequest | null;
   readonly items: readonly ThreadItem[];
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenLink?: (link: string) => void;
   readonly turn: ThreadTurn;
 }) {
   const finalAnswerStarted = turn.items.some(isFinalAnswer);
-  const running = turn.status === "inProgress" && !finalAnswerStarted;
+  const runningCommandCount = items.filter(
+    (item) =>
+      item.type === "commandExecution" && item.status === "inProgress",
+  ).length;
+  const turnWorkRunning =
+    turn.status === "inProgress" && !finalAnswerStarted;
+  const running = turnWorkRunning || runningCommandCount > 0;
   const initiallyExpanded = running;
   const transition = useCollapsibleContent(initiallyExpanded);
   const previousRunningRef = useRef(running);
-  const duration = useTurnDuration(turn, running);
+  const duration = useTurnDuration(turn, turnWorkRunning);
   const visibleItems = items;
+  const setGroupOpen = transition.setOpen;
+  const commandLocationRequestId = commandLocationRequest?.requestId;
   const runningCommand = visibleItems.findLast(
     (item): item is Extract<ThreadItem, { type: "commandExecution" }> =>
       item.type === "commandExecution" && item.status === "inProgress",
@@ -804,8 +872,17 @@ function ActivityGroup({
     if (wasRunning === running) {
       return;
     }
-    transition.setOpen(running);
-  }, [running, transition]);
+    setGroupOpen(running);
+  }, [running, setGroupOpen]);
+
+  useEffect(() => {
+    if (
+      commandLocationRequest !== null &&
+      visibleItems.some(({ id }) => id === commandLocationRequest.itemId)
+    ) {
+      setGroupOpen(true);
+    }
+  }, [commandLocationRequestId, setGroupOpen]);
 
   const toggle = () => {
     const nextExpanded = !transition.targetExpandedRef.current;
@@ -816,10 +893,15 @@ function ActivityGroup({
     <section
       className={styles.activityGroup}
       data-expanded={transition.expanded}
-      data-status={turn.status}
+      data-status={runningCommandCount > 0 ? "inProgress" : turn.status}
     >
       <button aria-expanded={transition.targetExpanded} className={styles.activityGroupHeader} onClick={toggle} type="button">
-        <span>{activityGroupLabel(turn.status, duration, finalAnswerStarted)}</span>
+        <span>{activityGroupLabel(
+          turn.status,
+          duration,
+          finalAnswerStarted,
+          runningCommandCount,
+        )}</span>
         <span aria-hidden="true">›</span>
       </button>
       {transition.contentMounted ? (
@@ -864,6 +946,7 @@ function CommandActivity({
     : item.aggregatedOutput ?? null;
   return (
     <ActivityDisclosure
+      dataItemId={item.id}
       label={commandActivityTitle(item)}
       status={item.status}
     >
@@ -973,11 +1056,13 @@ function FileChangeActivity({
 function ActivityDisclosure({
   ariaLabel,
   children,
+  dataItemId,
   label,
   status,
 }: {
   readonly ariaLabel?: string;
   readonly children?: ReactNode;
+  readonly dataItemId?: string;
   readonly label: ReactNode;
   readonly status: string;
 }) {
@@ -1043,6 +1128,9 @@ function ActivityDisclosure({
   return (
     <section
       className={styles.activityDisclosure}
+      {...(dataItemId === undefined
+        ? {}
+        : { "data-command-item-id": dataItemId })}
       data-expanded={transition.expanded}
       data-status={status}
     >
@@ -1129,7 +1217,11 @@ function activityGroupLabel(
   status: ThreadTurn["status"],
   duration: number | null,
   finalAnswerStarted: boolean,
+  runningCommandCount: number,
 ): string {
+  if (runningCommandCount > 0) {
+    return `${runningCommandCount} 个命令正在运行`;
+  }
   if (status === "interrupted") {
     return duration === null ? "已停止" : `已停止 ${formatDuration(duration)}`;
   }

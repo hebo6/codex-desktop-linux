@@ -17,7 +17,12 @@ import type {
   ServerThreadsPhase,
 } from "../app/useServerThreads";
 import { useVirtualRows } from "./useVirtualRows";
-import { ArchiveIcon, DeleteIcon, DraftIcon } from "./SidebarIcons";
+import {
+  ArchiveIcon,
+  DeleteIcon,
+  DraftIcon,
+  TerminalIcon,
+} from "./SidebarIcons";
 import styles from "./RecentThreads.module.css";
 
 export interface RecentThreadsProps {
@@ -32,6 +37,7 @@ export interface RecentThreadsProps {
   readonly pendingThreadIds: readonly string[];
   readonly removingThreadIds: readonly string[];
   readonly archivedThread: ThreadSummary | null;
+  readonly backgroundCommandCounts?: ReadonlyMap<string, number>;
   readonly onArchiveThread: (threadId: string) => void;
   readonly onDeleteThread: (threadId: string) => void;
   readonly onLoadMore: () => void;
@@ -112,6 +118,7 @@ export function RecentThreads({
   pendingThreadIds,
   removingThreadIds,
   archivedThread,
+  backgroundCommandCounts = EMPTY_COMMAND_COUNTS,
   onArchiveThread,
   onDeleteThread,
   onLoadMore,
@@ -512,6 +519,9 @@ export function RecentThreads({
                     />
                   ) : entry.type === "thread" ? (
                     <ThreadRow
+                      backgroundCommandCount={
+                        backgroundCommandCounts.get(entry.thread.id) ?? 0
+                      }
                       current={entry.thread.id === currentThreadId}
                       disabled={pendingThreadIds.includes(entry.thread.id)}
                       hasDraft={draftThreadIds.has(entry.thread.id)}
@@ -667,6 +677,7 @@ function GroupHeading({
 }
 
 function ThreadRow({
+  backgroundCommandCount,
   current,
   disabled,
   hasDraft,
@@ -679,6 +690,7 @@ function ThreadRow({
   onOpenInNewWindow,
   thread,
 }: {
+  readonly backgroundCommandCount: number;
   readonly current: boolean;
   readonly disabled: boolean;
   readonly hasDraft: boolean;
@@ -748,14 +760,29 @@ function ThreadRow({
           </span>
         ) : null}
         <span className={styles.threadTitle}>{title}</span>
-        {status === null ? null : (
-          <span
-            aria-label={status.label}
-            className={styles.threadStatus}
-            data-status={status.kind}
-            role="img"
-          >
-            {status.text}
+        {status === null && backgroundCommandCount === 0 ? null : (
+          <span className={styles.threadIndicators}>
+            {status === null ? null : (
+              <span
+                aria-label={status.label}
+                className={styles.threadStatus}
+                data-status={status.kind}
+                role="img"
+              >
+                {status.text}
+              </span>
+            )}
+            {backgroundCommandCount === 0 ? null : (
+              <span
+                aria-label={`${backgroundCommandCount} 个后台命令正在运行`}
+                className={styles.backgroundCommands}
+                role="img"
+                title={`${backgroundCommandCount} 个后台命令正在运行`}
+              >
+                <TerminalIcon />
+                <span>{backgroundCommandCount}</span>
+              </span>
+            )}
           </span>
         )}
       </button>
@@ -782,6 +809,8 @@ function ThreadRow({
     </div>
   );
 }
+
+const EMPTY_COMMAND_COUNTS: ReadonlyMap<string, number> = new Map();
 
 function contextMenuPosition(x: number, y: number): CSSProperties {
   return {

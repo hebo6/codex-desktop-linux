@@ -17,6 +17,8 @@ import type {
   ThreadDeleteResponse,
   ThreadStartResponse,
   ThreadSettingsUpdateResponse,
+  ThreadBackgroundTerminalsListResponse,
+  ThreadBackgroundTerminalsTerminateResponse,
   TurnStartResponse,
   TurnSteerResponse,
   TurnInterruptResponse,
@@ -52,6 +54,8 @@ import {
   validateThreadDeleteResponse as validateThreadDeleteResponseSchema,
   validateThreadStartResponse as validateThreadStartResponseSchema,
   validateThreadSettingsUpdateResponse as validateThreadSettingsUpdateResponseSchema,
+  validateThreadBackgroundTerminalsListResponse as validateThreadBackgroundTerminalsListResponseSchema,
+  validateThreadBackgroundTerminalsTerminateResponse as validateThreadBackgroundTerminalsTerminateResponseSchema,
   validateTurnStartResponse as validateTurnStartResponseSchema,
   validateTurnSteerResponse as validateTurnSteerResponseSchema,
   validateTurnInterruptResponse as validateTurnInterruptResponseSchema,
@@ -294,6 +298,30 @@ export function validateThreadSettingsUpdateResponse(
     "invalid_params",
     "params",
     "thread/settings/update 响应校验失败",
+  );
+}
+
+export function validateThreadBackgroundTerminalsListResponse(
+  value: unknown,
+): ProtocolValidationResult<ThreadBackgroundTerminalsListResponse> {
+  return validateWithSchema(
+    value,
+    validateThreadBackgroundTerminalsListResponseSchema,
+    "invalid_params",
+    "params",
+    "thread/backgroundTerminals/list 响应校验失败",
+  );
+}
+
+export function validateThreadBackgroundTerminalsTerminateResponse(
+  value: unknown,
+): ProtocolValidationResult<ThreadBackgroundTerminalsTerminateResponse> {
+  return validateWithSchema(
+    value,
+    validateThreadBackgroundTerminalsTerminateResponseSchema,
+    "invalid_params",
+    "params",
+    "thread/backgroundTerminals/terminate 响应校验失败",
   );
 }
 

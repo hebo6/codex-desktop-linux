@@ -22,6 +22,8 @@ import type {
   ServerRequest,
   SkillsListResponse,
   ThreadArchiveResponse,
+  ThreadBackgroundTerminalsListResponse,
+  ThreadBackgroundTerminalsTerminateResponse,
   ThreadCompactStartResponse,
   ThreadDeleteResponse,
   ThreadForkResponse,
@@ -76,3 +78,5 @@ export const validateFsGetMetadataResponse: StandaloneValidateFunction<FsGetMeta
 export const validateGetAccountRateLimitsResponse: StandaloneValidateFunction<GetAccountRateLimitsResponse>;
 export const validateConsumeAccountRateLimitResetCreditResponse: StandaloneValidateFunction<ConsumeAccountRateLimitResetCreditResponse>;
 export const validateGetAccountTokenUsageResponse: StandaloneValidateFunction<GetAccountTokenUsageResponse>;
+export const validateThreadBackgroundTerminalsListResponse: StandaloneValidateFunction<ThreadBackgroundTerminalsListResponse>;
+export const validateThreadBackgroundTerminalsTerminateResponse: StandaloneValidateFunction<ThreadBackgroundTerminalsTerminateResponse>;

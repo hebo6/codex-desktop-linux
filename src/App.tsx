@@ -10,6 +10,7 @@ import {
   type ConfiguredServerConnectionControllerOptions,
 } from "./app/useConfiguredServerConnection";
 import { useConversation } from "./app/useConversation";
+import { useBackgroundTerminals } from "./app/useBackgroundTerminals";
 import { useComposerCapabilities } from "./app/useComposerCapabilities";
 import {
   useServerProfileMutations,
@@ -36,10 +37,12 @@ import { ConnectionShell } from "./components/ConnectionShell";
 import {
   ConversationPlaceholder,
   ConversationView,
+  type CommandLocationRequest,
 } from "./components/ConversationView";
 import { ConversationWorkspace } from "./components/ConversationWorkspace";
 import { Composer } from "./components/Composer";
 import { ApprovalPanel } from "./components/ApprovalPanel";
+import { BackgroundCommandPanel } from "./components/BackgroundCommandPanel";
 import { RateLimitIndicator } from "./components/RateLimitIndicator";
 import { ExternalLinkDialog } from "./components/ExternalLinkDialog";
 import { FilePreviewDialog, type FilePreviewRequest } from "./components/FilePreviewDialog";
@@ -255,6 +258,10 @@ export function App({
       }
     },
   });
+  const backgroundTerminals = useBackgroundTerminals(
+    connection.conversationClient,
+    windowState.windowState?.currentThreadId ?? null,
+  );
   const [draftCwd, setDraftCwd] = useState<string | null>(null);
   const selectedServerId = windowState.windowState?.serverId ?? null;
   const selectedServer = selectedServerId === null
@@ -335,6 +342,8 @@ export function App({
   const [draftThreadPresence, setDraftThreadPresence] =
     useState<DraftThreadPresence>({ keyPrefix: null, threadIds: new Set() });
   const [shortcutStatus, setShortcutStatus] = useState<string | null>(null);
+  const [commandLocationRequest, setCommandLocationRequest] =
+    useState<CommandLocationRequest | null>(null);
   const [notificationPermission, setNotificationPermission] = useState(
     () => notificationService.permission(),
   );
@@ -371,6 +380,7 @@ export function App({
     undefined,
   );
   const deepLinkInFlightRef = useRef(false);
+  const commandLocationSequenceRef = useRef(0);
 
   const servers = useMemo(
     () =>
@@ -428,6 +438,10 @@ export function App({
         }),
     [conversation.turns, restoredThread],
   );
+
+  useEffect(() => {
+    setCommandLocationRequest(null);
+  }, [windowState.windowState?.currentThreadId]);
 
   useEffect(() => {
     let disposed = false;
@@ -1419,6 +1433,7 @@ export function App({
       <ConnectionShell
         announcement={shortcutStatus}
         archivedThread={serverThreads.archivedThread}
+        backgroundCommandCounts={backgroundTerminals.counts}
         contentSubtitle={contentSubtitle}
         contentTitle={contentTitle}
         currentThreadId={windowState.windowState?.currentThreadId ?? null}
@@ -1448,12 +1463,33 @@ export function App({
                   draftStore={draftStore}
                   error={conversation.error}
                   interactionPanel={
-                    <ApprovalPanel
-                      onOpenLink={openContentLink}
-                      onRespond={serverInteractions.respond}
-                      pending={serverInteractions.pending}
-                      resolvedElsewhereCount={serverInteractions.resolvedElsewhereCount}
-                    />
+                    <>
+                      <ApprovalPanel
+                        onOpenLink={openContentLink}
+                        onRespond={serverInteractions.respond}
+                        pending={serverInteractions.pending}
+                        resolvedElsewhereCount={serverInteractions.resolvedElsewhereCount}
+                      />
+                      <BackgroundCommandPanel
+                        error={backgroundTerminals.error}
+                        loaded={backgroundTerminals.loaded}
+                        onLocate={(itemId) => {
+                          commandLocationSequenceRef.current += 1;
+                          setCommandLocationRequest({
+                            itemId,
+                            requestId: commandLocationSequenceRef.current,
+                          });
+                        }}
+                        onTerminate={(processId) => {
+                          void backgroundTerminals.terminate(processId);
+                        }}
+                        terminals={backgroundTerminals.currentTerminals}
+                        terminatingProcessIds={
+                          backgroundTerminals.terminatingProcessIds
+                        }
+                        turns={displayedRestoredThread?.turns ?? []}
+                      />
+                    </>
                   }
                   models={composerCapabilities.models}
                   modelsLoading={
@@ -1500,6 +1536,7 @@ export function App({
                 actionError={
                   forkError ?? contentError ?? serverThreads.threadRestoreError
                 }
+                commandLocationRequest={commandLocationRequest}
                 onOpenDiff={openDiff}
                 onOpenLink={openContentLink}
                 {...(serverThreads.offline ? {} : { onForkTurn: (turnId: string, isLatest: boolean) => {

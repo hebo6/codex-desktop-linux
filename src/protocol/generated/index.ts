@@ -71,6 +71,10 @@ export type { ExecCommandApprovalResponse } from "./types/ExecCommandApprovalRes
 export type { ConsumeAccountRateLimitResetCreditResponse } from "./types/ConsumeAccountRateLimitResetCreditResponse";
 export type { ConsumeAccountRateLimitResetCreditParams } from "./types/ConsumeAccountRateLimitResetCreditParams";
 export type { GetAccountTokenUsageResponse } from "./types/GetAccountTokenUsageResponse";
+export type { ThreadBackgroundTerminalsListParams } from "./types/ThreadBackgroundTerminalsListParams";
+export type { ThreadBackgroundTerminalsListResponse } from "./types/ThreadBackgroundTerminalsListResponse";
+export type { ThreadBackgroundTerminalsTerminateParams } from "./types/ThreadBackgroundTerminalsTerminateParams";
+export type { ThreadBackgroundTerminalsTerminateResponse } from "./types/ThreadBackgroundTerminalsTerminateResponse";
 
 export {
   KNOWN_SERVER_NOTIFICATION_METHODS,

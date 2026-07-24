@@ -121120,3 +121120,309 @@ errors++;
 validate581.errors = vErrors;
 return errors === 0;
 }
+
+export const validateThreadBackgroundTerminalsListResponse = validate582;
+const schema909 = {"$schema":"http://json-schema.org/draft-07/schema#","definitions":{"AbsolutePathBuf":{"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"},"ThreadBackgroundTerminal":{"properties":{"command":{"type":"string"},"cpuPercent":{"type":["number","null"]},"cwd":{"$ref":"#/definitions/AbsolutePathBuf"},"itemId":{"type":"string"},"osPid":{"minimum":0,"type":["integer","null"],"maximum":4294967295},"processId":{"type":"string"},"rssKb":{"minimum":0,"type":["integer","null"],"maximum":9007199254740991}},"required":["command","cwd","itemId","processId"],"type":"object"}},"properties":{"data":{"items":{"$ref":"#/definitions/ThreadBackgroundTerminal"},"type":"array"},"nextCursor":{"description":"Opaque cursor to pass to the next call to continue after the last item. If None, there are no more items to return.","type":["string","null"]}},"required":["data"],"title":"ThreadBackgroundTerminalsListResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ThreadBackgroundTerminalsListResponse"};
+const schema910 = {"properties":{"command":{"type":"string"},"cpuPercent":{"type":["number","null"]},"cwd":{"$ref":"#/definitions/AbsolutePathBuf"},"itemId":{"type":"string"},"osPid":{"minimum":0,"type":["integer","null"],"maximum":4294967295},"processId":{"type":"string"},"rssKb":{"minimum":0,"type":["integer","null"],"maximum":9007199254740991}},"required":["command","cwd","itemId","processId"],"type":"object"};
+const schema911 = {"description":"A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.","type":"string"};
+
+function validate583(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.command === undefined){
+const err0 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "command"},message:"must have required property '"+"command"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.cwd === undefined){
+const err1 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "cwd"},message:"must have required property '"+"cwd"+"'"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+if(data.itemId === undefined){
+const err2 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "itemId"},message:"must have required property '"+"itemId"+"'"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+if(data.processId === undefined){
+const err3 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "processId"},message:"must have required property '"+"processId"+"'"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+if(data.command !== undefined){
+if(typeof data.command !== "string"){
+const err4 = {instancePath:instancePath+"/command",schemaPath:"#/properties/command/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err4];
+}
+else {
+vErrors.push(err4);
+}
+errors++;
+}
+}
+if(data.cpuPercent !== undefined){
+let data1 = data.cpuPercent;
+if((!((typeof data1 == "number") && (isFinite(data1)))) && (data1 !== null)){
+const err5 = {instancePath:instancePath+"/cpuPercent",schemaPath:"#/properties/cpuPercent/type",keyword:"type",params:{type: schema910.properties.cpuPercent.type},message:"must be number,null"};
+if(vErrors === null){
+vErrors = [err5];
+}
+else {
+vErrors.push(err5);
+}
+errors++;
+}
+}
+if(data.cwd !== undefined){
+if(typeof data.cwd !== "string"){
+const err6 = {instancePath:instancePath+"/cwd",schemaPath:"#/definitions/AbsolutePathBuf/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err6];
+}
+else {
+vErrors.push(err6);
+}
+errors++;
+}
+}
+if(data.itemId !== undefined){
+if(typeof data.itemId !== "string"){
+const err7 = {instancePath:instancePath+"/itemId",schemaPath:"#/properties/itemId/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err7];
+}
+else {
+vErrors.push(err7);
+}
+errors++;
+}
+}
+if(data.osPid !== undefined){
+let data4 = data.osPid;
+if((!(((typeof data4 == "number") && (!(data4 % 1) && !isNaN(data4))) && (isFinite(data4)))) && (data4 !== null)){
+const err8 = {instancePath:instancePath+"/osPid",schemaPath:"#/properties/osPid/type",keyword:"type",params:{type: schema910.properties.osPid.type},message:"must be integer,null"};
+if(vErrors === null){
+vErrors = [err8];
+}
+else {
+vErrors.push(err8);
+}
+errors++;
+}
+if((typeof data4 == "number") && (isFinite(data4))){
+if(data4 > 4294967295 || isNaN(data4)){
+const err9 = {instancePath:instancePath+"/osPid",schemaPath:"#/properties/osPid/maximum",keyword:"maximum",params:{comparison: "<=", limit: 4294967295},message:"must be <= 4294967295"};
+if(vErrors === null){
+vErrors = [err9];
+}
+else {
+vErrors.push(err9);
+}
+errors++;
+}
+if(data4 < 0 || isNaN(data4)){
+const err10 = {instancePath:instancePath+"/osPid",schemaPath:"#/properties/osPid/minimum",keyword:"minimum",params:{comparison: ">=", limit: 0},message:"must be >= 0"};
+if(vErrors === null){
+vErrors = [err10];
+}
+else {
+vErrors.push(err10);
+}
+errors++;
+}
+}
+}
+if(data.processId !== undefined){
+if(typeof data.processId !== "string"){
+const err11 = {instancePath:instancePath+"/processId",schemaPath:"#/properties/processId/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err11];
+}
+else {
+vErrors.push(err11);
+}
+errors++;
+}
+}
+if(data.rssKb !== undefined){
+let data6 = data.rssKb;
+if((!(((typeof data6 == "number") && (!(data6 % 1) && !isNaN(data6))) && (isFinite(data6)))) && (data6 !== null)){
+const err12 = {instancePath:instancePath+"/rssKb",schemaPath:"#/properties/rssKb/type",keyword:"type",params:{type: schema910.properties.rssKb.type},message:"must be integer,null"};
+if(vErrors === null){
+vErrors = [err12];
+}
+else {
+vErrors.push(err12);
+}
+errors++;
+}
+if((typeof data6 == "number") && (isFinite(data6))){
+if(data6 > 9007199254740991 || isNaN(data6)){
+const err13 = {instancePath:instancePath+"/rssKb",schemaPath:"#/properties/rssKb/maximum",keyword:"maximum",params:{comparison: "<=", limit: 9007199254740991},message:"must be <= 9007199254740991"};
+if(vErrors === null){
+vErrors = [err13];
+}
+else {
+vErrors.push(err13);
+}
+errors++;
+}
+if(data6 < 0 || isNaN(data6)){
+const err14 = {instancePath:instancePath+"/rssKb",schemaPath:"#/properties/rssKb/minimum",keyword:"minimum",params:{comparison: ">=", limit: 0},message:"must be >= 0"};
+if(vErrors === null){
+vErrors = [err14];
+}
+else {
+vErrors.push(err14);
+}
+errors++;
+}
+}
+}
+}
+else {
+const err15 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err15];
+}
+else {
+vErrors.push(err15);
+}
+errors++;
+}
+validate583.errors = vErrors;
+return errors === 0;
+}
+
+
+function validate582(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+/*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ThreadBackgroundTerminalsListResponse" */;
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.data === undefined){
+const err0 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "data"},message:"must have required property '"+"data"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.data !== undefined){
+let data0 = data.data;
+if(Array.isArray(data0)){
+const len0 = data0.length;
+for(let i0=0; i0<len0; i0++){
+if(!(validate583(data0[i0], {instancePath:instancePath+"/data/" + i0,parentData:data0,parentDataProperty:i0,rootData}))){
+vErrors = vErrors === null ? validate583.errors : vErrors.concat(validate583.errors);
+errors = vErrors.length;
+}
+}
+}
+else {
+const err1 = {instancePath:instancePath+"/data",schemaPath:"#/properties/data/type",keyword:"type",params:{type: "array"},message:"must be array"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+}
+if(data.nextCursor !== undefined){
+let data2 = data.nextCursor;
+if((typeof data2 !== "string") && (data2 !== null)){
+const err2 = {instancePath:instancePath+"/nextCursor",schemaPath:"#/properties/nextCursor/type",keyword:"type",params:{type: schema909.properties.nextCursor.type},message:"must be string,null"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+}
+}
+else {
+const err3 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err3];
+}
+else {
+vErrors.push(err3);
+}
+errors++;
+}
+validate582.errors = vErrors;
+return errors === 0;
+}
+
+export const validateThreadBackgroundTerminalsTerminateResponse = validate585;
+const schema912 = {"$schema":"http://json-schema.org/draft-07/schema#","properties":{"terminated":{"type":"boolean"}},"required":["terminated"],"title":"ThreadBackgroundTerminalsTerminateResponse","type":"object","$id":"urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ThreadBackgroundTerminalsTerminateResponse"};
+
+function validate585(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){
+/*# sourceURL="urn:codex-app-server:ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c:ThreadBackgroundTerminalsTerminateResponse" */;
+let vErrors = null;
+let errors = 0;
+if(data && typeof data == "object" && !Array.isArray(data)){
+if(data.terminated === undefined){
+const err0 = {instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: "terminated"},message:"must have required property '"+"terminated"+"'"};
+if(vErrors === null){
+vErrors = [err0];
+}
+else {
+vErrors.push(err0);
+}
+errors++;
+}
+if(data.terminated !== undefined){
+if(typeof data.terminated !== "boolean"){
+const err1 = {instancePath:instancePath+"/terminated",schemaPath:"#/properties/terminated/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"};
+if(vErrors === null){
+vErrors = [err1];
+}
+else {
+vErrors.push(err1);
+}
+errors++;
+}
+}
+}
+else {
+const err2 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err2];
+}
+else {
+vErrors.push(err2);
+}
+errors++;
+}
+validate585.errors = vErrors;
+return errors === 0;
+}
