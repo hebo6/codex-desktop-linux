@@ -17,6 +17,7 @@
 - [内容与文件](content-files.md)
 - [多窗口与设置](multi-window-settings.md)
 - [键盘、无障碍与动画](accessibility-motion.md)
+- [协议检查器](protocol-debugger.md)
 
 ## 设计依据
 

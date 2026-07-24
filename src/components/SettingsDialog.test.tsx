@@ -51,6 +51,8 @@ function renderSettings(overrides: Partial<Parameters<typeof SettingsDialog>[0]>
     notificationPermission: "granted",
     onBeforeClearAllLocalData: vi.fn(async () => undefined),
     onAllLocalDataCleared: vi.fn(),
+    protocolDebugAvailable: false,
+    onOpenProtocolDebug: vi.fn(),
     ...overrides,
   };
   render(<SettingsDialog {...props} />);
@@ -73,6 +75,17 @@ describe("SettingsDialog", () => {
     expect(screen.getByText("Ctrl+PageDown")).toBeVisible();
     expect(screen.getByText("Ctrl+B")).toBeVisible();
     expect(screen.getByText("打开项目选择器（仅新会话）")).toBeVisible();
+  });
+
+  it("仅在调试构建中展示协议检查器入口", () => {
+    const { props } = renderSettings({
+      initialSection: "developer",
+      protocolDebugAvailable: true,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "打开协议检查器" }));
+    expect(props.onOpenProtocolDebug).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/认证字段会在进入调试缓存前强制脱敏/u)).toBeVisible();
   });
 
   it("分别清理日志、临时文件和包含草稿的全部本地数据", async () => {

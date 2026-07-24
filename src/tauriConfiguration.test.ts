@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import tauriConfiguration from "../src-tauri/tauri.conf.json";
 import eventCapability from "../src-tauri/capabilities/app-events.json";
+import protocolDebugCapability from "../src-tauri/capabilities/protocol-debug.json";
 
 describe("Tauri 发布配置", () => {
   it("保留由前端封装间接调用的 IPC 命令", () => {
@@ -15,5 +16,21 @@ describe("Tauri 发布配置", () => {
       "core:event:allow-listen",
       "core:event:allow-unlisten",
     ]);
+  });
+
+  it("仅向独立协议检查器窗口授予只读追踪权限", () => {
+    expect(tauriConfiguration.app.security.capabilities).toContain(
+      "protocol-debug",
+    );
+    expect(protocolDebugCapability.windows).toEqual(["protocol-debug"]);
+    expect(protocolDebugCapability.permissions).toContain(
+      "allow-protocol-trace",
+    );
+    expect(protocolDebugCapability.permissions).not.toContain(
+      "allow-send-configured-server-message",
+    );
+    expect(protocolDebugCapability.permissions).not.toContain(
+      "allow-connect-configured-server",
+    );
   });
 });

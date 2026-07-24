@@ -16,7 +16,7 @@ describe("BackgroundCommandPanel", () => {
       id: "command-running",
       type: "commandExecution",
       command: "sleep 60",
-      commandActions: [],
+      commandActions: [] as never[],
       cwd: "/workspace/project",
       durationMs: 0,
       processId: "42",

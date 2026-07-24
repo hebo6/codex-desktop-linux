@@ -7,6 +7,12 @@ import { parseVisualRegressionQuery } from "./visual/visualRegressionQuery";
 import "./styles/global.css";
 
 const App = lazy(async () => ({ default: (await import("./App")).App }));
+const ProtocolDebugWindow = import.meta.env.DEV
+  ? lazy(async () => ({
+      default: (await import("./protocolDebug/ProtocolDebugWindow"))
+        .ProtocolDebugWindow,
+    }))
+  : null;
 const VisualRegressionFixture = import.meta.env.DEV
   ? lazy(async () => ({
       default: (await import("./visual/VisualRegressionFixture")).VisualRegressionFixture,
@@ -22,16 +28,23 @@ if (!rootElement) {
 const visualRegressionQuery = import.meta.env.DEV
   ? parseVisualRegressionQuery(window.location.search)
   : null;
+const protocolDebug =
+  ProtocolDebugWindow !== null &&
+  new URLSearchParams(window.location.search).get("view") === "protocol-debug";
 
 createRoot(rootElement).render(
   <StrictMode>
-    <Provider store={store}>
-      <Suspense fallback={<StartupShell />}>
-        {visualRegressionQuery === null || VisualRegressionFixture === null
-          ? <App />
-          : <VisualRegressionFixture {...visualRegressionQuery} />}
-      </Suspense>
-    </Provider>
+    <Suspense fallback={<StartupShell />}>
+      {protocolDebug && ProtocolDebugWindow !== null
+        ? <ProtocolDebugWindow />
+        : (
+          <Provider store={store}>
+            {visualRegressionQuery === null || VisualRegressionFixture === null
+              ? <App />
+              : <VisualRegressionFixture {...visualRegressionQuery} />}
+          </Provider>
+        )}
+    </Suspense>
   </StrictMode>,
 );
 

@@ -26,6 +26,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     configuration::{SensitiveEnvironment, ServerConfiguration},
+    protocol_trace::{ProtocolTraceContext, ProtocolTraceDirection, ProtocolTraceHub},
     sensitive::looks_sensitive_environment_name,
 };
 
@@ -1250,8 +1251,21 @@ impl std::error::Error for CommandError {}
 pub(crate) async fn send_local_stdio_message<R: Runtime>(
     window: WebviewWindow<R>,
     manager: State<'_, LocalStdioConnectionManager>,
+    trace: State<'_, ProtocolTraceHub>,
     request: SendLocalStdioMessageRequest,
 ) -> Result<(), CommandError> {
+    if trace.is_enabled() {
+        trace.record(
+            &ProtocolTraceContext::connection_test(
+                request.connection_id.clone(),
+                "localStdio",
+                "localStdio",
+                window.label().to_owned(),
+            ),
+            ProtocolTraceDirection::Outbound,
+            &request.json,
+        );
+    }
     manager.send(window.label(), request).await
 }
 

@@ -248,6 +248,7 @@ export function VisualRegressionFixture({ state, theme }: VisualRegressionQuery)
         onEditServer={() => undefined}
         onNewProxy={() => undefined}
         onNewServer={() => undefined}
+        onOpenProtocolDebug={() => undefined}
         onOpenServerInNewWindow={() => undefined}
         onUpdatePreferences={() => undefined}
         open={state === "settings"}
@@ -257,6 +258,7 @@ export function VisualRegressionFixture({ state, theme }: VisualRegressionQuery)
         preferencesLoading={false}
         preferencesSaving={false}
         preferencesStore={VISUAL_PREFERENCES_STORE}
+        protocolDebugAvailable={false}
         proxies={[]}
         recentConnectionError={null}
         servers={[]}

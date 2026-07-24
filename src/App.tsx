@@ -109,6 +109,10 @@ import {
   draftStore as persistentDraftStore,
   type DraftStore,
 } from "./transport/drafts";
+import {
+  openProtocolDebugWindow,
+  protocolDebugAvailable,
+} from "./transport/protocolTrace";
 
 export type AppWindowOpener = typeof openAppWindow;
 export type CredentialStorageStatusLoader = () => Promise<CredentialStorageStatus>;
@@ -128,6 +132,8 @@ export interface AppProps {
   readonly deepLinkSubscriber?: DeepLinkTargetSubscriber;
   readonly configuredServerStatusSubscriber?: ConfiguredServerStatusSubscriber;
   readonly draftStore?: DraftStore;
+  readonly protocolDebugAvailabilityLoader?: () => Promise<boolean>;
+  readonly protocolDebugWindowOpener?: () => Promise<void>;
 }
 
 interface DraftThreadPresence {
@@ -231,6 +237,8 @@ export function App({
   deepLinkSubscriber = subscribeDeepLinkTargets,
   configuredServerStatusSubscriber = subscribeConfiguredServerStatuses,
   draftStore = persistentDraftStore,
+  protocolDebugAvailabilityLoader = protocolDebugAvailable,
+  protocolDebugWindowOpener = openProtocolDebugWindow,
 }: AppProps = {}) {
   const configuration = useAppSelector(selectConfiguration);
   const windowState = useWindowState(windowStateOptions);
@@ -359,6 +367,7 @@ export function App({
   const [windowReferenceError, setWindowReferenceError] = useState<
     string | null
   >(null);
+  const [protocolDebugEnabled, setProtocolDebugEnabled] = useState(false);
   const [
     windowReferenceSubscriptionAttempt,
     setWindowReferenceSubscriptionAttempt,
@@ -379,6 +388,28 @@ export function App({
   const appliedWindowServerRef = useRef<ServerId | null | undefined>(
     undefined,
   );
+
+  useEffect(() => {
+    let active = true;
+    void protocolDebugAvailabilityLoader().then(
+      (available) => {
+        if (active) setProtocolDebugEnabled(available);
+      },
+      () => {
+        if (active) setProtocolDebugEnabled(false);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [protocolDebugAvailabilityLoader]);
+
+  const openProtocolDebugger = useCallback(() => {
+    setWindowActionError(null);
+    void protocolDebugWindowOpener().catch(() => {
+      setWindowActionError("无法打开协议检查器，请重试");
+    });
+  }, [protocolDebugWindowOpener]);
   const deepLinkInFlightRef = useRef(false);
   const commandLocationSequenceRef = useRef(0);
 
@@ -1208,6 +1239,9 @@ export function App({
       } else if (key === ",") {
         event.preventDefault();
         setSettingsSection("appearance");
+      } else if (key === "d" && event.shiftKey && protocolDebugEnabled) {
+        event.preventDefault();
+        openProtocolDebugger();
       } else if (key === "l") {
         const composer = document.querySelector<HTMLTextAreaElement>("[data-composer-input]");
         if (composer !== null && !composer.disabled) {
@@ -1240,6 +1274,8 @@ export function App({
     conversation.stopping,
     displayedRestoredThread,
     openNewWindowTask,
+    openProtocolDebugger,
+    protocolDebugEnabled,
   ]);
 
   const updatePreferences = (patch: Partial<AppPreferences>) => {
@@ -1729,6 +1765,10 @@ export function App({
         }}
         onBeforeClearAllLocalData={() => connection.disconnect()}
         onAllLocalDataCleared={() => window.location.reload()}
+        onOpenProtocolDebug={() => {
+          setSettingsSection(null);
+          openProtocolDebugger();
+        }}
         onUpdatePreferences={updatePreferences}
         notificationPermission={notificationPermission}
         open={settingsSection !== null}
@@ -1738,6 +1778,7 @@ export function App({
         preferencesLoading={preferences.loading}
         preferencesSaving={preferences.saving}
         preferencesStore={preferences.store}
+        protocolDebugAvailable={protocolDebugEnabled}
         proxies={proxies}
         recentConnectionError={recentConnectionError}
         servers={servers}

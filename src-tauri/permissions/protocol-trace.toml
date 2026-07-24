@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-protocol-trace"
+description = "Allows the isolated protocol debugger window to inspect and clear its in-memory trace"
+commands.allow = [
+    "subscribe_protocol_trace",
+    "unsubscribe_protocol_trace",
+    "clear_protocol_trace",
+    "get_window_button_layout",
+]

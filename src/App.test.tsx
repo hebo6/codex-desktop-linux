@@ -160,6 +160,8 @@ function renderApp(
     readonly deepLinkSubscriber?: DeepLinkTargetSubscriber;
     readonly configuredServerStatusSubscriber?: ConfiguredServerStatusSubscriber;
     readonly draftStore?: DraftStore;
+    readonly protocolDebugAvailabilityLoader?: () => Promise<boolean>;
+    readonly protocolDebugWindowOpener?: () => Promise<void>;
   } = {},
 ) {
   const testStore = createTestStore();
@@ -227,6 +229,12 @@ function renderApp(
         {...(options.draftStore === undefined
           ? {}
           : { draftStore: options.draftStore })}
+        protocolDebugAvailabilityLoader={
+          options.protocolDebugAvailabilityLoader ?? (async () => false)
+        }
+        protocolDebugWindowOpener={
+          options.protocolDebugWindowOpener ?? (async () => undefined)
+        }
         windowStateOptions={windowStateOptions}
       />
     </Provider>,
@@ -246,6 +254,19 @@ describe("App", () => {
 
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "键盘快捷键" })).not.toBeInTheDocument();
+  });
+
+  it("调试构建通过 Ctrl+Shift+D 打开协议检查器", async () => {
+    const protocolDebugWindowOpener = vi.fn(async () => undefined);
+    renderApp(() => ({ servers: [], proxies: [] }), {
+      protocolDebugAvailabilityLoader: async () => true,
+      protocolDebugWindowOpener,
+    });
+
+    await waitFor(() => {
+      fireEvent.keyDown(window, { ctrlKey: true, shiftKey: true, key: "D" });
+      expect(protocolDebugWindowOpener).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("密钥环不可用时在创建凭据前要求确认明文存储", async () => {
@@ -584,7 +605,7 @@ describe("App", () => {
       id: "command-running",
       type: "commandExecution",
       command: "sleep 60",
-      commandActions: [],
+      commandActions: [] as never[],
       cwd: "/workspace/project",
       durationMs: 3_000,
       processId: "42",

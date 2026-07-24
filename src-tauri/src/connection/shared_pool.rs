@@ -13,7 +13,10 @@ use tauri::ipc::Channel;
 use tokio::sync::watch;
 use uuid::Uuid;
 
-use crate::configuration::{ProxyId, ServerId};
+use crate::{
+    configuration::{ProxyId, ServerId},
+    protocol_trace::{ProtocolTraceContext, ProtocolTraceDirection, ProtocolTraceHub},
+};
 
 use super::{
     connection_id::ConnectionId, lifecycle::ConnectionLifecycle, local_stdio, remote_websocket,
@@ -49,6 +52,15 @@ impl ConfiguredConnectionPath {
             Self::HttpConnect => "httpConnect",
             Self::Socks5 => "socks5",
             Self::SshDirectTcpip => "sshDirectTcpip",
+        }
+    }
+}
+
+impl ConfiguredTransport {
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::LocalStdio => "localStdio",
+            Self::RemoteWebSocket => "remoteWebSocket",
         }
     }
 }
@@ -104,7 +116,7 @@ pub(super) struct PhysicalConnectionMetadata {
 #[derive(Clone)]
 pub(super) struct PhysicalConnectionHandle {
     pub(super) connection_id: ConnectionId,
-    pub(super) transport: ConfiguredTransport,
+    pub(super) metadata: PhysicalConnectionMetadata,
     pub(super) lifecycle: Arc<ConnectionLifecycle>,
 }
 
@@ -259,12 +271,12 @@ impl ConfiguredConnectionManagerState {
     }
 }
 
-#[derive(Default)]
 struct ConfiguredConnectionManagerInner {
     state: Mutex<ConfiguredConnectionManagerState>,
     next_logical_generation: AtomicU64,
     next_physical_generation: AtomicU64,
     next_status_subscriber_generation: AtomicU64,
+    trace: ProtocolTraceHub,
 }
 
 impl ConfiguredConnectionManagerInner {
@@ -617,7 +629,7 @@ impl ConfiguredConnectionManagerInner {
         json: String,
         transport: ConfiguredTransport,
     ) {
-        let deliveries = {
+        let (deliveries, trace_message) = {
             let mut state = self.state();
             let Some(entry) = state.physical_connections.get_mut(&key) else {
                 return;
@@ -625,8 +637,23 @@ impl ConfiguredConnectionManagerInner {
             if entry.generation != generation || entry.metadata.transport != transport {
                 return;
             }
-            route_inbound(entry, json)
+            let trace_message = self.trace.is_enabled().then(|| {
+                (
+                    ProtocolTraceContext::configured(
+                        entry.metadata.server_id.to_persisted_string(),
+                        entry.connection_id.as_str().to_owned(),
+                        entry.metadata.transport.as_str(),
+                        entry.metadata.connection_path.as_str(),
+                    ),
+                    json.clone(),
+                )
+            });
+            (route_inbound(entry, json), trace_message)
         };
+        if let Some((context, json)) = trace_message {
+            self.trace
+                .record(&context, ProtocolTraceDirection::Inbound, &json);
+        }
         deliver_events(self, deliveries);
     }
 
@@ -644,12 +671,30 @@ impl ConfiguredConnectionManagerInner {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub(crate) struct ConfiguredConnectionManager {
     inner: Arc<ConfiguredConnectionManagerInner>,
 }
 
+impl Default for ConfiguredConnectionManager {
+    fn default() -> Self {
+        Self::new(ProtocolTraceHub::default())
+    }
+}
+
 impl ConfiguredConnectionManager {
+    pub(crate) fn new(trace: ProtocolTraceHub) -> Self {
+        Self {
+            inner: Arc::new(ConfiguredConnectionManagerInner {
+                state: Mutex::new(ConfiguredConnectionManagerState::default()),
+                next_logical_generation: AtomicU64::new(0),
+                next_physical_generation: AtomicU64::new(0),
+                next_status_subscriber_generation: AtomicU64::new(0),
+                trace,
+            }),
+        }
+    }
+
     pub(super) fn subscribe_statuses(
         &self,
         owner_window_label: String,
@@ -765,7 +810,7 @@ impl ConfiguredConnectionManager {
                 let physical_generation = physical.generation;
                 let physical_handle = PhysicalConnectionHandle {
                     connection_id: physical.connection_id.clone(),
-                    transport: physical.metadata.transport,
+                    metadata: physical.metadata,
                     lifecycle: Arc::clone(&physical.lifecycle),
                 };
                 let start = physical.start.subscribe();
@@ -841,7 +886,7 @@ impl ConfiguredConnectionManager {
                     generation,
                     physical: PhysicalConnectionHandle {
                         connection_id: physical_id,
-                        transport: metadata.transport,
+                        metadata,
                         lifecycle,
                     },
                     start: receiver,
@@ -966,7 +1011,7 @@ impl ConfiguredConnectionManager {
                 MultiplexedOutbound::Forward => {
                     OutboundDisposition::Forward(PhysicalConnectionHandle {
                         connection_id: physical.connection_id.clone(),
-                        transport: physical.metadata.transport,
+                        metadata: physical.metadata,
                         lifecycle: Arc::clone(&physical.lifecycle),
                     })
                 }

@@ -27,6 +27,7 @@ use crate::configuration::{
     Socks5DnsResolution as ConfiguredSocks5DnsResolution, SshAuthenticationConfiguration,
     SshHostKeyRecord,
 };
+use crate::protocol_trace::{ProtocolTraceContext, ProtocolTraceDirection, ProtocolTraceHub};
 
 use super::{
     LocalStdioConnectionManager, RemoteWebSocketConnectionManager,
@@ -416,12 +417,26 @@ struct ConnectionAttemptManager {
     inner: Arc<ConnectionAttemptManagerInner>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub(crate) struct ServerConnectionTestManager {
     attempts: ConnectionAttemptManager,
+    trace: ProtocolTraceHub,
+}
+
+impl Default for ServerConnectionTestManager {
+    fn default() -> Self {
+        Self::new(ProtocolTraceHub::default())
+    }
 }
 
 impl ServerConnectionTestManager {
+    pub(crate) fn new(trace: ProtocolTraceHub) -> Self {
+        Self {
+            attempts: ConnectionAttemptManager::default(),
+            trace,
+        }
+    }
+
     fn reserve(
         &self,
         owner_window_label: String,
@@ -460,7 +475,7 @@ impl ConnectionAttemptManager {
         state.connections.insert(
             connection_id.clone(),
             AttemptConnectionEntry {
-                owner_window_label,
+                owner_window_label: owner_window_label.clone(),
                 generation,
                 lifecycle: Arc::clone(&lifecycle),
             },
@@ -471,6 +486,7 @@ impl ConnectionAttemptManager {
             connection_id,
             generation,
             lifecycle,
+            owner_window_label,
             committed: false,
         })
     }
@@ -518,30 +534,48 @@ struct ConnectionReservation {
     connection_id: ConnectionId,
     generation: u64,
     lifecycle: Arc<ConnectionLifecycle>,
+    owner_window_label: String,
     committed: bool,
 }
 
 impl ConnectionReservation {
     fn local_test_event_sink(
         &self,
+        trace: ProtocolTraceHub,
         events: Channel<ServerConnectionTestEvent>,
     ) -> Arc<dyn local_stdio::EventSink> {
         Arc::new(LocalTestEventSink {
             manager: Arc::clone(&self.manager),
             connection_id: self.connection_id.clone(),
             generation: self.generation,
+            trace,
+            trace_context: ProtocolTraceContext::connection_test(
+                self.connection_id.as_str().to_owned(),
+                ConfiguredTransport::LocalStdio.as_str(),
+                ConfiguredConnectionPath::LocalStdio.as_str(),
+                self.owner_window_label.clone(),
+            ),
             events,
         })
     }
 
     fn remote_test_event_sink(
         &self,
+        trace: ProtocolTraceHub,
+        connection_path: ConfiguredConnectionPath,
         events: Channel<ServerConnectionTestEvent>,
     ) -> Arc<dyn remote_websocket::EventSink> {
         Arc::new(RemoteTestEventSink {
             manager: Arc::clone(&self.manager),
             connection_id: self.connection_id.clone(),
             generation: self.generation,
+            trace,
+            trace_context: ProtocolTraceContext::connection_test(
+                self.connection_id.as_str().to_owned(),
+                ConfiguredTransport::RemoteWebSocket.as_str(),
+                connection_path.as_str(),
+                self.owner_window_label.clone(),
+            ),
             events,
         })
     }
@@ -568,11 +602,17 @@ struct LocalTestEventSink {
     manager: Arc<ConnectionAttemptManagerInner>,
     connection_id: ConnectionId,
     generation: u64,
+    trace: ProtocolTraceHub,
+    trace_context: ProtocolTraceContext,
     events: Channel<ServerConnectionTestEvent>,
 }
 
 impl local_stdio::EventSink for LocalTestEventSink {
     fn emit(&self, event: local_stdio::ConnectionEvent) -> Result<(), ()> {
+        if let local_stdio::ConnectionEvent::ProtocolMessage { json, .. } = &event {
+            self.trace
+                .record(&self.trace_context, ProtocolTraceDirection::Inbound, json);
+        }
         if local_event_is_terminal(&event) {
             self.manager
                 .remove_if_generation(&self.connection_id, self.generation);
@@ -587,11 +627,17 @@ struct RemoteTestEventSink {
     manager: Arc<ConnectionAttemptManagerInner>,
     connection_id: ConnectionId,
     generation: u64,
+    trace: ProtocolTraceHub,
+    trace_context: ProtocolTraceContext,
     events: Channel<ServerConnectionTestEvent>,
 }
 
 impl remote_websocket::EventSink for RemoteTestEventSink {
     fn emit(&self, event: remote_websocket::ConnectionEvent) -> Result<(), ()> {
+        if let remote_websocket::ConnectionEvent::ProtocolMessage { json, .. } = &event {
+            self.trace
+                .record(&self.trace_context, ProtocolTraceDirection::Inbound, json);
+        }
         if remote_event_is_terminal(&event) {
             self.manager
                 .remove_if_generation(&self.connection_id, self.generation);
@@ -665,6 +711,7 @@ pub(crate) async fn send_configured_server_message<R: Runtime>(
     configured_manager: State<'_, ConfiguredConnectionManager>,
     local_manager: State<'_, LocalStdioConnectionManager>,
     remote_manager: State<'_, RemoteWebSocketConnectionManager>,
+    trace: State<'_, ProtocolTraceHub>,
     request: SendConfiguredServerMessageRequest,
 ) -> Result<(), ConfiguredConnectionError> {
     let connection_id = ConnectionId::parse(request.connection_id).map_err(|_| {
@@ -677,7 +724,19 @@ pub(crate) async fn send_configured_server_message<R: Runtime>(
         OutboundDisposition::Suppress => Ok(()),
         OutboundDisposition::Forward(physical) => {
             let lifecycle = Arc::clone(&physical.lifecycle);
-            let result = match physical.transport {
+            let context = trace.is_enabled().then(|| {
+                ProtocolTraceContext::configured(
+                    physical.metadata.server_id.to_persisted_string(),
+                    physical.connection_id.as_str().to_owned(),
+                    physical.metadata.transport.as_str(),
+                    physical.metadata.connection_path.as_str(),
+                )
+                .with_window_label(window.label())
+            });
+            if let Some(context) = context {
+                trace.record(&context, ProtocolTraceDirection::Outbound, &request.json);
+            }
+            let result = match physical.metadata.transport {
                 ConfiguredTransport::LocalStdio => local_manager
                     .send(
                         PHYSICAL_CONNECTION_OWNER,
@@ -1002,7 +1061,7 @@ pub(crate) async fn connect_server_connection_test<R: Runtime>(
             if resolved.proxy.is_some() {
                 return Err(corrupt_configuration());
             }
-            let event_sink = reservation.local_test_event_sink(events);
+            let event_sink = reservation.local_test_event_sink(test_manager.trace.clone(), events);
             local_manager
                 .connect_configured(
                     owner_window_label,
@@ -1041,11 +1100,15 @@ pub(crate) async fn connect_server_connection_test<R: Runtime>(
                 tls_certificate_policy,
             )?;
             apply_server_authentication(&mut target, authentication, resolved.credential)?;
-            let event_sink = reservation.remote_test_event_sink(events);
-            let progress =
-                remote_connection_progress(Arc::clone(&event_sink), connection_id.clone());
             let (connection_path, proxy_id, proxy_version) = match resolved.proxy {
                 None => {
+                    let event_sink = reservation.remote_test_event_sink(
+                        test_manager.trace.clone(),
+                        ConfiguredConnectionPath::Direct,
+                        events,
+                    );
+                    let progress =
+                        remote_connection_progress(Arc::clone(&event_sink), connection_id.clone());
                     let connector = async move {
                         match timeout(
                             target.connect_timeout,
@@ -1073,19 +1136,34 @@ pub(crate) async fn connect_server_connection_test<R: Runtime>(
                 Some(proxy) => {
                     let proxy_id = proxy.proxy_id;
                     let proxy_version = proxy.proxy_version;
-                    let (path, connector) =
+                    let path = match &proxy.configuration {
+                        ProxyConfiguration::HttpConnect { .. } => {
+                            ConfiguredConnectionPath::HttpConnect
+                        }
+                        ProxyConfiguration::Socks5 { .. } => ConfiguredConnectionPath::Socks5,
+                        ProxyConfiguration::Ssh { .. } => ConfiguredConnectionPath::SshDirectTcpip,
+                    };
+                    let event_sink = reservation.remote_test_event_sink(
+                        test_manager.trace.clone(),
+                        path,
+                        events,
+                    );
+                    let progress =
+                        remote_connection_progress(Arc::clone(&event_sink), connection_id.clone());
+                    let (resolved_path, connector) =
                         configured_proxy_connector(target, proxy.into(), progress)?;
+                    debug_assert_eq!(path, resolved_path);
                     remote_manager
                         .connect_prepared(
                             owner_window_label,
                             connection_id.clone(),
-                            path.as_str(),
+                            resolved_path.as_str(),
                             event_sink,
                             Some(reservation.lifecycle()),
                             connector,
                         )
                         .await?;
-                    (path, proxy_id, proxy_version)
+                    (resolved_path, proxy_id, proxy_version)
                 }
             };
             ConnectServerConnectionTestResponse {

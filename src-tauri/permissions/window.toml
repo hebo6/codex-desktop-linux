@@ -6,6 +6,8 @@ commands.allow = [
     "bind_window_server",
     "update_window_session",
     "open_app_window",
+    "open_protocol_debug_window",
+    "protocol_debug_availability",
     "pick_local_directory",
     "open_external_url",
     "save_remote_file",

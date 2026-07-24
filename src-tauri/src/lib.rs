@@ -9,6 +9,7 @@ mod drafts;
 mod header_policy;
 mod local_data;
 mod preferences;
+mod protocol_trace;
 mod saved_prompts;
 mod sensitive;
 mod storage;
@@ -29,12 +30,18 @@ const RELEASE_SMOKE_ENVIRONMENT: &str = "CODEX_DESKTOP_RELEASE_SMOKE";
 pub fn run() {
     diagnostics::init();
     let deep_link_state = deep_link::DeepLinkState::from_environment();
+    let protocol_trace = protocol_trace::ProtocolTraceHub::default();
 
     let app = tauri::Builder::default()
         .manage(connection::LocalStdioConnectionManager::default())
         .manage(connection::RemoteWebSocketConnectionManager::default())
-        .manage(connection::ConfiguredConnectionManager::default())
-        .manage(connection::ServerConnectionTestManager::default())
+        .manage(connection::ConfiguredConnectionManager::new(
+            protocol_trace.clone(),
+        ))
+        .manage(connection::ServerConnectionTestManager::new(
+            protocol_trace.clone(),
+        ))
+        .manage(protocol_trace)
         .manage(deep_link_state)
         // The single-instance plugin must be registered first so later plugins cannot
         // initialize in a process that is about to exit.
@@ -134,6 +141,16 @@ pub fn run() {
         .on_window_event(|window, event| {
             use tauri::Manager;
 
+            if windows::is_protocol_debug_window(window.label()) {
+                if matches!(event, tauri::WindowEvent::Destroyed) {
+                    window
+                        .app_handle()
+                        .state::<protocol_trace::ProtocolTraceHub>()
+                        .disconnect_window(window.label());
+                }
+                return;
+            }
+
             let window_state_repository = window
                 .app_handle()
                 .state::<window_state::WindowStateRepository>();
@@ -226,6 +243,7 @@ pub fn run() {
             windows::bind_window_server,
             windows::update_window_session,
             windows::open_app_window,
+            windows::open_protocol_debug_window,
             dialogs::pick_local_directory,
             dialogs::open_external_url,
             dialogs::save_remote_file,
@@ -245,6 +263,10 @@ pub fn run() {
             saved_prompts::delete_saved_prompt,
             saved_prompts::reorder_saved_prompts,
             diagnostics::read_system_diagnostics,
+            protocol_trace::protocol_debug_availability,
+            protocol_trace::subscribe_protocol_trace,
+            protocol_trace::unsubscribe_protocol_trace,
+            protocol_trace::clear_protocol_trace,
             windows::get_window_button_layout
         ])
         .build(tauri::generate_context!())

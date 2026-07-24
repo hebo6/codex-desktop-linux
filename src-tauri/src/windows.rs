@@ -25,12 +25,17 @@ use crate::{
 };
 
 pub(crate) const MAIN_WINDOW_LABEL: &str = "main";
+pub(crate) const PROTOCOL_DEBUG_WINDOW_LABEL: &str = "protocol-debug";
 const APP_WINDOW_LABEL_PREFIX: &str = "app-";
 const MAX_WINDOW_ID_LEN: usize = 64;
 const DEFAULT_WINDOW_WIDTH: f64 = 1440.0;
 const DEFAULT_WINDOW_HEIGHT: f64 = 900.0;
 const MIN_WINDOW_WIDTH: f64 = 960.0;
 const MIN_WINDOW_HEIGHT: f64 = 640.0;
+const PROTOCOL_DEBUG_WINDOW_WIDTH: f64 = 1280.0;
+const PROTOCOL_DEBUG_WINDOW_HEIGHT: f64 = 800.0;
+const PROTOCOL_DEBUG_MIN_WINDOW_WIDTH: f64 = 900.0;
+const PROTOCOL_DEBUG_MIN_WINDOW_HEIGHT: f64 = 600.0;
 const WINDOW_SERVER_REFERENCES_CHANGED_EVENT: &str = "window-server-references-changed";
 const WINDOW_GEOMETRY_SAVE_DELAY: Duration = Duration::from_millis(240);
 const MIN_VISIBLE_WINDOW_EDGE: i64 = 64;
@@ -97,6 +102,20 @@ impl CommandError {
         Self::new(
             "windowClosed",
             "The application window closed before the command completed",
+        )
+    }
+
+    const fn protocol_debug_unavailable() -> Self {
+        Self::new(
+            "protocolDebugUnavailable",
+            "The protocol debugger is only available in debug builds",
+        )
+    }
+
+    const fn activation_failed() -> Self {
+        Self::new(
+            "windowActivationFailed",
+            "The application window could not be focused",
         )
     }
 }
@@ -560,6 +579,52 @@ pub(crate) async fn open_app_window<R: Runtime>(
         window_id: window_id.0,
         label,
     })
+}
+
+#[tauri::command]
+pub(crate) fn open_protocol_debug_window<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<(), CommandError> {
+    if !cfg!(debug_assertions) {
+        return Err(CommandError::protocol_debug_unavailable());
+    }
+    if let Some(window) = app.get_webview_window(PROTOCOL_DEBUG_WINDOW_LABEL) {
+        return activate_window(&window).map_err(|error| {
+            tracing::warn!(%error, "failed to focus existing protocol debugger window");
+            CommandError::activation_failed()
+        });
+    }
+
+    let window = WebviewWindowBuilder::new(
+        &app,
+        PROTOCOL_DEBUG_WINDOW_LABEL,
+        WebviewUrl::App(PathBuf::from("index.html?view=protocol-debug")),
+    )
+    .disable_drag_drop_handler()
+    .enable_clipboard_access()
+    .title("Codex 协议检查器")
+    .inner_size(PROTOCOL_DEBUG_WINDOW_WIDTH, PROTOCOL_DEBUG_WINDOW_HEIGHT)
+    .min_inner_size(
+        PROTOCOL_DEBUG_MIN_WINDOW_WIDTH,
+        PROTOCOL_DEBUG_MIN_WINDOW_HEIGHT,
+    )
+    .center()
+    .decorations(false)
+    .prevent_overflow()
+    .build()
+    .map_err(|error| {
+        tracing::error!(%error, "failed to create protocol debugger window");
+        CommandError::creation_failed()
+    })?;
+
+    activate_window(&window).map_err(|error| {
+        tracing::warn!(%error, "failed to focus new protocol debugger window");
+        CommandError::activation_failed()
+    })
+}
+
+pub(crate) fn is_protocol_debug_window(label: &str) -> bool {
+    label == PROTOCOL_DEBUG_WINDOW_LABEL
 }
 
 fn deserialize_optional_thread_id<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>

@@ -46,6 +46,7 @@ use crate::{
     authentication_policy::is_valid_bearer_token,
     configuration::{SecretText, TlsCertificatePolicy},
     header_policy::is_reserved_websocket_header,
+    protocol_trace::{ProtocolTraceContext, ProtocolTraceDirection, ProtocolTraceHub},
     sensitive::looks_sensitive_identifier,
 };
 
@@ -447,6 +448,7 @@ enum OutboundCommand {
 struct ConnectionEntry {
     owner_window_label: String,
     generation: u64,
+    connection_path: &'static str,
     outbound: Option<mpsc::Sender<OutboundCommand>>,
     cancellation: CancellationToken,
     task: Option<JoinHandle<()>>,
@@ -566,6 +568,7 @@ impl RemoteWebSocketConnectionManager {
                 ConnectionEntry {
                     owner_window_label: owner_window_label.clone(),
                     generation,
+                    connection_path,
                     outbound: None,
                     cancellation: cancellation.clone(),
                     task: None,
@@ -711,6 +714,20 @@ impl RemoteWebSocketConnectionManager {
             "remote WebSocket protocol message sent"
         );
         Ok(())
+    }
+
+    fn connection_path(
+        &self,
+        owner_window_label: &str,
+        connection_id: &str,
+    ) -> Option<&'static str> {
+        let connection_id = ConnectionId::parse(connection_id.to_owned()).ok()?;
+        let state = self.inner.state();
+        state
+            .connections
+            .get(&connection_id)
+            .filter(|entry| entry.owner_window_label == owner_window_label)
+            .map(|entry| entry.connection_path)
     }
 
     fn disconnect(
@@ -1486,8 +1503,24 @@ impl std::error::Error for CommandError {}
 pub(crate) async fn send_remote_websocket_message<R: Runtime>(
     window: WebviewWindow<R>,
     manager: State<'_, RemoteWebSocketConnectionManager>,
+    trace: State<'_, ProtocolTraceHub>,
     request: SendRemoteWebSocketMessageRequest,
 ) -> Result<(), CommandError> {
+    if trace.is_enabled()
+        && let Some(connection_path) =
+            manager.connection_path(window.label(), &request.connection_id)
+    {
+        trace.record(
+            &ProtocolTraceContext::connection_test(
+                request.connection_id.clone(),
+                "remoteWebSocket",
+                connection_path,
+                window.label().to_owned(),
+            ),
+            ProtocolTraceDirection::Outbound,
+            &request.json,
+        );
+    }
     manager.send(window.label(), request).await
 }
 
