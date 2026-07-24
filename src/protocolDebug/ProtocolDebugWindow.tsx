@@ -151,11 +151,11 @@ export function ProtocolDebugWindow() {
     <div className={styles.window}>
       <header className={styles.titlebar} data-tauri-drag-region>
         <WindowControls side="left" />
-        <div data-tauri-drag-region>
+        <div className={styles.title} data-tauri-drag-region>
           <strong data-tauri-drag-region>协议检查器</strong>
           <small data-tauri-drag-region>只读 · 关闭窗口后清空</small>
         </div>
-        <span data-tauri-drag-region />
+        <span className={styles.dragRegion} data-tauri-drag-region />
         <WindowControls side="right" />
       </header>
 

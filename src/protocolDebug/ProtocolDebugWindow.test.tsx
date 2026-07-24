@@ -28,6 +28,18 @@ describe("ProtocolDebugWindow", () => {
     });
   });
 
+  it("通过弹性拖拽区分隔标题和右侧窗口按钮", () => {
+    render(<ProtocolDebugWindow />);
+
+    const titlebar = screen.getByText("协议检查器").closest("header");
+    const dragRegion = titlebar?.querySelector(":scope > span");
+
+    expect(titlebar).not.toBeNull();
+    expect(dragRegion).not.toBeNull();
+    expect(getComputedStyle(titlebar!).display).toBe("flex");
+    expect(getComputedStyle(dragRegion!).flexGrow).toBe("1");
+  });
+
   it("展示追踪消息、配对方法和脱敏后的 JSON", async () => {
     render(<ProtocolDebugWindow />);
     await waitFor(() => expect(traceMocks.subscribe).toHaveBeenCalledTimes(1));
