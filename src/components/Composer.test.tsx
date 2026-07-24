@@ -349,6 +349,22 @@ describe("Composer", () => {
     expect(screen.queryByRole("button", { name: "项目" })).not.toBeInTheDocument();
   });
 
+  it("仅在新建会话页通过 Ctrl+O 打开项目选择器", () => {
+    const view = renderComposer({
+      onCwdChange: vi.fn(),
+      recentCwds: ["/workspace/project", "/workspace/other"],
+    });
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "o" });
+    expect(screen.getByRole("dialog", { name: "项目设置" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "项目" })).toHaveFocus();
+
+    view.unmount();
+    renderComposer({ showProjectPicker: false });
+    fireEvent.keyDown(window, { ctrlKey: true, key: "o" });
+    expect(screen.queryByRole("dialog", { name: "项目设置" })).not.toBeInTheDocument();
+  });
+
   it("设置命令直接打开客户端设置", async () => {
     const user = userEvent.setup();
     const onOpenSettings = vi.fn();

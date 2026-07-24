@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ThreadSummary } from "../app/useServerThreads";
-import { ConnectionShell } from "./ConnectionShell";
+import { ConnectionShell, adjacentThreadId } from "./ConnectionShell";
 
 describe("ConnectionShell", () => {
   it("顶部栏使用深层窗口拖拽区域", () => {
@@ -128,6 +128,47 @@ describe("ConnectionShell", () => {
     expect(onNewTask).toHaveBeenCalledTimes(1);
   });
 
+  it("通过 Ctrl+PageUp/PageDown 循环切换会话且不穿透模态框", () => {
+    const onOpenThread = vi.fn();
+    const threads = [
+      threadSummary("thread-new", 300),
+      threadSummary("thread-current", 200),
+      threadSummary("thread-old", 100),
+    ];
+    render(
+      <ConnectionShell
+        currentThreadId="thread-current"
+        onOpenThread={onOpenThread}
+        phase="ready"
+        threads={threads}
+      />,
+    );
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "PageUp" });
+    fireEvent.keyDown(window, { ctrlKey: true, key: "PageDown" });
+    expect(onOpenThread).toHaveBeenNthCalledWith(1, "thread-new");
+    expect(onOpenThread).toHaveBeenNthCalledWith(2, "thread-old");
+
+    const modal = document.createElement("div");
+    modal.setAttribute("aria-modal", "true");
+    document.body.append(modal);
+    fireEvent.keyDown(window, { ctrlKey: true, key: "PageDown" });
+    expect(onOpenThread).toHaveBeenCalledTimes(2);
+    modal.remove();
+  });
+
+  it("从新会话页按方向进入最近会话并在列表末端循环", () => {
+    const threads = [
+      threadSummary("thread-new", 300),
+      threadSummary("thread-old", 100),
+    ];
+
+    expect(adjacentThreadId(threads, null, 1)).toBe("thread-new");
+    expect(adjacentThreadId(threads, null, -1)).toBe("thread-old");
+    expect(adjacentThreadId(threads, "thread-old", 1)).toBe("thread-new");
+    expect(adjacentThreadId([threads[0]!], "thread-new", 1)).toBeNull();
+  });
+
   it("新建任务后关闭覆盖式侧栏", () => {
     const onNewTask = vi.fn();
     render(
@@ -218,6 +259,11 @@ describe("ConnectionShell", () => {
       "true",
     );
     expect(shell).toHaveAttribute("data-sidebar-collapsed", "false");
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "b" });
+    expect(screen.getByRole("button", { name: "显示侧栏" })).toBeVisible();
+    fireEvent.keyDown(window, { ctrlKey: true, key: "b" });
+    expect(screen.getByRole("button", { name: "隐藏侧栏" })).toBeVisible();
   });
 
   it("断线时保留当前进程主内容并提供只读提示", () => {
@@ -250,3 +296,21 @@ describe("ConnectionShell", () => {
     expect(screen.queryByRole("button", { name: "立即重连" })).not.toBeInTheDocument();
   });
 });
+
+function threadSummary(id: string, updatedAt: number): ThreadSummary {
+  return {
+    cliVersion: "1.0.0",
+    createdAt: updatedAt,
+    cwd: `/workspace/${id}`,
+    ephemeral: false,
+    id,
+    modelProvider: "openai",
+    name: id,
+    preview: id,
+    sessionId: `session-${id}`,
+    source: "appServer",
+    status: { type: "idle" },
+    turns: [],
+    updatedAt,
+  };
+}

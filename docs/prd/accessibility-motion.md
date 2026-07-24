@@ -22,6 +22,7 @@
 | 归档会话 | `Ctrl+Shift+A` |
 | 新建独立会话 | `Ctrl+Alt+O` |
 | 切换固定状态 | `Ctrl+Alt+P` |
+| 停止正在进行中的会话 | `Esc` |
 
 ### 导航
 
@@ -52,7 +53,7 @@
 
 | 功能 | 快捷键 |
 | --- | --- |
-| 打开文件夹 | `Ctrl+O` |
+| 打开项目选择器（仅新会话页） | `Ctrl+O` |
 
 ### 应用
 
@@ -67,7 +68,6 @@
 | 关闭标签页 | `Ctrl+W`、`Ctrl+F4` |
 | 关闭 | `Ctrl+W`、`Ctrl+F4` |
 | 打开模型选择器 | `Ctrl+Shift+M` |
-| 打开项目选择器 | `Ctrl+Alt+Shift+O` |
 | 复制深链 | `Ctrl+Alt+L` |
 | 复制会话 ID | `Ctrl+Alt+C` |
 | 复制工作目录 | `Ctrl+Shift+C` |

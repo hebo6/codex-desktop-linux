@@ -13,6 +13,7 @@ import {
   readConversationLoadDiagnostics,
   type ConversationLoadDiagnostic,
 } from "../diagnostics/conversationLoadDiagnostics";
+import { KEYBOARD_SHORTCUT_GROUPS } from "./keyboardShortcuts";
 import type { ServerConnectionView } from "./ServerSwitcher";
 import { useModalLayer } from "./modalStack";
 import styles from "./SettingsDialog.module.css";
@@ -280,8 +281,8 @@ function PrivacySection({ clearData, setState, state }: { readonly clearData: (k
 }
 
 function ShortcutsSection() {
-  const shortcuts = [["Ctrl+N", "新建会话"], ["Ctrl+Shift+N", "在新窗口新建会话"], ["Ctrl+K", "快速切换会话"], ["Ctrl+,", "打开设置"], ["Ctrl+L", "聚焦输入框"], ["Ctrl+Enter", "发送"], ["Ctrl+Shift+C", "复制当前 AI 回答 Markdown"], ["Esc", "关闭最上层浮层"]] as const;
-  return <Section title="默认快捷键" description="文本编辑器中的常见编辑操作保持不变"><dl className={styles.shortcuts}>{shortcuts.map(([key, label]) => <div key={key}><dt><kbd>{key}</kbd></dt><dd>{label}</dd></div>)}</dl></Section>;
+  const shortcuts = KEYBOARD_SHORTCUT_GROUPS.flatMap(({ shortcuts }) => shortcuts);
+  return <Section title="默认快捷键" description="文本编辑器中的常见编辑操作保持不变"><dl className={styles.shortcuts}>{shortcuts.map(({ keys, label }) => <div key={label}><dt>{keys.map((key) => <kbd key={key}>{key}</kbd>)}</dt><dd>{label}</dd></div>)}</dl></Section>;
 }
 
 function DiagnosticsSection({ copied, error, onCopy, report }: { readonly copied: boolean; readonly error: string | null; readonly onCopy: () => void; readonly report: string }) {

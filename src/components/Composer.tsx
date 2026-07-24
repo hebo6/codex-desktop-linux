@@ -1379,6 +1379,7 @@ function ProjectPicker({
 }) {
   const listboxId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const selectedIndex = cwd === null ? -1 : directories.indexOf(cwd);
   const [focusedIndex, setFocusedIndex] = useState(Math.max(0, selectedIndex));
@@ -1401,6 +1402,29 @@ function ProjectPicker({
   useEffect(() => {
     if (disabled) setOpen(false);
   }, [disabled]);
+
+  useEffect(() => {
+    if (disabled) {
+      return;
+    }
+    const handleShortcut = (event: globalThis.KeyboardEvent) => {
+      if (
+        event.ctrlKey &&
+        !event.shiftKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        event.key.toLowerCase() === "o" &&
+        document.querySelector('[aria-modal="true"]') === null
+      ) {
+        event.preventDefault();
+        setFocusedIndex(Math.max(0, selectedIndex));
+        setOpen(true);
+        triggerRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [disabled, selectedIndex]);
 
   const choose = (index: number) => {
     const directory = directories[index];
@@ -1439,6 +1463,7 @@ function ProjectPicker({
           }
         }}
         title={cwd ?? "选择服务器工作目录"}
+        ref={triggerRef}
         type="button"
       >
         <svg aria-hidden="true" className={styles.projectIcon} viewBox="0 0 24 24">

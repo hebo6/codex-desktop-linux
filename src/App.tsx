@@ -43,6 +43,7 @@ import { ApprovalPanel } from "./components/ApprovalPanel";
 import { RateLimitIndicator } from "./components/RateLimitIndicator";
 import { ExternalLinkDialog } from "./components/ExternalLinkDialog";
 import { FilePreviewDialog, type FilePreviewRequest } from "./components/FilePreviewDialog";
+import { KeyboardShortcutsDialog } from "./components/KeyboardShortcutsDialog";
 import { PlaintextCredentialConfirmDialog } from "./components/PlaintextCredentialConfirmDialog";
 import { ServerDeleteDialog } from "./components/ServerDeleteDialog";
 import { ServerEditorDialog } from "./components/ServerEditorDialog";
@@ -330,6 +331,7 @@ export function App({
   const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
   const [recentConnectionError, setRecentConnectionError] = useState<string | null>(null);
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
+  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [draftThreadPresence, setDraftThreadPresence] =
     useState<DraftThreadPresence>({ keyPrefix: null, threadIds: new Set() });
   const [shortcutStatus, setShortcutStatus] = useState<string | null>(null);
@@ -1166,12 +1168,30 @@ export function App({
 
   useEffect(() => {
     const handleGlobalShortcut = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        const blockingLayer = document.querySelector(
+          '[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"], [aria-label="会话侧栏"][data-open="true"]',
+        );
+        if (
+          !event.defaultPrevented &&
+          blockingLayer === null &&
+          conversation.activeTurnId !== null &&
+          !conversation.stopping
+        ) {
+          event.preventDefault();
+          void conversation.stop();
+        }
+        return;
+      }
       if (!event.ctrlKey || event.altKey || event.metaKey) return;
       const key = event.key.toLowerCase();
       const editing = event.target instanceof HTMLElement && (
         event.target.matches("input, textarea, select") || event.target.isContentEditable
       );
-      if (key === ",") {
+      if ((key === "/" && !event.shiftKey) || event.code === "Slash") {
+        event.preventDefault();
+        setKeyboardShortcutsOpen(true);
+      } else if (key === ",") {
         event.preventDefault();
         setSettingsSection("appearance");
       } else if (key === "l") {
@@ -1199,7 +1219,14 @@ export function App({
     };
     window.addEventListener("keydown", handleGlobalShortcut);
     return () => window.removeEventListener("keydown", handleGlobalShortcut);
-  }, [boundServerId, displayedRestoredThread, openNewWindowTask]);
+  }, [
+    boundServerId,
+    conversation.activeTurnId,
+    conversation.stop,
+    conversation.stopping,
+    displayedRestoredThread,
+    openNewWindowTask,
+  ]);
 
   const updatePreferences = (patch: Partial<AppPreferences>) => {
     const notificationKeys = [
@@ -1686,6 +1713,11 @@ export function App({
         onOpenThread={(threadId) => void openThread(threadId)}
         open={quickSwitcherOpen}
         threads={serverThreads.threads}
+      />
+
+      <KeyboardShortcutsDialog
+        onClose={() => setKeyboardShortcutsOpen(false)}
+        open={keyboardShortcutsOpen}
       />
 
       <ProxyDeleteDialog

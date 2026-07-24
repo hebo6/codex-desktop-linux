@@ -1,6 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -228,6 +228,19 @@ function renderApp(
 }
 
 describe("App", () => {
+  it("通过 Ctrl+/ 打开并关闭键盘快捷键列表", async () => {
+    renderApp(() => ({ servers: [], proxies: [] }));
+
+    await screen.findByRole("button", {
+      name: "选择服务器，未连接，打开服务器选择器",
+    });
+    fireEvent.keyDown(window, { ctrlKey: true, key: "/" });
+    expect(screen.getByRole("dialog", { name: "键盘快捷键" })).toBeVisible();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "键盘快捷键" })).not.toBeInTheDocument();
+  });
+
   it("密钥环不可用时在创建凭据前要求确认明文存储", async () => {
     const user = userEvent.setup();
     let authoritativeSnapshot: ConfigurationSnapshot = {
@@ -533,6 +546,9 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "项目" })).not.toBeInTheDocument();
     expect(screen.queryByText("这个会话还没有回合")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert", { name: /无法恢复会话/u })).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(requestMethods).toContain("turn/interrupt"));
 
     act(() => {
       const completed = {

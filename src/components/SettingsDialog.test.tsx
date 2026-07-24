@@ -65,6 +65,16 @@ describe("SettingsDialog", () => {
     expect(props.onUpdatePreferences).toHaveBeenCalledWith({ theme: "dark" });
   });
 
+  it("快捷键设置与快捷键弹窗共享完整定义", () => {
+    renderSettings({ initialSection: "shortcuts" });
+
+    expect(screen.getByText("Ctrl+/")).toBeVisible();
+    expect(screen.getByText("Ctrl+PageUp")).toBeVisible();
+    expect(screen.getByText("Ctrl+PageDown")).toBeVisible();
+    expect(screen.getByText("Ctrl+B")).toBeVisible();
+    expect(screen.getByText("打开项目选择器（仅新会话）")).toBeVisible();
+  });
+
   it("分别清理日志、临时文件和包含草稿的全部本地数据", async () => {
     const { props, store } = renderSettings({ initialSection: "privacy" });
 
