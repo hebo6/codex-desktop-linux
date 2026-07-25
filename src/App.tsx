@@ -1812,6 +1812,10 @@ export function App({
       const thread = tab.threadId === null
         ? undefined
         : serverThreads.threads.find(({ id }) => id === tab.threadId);
+      const cwd = thread?.cwd ||
+        (tab.threadId === null
+          ? draftCwds.get(tab.id) ?? recentCwds[0] ?? configuredCwd
+          : null);
       const waiting = tab.threadId === null
         ? undefined
         : serverInteractions.pending.find(
@@ -1819,18 +1823,27 @@ export function App({
           );
       return {
         id: tab.id,
+        projectName: cwd ? getBasename(cwd) : boundServerName,
+        ...(cwd ? { projectPath: cwd } : {}),
         title: tab.threadId === null
           ? "新任务"
           : thread === undefined
             ? "正在恢复会话"
             : threadDisplayTitle(thread),
-        ...(thread?.cwd ? { subtitle: getBasename(thread.cwd) } : {}),
         ...(waiting === undefined
           ? threadTabStatus(thread)
           : { status: "approval" as const }),
       };
     }),
-    [serverInteractions.pending, serverThreads.threads, windowTabs],
+    [
+      boundServerName,
+      configuredCwd,
+      draftCwds,
+      recentCwds,
+      serverInteractions.pending,
+      serverThreads.threads,
+      windowTabs,
+    ],
   );
   const tabControlsDisabled =
     windowState.status !== "ready" || conversation.submitting;

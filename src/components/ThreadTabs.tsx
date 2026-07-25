@@ -1,12 +1,17 @@
 import { useEffect, useRef } from "react";
 
+import {
+  ThreadStatusIndicator,
+  type ThreadStatusKind,
+} from "./ThreadStatusIndicator";
 import styles from "./ThreadTabs.module.css";
 
 export interface ThreadTabView {
   readonly id: string;
+  readonly projectName: string;
+  readonly projectPath?: string;
   readonly title: string;
-  readonly subtitle?: string;
-  readonly status?: "running" | "approval" | "input" | "error";
+  readonly status?: ThreadStatusKind;
 }
 
 export function ThreadTabs({
@@ -48,20 +53,18 @@ export function ThreadTabs({
                 onClick={() => onActivate(tab.id)}
                 ref={active ? activeRef : undefined}
                 role="tab"
-                title={tab.subtitle === undefined
-                  ? tab.title
-                  : `${tab.subtitle} / ${tab.title}`}
+                title={`${tab.title}\n${tab.projectPath ?? tab.projectName}`}
                 type="button"
               >
-                {tab.status === undefined ? null : (
-                  <span
-                    aria-label={statusLabel(tab.status)}
-                    className={styles.status}
-                    data-status={tab.status}
-                    role="img"
-                  />
-                )}
-                <span>{tab.title}</span>
+                <span className={styles.labels}>
+                  <span className={styles.titleRow}>
+                    <span className={styles.title}>{tab.title}</span>
+                    {tab.status === undefined ? null : (
+                      <ThreadStatusIndicator status={tab.status} />
+                    )}
+                  </span>
+                  <span className={styles.project}>{tab.projectName}</span>
+                </span>
               </button>
               <button
                 aria-label={`关闭“${tab.title}”`}
@@ -93,17 +96,4 @@ export function ThreadTabs({
       </button>
     </div>
   );
-}
-
-function statusLabel(status: NonNullable<ThreadTabView["status"]>): string {
-  switch (status) {
-    case "running":
-      return "正在运行";
-    case "approval":
-      return "等待审批";
-    case "input":
-      return "等待输入";
-    case "error":
-      return "会话失败";
-  }
 }

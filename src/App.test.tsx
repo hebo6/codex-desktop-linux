@@ -510,8 +510,12 @@ describe("App", () => {
       screen.getByRole("button", { name: "项目" }),
     ).toHaveAttribute("title", thread.cwd));
 
-    const blankTabs = screen.getAllByRole("tab", { name: "新任务" });
+    const blankTabs = screen.getAllByRole("tab", { name: /新任务/u });
     expect(blankTabs).toHaveLength(2);
+    expect(blankTabs.map((tab) => tab.title)).toEqual([
+      `新任务\n${otherThread.cwd}`,
+      `新任务\n${thread.cwd}`,
+    ]);
     await user.click(blankTabs[0]!);
     expect(screen.getByRole("textbox", { name: "任务输入" }))
       .toHaveValue("新会话草稿");

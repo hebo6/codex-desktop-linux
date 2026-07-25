@@ -23,6 +23,10 @@ import {
   DraftIcon,
   TerminalIcon,
 } from "./SidebarIcons";
+import {
+  ThreadStatusIndicator,
+  type ThreadStatusKind,
+} from "./ThreadStatusIndicator";
 import styles from "./RecentThreads.module.css";
 
 export interface RecentThreadsProps {
@@ -769,14 +773,7 @@ function ThreadRow({
         {status === null && backgroundCommandCount === 0 ? null : (
           <span className={styles.threadIndicators}>
             {status === null ? null : (
-              <span
-                aria-label={status.label}
-                className={styles.threadStatus}
-                data-status={status.kind}
-                role="img"
-              >
-                {status.text}
-              </span>
+              <ThreadStatusIndicator status={status} />
             )}
             {backgroundCommandCount === 0 ? null : (
               <span
@@ -834,24 +831,20 @@ function threadTitle(thread: ThreadSummary): string {
   return preview === undefined || preview.length === 0 ? "未命名会话" : preview;
 }
 
-function threadStatus(thread: ThreadSummary): {
-  readonly kind: "running" | "approval" | "input" | "error";
-  readonly label: string;
-  readonly text: string;
-} | null {
+function threadStatus(thread: ThreadSummary): ThreadStatusKind | null {
   if (thread.status.type === "systemError") {
-    return { kind: "error", label: "会话失败", text: "失败" };
+    return "error";
   }
   if (thread.status.type !== "active") {
     return null;
   }
   if (thread.status.activeFlags.includes("waitingOnApproval")) {
-    return { kind: "approval", label: "等待审批", text: "审批" };
+    return "approval";
   }
   if (thread.status.activeFlags.includes("waitingOnUserInput")) {
-    return { kind: "input", label: "等待输入", text: "待回复" };
+    return "input";
   }
-  return { kind: "running", label: "正在运行", text: "" };
+  return "running";
 }
 
 function groupThreads(

@@ -22,9 +22,9 @@
 
 .tab {
   display: flex;
-  min-width: 128px;
+  min-width: 144px;
   max-width: 240px;
-  height: 34px;
+  height: 38px;
   flex: 0 1 200px;
   align-items: center;
   border-radius: var(--radius-sm);
@@ -53,18 +53,44 @@
   height: 100%;
   flex: 1 1 0;
   align-items: center;
-  gap: var(--space-2);
   padding: 0 4px 0 var(--space-3);
   text-align: left;
 }
 
-.activate span:last-child {
+.labels {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 0;
+  align-content: center;
+}
+
+.titleRow {
+  display: flex;
+  min-width: 0;
+  min-height: 18px;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.title,
+.project {
   min-width: 0;
   overflow: hidden;
-  font-size: 12px;
-  font-weight: 550;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.title {
+  flex: 1 1 0;
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 16px;
+}
+
+.project {
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+  line-height: 12px;
 }
 
 .close,
@@ -103,27 +129,6 @@
   stroke-width: 1.6;
 }
 
-.status {
-  width: 7px;
-  height: 7px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--color-status-neutral);
-}
-
-.status[data-status="running"] {
-  background: var(--color-status-progress);
-}
-
-.status[data-status="approval"],
-.status[data-status="input"] {
-  background: var(--color-status-warning);
-}
-
-.status[data-status="error"] {
-  background: var(--color-status-danger);
-}
-
 .activate:disabled,
 .close:disabled,
 .newTab:disabled {
@@ -133,7 +138,7 @@
 
 @media (max-width: 720px) {
   .tab {
-    min-width: 104px;
-    flex-basis: 152px;
+    min-width: 128px;
+    flex-basis: 168px;
   }
 }
