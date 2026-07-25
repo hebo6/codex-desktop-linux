@@ -274,34 +274,11 @@ export function ConnectionShell({
         } else {
           setIsSidebarCollapsed((collapsed) => !collapsed);
         }
-        return;
-      }
-      if (phase !== "ready") {
-        return;
-      }
-      if (event.key.toLowerCase() === "n" && onNewTask !== undefined) {
-        event.preventDefault();
-        onNewTask();
-        return;
-      }
-      if (
-        (event.key === "PageUp" || event.key === "PageDown") &&
-        onOpenThread !== undefined
-      ) {
-        const threadId = adjacentThreadId(
-          threads,
-          currentThreadId,
-          event.key === "PageDown" ? 1 : -1,
-        );
-        if (threadId !== null) {
-          event.preventDefault();
-          onOpenThread(threadId);
-        }
       }
     };
     window.addEventListener("keydown", handleNavigationShortcut);
     return () => window.removeEventListener("keydown", handleNavigationShortcut);
-  }, [currentThreadId, onNewTask, onOpenThread, phase, threads]);
+  }, []);
 
   const closeSidebar = () => {
     setIsSidebarOpen(false);
@@ -735,26 +712,6 @@ export function ConnectionShell({
       </main>
     </div>
   );
-}
-
-export function adjacentThreadId(
-  threads: readonly ThreadSummary[],
-  currentThreadId: string | null,
-  direction: 1 | -1,
-): string | null {
-  if (
-    threads.length === 0 ||
-    (threads.length === 1 && threads[0]?.id === currentThreadId)
-  ) {
-    return null;
-  }
-  const currentIndex = threads.findIndex(({ id }) => id === currentThreadId);
-  if (currentIndex === -1) {
-    return direction === 1 ? threads[0]?.id ?? null : threads.at(-1)?.id ?? null;
-  }
-  return threads[
-    (currentIndex + direction + threads.length) % threads.length
-  ]?.id ?? null;
 }
 
 const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();

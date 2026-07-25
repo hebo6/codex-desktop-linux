@@ -360,7 +360,7 @@ describe("App", () => {
     ])).toEqual(["/workspace/alpha", "/workspace/beta"]);
   });
 
-  it("顶部新建继承当前目录且重复新建保留单份草稿", async () => {
+  it("最近会话和新建入口在末尾追加标签并保留各自草稿", async () => {
     const user = userEvent.setup();
     const thread = {
       cliVersion: "1.0.0",
@@ -386,11 +386,18 @@ describe("App", () => {
       updatedAt: 100,
     } as const;
     const requestSession = {
-      sendRequest(request: { readonly method: string }) {
+      sendRequest(request: {
+        readonly method: string;
+        readonly params?: { readonly threadId?: string };
+      }) {
         const result = request.method === "thread/list"
           ? { data: [thread, otherThread], nextCursor: null }
           : request.method === "thread/resume"
-            ? { thread }
+            ? {
+                thread: request.params?.threadId === otherThread.id
+                  ? otherThread
+                  : thread,
+              }
             : {};
         return {
           cancel: () => undefined,
@@ -453,31 +460,61 @@ describe("App", () => {
     await user.click(screen.getByRole("menuitem", { name: /搜索会话/u }));
     expect(screen.getByRole("dialog", { name: "快速切换会话" })).toBeVisible();
     await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "其他项目会话" }));
+
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(1));
+    const recentThreadRequest = tabsUpdater.mock.calls[0]?.[0];
+    expect(recentThreadRequest?.tabs.map(({ threadId }) => threadId)).toEqual([
+      thread.id,
+      otherThread.id,
+    ]);
+    expect(recentThreadRequest?.activeTabId).toBe(
+      recentThreadRequest?.tabs.at(-1)?.id,
+    );
+
     await user.click(screen.getByRole("button", { name: "新建任务" }));
 
-    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledWith({
-      expectedVersion: 1,
-      tabs: [{ id: "tab-current", threadId: null }],
-      activeTabId: "tab-current",
-    }));
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(2));
+    const headerNewRequest = tabsUpdater.mock.calls[1]?.[0];
+    expect(headerNewRequest?.tabs.map(({ threadId }) => threadId)).toEqual([
+      thread.id,
+      otherThread.id,
+      null,
+    ]);
+    expect(headerNewRequest?.activeTabId).toBe(headerNewRequest?.tabs.at(-1)?.id);
     await waitFor(() => {
       const newTaskCwd = screen.getByRole("button", { name: "项目" });
       expect(newTaskCwd).toBeEnabled();
-      expect(newTaskCwd).toHaveAttribute("title", thread.cwd);
+      expect(newTaskCwd).toHaveAttribute("title", otherThread.cwd);
     });
     const editor = screen.getByRole("textbox", { name: "任务输入" });
     await user.type(editor, "新会话草稿");
 
     await user.click(screen.getByRole("button", { name: "按项目分组" }));
     await user.click(screen.getByRole("button", {
-      name: `在 ${otherThread.cwd} 中新建会话`,
+      name: `在 ${thread.cwd} 中新建会话`,
     }));
 
-    expect(tabsUpdater).toHaveBeenCalledTimes(1);
-    expect(editor).toHaveValue("新会话草稿");
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(3));
+    const projectNewRequest = tabsUpdater.mock.calls[2]?.[0];
+    expect(projectNewRequest?.tabs.map(({ threadId }) => threadId)).toEqual([
+      thread.id,
+      otherThread.id,
+      null,
+      null,
+    ]);
+    expect(projectNewRequest?.activeTabId).toBe(
+      projectNewRequest?.tabs.at(-1)?.id,
+    );
     await waitFor(() => expect(
       screen.getByRole("button", { name: "项目" }),
-    ).toHaveAttribute("title", otherThread.cwd));
+    ).toHaveAttribute("title", thread.cwd));
+
+    const blankTabs = screen.getAllByRole("tab", { name: "新任务" });
+    expect(blankTabs).toHaveLength(2);
+    await user.click(blankTabs[0]!);
+    expect(screen.getByRole("textbox", { name: "任务输入" }))
+      .toHaveValue("新会话草稿");
   });
 
   it("新建线程首次发送直接采用创建响应", async () => {
@@ -782,13 +819,51 @@ describe("App", () => {
       await Promise.resolve();
     });
 
+    fireEvent.keyDown(window, { ctrlKey: true, key: "PageDown" });
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(1));
+    expect(tabsUpdater.mock.calls.at(-1)?.[0].activeTabId).toBe("tab-b");
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "PageUp" });
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(2));
+    expect(tabsUpdater.mock.calls.at(-1)?.[0].activeTabId).toBe("tab-a");
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "Tab" });
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(3));
+    expect(tabsUpdater.mock.calls.at(-1)?.[0].activeTabId).toBe("tab-b");
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "Tab", shiftKey: true });
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(4));
+    expect(tabsUpdater.mock.calls.at(-1)?.[0].activeTabId).toBe("tab-a");
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "n" });
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(5));
+    const ctrlNRequest = tabsUpdater.mock.calls.at(-1)?.[0];
+    expect(ctrlNRequest?.tabs.map(({ threadId }) => threadId)).toEqual([
+      "thread-a",
+      "thread-b",
+      null,
+    ]);
+    expect(ctrlNRequest?.activeTabId).toBe(ctrlNRequest?.tabs.at(-1)?.id);
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "t" });
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(6));
+    const ctrlTRequest = tabsUpdater.mock.calls.at(-1)?.[0];
+    expect(ctrlTRequest?.tabs.map(({ threadId }) => threadId)).toEqual([
+      "thread-a",
+      "thread-b",
+      null,
+      null,
+    ]);
+    expect(ctrlTRequest?.activeTabId).toBe(ctrlTRequest?.tabs.at(-1)?.id);
+
     await user.click(await screen.findByRole("tab", { name: /会话 B/u }));
     expect(await screen.findByText("后台标签已完成")).toBeVisible();
-    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledWith({
-      expectedVersion: 1,
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(7));
+    expect(tabsUpdater.mock.calls.at(-1)?.[0]).toEqual({
+      expectedVersion: 7,
       tabs: authoritative.tabs,
       activeTabId: "tab-b",
-    }));
+    });
     expect(requests.filter(({ method }) => method === "thread/resume"))
       .toHaveLength(2);
     expect(requests.filter(({ method }) => method === "thread/unsubscribe"))

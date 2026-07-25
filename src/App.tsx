@@ -1558,7 +1558,7 @@ export function App({
           void windowState.activateTab(target.id);
         }
       } else if (
-        key === "t" &&
+        (key === "n" || key === "t") &&
         !event.shiftKey &&
         !conversation.submitting
       ) {
@@ -2025,11 +2025,11 @@ export function App({
         onDeleteThread={setDeletingThreadId}
         onLoadMoreThreads={() => void serverThreads.loadMoreThreads()}
         onLoadProjectThreads={serverThreads.loadProjectThreads}
-        onNewTask={() => void openNewTask()}
-        onNewTaskInProject={(cwd) => void openNewTask(cwd)}
+        onNewTask={() => void openNewTab()}
+        onNewTaskInProject={(cwd) => void openNewTab(cwd)}
         onRefreshThreads={() => void serverThreads.refreshThreads()}
         onSearchThreads={() => setQuickSwitcherOpen(true)}
-        onOpenThread={(threadId) => void openThread(threadId)}
+        onOpenThread={(threadId) => void openThreadInNewTab(threadId)}
         onOpenThreadInNewTab={(threadId) => void openThreadInNewTab(threadId)}
         onUndoArchive={() => void serverThreads.undoArchive()}
         pendingThreadIds={serverThreads.pendingThreadIds}

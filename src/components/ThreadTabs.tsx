@@ -84,7 +84,7 @@ export function ThreadTabs({
         className={styles.newTab}
         disabled={disabled}
         onClick={onNew}
-        title="新建会话标签 Ctrl+T"
+        title="新建会话标签 Ctrl+N / Ctrl+T"
         type="button"
       >
         <svg aria-hidden="true" viewBox="0 0 16 16">

@@ -500,14 +500,8 @@ function applyTabsMutation(
           ? null
           : { tabs: state.tabs, activeTabId: existing.id };
       }
-      const activeIndex = state.tabs.findIndex(({ id }) => id === activeTabId);
-      const insertionIndex = activeIndex < 0 ? state.tabs.length : activeIndex + 1;
       return {
-        tabs: Object.freeze([
-          ...state.tabs.slice(0, insertionIndex),
-          mutation.tab,
-          ...state.tabs.slice(insertionIndex),
-        ]),
+        tabs: Object.freeze([...state.tabs, mutation.tab]),
         activeTabId: mutation.tab.id,
       };
     }

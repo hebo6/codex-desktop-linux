@@ -209,6 +209,41 @@ describe("WindowStateController", () => {
     expect(next.tabs).toHaveLength(2);
   });
 
+  it("从中间标签打开新标签时追加到标签栏末尾", async () => {
+    const pendingLoad = deferred<WindowState>();
+    const current = boundState(
+      2,
+      [
+        { id: "tab-a", threadId: "thread-a" },
+        { id: "tab-b", threadId: "thread-b" },
+        { id: "tab-c", threadId: "thread-c" },
+      ],
+      "tab-b",
+    );
+    const tabsUpdater = vi.fn(async (request: UpdateWindowTabsRequest) => ({
+      ...current,
+      version: 3,
+      tabs: request.tabs,
+      activeTabId: request.activeTabId,
+      updatedAtMs: 1_003,
+    }));
+    const controller = new WindowStateController({
+      loader: () => pendingLoad.promise,
+      tabsUpdater,
+    });
+    await loadController(controller, pendingLoad, current);
+
+    const next = await controller.openTab("thread-d");
+
+    expect(next.tabs.map(({ threadId }) => threadId)).toEqual([
+      "thread-a",
+      "thread-b",
+      "thread-c",
+      "thread-d",
+    ]);
+    expect(next.activeTabId).toBe(next.tabs.at(-1)?.id);
+  });
+
   it("关闭最后一个标签时创建新的空白标签", async () => {
     const pendingLoad = deferred<WindowState>();
     const current = boundState(
