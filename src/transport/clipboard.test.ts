@@ -5,26 +5,37 @@ import { readClipboardFiles } from "./clipboard";
 
 describe("readClipboardFiles", () => {
   it("解码本机剪贴板文件并保留逐文件错误", async () => {
+    const token = "11111111-1111-4111-8111-111111111111";
     const ipc = {
-      invoke: vi.fn(async () => [
-        {
-          name: "screen.png",
-          size: 8,
-          dataBase64: "iVBORw0KGgo=",
-          error: null,
-        },
-        {
-          name: "large.png",
-          size: 16 * 1024 * 1024 + 1,
-          dataBase64: null,
-          error: "图片超过 16 MiB 上限",
-        },
-      ]),
+      invoke: vi.fn(async (command: string) => command === "read_clipboard_files"
+        ? [
+            {
+              name: "screen.png",
+              size: 8,
+              token,
+              error: null,
+            },
+            {
+              name: "large.png",
+              size: 16 * 1024 * 1024 + 1,
+              token: null,
+              error: "图片超过 16 MiB 上限",
+            },
+          ]
+        : {
+            dataBase64: "iVBORw0KGgo=",
+            nextOffset: 8,
+            complete: true,
+          }),
     } as unknown as TauriIpc;
 
     const files = await readClipboardFiles(ipc);
 
-    expect(ipc.invoke).toHaveBeenCalledWith("read_clipboard_files", {});
+    expect(ipc.invoke).toHaveBeenNthCalledWith(1, "read_clipboard_files", {});
+    expect(ipc.invoke).toHaveBeenNthCalledWith(2, "read_clipboard_file_chunk", {
+      token,
+      offset: 0,
+    });
     expect(files[0]).toMatchObject({
       name: "screen.png",
       size: 8,
@@ -48,14 +59,12 @@ describe("readClipboardFiles", () => {
     } as unknown as TauriIpc;
     await expect(readClipboardFiles(invalidShape)).rejects.toThrow("无效文件");
 
+    const token = "11111111-1111-4111-8111-111111111111";
     const invalidSize = {
-      invoke: vi.fn(async () => [{
-        name: "screen.png",
-        size: 9,
-        dataBase64: "iVBORw0KGgo=",
-        error: null,
-      }]),
+      invoke: vi.fn(async (command: string) => command === "read_clipboard_files"
+        ? [{ name: "screen.png", size: 9, token, error: null }]
+        : { dataBase64: "iVBORw0KGgo=", nextOffset: 8, complete: true }),
     } as unknown as TauriIpc;
-    await expect(readClipboardFiles(invalidSize)).rejects.toThrow("大小不一致");
+    await expect(readClipboardFiles(invalidSize)).rejects.toThrow("无效文件分块");
   });
 });

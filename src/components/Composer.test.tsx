@@ -957,7 +957,7 @@ describe("Composer", () => {
     const editor = screen.getByRole("textbox", { name: "任务输入" });
     const event = createEvent.paste(editor, {
       clipboardData: {
-        getData: () => "/tmp/screen.png",
+        getData: () => "普通文本",
         items: [{ getAsFile: () => null, kind: "string", type: "text/plain" }],
         types: ["text/plain"],
       },
@@ -968,6 +968,30 @@ describe("Composer", () => {
     expect(event.defaultPrevented).toBe(false);
     expect(clipboardFilesReader).not.toHaveBeenCalled();
     expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+  });
+
+  it("本地路径没有对应文件剪贴板时仍作为文本粘贴", async () => {
+    const clipboardFilesReader = vi.fn(async () => []);
+    renderComposer({ clipboardFilesReader, initialText: "查看 " });
+    const editor = screen.getByRole("textbox", { name: "任务输入" }) as HTMLTextAreaElement;
+    editor.setSelectionRange(3, 3);
+    const event = createEvent.paste(editor, {
+      clipboardData: {
+        getData: () => "/tmp/screen.png",
+        items: [{ getAsFile: () => null, kind: "string", type: "text/plain" }],
+        types: ["text/plain"],
+      },
+    });
+
+    fireEvent(editor, event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(clipboardFilesReader).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(editor).toHaveValue("查看 /tmp/screen.png"));
+    expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "z" });
+    expect(editor).toHaveValue("查看 ");
   });
 
   it("将 Linux 文件 URI 剪贴板读取为图片而不是粘贴路径", async () => {
@@ -1000,7 +1024,34 @@ describe("Composer", () => {
     expect(editor).toHaveValue("");
   });
 
-  it("URI 剪贴板中的网页链接仍按普通文本粘贴", () => {
+  it("WebKit 未暴露文件项目时从原生剪贴板读取截图", async () => {
+    const screenshot = imageFile("粘贴图片.png");
+    const clipboardFilesReader = vi.fn(async () => [{
+      name: screenshot.name,
+      size: screenshot.size,
+      file: screenshot,
+      error: null,
+    }]);
+    renderComposer({ clipboardFilesReader });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    const event = createEvent.paste(editor, {
+      clipboardData: {
+        getData: () => "",
+        items: [],
+        types: [],
+      },
+    });
+
+    fireEvent(editor, event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(clipboardFilesReader).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(screen.getByLabelText("附件")).toHaveTextContent("粘贴图片.png"),
+    );
+  });
+
+  it("URI 剪贴板中的网页链接探测后仍按普通文本粘贴", async () => {
     const clipboardFilesReader = vi.fn(async () => []);
     renderComposer({ clipboardFilesReader });
     const editor = screen.getByRole("textbox", { name: "任务输入" });
@@ -1014,8 +1065,9 @@ describe("Composer", () => {
 
     fireEvent(editor, event);
 
-    expect(event.defaultPrevented).toBe(false);
-    expect(clipboardFilesReader).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(true);
+    expect(clipboardFilesReader).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(editor).toHaveValue("https://example.com/image.png"));
     expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
   });
 

@@ -41,6 +41,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .manage(connection::LocalStdioConnectionManager::default())
         .manage(connection::RemoteWebSocketConnectionManager::default())
+        .manage(clipboard::ClipboardFileStore::default())
         .manage(connection::ConfiguredConnectionManager::new(
             protocol_trace.clone(),
         ))
@@ -246,6 +247,7 @@ pub fn run() {
             configuration::commands::confirm_proxy_ssh_host_key,
             configuration::commands::record_proxy_test,
             clipboard::read_clipboard_files,
+            clipboard::read_clipboard_file_chunk,
             windows::load_window_state,
             windows::bind_window_server,
             windows::update_window_tabs,

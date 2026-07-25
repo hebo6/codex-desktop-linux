@@ -12,6 +12,7 @@ commands.allow = [
     "open_external_url",
     "save_remote_file",
     "read_clipboard_files",
+    "read_clipboard_file_chunk",
     "load_thread_cache",
     "save_thread_cache",
     "list_draft_keys",
