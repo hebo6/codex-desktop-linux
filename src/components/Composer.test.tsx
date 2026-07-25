@@ -109,6 +109,8 @@ describe("Composer", () => {
       { cwd: "/workspace/project" },
     ));
     await waitFor(() => expect(editor).toHaveValue(""));
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "z" });
+    expect(editor).toHaveValue("");
   });
 
   it("在保留 Markdown 源文和选区的前提下切换安全预览", async () => {
@@ -136,6 +138,90 @@ describe("Composer", () => {
     await waitFor(() => expect(restoredEditor).toHaveFocus());
     expect(restoredEditor.selectionStart).toBe(3);
     expect(restoredEditor.selectionEnd).toBe(5);
+  });
+
+  it("通过常用快捷键撤销和重做连续文本输入", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+
+    await user.type(editor, "连续输入");
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "z" });
+    expect(editor).toHaveValue("");
+
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "y" });
+    expect(editor).toHaveValue("连续输入");
+
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "z" });
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "Z", shiftKey: true });
+    expect(editor).toHaveValue("连续输入");
+  });
+
+  it("撤销和重做文本编辑时恢复对应选区", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+
+    await user.type(editor, "abcdef");
+    editor.setSelectionRange(2, 4, "forward");
+    fireEvent.select(editor);
+    await user.keyboard("{Backspace}");
+    expect(editor).toHaveValue("abef");
+
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "z" });
+    expect(editor).toHaveValue("abcdef");
+    await waitFor(() => {
+      expect(editor.selectionStart).toBe(2);
+      expect(editor.selectionEnd).toBe(4);
+    });
+
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "Z", shiftKey: true });
+    expect(editor).toHaveValue("abef");
+    await waitFor(() => {
+      expect(editor.selectionStart).toBe(2);
+      expect(editor.selectionEnd).toBe(2);
+    });
+  });
+
+  it("统一撤销和重做结构化令牌与附件变更", async () => {
+    const user = userEvent.setup();
+    renderComposer({
+      onLoadSkills: vi.fn(async () => undefined),
+      skills: [{
+        description: "部署",
+        enabled: true,
+        name: "deploy",
+        path: "/skills/deploy",
+        scope: "repo",
+      }],
+    });
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+    const image = new File([new Uint8Array([1, 2])], "history.png", { type: "image/png" });
+
+    await user.type(editor, "$dep");
+    await user.click(screen.getByRole("option", { name: /\$deploy/u }));
+    fireEvent.change(screen.getByLabelText("选择图片附件"), {
+      target: { files: [image] },
+    });
+    await waitFor(() => expect(screen.getByLabelText("附件")).toHaveTextContent("history.png"));
+
+    editor.focus();
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "z" });
+    expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("结构化输入")).toHaveTextContent("$deploy");
+
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "y" });
+    expect(screen.getByLabelText("附件")).toHaveTextContent("history.png");
+
+    await user.click(screen.getByRole("button", { name: "移除 history.png" }));
+    editor.focus();
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "z" });
+    expect(screen.getByLabelText("附件")).toHaveTextContent("history.png");
+
+    await user.click(screen.getByRole("button", { name: "移除 deploy" }));
+    editor.focus();
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "z" });
+    expect(screen.getByLabelText("结构化输入")).toHaveTextContent("$deploy");
   });
 
   it("新会话创建后发送失败时将草稿迁移到服务端会话", async () => {

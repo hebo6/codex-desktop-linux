@@ -7,6 +7,7 @@ import {
   type ChangeEvent,
   type ClipboardEvent,
   type DragEvent,
+  type FormEvent,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
@@ -33,6 +34,11 @@ import {
 } from "../transport/savedPrompts";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { SavedPromptManagerDialog } from "./SavedPromptManagerDialog";
+import {
+  useComposerHistory,
+  type ComposerHistorySnapshot,
+  type ComposerSelection,
+} from "./useComposerHistory";
 import styles from "./Composer.module.css";
 
 type StructuredInput = Extract<
@@ -85,6 +91,12 @@ interface DraftAttachment {
   readonly size: number;
   readonly blob: Blob | null;
   readonly error: string | null;
+}
+
+interface ComposerContent {
+  readonly text: string;
+  readonly tokens: readonly StructuredInput[];
+  readonly attachments: readonly DraftAttachment[];
 }
 
 const MAX_IMAGE_SIZE = 16 * 1024 * 1024;
@@ -188,9 +200,22 @@ export function Composer({
   submitting,
   showProjectPicker,
 }: ComposerProps) {
-  const [text, setText] = useState(initialText);
-  const [tokens, setTokens] = useState<readonly StructuredInput[]>([]);
-  const [attachments, setAttachments] = useState<readonly DraftAttachment[]>([]);
+  const {
+    breakMerge: breakComposerHistoryMerge,
+    change: changeComposerContent,
+    getSelection: getComposerSelection,
+    redo: redoComposerContent,
+    rememberSelection: rememberComposerHistorySelection,
+    replace: replaceComposerContent,
+    reset: resetComposerContent,
+    undo: undoComposerContent,
+    value: composerContent,
+  } = useComposerHistory<ComposerContent>(
+    { text: initialText, tokens: [], attachments: [] },
+    collapsedSelection(initialText.length),
+    composerContentsEqual,
+  );
+  const { attachments, text, tokens } = composerContent;
   const [selectedTokenIndex, setSelectedTokenIndex] = useState<number | null>(null);
   const [editingCwd, setEditingCwd] = useState(false);
   const [cwdInput, setCwdInput] = useState(cwd ?? "");
@@ -237,11 +262,6 @@ export function Composer({
   } | null>(null);
   const preserveDraftForNextKeyRef = useRef(false);
   const currentDraftRef = useRef({ text, tokens });
-  const composerSelectionRef = useRef<{
-    start: number;
-    end: number;
-    direction: "forward" | "backward" | "none";
-  }>({ start: initialText.length, end: initialText.length, direction: "none" });
   const savedPrompts = useSavedPrompts(savedPromptStore);
   draftKeyRef.current = draftKey;
   currentDraftRef.current = { text, tokens };
@@ -406,35 +426,40 @@ export function Composer({
     setSelectedServiceTier(null);
     setServiceTierUpdating(false);
     setSelectedPermission(null);
-    setAttachments([]);
     if (draftKey === null) {
-      setText(initialText);
-      setTokens([]);
+      resetComposerContent(
+        { text: initialText, tokens: [], attachments: [] },
+        collapsedSelection(initialText.length),
+      );
       return () => { disposed = true; };
     }
+    resetComposerContent(
+      { text: "", tokens: [], attachments: [] },
+      collapsedSelection(0),
+    );
     void draftStore.load(draftKey).then(
       (stored) => {
         if (disposed) return;
-        if (stored === null) {
-          setText("");
-          setTokens([]);
-        } else {
-          setText(stored.text);
-          setTokens(stored.tokens);
-        }
+        const restored = stored ?? { text: "", tokens: [] };
+        resetComposerContent(
+          { ...restored, attachments: [] },
+          collapsedSelection(restored.text.length),
+        );
         loadedDraftKeyRef.current = draftKey;
         setLoadedDraftKey(draftKey);
       },
       () => {
         if (disposed) return;
-        setText("");
-        setTokens([]);
+        resetComposerContent(
+          { text: "", tokens: [], attachments: [] },
+          collapsedSelection(0),
+        );
         loadedDraftKeyRef.current = draftKey;
         setLoadedDraftKey(draftKey);
       },
     );
     return () => { disposed = true; };
-  }, [draftKey, draftStore, initialText]);
+  }, [draftKey, draftStore, initialText, resetComposerContent]);
 
   useEffect(() => {
     if (draftKey === null || loadedDraftKey !== draftKey) {
@@ -597,11 +622,13 @@ export function Composer({
         prepared.filter(({ url }) => url === null).map(({ id }) => id),
       );
       if (failed.size > 0) {
-        setAttachments((current) => current.map((attachment) =>
-          failed.has(attachment.id)
-            ? { ...attachment, error: "无法读取此图片" }
-            : attachment,
-        ));
+        replaceComposerContent((current) => ({
+          ...current,
+          attachments: current.attachments.map((attachment) =>
+            failed.has(attachment.id)
+              ? { ...attachment, error: "无法读取此图片" }
+              : attachment),
+        }));
         return;
       }
       const input: TurnStartParams["input"] = [
@@ -613,9 +640,10 @@ export function Composer({
       ];
       if (showProjectPicker) preserveDraftForNextKeyRef.current = true;
       if (await onSend(input, turnConfiguration())) {
-        setText("");
-        setTokens([]);
-        setAttachments([]);
+        resetComposerContent(
+          { text: "", tokens: [], attachments: [] },
+          collapsedSelection(0),
+        );
         setSelectedTokenIndex(null);
         setTrigger(null);
         setMarkdownPreview(false);
@@ -632,9 +660,40 @@ export function Composer({
     setTrigger(composing ? null : findTrigger(value, cursor));
   };
 
+  const focusComposerSelection = (selection: ComposerSelection) => {
+    window.requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (textarea === null || textarea.disabled) return;
+      textarea.focus();
+      textarea.setSelectionRange(selection.start, selection.end, selection.direction);
+    });
+  };
+
+  const restoreComposerSnapshot = (
+    snapshot: ComposerHistorySnapshot<ComposerContent> | null,
+  ) => {
+    if (snapshot === null) return;
+    setSelectedTokenIndex(null);
+    updateTrigger(snapshot.value.text, snapshot.selection.start);
+    focusComposerSelection(snapshot.selection);
+  };
+
+  const performComposerHistoryAction = (action: "undo" | "redo") => {
+    restoreComposerSnapshot(
+      action === "undo" ? undoComposerContent() : redoComposerContent(),
+    );
+  };
+
   const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     const value = event.target.value;
-    setText(value);
+    const selection = selectionFromTextarea(event.target);
+    const merge = composerHistoryMerge(event.nativeEvent);
+    changeComposerContent(
+      (current) => ({ ...current, text: value }),
+      selection,
+      merge?.key ?? null,
+      merge?.windowMs,
+    );
     setSelectedTokenIndex(null);
     updateTrigger(
       value,
@@ -649,24 +708,39 @@ export function Composer({
     }
     if (suggestion.kind === "command") {
       const command = suggestion.value as SlashCommand;
+      const next = replaceTrigger(text, trigger, "");
+      const nextSelection = collapsedSelection(trigger.start);
       if (command.behavior === "compact" || command.behavior === "review") {
-        setText(replaceTrigger(text, trigger, ""));
+        changeComposerContent(
+          (current) => ({ ...current, text: next }),
+          nextSelection,
+        );
         setTrigger(null);
         await onRunImmediateCommand?.(command.behavior);
       } else if (command.behavior === "attach") {
-        setText(replaceTrigger(text, trigger, ""));
+        changeComposerContent(
+          (current) => ({ ...current, text: next }),
+          nextSelection,
+        );
         setTrigger(null);
         attachmentInputRef.current?.click();
       } else if (command.behavior === "settings") {
-        setText(replaceTrigger(text, trigger, ""));
+        changeComposerContent(
+          (current) => ({ ...current, text: next }),
+          nextSelection,
+        );
         setTrigger(null);
         onOpenSettings?.();
       } else if (command.behavior === "insert") {
         const replacement = `/${command.name}${keepTyping ? " " : " "}`;
-        const next = replaceTrigger(text, trigger, replacement);
-        setText(next);
+        const inserted = replaceTrigger(text, trigger, replacement);
+        const cursor = trigger.start + replacement.length;
+        changeComposerContent(
+          (current) => ({ ...current, text: inserted }),
+          collapsedSelection(cursor),
+        );
         setTrigger(null);
-        focusAt(textareaRef.current, trigger.start + replacement.length);
+        focusAt(textareaRef.current, cursor);
       }
       return;
     }
@@ -689,21 +763,44 @@ export function Composer({
         };
     const replacement = keepTyping ? " " : "";
     const next = replaceTrigger(text, trigger, replacement);
-    setText(next);
-    setTokens((current) => [...current, nextToken]);
+    const cursor = trigger.start + replacement.length;
+    changeComposerContent(
+      (current) => ({
+        ...current,
+        text: next,
+        tokens: [...current.tokens, nextToken],
+      }),
+      collapsedSelection(cursor),
+    );
     setTrigger(null);
-    focusAt(textareaRef.current, trigger.start + replacement.length);
+    focusAt(textareaRef.current, cursor);
+  };
+
+  const handleBeforeInput = (event: FormEvent<HTMLTextAreaElement>) => {
+    const action = composerHistoryInputAction(event.nativeEvent);
+    if (action === null) return;
+    event.preventDefault();
+    performComposerHistoryAction(action);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.nativeEvent.isComposing) {
       return;
     }
+    const historyAction = composerHistoryKeyboardAction(event);
+    if (historyAction !== null) {
+      event.preventDefault();
+      performComposerHistoryAction(historyAction);
+      return;
+    }
     if (event.key === "Backspace" && text.length === 0 && tokens.length > 0) {
       event.preventDefault();
       const lastIndex = tokens.length - 1;
       if (selectedTokenIndex === lastIndex) {
-        setTokens((current) => current.slice(0, -1));
+        changeComposerContent(
+          (current) => ({ ...current, tokens: current.tokens.slice(0, -1) }),
+          getComposerSelection(),
+        );
         setSelectedTokenIndex(null);
       } else {
         setSelectedTokenIndex(lastIndex);
@@ -744,21 +841,11 @@ export function Composer({
   const rememberComposerSelection = () => {
     const textarea = textareaRef.current;
     if (textarea === null) return;
-    composerSelectionRef.current = {
-      start: textarea.selectionStart,
-      end: textarea.selectionEnd,
-      direction: textarea.selectionDirection ?? "none",
-    };
+    rememberComposerHistorySelection(selectionFromTextarea(textarea));
   };
 
   const restoreComposerSelection = () => {
-    window.requestAnimationFrame(() => {
-      const textarea = textareaRef.current;
-      if (textarea === null || textarea.disabled) return;
-      const selection = composerSelectionRef.current;
-      textarea.focus();
-      textarea.setSelectionRange(selection.start, selection.end, selection.direction);
-    });
+    focusComposerSelection(getComposerSelection());
   };
 
   const openSavedPromptPicker = () => {
@@ -831,11 +918,14 @@ export function Composer({
     const cursor = textarea.selectionStart ?? value.length;
 
     const newValue = value.slice(0, cursor) + "@" + value.slice(textarea.selectionEnd ?? cursor);
-    setText(newValue);
+    const newCursor = cursor + 1;
+    changeComposerContent(
+      (current) => ({ ...current, text: newValue }),
+      collapsedSelection(newCursor),
+    );
 
     textarea.focus();
     setTimeout(() => {
-      const newCursor = cursor + 1;
       textarea.selectionStart = newCursor;
       textarea.selectionEnd = newCursor;
       updateTrigger(newValue, newCursor);
@@ -844,7 +934,13 @@ export function Composer({
 
   const addFiles = async (files: FileList | readonly File[]) => {
     const pending = await Promise.all([...files].map(readAttachment));
-    setAttachments((current) => [...current, ...pending]);
+    changeComposerContent(
+      (current) => ({
+        ...current,
+        attachments: [...current.attachments, ...pending],
+      }),
+      getComposerSelection(),
+    );
   };
 
   const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -991,19 +1087,26 @@ export function Composer({
             aria-label="任务输入"
             data-composer-input
             disabled={submitting || preparingAttachments}
+            onBeforeInput={handleBeforeInput}
             onChange={handleChange}
             onClick={(event) => updateTrigger(text, event.currentTarget.selectionStart)}
             onCompositionStart={() => {
               composingRef.current = true;
+              breakComposerHistoryMerge();
               setTrigger(null);
             }}
             onCompositionEnd={(event) => {
               composingRef.current = false;
+              breakComposerHistoryMerge();
               updateTrigger(event.currentTarget.value, event.currentTarget.selectionStart);
             }}
             onKeyDown={handleKeyDown}
             onKeyUp={(event) => {
-              if (!event.nativeEvent.isComposing && !["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) {
+              if (
+                !event.nativeEvent.isComposing
+                && composerHistoryKeyboardAction(event) === null
+                && !["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)
+              ) {
                 updateTrigger(text, event.currentTarget.selectionStart);
               }
             }}
@@ -1039,7 +1142,20 @@ export function Composer({
                   <strong>{attachment.name}</strong>
                   <small>{attachment.error ?? (selectedModelRejectsImages ? "当前模型不支持图片输入" : formatFileSize(attachment.size))}</small>
                 </span>
-                <button aria-label={`移除 ${attachment.name}`} disabled={preparingAttachments || submitting} onClick={() => setAttachments((current) => current.filter(({ id }) => id !== attachment.id))} type="button">×</button>
+                <button
+                  aria-label={`移除 ${attachment.name}`}
+                  disabled={preparingAttachments || submitting}
+                  onClick={() => changeComposerContent(
+                    (current) => ({
+                      ...current,
+                      attachments: current.attachments.filter(({ id }) => id !== attachment.id),
+                    }),
+                    getComposerSelection(),
+                  )}
+                  type="button"
+                >
+                  ×
+                </button>
               </article>
             ))}
           </div>
@@ -1054,7 +1170,19 @@ export function Composer({
                 onClick={() => setSelectedTokenIndex(index)}
               >
                 <span>{token.type === "skill" ? "$" : "@"}{token.name}</span>
-                <button aria-label={`移除 ${token.name}`} onClick={() => setTokens((current) => current.filter((_, itemIndex) => itemIndex !== index))} type="button">×</button>
+                <button
+                  aria-label={`移除 ${token.name}`}
+                  onClick={() => changeComposerContent(
+                    (current) => ({
+                      ...current,
+                      tokens: current.tokens.filter((_, itemIndex) => itemIndex !== index),
+                    }),
+                    getComposerSelection(),
+                  )}
+                  type="button"
+                >
+                  ×
+                </button>
               </span>
             ))}
           </div>
@@ -2091,6 +2219,70 @@ function nextSelectableIndex(items: readonly Suggestion[], current: number, dire
     }
   }
   return current;
+}
+
+function composerContentsEqual(left: ComposerContent, right: ComposerContent): boolean {
+  return left.text === right.text
+    && left.tokens === right.tokens
+    && left.attachments === right.attachments;
+}
+
+function collapsedSelection(position: number): ComposerSelection {
+  return { start: position, end: position, direction: "none" };
+}
+
+function selectionFromTextarea(textarea: HTMLTextAreaElement): ComposerSelection {
+  return {
+    start: textarea.selectionStart,
+    end: textarea.selectionEnd,
+    direction: textarea.selectionDirection ?? "none",
+  };
+}
+
+function composerHistoryKeyboardAction(
+  event: KeyboardEvent<HTMLElement>,
+): "undo" | "redo" | null {
+  if (!event.ctrlKey || event.altKey || event.metaKey) {
+    return null;
+  }
+  const key = event.key.toLocaleLowerCase();
+  if (key === "z") {
+    return event.shiftKey ? "redo" : "undo";
+  }
+  if (key === "y" && !event.shiftKey) {
+    return "redo";
+  }
+  return null;
+}
+
+function composerHistoryInputAction(event: Event): "undo" | "redo" | null {
+  const inputType = eventInputType(event);
+  if (inputType === "historyUndo") return "undo";
+  if (inputType === "historyRedo") return "redo";
+  return null;
+}
+
+function composerHistoryMerge(
+  event: Event,
+): { readonly key: string; readonly windowMs: number } | null {
+  if (isComposingEvent(event)) {
+    return { key: "composition", windowMs: Number.POSITIVE_INFINITY };
+  }
+  const inputType = eventInputType(event);
+  if (inputType === "insertText") {
+    return { key: inputType, windowMs: 1_000 };
+  }
+  if (inputType === "deleteContentBackward" || inputType === "deleteContentForward") {
+    return { key: inputType, windowMs: 1_000 };
+  }
+  return null;
+}
+
+function eventInputType(event: Event): string | null {
+  if (!("inputType" in event) || typeof event.inputType !== "string") {
+    return null;
+  }
+  return event.inputType;
 }
 
 function focusAt(textarea: HTMLTextAreaElement | null, position: number): void {
