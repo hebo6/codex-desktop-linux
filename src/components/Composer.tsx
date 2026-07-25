@@ -32,6 +32,10 @@ import {
   type SavedPrompt,
   type SavedPromptStore,
 } from "../transport/savedPrompts";
+import {
+  ComposerAccessoryPanel,
+  ComposerAccessoryRow,
+} from "./ComposerAccessoryPanel";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { SavedPromptManagerDialog } from "./SavedPromptManagerDialog";
 import {
@@ -133,6 +137,7 @@ export interface ComposerProps {
   readonly mentionReferences?: readonly ComposerMentionReference[];
   readonly mentionsLoading?: boolean;
   readonly mentionsError?: string | null;
+  readonly accessoryPanel?: ReactNode;
   readonly interactionPanel?: ReactNode;
   readonly skills?: readonly SkillMetadata[];
   readonly skillsLoading?: boolean;
@@ -180,6 +185,7 @@ export function Composer({
   mentionReferences = [],
   mentionsLoading = false,
   mentionsError = null,
+  accessoryPanel,
   interactionPanel,
   skills = [],
   skillsLoading = false,
@@ -1048,41 +1054,46 @@ export function Composer({
         ? null
         : <div className={styles.error} role="alert">{draftPersistenceError}</div>}
       {capabilitiesError === null ? null : <div className={styles.capabilityError} role="status">{capabilitiesError}</div>}
-      {showProjectPicker ? (
-        <div className={styles.projectBar}>
-          <div className={styles.cwdControl}>
-            <ProjectPicker
-              cwd={cwd}
-              directories={cwdOptions}
-              disabled={onCwdChange === undefined || activeTurn || submitting}
-              onBrowse={onPickCwd === undefined ? undefined : () => void chooseCwd()}
-              onCustom={() => {
-                setCwdInput(cwd ?? "");
-                setCwdError(null);
-                setEditingCwd(true);
-              }}
-              onSelect={(directory) => onCwdChange?.(directory)}
-              picking={pickingCwd}
-            />
-            {editingCwd ? (
-              <div className={styles.cwdEditor}>
-                <label>
-                  <span>服务器工作目录</span>
-                  <input autoFocus onChange={(event) => setCwdInput(event.target.value)} onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      applyCwd();
-                    } else if (event.key === "Escape") {
-                      setEditingCwd(false);
-                    }
-                  }} placeholder="/workspace/project" value={cwdInput} />
-                </label>
-                {cwdError === null ? null : <small role="alert">{cwdError}</small>}
-                <div><button onClick={() => setEditingCwd(false)} type="button">取消</button><button onClick={applyCwd} type="button">应用</button></div>
+      {showProjectPicker || accessoryPanel !== undefined ? (
+        <ComposerAccessoryPanel>
+          {showProjectPicker ? (
+            <ComposerAccessoryRow>
+              <div className={styles.cwdControl}>
+                <ProjectPicker
+                  cwd={cwd}
+                  directories={cwdOptions}
+                  disabled={onCwdChange === undefined || activeTurn || submitting}
+                  onBrowse={onPickCwd === undefined ? undefined : () => void chooseCwd()}
+                  onCustom={() => {
+                    setCwdInput(cwd ?? "");
+                    setCwdError(null);
+                    setEditingCwd(true);
+                  }}
+                  onSelect={(directory) => onCwdChange?.(directory)}
+                  picking={pickingCwd}
+                />
+                {editingCwd ? (
+                  <div className={styles.cwdEditor}>
+                    <label>
+                      <span>服务器工作目录</span>
+                      <input autoFocus onChange={(event) => setCwdInput(event.target.value)} onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          applyCwd();
+                        } else if (event.key === "Escape") {
+                          setEditingCwd(false);
+                        }
+                      }} placeholder="/workspace/project" value={cwdInput} />
+                    </label>
+                    {cwdError === null ? null : <small role="alert">{cwdError}</small>}
+                    <div><button onClick={() => setEditingCwd(false)} type="button">取消</button><button onClick={applyCwd} type="button">应用</button></div>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        </div>
+            </ComposerAccessoryRow>
+          ) : null}
+          {accessoryPanel}
+        </ComposerAccessoryPanel>
       ) : null}
       <div
         className={styles.surface}

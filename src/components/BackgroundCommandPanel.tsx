@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ObservedBackgroundTerminal } from "../app/useBackgroundTerminals";
 import type { ThreadTurn } from "../app/useServerThreads";
+import { ComposerAccessoryDisclosure } from "./ComposerAccessoryPanel";
 import styles from "./BackgroundCommandPanel.module.css";
 
 type ThreadItem = ThreadTurn["items"][number];
@@ -12,8 +13,8 @@ interface RunningCommand {
   readonly cwd: string;
   readonly durationMs: number;
   readonly itemId: string;
-  readonly latestOutput: string | null;
   readonly locatable: boolean;
+  readonly output: string | null;
   readonly processId: string | null;
 }
 
@@ -74,69 +75,57 @@ export function BackgroundCommandPanel({
   const summary = `${commands.length} 个命令正在运行 · ${formatDuration(longestDuration)}`;
 
   return (
-    <section
-      aria-label="运行中命令"
-      aria-live="polite"
-      className={styles.panel}
-      data-expanded={expanded}
+    <ComposerAccessoryDisclosure
+      expanded={expanded}
+      icon={<span className={styles.runningDot} />}
+      label="运行中命令"
+      live="polite"
+      onExpandedChange={setExpanded}
+      summary={summary}
     >
-      <button
-        aria-expanded={expanded}
-        className={styles.summary}
-        onClick={() => setExpanded((current) => !current)}
-        type="button"
-      >
-        <span aria-hidden="true" className={styles.runningDot} />
-        <strong>{summary}</strong>
-        <span aria-hidden="true" className={styles.chevron}>›</span>
-      </button>
-      {expanded ? (
-        <div className={styles.commandList}>
-          {commands.map((command) => {
-            const terminating = command.processId !== null &&
-              terminatingProcessIds.has(command.processId);
-            return (
-              <article className={styles.command} key={command.itemId}>
-                <div className={styles.commandCopy}>
-                  <code title={command.command}>{command.command}</code>
-                  <small title={command.cwd}>
-                    {command.cwd} · {formatDuration(command.durationMs)}
-                  </small>
-                  {command.latestOutput === null ? null : (
-                    <samp title={command.latestOutput}>
-                      {command.latestOutput}
-                    </samp>
-                  )}
-                </div>
-                <div className={styles.actions}>
-                  <button
-                    disabled={!command.locatable}
-                    onClick={() => onLocate(command.itemId)}
-                    type="button"
-                  >
-                    定位
-                  </button>
-                  <button
-                    disabled={command.processId === null || terminating}
-                    onClick={() => {
-                      if (command.processId !== null) {
-                        onTerminate(command.processId);
-                      }
-                    }}
-                    type="button"
-                  >
-                    {terminating ? "正在终止" : "终止"}
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-          {error === null ? null : (
-            <p className={styles.error} role="status">{error}</p>
-          )}
-        </div>
-      ) : null}
-    </section>
+      <div className={styles.commandList}>
+        {commands.map((command) => {
+          const terminating = command.processId !== null &&
+            terminatingProcessIds.has(command.processId);
+          return (
+            <article className={styles.command} key={command.itemId}>
+              <div className={styles.commandCopy}>
+                <code>{command.command}</code>
+                <small title={command.cwd}>
+                  {command.cwd} · {formatDuration(command.durationMs)}
+                </small>
+                {command.output === null ? null : (
+                  <samp aria-label="命令输出">{command.output}</samp>
+                )}
+              </div>
+              <div className={styles.actions}>
+                <button
+                  disabled={!command.locatable}
+                  onClick={() => onLocate(command.itemId)}
+                  type="button"
+                >
+                  定位
+                </button>
+                <button
+                  disabled={command.processId === null || terminating}
+                  onClick={() => {
+                    if (command.processId !== null) {
+                      onTerminate(command.processId);
+                    }
+                  }}
+                  type="button"
+                >
+                  {terminating ? "正在终止" : "终止"}
+                </button>
+              </div>
+            </article>
+          );
+        })}
+        {error === null ? null : (
+          <p className={styles.error} role="status">{error}</p>
+        )}
+      </div>
+    </ComposerAccessoryDisclosure>
   );
 }
 
@@ -213,19 +202,17 @@ function commandPresentation(
       (item?.durationMs ?? 0) + now - observedAt,
     ),
     itemId,
-    latestOutput: latestOutputLine(item?.aggregatedOutput),
     locatable: item !== undefined,
+    output: commandOutput(item?.aggregatedOutput),
     processId,
   };
 }
 
-function latestOutputLine(output: string | null | undefined): string | null {
+function commandOutput(output: string | null | undefined): string | null {
   if (output === null || output === undefined) {
     return null;
   }
-  const lines = output.trimEnd().split(/\r?\n/u);
-  const latest = lines.findLast((line) => line.trim().length > 0)?.trim();
-  return latest === undefined || latest.length === 0 ? null : latest;
+  return output.length === 0 ? null : output;
 }
 
 function formatDuration(durationMs: number): string {

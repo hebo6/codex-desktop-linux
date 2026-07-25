@@ -1,44 +1,3 @@
-.panel {
-  margin-bottom: var(--space-2);
-  overflow: hidden;
-  border: 1px solid var(--color-divider-strong);
-  border-radius: 16px;
-  color: var(--color-text-secondary);
-  background: var(--color-content-bg);
-  box-shadow: 0 10px 28px rgb(20 20 18 / 10%);
-  pointer-events: auto;
-}
-
-.summary {
-  display: grid;
-  width: 100%;
-  min-height: 42px;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 0 var(--space-4);
-  border: 0;
-  color: inherit;
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.summary:hover,
-.summary:focus-visible {
-  background: var(--color-fill-hover);
-}
-
-.summary strong {
-  overflow: hidden;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .runningDot {
   width: 8px;
   height: 8px;
@@ -46,15 +5,6 @@
   background: var(--color-status-progress);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-status-progress) 12%, transparent);
   animation: running-pulse 1.6s ease-in-out infinite;
-}
-
-.chevron {
-  color: var(--color-text-tertiary);
-  transition: transform var(--duration-panel) var(--ease-standard);
-}
-
-.panel[data-expanded="true"] .chevron {
-  transform: rotate(90deg);
 }
 
 .commandList {
@@ -80,9 +30,7 @@
   gap: 2px;
 }
 
-.commandCopy code,
-.commandCopy small,
-.commandCopy samp {
+.commandCopy small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -91,12 +39,28 @@
 .commandCopy code {
   color: var(--color-text-primary);
   font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
-.commandCopy small,
-.commandCopy samp {
+.commandCopy small {
   color: var(--color-text-tertiary);
   font-size: 11px;
+}
+
+.commandCopy samp {
+  max-height: 240px;
+  padding: var(--space-2);
+  margin-top: var(--space-1);
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-content-bg);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .actions {

@@ -12,6 +12,7 @@ import {
 import { useConversation } from "./app/useConversation";
 import { useBackgroundTerminals } from "./app/useBackgroundTerminals";
 import { useComposerCapabilities } from "./app/useComposerCapabilities";
+import { useTurnPlan } from "./app/useTurnPlan";
 import {
   useServerProfileMutations,
   type ServerProfileMutationCommands,
@@ -53,6 +54,7 @@ import { ConversationWorkspace } from "./components/ConversationWorkspace";
 import { Composer } from "./components/Composer";
 import { ApprovalPanel } from "./components/ApprovalPanel";
 import { BackgroundCommandPanel } from "./components/BackgroundCommandPanel";
+import { TaskPlanPanel } from "./components/TaskPlanPanel";
 import { RateLimitIndicator } from "./components/RateLimitIndicator";
 import { ExternalLinkDialog } from "./components/ExternalLinkDialog";
 import { FilePreviewDialog, type FilePreviewRequest } from "./components/FilePreviewDialog";
@@ -356,6 +358,11 @@ export function App({
     connection.conversationClient,
     currentThreadId,
     resumedThreadId,
+    subscribedThreadIds,
+  );
+  const turnPlan = useTurnPlan(
+    connection.conversationClient,
+    currentThreadId,
     subscribedThreadIds,
   );
   const [draftCwds, setDraftCwds] = useState<ReadonlyMap<string, string | null>>(
@@ -1929,14 +1936,9 @@ export function App({
                   )}
                   draftStore={tabDraftStore}
                   error={conversation.error}
-                  interactionPanel={
+                  accessoryPanel={
                     <>
-                      <ApprovalPanel
-                        onOpenLink={openContentLink}
-                        onRespond={serverInteractions.respond}
-                        pending={activePendingInteractions}
-                        resolvedElsewhereCount={serverInteractions.resolvedElsewhereCount}
-                      />
+                      <TaskPlanPanel plan={turnPlan} />
                       <BackgroundCommandPanel
                         error={backgroundTerminals.error}
                         loaded={backgroundTerminals.loaded}
@@ -1957,6 +1959,14 @@ export function App({
                         turns={displayedRestoredThread?.turns ?? []}
                       />
                     </>
+                  }
+                  interactionPanel={
+                    <ApprovalPanel
+                      onOpenLink={openContentLink}
+                      onRespond={serverInteractions.respond}
+                      pending={activePendingInteractions}
+                      resolvedElsewhereCount={serverInteractions.resolvedElsewhereCount}
+                    />
                   }
                   models={composerCapabilities.models}
                   modelsLoading={
