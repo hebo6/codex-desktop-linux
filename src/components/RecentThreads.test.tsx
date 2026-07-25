@@ -50,7 +50,7 @@ function renderThreads(
   overrides: Partial<ComponentProps<typeof RecentThreads>> = {},
 ) {
   const onOpenThread = vi.fn();
-  const onOpenThreadInNewWindow = vi.fn();
+  const onOpenThreadInNewTab = vi.fn();
   const onLoadMore = vi.fn();
   const onLoadProjectThreads = vi.fn(async () => ({ hasMore: false }));
   const onNewTaskInProject = vi.fn();
@@ -71,7 +71,7 @@ function renderThreads(
     onLoadProjectThreads,
     onNewTaskInProject,
     onOpenThread,
-    onOpenThreadInNewWindow,
+    onOpenThreadInNewTab,
     onUndoArchive,
     pendingThreadIds: [],
     removingThreadIds: [],
@@ -87,7 +87,7 @@ function renderThreads(
     onLoadProjectThreads,
     onNewTaskInProject,
     onOpenThread,
-    onOpenThreadInNewWindow,
+    onOpenThreadInNewTab,
     onUndoArchive,
     rerenderThreads(next: Partial<ComponentProps<typeof RecentThreads>>) {
       rendered.rerender(<RecentThreads {...props} {...next} />);
@@ -171,8 +171,8 @@ describe("RecentThreads", () => {
     expect(onOpenThread).toHaveBeenCalledWith(THREAD_TWO.id);
   });
 
-  it("支持中键和键盘上下文菜单在新窗口打开会话", () => {
-    const { onOpenThreadInNewWindow } = renderThreads();
+  it("支持中键和键盘上下文菜单在新标签打开会话", () => {
+    const { onOpenThreadInNewTab } = renderThreads();
     const first = screen.getByRole("button", { name: "服务端标题 正在运行" });
     const second = screen.getByRole("button", { name: "预览标题 等待审批" });
 
@@ -180,14 +180,14 @@ describe("RecentThreads", () => {
       first,
       new MouseEvent("auxclick", { bubbles: true, button: 1 }),
     );
-    expect(onOpenThreadInNewWindow).toHaveBeenCalledWith(THREAD_ONE.id);
+    expect(onOpenThreadInNewTab).toHaveBeenCalledWith(THREAD_ONE.id);
 
     second.focus();
     fireEvent.keyDown(second, { key: "F10", shiftKey: true });
     const menu = screen.getByRole("menu", { name: "会话“预览标题”操作" });
     expect(menu).toBeVisible();
-    fireEvent.click(screen.getByRole("menuitem", { name: "在新窗口打开" }));
-    expect(onOpenThreadInNewWindow).toHaveBeenLastCalledWith(THREAD_TWO.id);
+    fireEvent.click(screen.getByRole("menuitem", { name: "在新标签打开" }));
+    expect(onOpenThreadInNewTab).toHaveBeenLastCalledWith(THREAD_TWO.id);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
@@ -196,7 +196,7 @@ describe("RecentThreads", () => {
     const first = screen.getByRole("button", { name: "服务端标题 正在运行" });
 
     fireEvent.contextMenu(first, { clientX: 80, clientY: 120 });
-    expect(screen.getByRole("menuitem", { name: "在新窗口打开" })).toHaveFocus();
+    expect(screen.getByRole("menuitem", { name: "在新标签打开" })).toHaveFocus();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });

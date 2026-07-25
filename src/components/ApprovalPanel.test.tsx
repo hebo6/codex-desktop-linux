@@ -6,7 +6,7 @@ import type { ServerRequest } from "../protocol/generated";
 import { ApprovalPanel } from "./ApprovalPanel";
 
 function pending(request: ServerRequest, responding = false): PendingInteraction {
-  return { key: "number:1", request, responding };
+  return { key: "number:1", request, responding, threadId: "thread-1" };
 }
 
 function renderPanel(request: ServerRequest, additional: readonly PendingInteraction[] = []) {

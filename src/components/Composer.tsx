@@ -489,6 +489,23 @@ export function Composer({
     return () => window.clearTimeout(timeout);
   }, [draftKey, draftStore, loadedDraftKey, text, tokens]);
 
+  useEffect(() => () => {
+    const currentDraftKey = draftKeyRef.current;
+    if (
+      currentDraftKey === null ||
+      loadedDraftKeyRef.current !== currentDraftKey ||
+      sendingRef.current
+    ) {
+      return;
+    }
+    const current = currentDraftRef.current;
+    const persistence =
+      current.text.length === 0 && current.tokens.length === 0
+        ? draftStore.delete(currentDraftKey)
+        : draftStore.save(currentDraftKey, current);
+    void persistence.catch(() => undefined);
+  }, [draftStore]);
+
   useEffect(() => {
     if (
       draftKey === null ||

@@ -246,7 +246,7 @@ pub fn run() {
             configuration::commands::record_proxy_test,
             windows::load_window_state,
             windows::bind_window_server,
-            windows::update_window_session,
+            windows::update_window_tabs,
             windows::open_app_window,
             windows::open_protocol_debug_window,
             dialogs::pick_local_directory,

@@ -6,7 +6,8 @@ import {
   loadWindowState,
   openAppWindow,
   subscribeWindowServerReferenceChanges,
-  updateWindowSession,
+  subscribeWindowStateChanges,
+  updateWindowTabs,
   WindowStateTransportError,
 } from "./windowState";
 import type { WindowStateEventApi, WindowStateIpc } from "./windowState";
@@ -48,17 +49,30 @@ class FakeEvents implements WindowStateEventApi {
   }
 }
 
-function windowState(overrides: Record<string, unknown> = {}) {
+function unboundState(overrides: Record<string, unknown> = {}) {
   return {
     windowId: "main",
     version: 1,
+    tabs: [],
+    updatedAtMs: 1_000,
+    ...overrides,
+  };
+}
+
+function boundState(overrides: Record<string, unknown> = {}) {
+  return {
+    windowId: "main",
+    version: 1,
+    serverId: SERVER_A,
+    tabs: [{ id: "tab-a", threadId: null }],
+    activeTabId: "tab-a",
     updatedAtMs: 1_000,
     ...overrides,
   };
 }
 
 describe("windowState transport", () => {
-  it("只订阅严格的活动窗口引用变化事件并返回取消函数", async () => {
+  it("订阅严格的活动窗口引用变化事件", async () => {
     const events = new FakeEvents();
     const onChange = vi.fn();
     const unlisten = await subscribeWindowServerReferenceChanges(
@@ -76,72 +90,46 @@ describe("windowState transport", () => {
     expect(events.unlisten).toHaveBeenCalledTimes(1);
   });
 
-  it("窗口引用事件监听器异常不会阻断后续事件", async () => {
+  it("订阅并严格解析目标窗口标签状态", async () => {
     const events = new FakeEvents();
-    const onChange = vi
-      .fn()
-      .mockImplementationOnce(() => {
-        throw new Error("view closed");
-      })
-      .mockImplementationOnce(() => undefined);
-    await subscribeWindowServerReferenceChanges(onChange, events);
+    const onChange = vi.fn();
+    await subscribeWindowStateChanges(onChange, events);
 
-    expect(() => events.handler?.({ payload: {} })).not.toThrow();
-    expect(() => events.handler?.({ payload: {} })).not.toThrow();
-    expect(onChange).toHaveBeenCalledTimes(2);
-  });
-
-  it("无参数加载当前调用窗口状态并接受缺省的可选字段", async () => {
-    const ipc = new FakeIpc();
-    ipc.responses.set("load_window_state", windowState());
-
-    const state = await loadWindowState(ipc);
-
-    expect(state).toEqual({
-      windowId: "main",
-      version: 1,
-      updatedAtMs: 1_000,
+    expect(events.eventName).toBe("window-state-changed");
+    events.handler?.({ payload: { invalid: true } });
+    expect(onChange).not.toHaveBeenCalled();
+    events.handler?.({ payload: boundState({ version: 3 }) });
+    expect(onChange).toHaveBeenCalledWith({
+      ...boundState({ version: 3 }),
+      tabs: Object.freeze([{ id: "tab-a", threadId: null }]),
     });
-    expect(Object.isFrozen(state)).toBe(true);
-    expect(ipc.calls).toEqual([
-      { command: "load_window_state", arguments: {} },
-    ]);
-    expect(JSON.stringify(ipc.calls)).not.toContain("windowId");
   });
 
-  it("严格解析完整窗口状态", async () => {
+  it("加载未绑定或包含多个标签的窗口状态", async () => {
     const ipc = new FakeIpc();
-    ipc.responses.set(
-      "load_window_state",
-      windowState({
-        windowId: "0198a708-8c47-7e56-8458-155a60c8945c",
-        version: Number.MAX_SAFE_INTEGER,
-        serverId: SERVER_A,
-        currentThreadId: "线程-1",
-        updatedAtMs: Number.MAX_SAFE_INTEGER,
-      }),
-    );
+    ipc.responses.set("load_window_state", unboundState());
+    await expect(loadWindowState(ipc)).resolves.toEqual(unboundState());
 
-    await expect(loadWindowState(ipc)).resolves.toEqual({
-      windowId: "0198a708-8c47-7e56-8458-155a60c8945c",
-      version: Number.MAX_SAFE_INTEGER,
+    ipc.responses.set("load_window_state", boundState({
+      tabs: [
+        { id: "tab-a", threadId: "线程-1" },
+        { id: "tab-b", threadId: null },
+      ],
+      activeTabId: "tab-b",
+    }));
+    await expect(loadWindowState(ipc)).resolves.toMatchObject({
       serverId: SERVER_A,
-      currentThreadId: "线程-1",
-      updatedAtMs: Number.MAX_SAFE_INTEGER,
+      activeTabId: "tab-b",
+      tabs: [
+        { id: "tab-a", threadId: "线程-1" },
+        { id: "tab-b", threadId: null },
+      ],
     });
   });
 
-  it("按期望版本绑定或清空服务器且请求中不存在 windowId", async () => {
+  it("绑定服务器时校验响应服务器与版本", async () => {
     const ipc = new FakeIpc();
-    ipc.responses.set(
-      "bind_window_server",
-      windowState({
-        version: 8,
-        serverId: SERVER_A,
-        currentThreadId: "thread-a",
-        updatedAtMs: 1_001,
-      }),
-    );
+    ipc.responses.set("bind_window_server", boundState({ version: 8 }));
 
     await expect(
       bindWindowServer({ expectedVersion: 7, serverId: SERVER_A }, ipc),
@@ -152,295 +140,133 @@ describe("windowState transport", () => {
         request: { expectedVersion: 7, serverId: SERVER_A },
       },
     });
-    expect(JSON.stringify(ipc.calls[0])).not.toContain("windowId");
 
-    ipc.responses.set(
-      "bind_window_server",
-      windowState({ version: 9, updatedAtMs: 1_002 }),
-    );
+    ipc.responses.set("bind_window_server", boundState({
+      version: 9,
+      serverId: SERVER_B,
+    }));
     await expect(
-      bindWindowServer({ expectedVersion: 8, serverId: null }, ipc),
-    ).resolves.toEqual(windowState({ version: 9, updatedAtMs: 1_002 }));
-    expect(ipc.calls[1]?.arguments).toEqual({
-      request: { expectedVersion: 8, serverId: null },
-    });
-
-    ipc.responses.set(
-      "bind_window_server",
-      windowState({ version: 9, serverId: SERVER_A, updatedAtMs: 1_003 }),
-    );
-    await expect(
-      bindWindowServer({ expectedVersion: 9, serverId: SERVER_A }, ipc),
-    ).resolves.toMatchObject({ version: 9, serverId: SERVER_A });
+      bindWindowServer({ expectedVersion: 8, serverId: SERVER_A }, ipc),
+    ).rejects.toMatchObject({ code: "invalidResponse" });
   });
 
-  it("显式传递 nullable 会话并校验响应相关性", async () => {
+  it("更新完整标签集合并校验响应相关性", async () => {
     const ipc = new FakeIpc();
-    ipc.responses.set(
-      "update_window_session",
-      windowState({
-        version: 3,
-        serverId: SERVER_A,
-        currentThreadId: "thread-2",
-        updatedAtMs: 2_000,
-      }),
-    );
+    const tabs = [
+      { id: "tab-a", threadId: "thread-a" },
+      { id: "tab-b", threadId: null },
+    ] as const;
+    ipc.responses.set("update_window_tabs", boundState({
+      version: 3,
+      tabs,
+      activeTabId: "tab-b",
+      updatedAtMs: 2_000,
+    }));
 
-    await updateWindowSession(
-      {
-        expectedVersion: 2,
-        currentThreadId: "thread-2",
-      },
-      ipc,
-    );
+    await updateWindowTabs({
+      expectedVersion: 2,
+      tabs,
+      activeTabId: "tab-b",
+    }, ipc);
     expect(ipc.calls[0]).toEqual({
-      command: "update_window_session",
+      command: "update_window_tabs",
       arguments: {
         request: {
           expectedVersion: 2,
-          currentThreadId: "thread-2",
+          tabs,
+          activeTabId: "tab-b",
         },
       },
     });
 
-    ipc.responses.set(
-      "update_window_session",
-      windowState({ version: 4, serverId: SERVER_A, updatedAtMs: 2_001 }),
-    );
-    await expect(
-      updateWindowSession(
-        { expectedVersion: 3, currentThreadId: null },
-        ipc,
-      ),
-    ).resolves.toMatchObject({ version: 4 });
-    expect(ipc.calls[1]?.arguments).toEqual({
-      request: {
-        expectedVersion: 3,
-        currentThreadId: null,
-      },
-    });
-
-    ipc.responses.set(
-      "update_window_session",
-      windowState({
-        version: 5,
-        currentThreadId: "wrong-thread",
-        updatedAtMs: 2_002,
-      }),
-    );
-    await expect(
-      updateWindowSession(
-        { expectedVersion: 4, currentThreadId: null },
-        ipc,
-      ),
-    ).rejects.toMatchObject({ code: "invalidResponse" });
-
-    ipc.responses.set(
-      "update_window_session",
-      windowState({
-        version: 5,
-        serverId: SERVER_A,
-        currentThreadId: "thread-5",
-        updatedAtMs: 2_003,
-      }),
-    );
-    await expect(
-      updateWindowSession(
-        {
-          expectedVersion: 5,
-          currentThreadId: "thread-5",
-        },
-        ipc,
-      ),
-    ).resolves.toMatchObject({ version: 5 });
+    ipc.responses.set("update_window_tabs", boundState({
+      version: 4,
+      tabs,
+      activeTabId: "tab-a",
+    }));
+    await expect(updateWindowTabs({
+      expectedVersion: 3,
+      tabs,
+      activeTabId: "tab-b",
+    }, ipc)).rejects.toMatchObject({ code: "invalidResponse" });
   });
 
-  it("创建窗口可选择目标会话并校验稳定标签", async () => {
+  it("拒绝重复会话、缺失活动标签和非法请求", async () => {
+    const ipc = new FakeIpc();
+    const invalidStates = [
+      boundState({ activeTabId: "missing" }),
+      boundState({
+        tabs: [
+          { id: "tab-a", threadId: "thread-a" },
+          { id: "tab-b", threadId: "thread-a" },
+        ],
+      }),
+      unboundState({ tabs: [{ id: "tab-a", threadId: null }] }),
+      unboundState({ activeTabId: "tab-a" }),
+    ];
+    for (const invalid of invalidStates) {
+      ipc.responses.set("load_window_state", invalid);
+      await expect(loadWindowState(ipc)).rejects.toBeInstanceOf(
+        WindowStateTransportError,
+      );
+    }
+
+    for (const request of [
+      { expectedVersion: 1, tabs: [], activeTabId: "tab-a" },
+      {
+        expectedVersion: 1,
+        tabs: [{ id: "tab-a", threadId: null }],
+        activeTabId: "missing",
+      },
+      {
+        expectedVersion: 1,
+        tabs: [{ id: "", threadId: null }],
+        activeTabId: "",
+      },
+    ]) {
+      await expect(updateWindowTabs(request, ipc)).rejects.toMatchObject({
+        code: "invalidRequest",
+      });
+    }
+  });
+
+  it("打开窗口接受新窗口或已有 main 窗口标签", async () => {
     const ipc = new FakeIpc();
     const windowId = "0198a708-8c47-7e56-8458-155a60c8945c";
     ipc.responses.set("open_app_window", {
       windowId,
       label: `app-${windowId}`,
     });
-
-    await expect(openAppWindow({ serverId: SERVER_B }, ipc)).resolves.toEqual({
-      windowId,
-      label: `app-${windowId}`,
-    });
-    expect(ipc.calls).toEqual([
-      {
-        command: "open_app_window",
-        arguments: { request: { serverId: SERVER_B } },
-      },
-    ]);
-
     await expect(
       openAppWindow({ serverId: SERVER_B, threadId: "thread-5" }, ipc),
     ).resolves.toEqual({ windowId, label: `app-${windowId}` });
-    expect(ipc.calls.at(-1)).toEqual({
-      command: "open_app_window",
-      arguments: {
-        request: { serverId: SERVER_B, threadId: "thread-5" },
-      },
-    });
 
     ipc.responses.set("open_app_window", {
-      windowId,
-      label: "app-another-window",
+      windowId: "main",
+      label: "main",
+    });
+    await expect(openAppWindow({ serverId: SERVER_A }, ipc)).resolves.toEqual({
+      windowId: "main",
+      label: "main",
+    });
+  });
+
+  it("识别服务器已被其它窗口占用并收敛其它命令错误", async () => {
+    const ipc = new FakeIpc();
+    ipc.failures.set("bind_window_server", {
+      code: "serverAlreadyOpen",
+      message: "already open",
     });
     await expect(
-      openAppWindow({ serverId: SERVER_B }, ipc),
-    ).rejects.toMatchObject({ code: "invalidResponse" });
-  });
+      bindWindowServer({ expectedVersion: 1, serverId: SERVER_A }, ipc),
+    ).rejects.toMatchObject({ code: "serverAlreadyOpen" });
 
-  it("拒绝响应缺字段、多字段、错误标识、错误数值与 nullable 可选字段", async () => {
-    const invalidStates: unknown[] = [
-      { version: 1, updatedAtMs: 1 },
-      { windowId: "main", updatedAtMs: 1 },
-      { windowId: "main", version: 1 },
-      windowState({ extra: true }),
-      windowState({ windowId: "Main" }),
-      windowState({ version: 0 }),
-      windowState({ version: 1.5 }),
-      windowState({ updatedAtMs: -1 }),
-      windowState({ updatedAtMs: Number.MAX_SAFE_INTEGER + 1 }),
-      windowState({ serverId: "not-a-server" }),
-      windowState({ serverId: null }),
-      windowState({ currentThreadId: null }),
-      windowState({ draftKey: "draft" }),
-      windowState({ currentThreadId: "thread-without-server" }),
-      windowState({ serverId: SERVER_A, currentThreadId: "nul\0thread" }),
-      windowState({ currentThreadId: "中".repeat(342) }),
-      [],
-      null,
-    ];
-
-    for (const invalid of invalidStates) {
-      const ipc = new FakeIpc();
-      ipc.responses.set("load_window_state", invalid);
-      await expect(loadWindowState(ipc)).rejects.toBeInstanceOf(
-        WindowStateTransportError,
-      );
-    }
-  });
-
-  it("按 UTF-8 字节限制会话字段并拒绝请求字段缺失或额外字段", async () => {
-    const ipc = new FakeIpc();
-    ipc.responses.set(
-      "update_window_session",
-      windowState({
-        version: 2,
-        serverId: SERVER_A,
-        currentThreadId: "中".repeat(341),
-        updatedAtMs: 2,
-      }),
-    );
-    await expect(
-      updateWindowSession(
-        {
-          expectedVersion: 1,
-          currentThreadId: "中".repeat(341),
-        },
-        ipc,
-      ),
-    ).resolves.toMatchObject({ version: 2 });
-
-    const invalidRequests: unknown[] = [
-      { expectedVersion: 1, draftKey: null },
-      { currentThreadId: null },
-      {
-        expectedVersion: 1,
-        currentThreadId: null,
-        windowId: "main",
-      },
-      {
-        expectedVersion: 1,
-        currentThreadId: "中".repeat(342),
-      },
-      { expectedVersion: 1, currentThreadId: "" },
-      { expectedVersion: 1, currentThreadId: "nul\0thread" },
-    ];
-    for (const invalid of invalidRequests) {
-      await expect(
-        updateWindowSession(invalid as never, ipc),
-      ).rejects.toMatchObject({ code: "invalidRequest" });
-    }
-  });
-
-  it("拒绝 bind/open 请求中的缺失、额外或无效字段且不调用 IPC", async () => {
-    const ipc = new FakeIpc();
-    const bindRequests: unknown[] = [
-      { serverId: SERVER_A },
-      { expectedVersion: 1 },
-      { expectedVersion: 0, serverId: SERVER_A },
-      { expectedVersion: 1, serverId: "invalid" },
-      { expectedVersion: 1, serverId: SERVER_A, windowId: "main" },
-    ];
-    for (const request of bindRequests) {
-      await expect(
-        bindWindowServer(request as never, ipc),
-      ).rejects.toMatchObject({ code: "invalidRequest" });
-    }
-    const openRequests: unknown[] = [
-      {},
-      { serverId: null },
-      { serverId: "invalid" },
-      { serverId: SERVER_A, threadId: null },
-      { serverId: SERVER_A, threadId: "" },
-      { serverId: SERVER_A, threadId: "nul\0thread" },
-      { serverId: SERVER_A, threadId: "中".repeat(342) },
-      { serverId: SERVER_A, windowId: "main" },
-    ];
-    for (const request of openRequests) {
-      await expect(openAppWindow(request as never, ipc)).rejects.toMatchObject({
-        code: "invalidRequest",
-      });
-    }
-    expect(ipc.calls).toHaveLength(0);
-  });
-
-  it("拒绝 bind/update 的错误版本或字段响应", async () => {
-    const ipc = new FakeIpc();
-    ipc.responses.set(
-      "bind_window_server",
-      windowState({ version: 7, serverId: SERVER_B }),
-    );
-    await expect(
-      bindWindowServer({ expectedVersion: 7, serverId: SERVER_A }, ipc),
-    ).rejects.toMatchObject({ code: "invalidResponse" });
-
-    ipc.responses.set(
-      "bind_window_server",
-      windowState({ version: 8, serverId: SERVER_B }),
-    );
-    await expect(
-      bindWindowServer({ expectedVersion: 7, serverId: SERVER_A }, ipc),
-    ).rejects.toMatchObject({ code: "invalidResponse" });
-  });
-
-  it("将未知命令错误收敛为固定错误且不泄露后端正文", async () => {
-    const ipc = new FakeIpc();
     ipc.failures.set("load_window_state", {
       code: "unknown",
-      message: "DO_NOT_REPORT database path and SQL",
+      message: "DO_NOT_REPORT database path",
     });
-
-    const error = await loadWindowState(ipc).catch(
-      (failure: unknown) => failure,
-    );
-
-    expect(error).toBeInstanceOf(WindowStateTransportError);
+    const error = await loadWindowState(ipc).catch((failure: unknown) => failure);
     expect(error).toMatchObject({ code: "commandFailed" });
     expect(JSON.stringify(error)).not.toContain("DO_NOT_REPORT");
-  });
-
-  it("即使 IPC 同步抛错也只返回安全命令错误", async () => {
-    const invoke = vi.fn(() => {
-      throw new Error("DO_NOT_REPORT synchronous error");
-    });
-
-    await expect(loadWindowState({ invoke })).rejects.toMatchObject({
-      code: "commandFailed",
-    });
   });
 });

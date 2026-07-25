@@ -13,10 +13,20 @@ export const KEYBOARD_SHORTCUT_GROUPS: readonly KeyboardShortcutGroup[] = [
     title: "会话",
     shortcuts: [
       { label: "新建会话", keys: ["Ctrl+N"] },
-      { label: "在新窗口新建会话", keys: ["Ctrl+Shift+N"] },
+      { label: "新建会话标签", keys: ["Ctrl+T"] },
+      { label: "在服务器窗口新建会话", keys: ["Ctrl+Shift+N"] },
       { label: "快速切换会话", keys: ["Ctrl+K"] },
-      { label: "切换到上一个会话", keys: ["Ctrl+PageUp"] },
-      { label: "切换到下一个会话", keys: ["Ctrl+PageDown"] },
+      {
+        label: "切换到上一个标签",
+        keys: ["Ctrl+Shift+Tab", "Ctrl+PageUp"],
+      },
+      {
+        label: "切换到下一个标签",
+        keys: ["Ctrl+Tab", "Ctrl+PageDown"],
+      },
+      { label: "转到标签 1 至 8", keys: ["Ctrl+1 … Ctrl+8"] },
+      { label: "转到最后一个标签", keys: ["Ctrl+9"] },
+      { label: "关闭当前标签", keys: ["Ctrl+W", "Ctrl+F4"] },
       { label: "停止正在进行中的会话", keys: ["Esc"] },
     ],
   },

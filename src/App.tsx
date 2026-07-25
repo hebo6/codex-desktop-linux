@@ -20,7 +20,16 @@ import {
   useProxyProfileMutations,
   type ProxyProfileMutationCommands,
 } from "./app/useProxyProfileMutations";
-import { useServerThreads, type RestoredThread, type ThreadSummary } from "./app/useServerThreads";
+import {
+  useServerThreads,
+  type RestoredThread,
+  type ServerThreadsClient,
+  type ThreadSummary,
+} from "./app/useServerThreads";
+import {
+  useThreadSession,
+  type ThreadSessionState,
+} from "./app/useThreadSession";
 import { useServerInteractions } from "./app/useServerInteractions";
 import { useAccountRateLimits } from "./app/useAccountRateLimits";
 import { useAccountTokenUsage } from "./app/useAccountTokenUsage";
@@ -31,6 +40,7 @@ import {
 } from "./app/useServerConnectionTest";
 import {
   useWindowState,
+  WindowStateControllerError,
   type WindowStateControllerOptions,
 } from "./app/useWindowState";
 import { ConnectionShell } from "./components/ConnectionShell";
@@ -59,6 +69,7 @@ import { ServerSwitcher } from "./components/ServerSwitcher";
 import { ThreadDeleteDialog } from "./components/ThreadDeleteDialog";
 import { ThreadForkDialog } from "./components/ThreadForkDialog";
 import { ThreadQuickSwitcher } from "./components/ThreadQuickSwitcher";
+import { ThreadTabs, type ThreadTabView } from "./components/ThreadTabs";
 import { WindowResizeHandles } from "./components/WindowResizeHandles";
 import type {
   ServerConnectionStartResult,
@@ -71,6 +82,7 @@ import type {
   ServerId,
   ServerProfile,
 } from "./configuration";
+import type { ThreadStartResponse } from "./protocol/generated";
 import { resolveLink, type ExtractedLink } from "./content/linkResolver";
 import type {
   ServerEditorMode,
@@ -80,7 +92,10 @@ import { useAppSelector } from "./store/hooks";
 import { selectConfiguration } from "./store/store";
 import {
   openAppWindow,
+  subscribeWindowStateChanges,
   subscribeWindowServerReferenceChanges,
+  type WindowTab,
+  type WindowStateSubscriber,
   type WindowServerReferenceSubscriber,
 } from "./transport/windowState";
 import { openExternalUrl, pickLocalDirectory } from "./transport/systemDialog";
@@ -107,6 +122,7 @@ import {
 import { getCredentialStorageStatus } from "./transport/configuration";
 import {
   draftStore as persistentDraftStore,
+  createTransientDraftStore,
   type DraftStore,
 } from "./transport/drafts";
 import {
@@ -127,6 +143,7 @@ export interface AppProps {
   readonly windowStateOptions?: WindowStateControllerOptions;
   readonly windowOpener?: AppWindowOpener;
   readonly windowReferenceSubscriber?: WindowServerReferenceSubscriber;
+  readonly windowStateSubscriber?: WindowStateSubscriber;
   readonly preferencesStore?: PreferencesStore;
   readonly notificationService?: DesktopNotificationService;
   readonly deepLinkSubscriber?: DeepLinkTargetSubscriber;
@@ -232,6 +249,7 @@ export function App({
   windowStateOptions,
   windowOpener = openAppWindow,
   windowReferenceSubscriber = subscribeWindowServerReferenceChanges,
+  windowStateSubscriber = subscribeWindowStateChanges,
   preferencesStore = defaultPreferencesStore,
   notificationService = desktopNotificationService,
   deepLinkSubscriber = subscribeDeepLinkTargets,
@@ -242,6 +260,33 @@ export function App({
 }: AppProps = {}) {
   const configuration = useAppSelector(selectConfiguration);
   const windowState = useWindowState(windowStateOptions);
+  const windowTabs = windowState.windowState?.tabs ?? EMPTY_WINDOW_TABS;
+  const activeTabId = windowState.windowState?.activeTabId ?? null;
+  const activeTab = activeTabId === null
+    ? null
+    : windowTabs.find(({ id }) => id === activeTabId) ?? null;
+  const currentThreadId = activeTab?.threadId ?? null;
+  const [tabSessions, setTabSessions] = useState<
+    ReadonlyMap<string, TabThreadSession>
+  >(() => new Map());
+  const activeTabSession = activeTabId === null || currentThreadId === null
+    ? null
+    : tabSessions.get(activeTabId) ?? null;
+  const activeThreadSession =
+    activeTabSession?.threadId === currentThreadId
+      ? activeTabSession.state
+      : null;
+  const restoredThread =
+    activeThreadSession?.restoredThread?.metadata.id === currentThreadId
+      ? activeThreadSession.restoredThread
+      : null;
+  const threadRestorePhase = currentThreadId === null
+    ? "ready" as const
+    : restoredThread === null && activeThreadSession?.phase === "ready"
+      ? "loading" as const
+      : activeThreadSession?.phase ?? "loading";
+  const currentThreadDeleted = activeThreadSession?.deleted ?? false;
+  const threadRestoreError = activeThreadSession?.error ?? null;
   const profiles = useConfigurationProfiles(
     configurationLoader,
     windowState.windowState !== null,
@@ -249,33 +294,113 @@ export function App({
   const connection = useConfiguredServerConnection(connectionOptions);
   const serverThreads = useServerThreads(
     connection.threadClient,
-    windowState.windowState?.currentThreadId ?? null,
+    null,
     windowState.windowState?.serverId ?? null,
   );
   const conversation = useConversation({
     client: connection.conversationClient,
-    currentThreadId: windowState.windowState?.currentThreadId ?? null,
-    restoredThread: serverThreads.restoredThread,
+    currentThreadId,
+    restoredThread,
     onThreadCreated: async (response) => {
-      const cancelPreparation = serverThreads.prepareStartedThread(response);
+      if (activeTabId === null) {
+        throw new TypeError("cannot attach a thread without an active tab");
+      }
+      const tabId = activeTabId;
+      const preparedState = startedThreadSession(response);
+      setTabSessions((current) => {
+        const next = new Map(current);
+        next.set(tabId, {
+          threadId: response.thread.id,
+          state: preparedState,
+          preparedClient: connection.threadClient,
+        });
+        return next;
+      });
       try {
-        await windowState.updateSession(response.thread.id);
+        await windowState.attachThread(tabId, response.thread.id);
       } catch (error) {
-        cancelPreparation();
+        setTabSessions((current) => {
+          const prepared = current.get(tabId);
+          if (
+            prepared?.threadId !== response.thread.id ||
+            prepared.state !== preparedState
+          ) {
+            return current;
+          }
+          const next = new Map(current);
+          next.delete(tabId);
+          return next;
+        });
+        try {
+          void connection.threadClient
+            ?.unsubscribeThread(response.thread.id)
+            .result.catch(() => undefined);
+        } catch {
+          // 窗口状态失败后尽力释放未绑定到标签的会话订阅
+        }
         throw error;
       }
     },
   });
-  const currentThreadId = windowState.windowState?.currentThreadId ?? null;
-  const resumedThreadId = serverThreads.resumedThreadId === currentThreadId
-    ? currentThreadId
-    : null;
+  const resumedThreadId =
+    activeThreadSession?.resumedThreadId === currentThreadId
+      ? currentThreadId
+      : null;
+  const subscribedThreadIds = useMemo(
+    () => windowTabs.flatMap(({ threadId }) =>
+      threadId === null ? [] : [threadId]
+    ),
+    [windowTabs],
+  );
   const backgroundTerminals = useBackgroundTerminals(
     connection.conversationClient,
     currentThreadId,
     resumedThreadId,
+    subscribedThreadIds,
   );
-  const [draftCwd, setDraftCwd] = useState<string | null>(null);
+  const [draftCwds, setDraftCwds] = useState<ReadonlyMap<string, string | null>>(
+    () => new Map(),
+  );
+  const draftCwd = activeTabId === null
+    ? null
+    : draftCwds.get(activeTabId) ?? null;
+  const setDraftCwd = useCallback((cwd: string | null) => {
+    if (activeTabId === null) {
+      return;
+    }
+    setDraftCwds((current) => {
+      const next = new Map(current);
+      next.set(activeTabId, cwd);
+      return next;
+    });
+  }, [activeTabId]);
+  const tabDraftStore = useMemo(
+    () => createTransientDraftStore(draftStore),
+    [draftStore],
+  );
+  const updateTabSession = useCallback((
+    tabId: string,
+    threadId: string,
+    state: ThreadSessionState | null,
+  ) => {
+    setTabSessions((current) => {
+      const existing = current.get(tabId);
+      if (state === null) {
+        if (existing?.threadId !== threadId) {
+          return current;
+        }
+        const next = new Map(current);
+        next.delete(tabId);
+        return next;
+      }
+      if (existing?.threadId === threadId && existing.state === state) {
+        return current;
+      }
+      const next = new Map(current);
+      next.set(tabId, { threadId, state, preparedClient: null });
+      return next;
+    });
+  }, []);
   const selectedServerId = windowState.windowState?.serverId ?? null;
   const selectedServer = selectedServerId === null
     ? undefined
@@ -287,7 +412,7 @@ export function App({
     () => recentWorkingDirectories(serverThreads.threads),
     [serverThreads.threads],
   );
-  const composerCwd = serverThreads.restoredThread?.metadata.cwd
+  const composerCwd = restoredThread?.metadata.cwd
     ?? draftCwd
     ?? recentCwds[0]
     ?? configuredCwd;
@@ -295,7 +420,7 @@ export function App({
     connection.capabilityClient,
     composerCwd,
   );
-  const composerThreadSettings = serverThreads.restoredThread?.modelSettings ?? null;
+  const composerThreadSettings = restoredThread?.modelSettings ?? null;
   const composerDefaultModel = composerThreadSettings?.model
     ?? composerCapabilities.defaultModel;
   const composerDefaultEffort = composerThreadSettings === null
@@ -461,7 +586,6 @@ export function App({
       : (configuration.serversById[boundServerId]?.name ?? "当前服务器");
   const boundServer =
     boundServerId === null ? null : (configuration.serversById[boundServerId] ?? null);
-  const restoredThread = serverThreads.restoredThread;
   const displayedRestoredThread = useMemo(
     () => restoredThread === null
       ? null
@@ -477,7 +601,7 @@ export function App({
 
   useEffect(() => {
     setCommandLocationRequest(null);
-  }, [windowState.windowState?.currentThreadId]);
+  }, [currentThreadId]);
 
   useEffect(() => {
     let disposed = false;
@@ -559,7 +683,7 @@ export function App({
   }, [notificationService]);
 
   useEffect(() => {
-    const threadId = windowState.windowState?.currentThreadId ?? null;
+    const threadId = currentThreadId;
     const previous = conversationActivityRef.current;
     const latestTurn = displayedRestoredThread?.turns.at(-1);
     if (
@@ -585,7 +709,7 @@ export function App({
     notificationService,
     preferences.preferences.notifyTaskComplete,
     windowId,
-    windowState.windowState?.currentThreadId,
+    currentThreadId,
   ]);
 
   useEffect(() => {
@@ -635,10 +759,10 @@ export function App({
   ]);
 
   const contentTitle =
-    serverThreads.currentThreadDeleted
+    currentThreadDeleted
       ? "会话已删除"
       : restoredThread === null
-        ? windowState.windowState?.currentThreadId === undefined
+        ? currentThreadId === null
           ? "新任务"
           : "正在恢复会话"
         : threadDisplayTitle(restoredThread.metadata);
@@ -667,12 +791,12 @@ export function App({
     boundServerId !== null && connection.currentServerId !== boundServerId;
 
   useEffect(() => {
-    document.title = serverThreads.currentThreadDeleted
+    document.title = currentThreadDeleted
       ? `会话已删除 — ${boundServerName}`
       : restoredThread === null
         ? `Codex Desktop Linux — ${boundServerName}`
         : `${threadDisplayTitle(restoredThread.metadata)} — ${boundServerName}`;
-  }, [boundServerName, restoredThread, serverThreads.currentThreadDeleted]);
+  }, [boundServerName, currentThreadDeleted, restoredThread]);
 
   useEffect(() => {
     if (shortcutStatus === null) return;
@@ -681,7 +805,7 @@ export function App({
   }, [shortcutStatus]);
 
   useEffect(() => {
-    setDraftCwd(null);
+    setDraftCwds(new Map());
   }, [boundServerId]);
 
   useEffect(() => {
@@ -716,6 +840,32 @@ export function App({
     windowReferenceSubscriber,
     windowReferenceSubscriptionAttempt,
   ]);
+
+  useEffect(() => {
+    if (windowId === null) {
+      return;
+    }
+    let disposed = false;
+    let release: (() => void) | null = null;
+    void windowStateSubscriber(windowState.applyExternalState).then(
+      (unsubscribe) => {
+        if (disposed) {
+          unsubscribe();
+        } else {
+          release = unsubscribe;
+        }
+      },
+      () => {
+        if (!disposed) {
+          setWindowActionError("无法同步标签状态，请重试");
+        }
+      },
+    );
+    return () => {
+      disposed = true;
+      release?.();
+    };
+  }, [windowId, windowState.applyExternalState, windowStateSubscriber]);
 
   useEffect(() => {
     let disposed = false;
@@ -761,11 +911,28 @@ export function App({
           profiles.reload();
         }
         if (target.threadId !== undefined) {
-          await windowState.updateSession(target.threadId);
+          await windowState.openTab(target.threadId);
         }
         setWindowActionError(null);
-      } catch {
-        setWindowActionError("无法打开深链目标，请重试");
+      } catch (error) {
+        if (
+          error instanceof WindowStateControllerError &&
+          error.code === "serverAlreadyOpen"
+        ) {
+          try {
+            await windowOpener({
+              serverId: target.serverId,
+              ...(target.threadId === undefined
+                ? {}
+                : { threadId: target.threadId }),
+            });
+            setWindowActionError(null);
+          } catch {
+            setWindowActionError("无法打开深链目标，请重试");
+          }
+        } else {
+          setWindowActionError("无法打开深链目标，请重试");
+        }
       } finally {
         deepLinkInFlightRef.current = false;
         setPendingDeepLink((current) => current === target ? null : current);
@@ -1183,10 +1350,38 @@ export function App({
       return;
     }
     setWindowActionError(null);
+    const sourceTabId = activeTabId;
+    const sourceWasBlank = currentThreadId === null;
     try {
-      await windowState.updateSession(threadId);
+      const state = await windowState.replaceActiveThread(threadId);
+      if (
+        sourceWasBlank &&
+        sourceTabId !== null &&
+        state.tabs.find(({ id }) => id === sourceTabId)?.threadId !== null
+      ) {
+        const key = transientDraftKey(
+          state.windowId,
+          state.serverId ?? null,
+          sourceTabId,
+        );
+        if (key !== null) {
+          tabDraftStore.discardTransient(key);
+        }
+      }
     } catch {
       setWindowActionError("无法打开会话，请重试");
+    }
+  };
+
+  const openThreadInNewTab = async (threadId: string): Promise<void> => {
+    if (windowState.status !== "ready") {
+      return;
+    }
+    setWindowActionError(null);
+    try {
+      await windowState.openTab(threadId);
+    } catch {
+      setWindowActionError("无法在新标签打开会话，请重试");
     }
   };
 
@@ -1197,13 +1392,95 @@ export function App({
       return;
     }
     setWindowActionError(null);
+    const targetTabId = activeTabId;
+    const sourceWasThread = currentThreadId !== null;
     const previousDraftCwd = draftCwd;
     setDraftCwd(targetCwd);
     try {
-      await windowState.updateSession(null);
+      const state = await windowState.replaceActiveThread(null);
+      if (sourceWasThread && targetTabId !== null) {
+        const key = transientDraftKey(
+          state.windowId,
+          state.serverId ?? null,
+          targetTabId,
+        );
+        if (key !== null) {
+          tabDraftStore.resetTransient(key);
+        }
+      }
     } catch {
-      setDraftCwd(previousDraftCwd);
+      if (targetTabId === activeTabId) {
+        setDraftCwd(previousDraftCwd);
+      }
       setWindowActionError("无法新建任务，请重试");
+    }
+  };
+
+  const openNewTab = useCallback(async (
+    targetCwd: string | null = restoredThread?.metadata.cwd ?? null,
+  ): Promise<void> => {
+    if (windowState.status !== "ready") {
+      return;
+    }
+    setWindowActionError(null);
+    try {
+      const state = await windowState.openTab();
+      if (state.activeTabId !== undefined && targetCwd !== null) {
+        setDraftCwds((current) => {
+          const next = new Map(current);
+          next.set(state.activeTabId!, targetCwd);
+          return next;
+        });
+      }
+    } catch {
+      setWindowActionError("无法新建会话标签，请重试");
+    }
+  }, [restoredThread?.metadata.cwd, windowState]);
+
+  const activateTab = async (tabId: string): Promise<void> => {
+    if (
+      windowState.status !== "ready" ||
+      conversation.submitting ||
+      tabId === activeTabId
+    ) {
+      return;
+    }
+    setWindowActionError(null);
+    try {
+      await windowState.activateTab(tabId);
+    } catch {
+      setWindowActionError("无法切换会话标签，请重试");
+    }
+  };
+
+  const closeTab = async (tabId: string): Promise<void> => {
+    if (windowState.status !== "ready" || conversation.submitting) {
+      return;
+    }
+    const tab = windowTabs.find(({ id }) => id === tabId);
+    setWindowActionError(null);
+    try {
+      await windowState.closeTab(tabId);
+      setDraftCwds((current) => {
+        if (!current.has(tabId)) {
+          return current;
+        }
+        const next = new Map(current);
+        next.delete(tabId);
+        return next;
+      });
+      if (tab?.threadId === null) {
+        const key = transientDraftKey(
+          windowState.windowState?.windowId ?? null,
+          boundServerId,
+          tabId,
+        );
+        if (key !== null) {
+          tabDraftStore.discardTransient(key);
+        }
+      }
+    } catch {
+      setWindowActionError("无法关闭会话标签，请重试");
     }
   };
 
@@ -1212,7 +1489,7 @@ export function App({
     setWindowActionError(null);
     void windowOpener({ serverId: boundServerId }).then(
       () => profiles.reload(),
-      () => setWindowActionError("无法在新窗口新建任务，请重试"),
+      () => setWindowActionError("无法打开服务器窗口，请重试"),
     );
   }, [boundServerId, profiles.reload, windowOpener]);
 
@@ -1238,7 +1515,64 @@ export function App({
       const editing = event.target instanceof HTMLElement && (
         event.target.matches("input, textarea, select") || event.target.isContentEditable
       );
-      if ((key === "/" && !event.shiftKey) || event.code === "Slash") {
+      if (
+        key === "tab" &&
+        activeTabId !== null &&
+        !conversation.submitting
+      ) {
+        event.preventDefault();
+        const target = adjacentTabId(
+          windowTabs,
+          activeTabId,
+          event.shiftKey ? -1 : 1,
+        );
+        if (target !== null) {
+          void windowState.activateTab(target);
+        }
+      } else if (
+        (event.key === "PageUp" || event.key === "PageDown") &&
+        activeTabId !== null &&
+        !conversation.submitting
+      ) {
+        event.preventDefault();
+        const target = adjacentTabId(
+          windowTabs,
+          activeTabId,
+          event.key === "PageDown" ? 1 : -1,
+        );
+        if (target !== null) {
+          void windowState.activateTab(target);
+        }
+      } else if (
+        !event.shiftKey &&
+        /^[1-9]$/u.test(key) &&
+        windowTabs.length > 0 &&
+        !conversation.submitting
+      ) {
+        event.preventDefault();
+        const index = key === "9"
+          ? windowTabs.length - 1
+          : Math.min(Number(key) - 1, windowTabs.length - 1);
+        const target = windowTabs[index];
+        if (target !== undefined) {
+          void windowState.activateTab(target.id);
+        }
+      } else if (
+        key === "t" &&
+        !event.shiftKey &&
+        !conversation.submitting
+      ) {
+        event.preventDefault();
+        void openNewTab();
+      } else if (
+        (key === "w" || event.key === "F4") &&
+        !event.shiftKey &&
+        activeTabId !== null &&
+        !conversation.submitting
+      ) {
+        event.preventDefault();
+        void closeTab(activeTabId);
+      } else if ((key === "/" && !event.shiftKey) || event.code === "Slash") {
         event.preventDefault();
         setKeyboardShortcutsOpen(true);
       } else if (key === ",") {
@@ -1253,7 +1587,12 @@ export function App({
           event.preventDefault();
           composer.focus();
         }
-      } else if (key === "n" && event.shiftKey && boundServerId !== null) {
+      } else if (
+        key === "n" &&
+        event.shiftKey &&
+        boundServerId !== null &&
+        !conversation.submitting
+      ) {
         event.preventDefault();
         openNewWindowTask();
       } else if (key === "k" && !event.shiftKey && !editing) {
@@ -1274,13 +1613,19 @@ export function App({
     return () => window.removeEventListener("keydown", handleGlobalShortcut);
   }, [
     boundServerId,
+    activeTabId,
     conversation.activeTurnId,
+    conversation.submitting,
     conversation.stop,
     conversation.stopping,
     displayedRestoredThread,
+    closeTab,
+    openNewTab,
     openNewWindowTask,
     openProtocolDebugger,
     protocolDebugEnabled,
+    windowState,
+    windowTabs,
   ]);
 
   const updatePreferences = (patch: Partial<AppPreferences>) => {
@@ -1316,20 +1661,37 @@ export function App({
       return;
     }
     setDeletingThreadId((current) => (current === threadId ? null : current));
-    if (
-      windowState.status === "ready" &&
-      (windowState.windowState?.currentThreadId ?? null) === threadId
-    ) {
+    const tab = windowState.windowState?.tabs.find(
+      (candidate) => candidate.threadId === threadId,
+    );
+    if (windowState.status === "ready" && tab !== undefined) {
       try {
-        await windowState.updateSession(null);
+        await windowState.closeTab(tab.id);
       } catch {
         setWindowActionError("会话已删除，但无法更新当前窗口状态");
       }
     }
   };
 
+  const archiveThread = async (threadId: string): Promise<void> => {
+    const archived = await serverThreads.archiveThread(threadId);
+    if (!archived) {
+      return;
+    }
+    const tab = windowState.windowState?.tabs.find(
+      (candidate) => candidate.threadId === threadId,
+    );
+    if (windowState.status === "ready" && tab !== undefined) {
+      try {
+        await windowState.closeTab(tab.id);
+      } catch {
+        setWindowActionError("会话已归档，但无法关闭对应标签");
+      }
+    }
+  };
+
   const forkThread = async (turnId: string): Promise<void> => {
-    const threadId = windowState.windowState?.currentThreadId ?? null;
+    const threadId = currentThreadId;
     if (
       connection.threadClient === null ||
       threadId === null ||
@@ -1342,7 +1704,7 @@ export function App({
     setForkError(null);
     try {
       const response = await connection.threadClient.forkThread(threadId, turnId).result;
-      await windowState.updateSession(response.thread.id);
+      await windowState.openTab(response.thread.id);
       setPendingForkTurnId(null);
     } catch {
       setForkError("无法创建会话分支，原会话未受影响，请重试");
@@ -1420,7 +1782,13 @@ export function App({
       appliedWindowServerRef.current = undefined;
       profiles.reload();
       return "started";
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof WindowStateControllerError &&
+        error.code === "serverAlreadyOpen"
+      ) {
+        return "cancelled";
+      }
       setWindowActionError("无法切换服务器，请重试");
       return "cancelled";
     }
@@ -1434,14 +1802,38 @@ export function App({
     );
   };
 
-  const openThreadInNewWindow = (threadId: string) => {
-    if (boundServerId === null) return;
-    setWindowActionError(null);
-    void windowOpener({ serverId: boundServerId, threadId }).then(
-      () => profiles.reload(),
-      () => setWindowActionError("无法在新窗口打开会话，请重试"),
-    );
-  };
+  const activePendingInteractions = currentThreadId === null
+    ? []
+    : serverInteractions.pending.filter(
+        ({ threadId }) => threadId === currentThreadId,
+      );
+  const tabViews = useMemo<readonly ThreadTabView[]>(
+    () => windowTabs.map((tab) => {
+      const thread = tab.threadId === null
+        ? undefined
+        : serverThreads.threads.find(({ id }) => id === tab.threadId);
+      const waiting = tab.threadId === null
+        ? undefined
+        : serverInteractions.pending.find(
+            ({ threadId }) => threadId === tab.threadId,
+          );
+      return {
+        id: tab.id,
+        title: tab.threadId === null
+          ? "新任务"
+          : thread === undefined
+            ? "正在恢复会话"
+            : threadDisplayTitle(thread),
+        ...(thread?.cwd ? { subtitle: getBasename(thread.cwd) } : {}),
+        ...(waiting === undefined
+          ? threadTabStatus(thread)
+          : { status: "approval" as const }),
+      };
+    }),
+    [serverInteractions.pending, serverThreads.threads, windowTabs],
+  );
+  const tabControlsDisabled =
+    windowState.status !== "ready" || conversation.submitting;
 
   const serverControl = (
     <ServerSwitcher
@@ -1470,6 +1862,27 @@ export function App({
 
   return (
     <>
+      {windowTabs.map((tab) => {
+        if (tab.threadId === null) {
+          return null;
+        }
+        const prepared = tabSessions.get(tab.id);
+        return (
+          <ThreadSubscription
+            client={connection.threadClient}
+            key={tab.id}
+            onChange={updateTabSession}
+            preparedState={
+              prepared?.preparedClient === connection.threadClient &&
+                prepared.threadId === tab.threadId
+                ? prepared.state
+                : null
+            }
+            tabId={tab.id}
+            threadId={tab.threadId}
+          />
+        );
+      })}
       <WindowResizeHandles />
       <ConnectionShell
         announcement={shortcutStatus}
@@ -1477,7 +1890,7 @@ export function App({
         backgroundCommandCounts={backgroundTerminals.counts}
         contentSubtitle={contentSubtitle}
         contentTitle={contentTitle}
-        currentThreadId={windowState.windowState?.currentThreadId ?? null}
+        currentThreadId={currentThreadId}
         draftThreadIds={draftThreadIds}
         hasMoreThreads={serverThreads.nextThreadCursor !== null}
         loadingMoreThreads={serverThreads.loadingMoreThreads}
@@ -1486,28 +1899,29 @@ export function App({
             composer={
               connection.view.phase === "ready" && (
                 restoredThread !== null ||
-                windowState.windowState?.currentThreadId === undefined
+                currentThreadId === null
               ) ? (
                 <Composer
                   activeTurn={conversation.activeTurnId !== null}
                   capabilitiesError={composerCapabilities.error}
                   canRunImmediateCommands={
-                    (windowState.windowState?.currentThreadId ?? null) !== null
+                    currentThreadId !== null
                   }
                   cwd={composerCwd}
                   draftKey={composerDraftKey(
                     windowState.windowState?.windowId ?? null,
                     boundServerId,
-                    windowState.windowState?.currentThreadId ?? null,
+                    activeTabId,
+                    currentThreadId,
                   )}
-                  draftStore={draftStore}
+                  draftStore={tabDraftStore}
                   error={conversation.error}
                   interactionPanel={
                     <>
                       <ApprovalPanel
                         onOpenLink={openContentLink}
                         onRespond={serverInteractions.respond}
-                        pending={serverInteractions.pending}
+                        pending={activePendingInteractions}
                         resolvedElsewhereCount={serverInteractions.resolvedElsewhereCount}
                       />
                       <BackgroundCommandPanel
@@ -1564,7 +1978,7 @@ export function App({
                   recentCwds={recentCwds}
                   skills={composerCapabilities.skills}
                   skillsLoading={composerCapabilities.skillsLoading}
-                  showProjectPicker={windowState.windowState?.currentThreadId === undefined}
+                  showProjectPicker={currentThreadId === null}
                   stopping={conversation.stopping}
                   submitting={conversation.submitting}
                 />
@@ -1574,12 +1988,14 @@ export function App({
             {displayedRestoredThread !== null ? (
               <ConversationView
                 actionError={
-                  forkError ?? contentError ?? serverThreads.threadRestoreError
+                  forkError ?? contentError ?? threadRestoreError
                 }
                 commandLocationRequest={commandLocationRequest}
                 onOpenDiff={openDiff}
                 onOpenLink={openContentLink}
-                {...(serverThreads.offline ? {} : { onForkTurn: (turnId: string, isLatest: boolean) => {
+                {...(serverThreads.offline || activeThreadSession?.offline
+                  ? {}
+                  : { onForkTurn: (turnId: string, isLatest: boolean) => {
                   setForkError(null);
                   if (isLatest) {
                     void forkThread(turnId);
@@ -1592,11 +2008,11 @@ export function App({
             ) : (
               <ConversationPlaceholder
                 kind={
-                  serverThreads.currentThreadDeleted
+                  currentThreadDeleted
                     ? "deleted"
-                    : windowState.windowState?.currentThreadId === undefined
+                    : currentThreadId === null
                       ? "blank"
-                      : serverThreads.threadRestorePhase === "error"
+                      : threadRestorePhase === "error"
                         ? "error"
                         : "loading"
                 }
@@ -1605,7 +2021,7 @@ export function App({
             )}
           </ConversationWorkspace>
         }
-        onArchiveThread={(threadId) => void serverThreads.archiveThread(threadId)}
+        onArchiveThread={(threadId) => void archiveThread(threadId)}
         onDeleteThread={setDeletingThreadId}
         onLoadMoreThreads={() => void serverThreads.loadMoreThreads()}
         onLoadProjectThreads={serverThreads.loadProjectThreads}
@@ -1614,7 +2030,7 @@ export function App({
         onRefreshThreads={() => void serverThreads.refreshThreads()}
         onSearchThreads={() => setQuickSwitcherOpen(true)}
         onOpenThread={(threadId) => void openThread(threadId)}
-        onOpenThreadInNewWindow={openThreadInNewWindow}
+        onOpenThreadInNewTab={(threadId) => void openThreadInNewTab(threadId)}
         onUndoArchive={() => void serverThreads.undoArchive()}
         pendingThreadIds={serverThreads.pendingThreadIds}
         removingThreadIds={serverThreads.removingThreadIds}
@@ -1646,6 +2062,18 @@ export function App({
         threadListError={serverThreads.threadListError}
         threadListPhase={serverThreads.threadListPhase}
         threads={serverThreads.threads}
+        topbarNavigation={
+          boundServerId === null ? null : (
+            <ThreadTabs
+              activeTabId={activeTabId}
+              disabled={tabControlsDisabled}
+              onActivate={(tabId) => void activateTab(tabId)}
+              onClose={(tabId) => void closeTab(tabId)}
+              onNew={() => void openNewTab()}
+              tabs={tabViews}
+            />
+          )
+        }
         topbarAccessory={
           <RateLimitIndicator
             data={accountRateLimits.data}
@@ -1790,7 +2218,7 @@ export function App({
       />
 
       <ThreadQuickSwitcher
-        currentThreadId={windowState.windowState?.currentThreadId ?? null}
+        currentThreadId={currentThreadId}
         onClose={() => setQuickSwitcherOpen(false)}
         onOpenThread={(threadId) => void openThread(threadId)}
         open={quickSwitcherOpen}
@@ -1948,15 +2376,30 @@ export function recentWorkingDirectories(
 function composerDraftKey(
   windowId: string | null,
   serverId: string | null,
+  tabId: string | null,
   threadId: string | null,
 ): string | null {
+  if (threadId === null) {
+    return transientDraftKey(windowId, serverId, tabId);
+  }
   const keyPrefix = composerDraftKeyPrefix(windowId, serverId);
   return keyPrefix === null
     ? null
-    : `${keyPrefix}${threadId ?? "new"}`;
+    : `${keyPrefix}${threadId}`;
+}
+
+function transientDraftKey(
+  windowId: string | null,
+  serverId: string | null,
+  tabId: string | null,
+): string | null {
+  return windowId === null || serverId === null || tabId === null
+    ? null
+    : `transient:${windowId}:${serverId}:${tabId}`;
 }
 
 const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();
+const EMPTY_WINDOW_TABS: readonly WindowTab[] = Object.freeze([]);
 
 function composerDraftKeyPrefix(
   windowId: string | null,
@@ -1984,4 +2427,94 @@ function getBasename(path: string): string {
     return trimmed;
   }
   return trimmed.slice(index + 1);
+}
+
+interface TabThreadSession {
+  readonly threadId: string;
+  readonly state: ThreadSessionState;
+  readonly preparedClient: ServerThreadsClient | null;
+}
+
+function ThreadSubscription({
+  client,
+  onChange,
+  preparedState,
+  tabId,
+  threadId,
+}: {
+  readonly client: ServerThreadsClient | null;
+  readonly onChange: (
+    tabId: string,
+    threadId: string,
+    state: ThreadSessionState | null,
+  ) => void;
+  readonly preparedState: ThreadSessionState | null;
+  readonly tabId: string;
+  readonly threadId: string;
+}) {
+  const session = useThreadSession(client, threadId, preparedState);
+
+  useEffect(() => {
+    onChange(tabId, threadId, session);
+  }, [onChange, session, tabId, threadId]);
+
+  useEffect(() => () => {
+    onChange(tabId, threadId, null);
+  }, [onChange, tabId, threadId]);
+
+  return null;
+}
+
+function startedThreadSession(
+  response: ThreadStartResponse,
+): ThreadSessionState {
+  return Object.freeze({
+    phase: "ready",
+    restoredThread: Object.freeze({
+      metadata: response.thread,
+      modelSettings: Object.freeze({
+        effort: response.reasoningEffort ?? null,
+        model: response.model,
+        serviceTier: response.serviceTier ?? null,
+      }),
+      turns: Object.freeze([]),
+    }),
+    resumedThreadId: response.thread.id,
+    deleted: false,
+    offline: false,
+    error: null,
+  });
+}
+
+function adjacentTabId(
+  tabs: readonly WindowTab[],
+  activeTabId: string,
+  direction: 1 | -1,
+): string | null {
+  if (tabs.length < 2) {
+    return null;
+  }
+  const activeIndex = tabs.findIndex(({ id }) => id === activeTabId);
+  const index = activeIndex < 0
+    ? direction === 1 ? 0 : tabs.length - 1
+    : (activeIndex + direction + tabs.length) % tabs.length;
+  return tabs[index]?.id ?? null;
+}
+
+function threadTabStatus(
+  thread: ThreadSummary | undefined,
+): Pick<ThreadTabView, "status"> {
+  if (thread?.status.type === "systemError") {
+    return { status: "error" };
+  }
+  if (thread?.status.type !== "active") {
+    return {};
+  }
+  if (thread.status.activeFlags.includes("waitingOnApproval")) {
+    return { status: "approval" };
+  }
+  if (thread.status.activeFlags.includes("waitingOnUserInput")) {
+    return { status: "input" };
+  }
+  return { status: "running" };
 }

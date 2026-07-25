@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createDraftStore, parseDraftKeys, parseStoredDraft } from "./drafts";
+import {
+  createDraftStore,
+  createTransientDraftStore,
+  parseDraftKeys,
+  parseStoredDraft,
+} from "./drafts";
+import type { DraftStore } from "./drafts";
 import type { TauriIpc } from "./tauriIpc";
 
 describe("DraftStore", () => {
@@ -105,6 +111,51 @@ describe("DraftStore", () => {
       "transition_draft",
       "load_draft",
     ]);
+  });
+
+  it("空白标签草稿只保存在内存并在绑定会话时转入持久存储", async () => {
+    const persistent: DraftStore = {
+      listKeys: vi.fn(async () => ["main:server:thread-a"]),
+      load: vi.fn(async () => null),
+      save: vi.fn(async () => undefined),
+      delete: vi.fn(async () => undefined),
+      transition: vi.fn(async () => undefined),
+    };
+    const store = createTransientDraftStore(persistent);
+    const transientKey = "transient:main:server:tab-a";
+    const draft = {
+      text: "尚未发送",
+      tokens: [{ type: "mention", name: "README", path: "/workspace/README.md" }],
+    } as const;
+
+    await store.save(transientKey, draft);
+    await expect(store.load(transientKey)).resolves.toEqual(draft);
+    await expect(store.listKeys("transient:main:server:")).resolves.toEqual([
+      transientKey,
+    ]);
+    expect(persistent.save).not.toHaveBeenCalled();
+    expect(persistent.listKeys).not.toHaveBeenCalled();
+
+    await store.transition(
+      transientKey,
+      "main:server:thread-b",
+      draft,
+    );
+
+    await expect(store.load(transientKey)).resolves.toBeNull();
+    expect(persistent.save).toHaveBeenCalledWith(
+      "main:server:thread-b",
+      draft,
+    );
+
+    await store.save(transientKey, draft);
+    store.discardTransient(transientKey);
+    await store.save(transientKey, { text: "延迟保存", tokens: [] });
+    await expect(store.load(transientKey)).resolves.toBeNull();
+
+    store.resetTransient(transientKey);
+    await store.save(transientKey, draft);
+    await expect(store.load(transientKey)).resolves.toEqual(draft);
   });
 
   it("拒绝带额外字段或未知类型的草稿令牌", () => {

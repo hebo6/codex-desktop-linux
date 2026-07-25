@@ -31,18 +31,14 @@
 | 查找 | `Ctrl+F` |
 | 后退 | `Ctrl+[`、`Mouse Back` |
 | 前进 | `Ctrl+]`、`Mouse Forward` |
-| 下一个最近查看的会话 | `Ctrl+Tab` |
-| 下一个标签页 | `Ctrl+Tab`、`Ctrl+Shift+]`、`Ctrl+PageDown` |
-| 下一个会话 | `Ctrl+Shift+]`、`Ctrl+PageDown` |
-| 上一个最近查看的会话 | `Ctrl+Shift+Tab` |
-| 上一个标签页 | `Ctrl+Shift+Tab`、`Ctrl+Shift+[`、`Ctrl+PageUp` |
-| 上一个会话 | `Ctrl+Shift+[`、`Ctrl+PageUp` |
+| 下一个标签页 | `Ctrl+Tab`、`Ctrl+PageDown` |
+| 上一个标签页 | `Ctrl+Shift+Tab`、`Ctrl+PageUp` |
 
 ### 面板
 
 | 功能 | 快捷键 |
 | --- | --- |
-| 打开浏览器标签页 | `Ctrl+T` |
+| 新建会话标签 | `Ctrl+T` |
 | 切换底部面板 | `Ctrl+J` |
 | 切换浏览器面板 | `Ctrl+Shift+B` |
 | 切换侧边栏 | `Ctrl+B` |
@@ -67,7 +63,7 @@
 
 | 功能 | 快捷键 |
 | --- | --- |
-| 关闭标签页 | `Ctrl+W`、`Ctrl+F4` |
+| 关闭当前标签 | `Ctrl+W`、`Ctrl+F4` |
 | 打开模型选择器 | `Ctrl+Shift+M` |
 | 复制深链 | `Ctrl+Alt+L` |
 | 复制会话 ID | `Ctrl+Alt+C` |
@@ -79,15 +75,15 @@
 | 重命名会话 | `Ctrl+Alt+R` |
 | 搜索文件… | `Ctrl+P` |
 | 显示键盘快捷键 | `Ctrl+/` |
-| 转到会话 1 | `Ctrl+1` |
-| 转到会话 2 | `Ctrl+2` |
-| 转到会话 3 | `Ctrl+3` |
-| 转到会话 4 | `Ctrl+4` |
-| 转到会话 5 | `Ctrl+5` |
-| 转到会话 6 | `Ctrl+6` |
-| 转到会话 7 | `Ctrl+7` |
-| 转到会话 8 | `Ctrl+8` |
-| 转到会话 9 | `Ctrl+9` |
+| 转到标签 1 | `Ctrl+1` |
+| 转到标签 2 | `Ctrl+2` |
+| 转到标签 3 | `Ctrl+3` |
+| 转到标签 4 | `Ctrl+4` |
+| 转到标签 5 | `Ctrl+5` |
+| 转到标签 6 | `Ctrl+6` |
+| 转到标签 7 | `Ctrl+7` |
+| 转到标签 8 | `Ctrl+8` |
+| 转到最后一个标签 | `Ctrl+9` |
 | 切换文件树 | `Ctrl+Shift+E` |
 
 快捷键不得破坏文本编辑器中的常见编辑操作

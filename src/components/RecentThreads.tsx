@@ -47,7 +47,7 @@ export interface RecentThreadsProps {
   ) => Promise<ProjectThreadPage>;
   readonly onNewTaskInProject?: (cwd: string) => void;
   readonly onOpenThread: (threadId: string) => void;
-  readonly onOpenThreadInNewWindow?: (threadId: string) => void;
+  readonly onOpenThreadInNewTab?: (threadId: string) => void;
   readonly onUndoArchive: () => void;
   readonly phase: ServerThreadsPhase;
   readonly threads: readonly ThreadSummary[];
@@ -125,7 +125,7 @@ export function RecentThreads({
   onLoadProjectThreads,
   onNewTaskInProject,
   onOpenThread,
-  onOpenThreadInNewWindow,
+  onOpenThreadInNewTab,
   onUndoArchive,
   phase,
   threads,
@@ -534,7 +534,7 @@ export function RecentThreads({
                         navigate(entry.thread.id, direction)
                       }
                       onOpen={() => onOpenThread(entry.thread.id)}
-                      {...(onOpenThreadInNewWindow === undefined
+                      {...(onOpenThreadInNewTab === undefined
                         ? {}
                         : {
                             onOpenContextMenu: (x: number, y: number) =>
@@ -544,8 +544,8 @@ export function RecentThreads({
                                 x,
                                 y,
                               }),
-                            onOpenInNewWindow: () =>
-                              onOpenThreadInNewWindow(entry.thread.id),
+                            onOpenInNewTab: () =>
+                              onOpenThreadInNewTab(entry.thread.id),
                           })}
                       thread={entry.thread}
                     />
@@ -602,7 +602,7 @@ export function RecentThreads({
           </button>
         </div>
       )}
-      {contextMenu === null || onOpenThreadInNewWindow === undefined
+      {contextMenu === null || onOpenThreadInNewTab === undefined
         ? null
         : createPortal(
             <div
@@ -615,13 +615,13 @@ export function RecentThreads({
               <button
                 autoFocus
                 onClick={() => {
-                  onOpenThreadInNewWindow(contextMenu.threadId);
+                  onOpenThreadInNewTab(contextMenu.threadId);
                   setContextMenu(null);
                 }}
                 role="menuitem"
                 type="button"
               >
-                在新窗口打开
+                在新标签打开
               </button>
             </div>,
             document.body,
@@ -687,7 +687,7 @@ function ThreadRow({
   onNavigate,
   onOpen,
   onOpenContextMenu,
-  onOpenInNewWindow,
+  onOpenInNewTab,
   thread,
 }: {
   readonly backgroundCommandCount: number;
@@ -700,7 +700,7 @@ function ThreadRow({
   readonly onNavigate: (direction: 1 | -1) => void;
   readonly onOpen: () => void;
   readonly onOpenContextMenu?: (x: number, y: number) => void;
-  readonly onOpenInNewWindow?: () => void;
+  readonly onOpenInNewTab?: () => void;
   readonly thread: ThreadSummary;
 }) {
   const title = threadTitle(thread);
@@ -716,9 +716,9 @@ function ThreadRow({
         data-thread-id={thread.id}
         disabled={disabled}
         onAuxClick={(event) => {
-          if (event.button === 1 && onOpenInNewWindow !== undefined) {
+          if (event.button === 1 && onOpenInNewTab !== undefined) {
             event.preventDefault();
-            onOpenInNewWindow();
+            onOpenInNewTab();
           }
         }}
         onContextMenu={(event) => {
@@ -744,7 +744,13 @@ function ThreadRow({
             onNavigate(event.key === "ArrowDown" ? 1 : -1);
           }
         }}
-        onClick={onOpen}
+        onClick={(event) => {
+          if (event.ctrlKey && onOpenInNewTab !== undefined) {
+            onOpenInNewTab();
+          } else {
+            onOpen();
+          }
+        }}
         title={`${title}\n${thread.cwd}`}
         type="button"
       >

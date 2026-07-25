@@ -10,7 +10,7 @@ describe("KeyboardShortcutsDialog", () => {
     );
 
     expect(screen.getByRole("dialog", { name: "键盘快捷键" })).toBeVisible();
-    expect(screen.getByText("切换到上一个会话")).toBeVisible();
+    expect(screen.getByText("切换到上一个标签")).toBeVisible();
     expect(screen.getByText("Ctrl+PageUp")).toBeVisible();
     expect(screen.getByText("停止正在进行中的会话")).toBeVisible();
     expect(screen.getByText("打开项目选择器（仅新会话）")).toBeVisible();

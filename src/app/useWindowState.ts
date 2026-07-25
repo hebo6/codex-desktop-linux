@@ -4,11 +4,13 @@ import type { ServerId } from "../configuration";
 import {
   bindWindowServer,
   loadWindowState,
-  updateWindowSession,
+  updateWindowTabs,
+  WindowStateTransportError,
 } from "../transport/windowState";
 import type {
   BindWindowServerRequest,
-  UpdateWindowSessionRequest,
+  UpdateWindowTabsRequest,
+  WindowTab,
   WindowState,
 } from "../transport/windowState";
 
@@ -26,21 +28,24 @@ export interface WindowStateSnapshot {
 export interface WindowStateControls extends WindowStateSnapshot {
   readonly reload: () => void;
   readonly bindServer: (serverId: ServerId | null) => Promise<WindowState>;
-  readonly updateSession: (
-    currentThreadId: string | null,
-  ) => Promise<WindowState>;
+  readonly replaceActiveThread: (threadId: string | null) => Promise<WindowState>;
+  readonly openTab: (threadId?: string | null) => Promise<WindowState>;
+  readonly activateTab: (tabId: string) => Promise<WindowState>;
+  readonly closeTab: (tabId: string) => Promise<WindowState>;
+  readonly attachThread: (tabId: string, threadId: string) => Promise<WindowState>;
+  readonly applyExternalState: (state: WindowState) => void;
 }
 
 export interface WindowStateControllerOptions {
   readonly loader?: () => Promise<WindowState>;
   readonly binder?: (request: BindWindowServerRequest) => Promise<WindowState>;
-  readonly sessionUpdater?: (
-    request: UpdateWindowSessionRequest,
+  readonly tabsUpdater?: (
+    request: UpdateWindowTabsRequest,
   ) => Promise<WindowState>;
 }
 
 export type WindowStateControllerErrorCode =
-  "stateUnavailable" | "operationFailed";
+  "stateUnavailable" | "operationFailed" | "serverAlreadyOpen";
 
 export class WindowStateControllerError extends Error {
   readonly code: WindowStateControllerErrorCode;
@@ -68,8 +73,26 @@ type WindowMutation =
       readonly serverId: ServerId | null;
     }
   | {
-      readonly type: "updateSession";
-      readonly currentThreadId: string | null;
+      readonly type: "replaceActiveThread";
+      readonly threadId: string | null;
+    }
+  | {
+      readonly type: "openTab";
+      readonly tab: WindowTab;
+    }
+  | {
+      readonly type: "activateTab";
+      readonly tabId: string;
+    }
+  | {
+      readonly type: "closeTab";
+      readonly tabId: string;
+      readonly replacementTabId: string;
+    }
+  | {
+      readonly type: "attachThread";
+      readonly tabId: string;
+      readonly threadId: string;
     };
 
 export class WindowStateController {
@@ -77,8 +100,8 @@ export class WindowStateController {
   private readonly binder: (
     request: BindWindowServerRequest,
   ) => Promise<WindowState>;
-  private readonly sessionUpdater: (
-    request: UpdateWindowSessionRequest,
+  private readonly tabsUpdater: (
+    request: UpdateWindowTabsRequest,
   ) => Promise<WindowState>;
   private readonly listeners = new Set<() => void>();
 
@@ -94,7 +117,7 @@ export class WindowStateController {
   constructor(options: WindowStateControllerOptions = DEFAULT_OPTIONS) {
     this.loader = options.loader ?? loadWindowState;
     this.binder = options.binder ?? bindWindowServer;
-    this.sessionUpdater = options.sessionUpdater ?? updateWindowSession;
+    this.tabsUpdater = options.tabsUpdater ?? updateWindowTabs;
   }
 
   readonly getSnapshot = (): WindowStateSnapshot => this.snapshotValue;
@@ -133,13 +156,49 @@ export class WindowStateController {
   readonly bindServer = (serverId: ServerId | null): Promise<WindowState> =>
     this.enqueueMutation({ type: "bindServer", serverId });
 
-  readonly updateSession = (
-    currentThreadId: string | null,
-  ): Promise<WindowState> =>
+  readonly replaceActiveThread = (threadId: string | null): Promise<WindowState> =>
+    this.enqueueMutation({ type: "replaceActiveThread", threadId });
+
+  readonly openTab = (threadId: string | null = null): Promise<WindowState> =>
     this.enqueueMutation({
-      type: "updateSession",
-      currentThreadId,
+      type: "openTab",
+      tab: Object.freeze({ id: crypto.randomUUID(), threadId }),
     });
+
+  readonly activateTab = (tabId: string): Promise<WindowState> =>
+    this.enqueueMutation({ type: "activateTab", tabId });
+
+  readonly closeTab = (tabId: string): Promise<WindowState> =>
+    this.enqueueMutation({
+      type: "closeTab",
+      tabId,
+      replacementTabId: crypto.randomUUID(),
+    });
+
+  readonly attachThread = (
+    tabId: string,
+    threadId: string,
+  ): Promise<WindowState> =>
+    this.enqueueMutation({ type: "attachThread", tabId, threadId });
+
+  readonly applyExternalState = (state: WindowState): void => {
+    const current = this.authoritativeState;
+    if (
+      this.disposed ||
+      current === null ||
+      state.windowId !== current.windowId ||
+      state.version <= current.version
+    ) {
+      return;
+    }
+    this.loadGeneration += 1;
+    this.authoritativeState = state;
+    this.publish(
+      this.pendingMutationCount > 0 ? "updating" : "ready",
+      state,
+      null,
+    );
+  };
 
   retain(): () => void {
     if (this.disposed) {
@@ -205,8 +264,12 @@ export class WindowStateController {
       try {
         const state = await this.executeMutation(mutation);
         resolveOperation(state);
-      } catch {
-        rejectOperation(new WindowStateControllerError("operationFailed"));
+      } catch (error) {
+        rejectOperation(
+          error instanceof WindowStateControllerError
+            ? error
+            : new WindowStateControllerError("operationFailed"),
+        );
       } finally {
         this.pendingMutationCount -= 1;
       }
@@ -222,7 +285,13 @@ export class WindowStateController {
     if (this.disposed || previous === null) {
       throw new WindowStateControllerError("stateUnavailable");
     }
-    if (mutationMatchesState(previous, mutation)) {
+    const tabsMutation =
+      mutation.type === "bindServer" ? null : applyTabsMutation(previous, mutation);
+    if (
+      mutation.type === "bindServer"
+        ? mutationMatchesState(previous, mutation)
+        : tabsMutation === null
+    ) {
       if (!this.disposed) {
         this.publish(
           this.pendingMutationCount > 1 ? "updating" : "ready",
@@ -241,12 +310,26 @@ export class WindowStateController {
               expectedVersion: previous.version,
               serverId: mutation.serverId,
             })
-          : await this.sessionUpdater({
+          : await this.tabsUpdater({
               expectedVersion: previous.version,
-              currentThreadId: mutation.currentThreadId,
+              tabs: tabsMutation!.tabs,
+              activeTabId: tabsMutation!.activeTabId,
             });
       assertMutationResult(previous, next, mutation);
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof WindowStateTransportError &&
+        error.code === "serverAlreadyOpen"
+      ) {
+        if (!this.disposed) {
+          this.publish(
+            this.pendingMutationCount > 1 ? "updating" : "ready",
+            previous,
+            null,
+          );
+        }
+        throw new WindowStateControllerError("serverAlreadyOpen");
+      }
       this.authoritativeState = null;
       if (!this.disposed) {
         this.publish(
@@ -314,7 +397,7 @@ function mutationMatchesState(
 ): boolean {
   return mutation.type === "bindServer"
     ? (state.serverId ?? null) === mutation.serverId
-    : (state.currentThreadId ?? null) === mutation.currentThreadId;
+    : false;
 }
 
 export function useWindowState(
@@ -334,7 +417,12 @@ export function useWindowState(
       ...snapshot,
       reload: controller.reload,
       bindServer: controller.bindServer,
-      updateSession: controller.updateSession,
+      replaceActiveThread: controller.replaceActiveThread,
+      openTab: controller.openTab,
+      activateTab: controller.activateTab,
+      closeTab: controller.closeTab,
+      attachThread: controller.attachThread,
+      applyExternalState: controller.applyExternalState,
     }),
     [controller, snapshot],
   );
@@ -353,16 +441,141 @@ function assertMutationResult(
     throw new WindowStateControllerError("operationFailed");
   }
   if (
-    mutation.type === "updateSession" &&
-    (next.serverId !== previous.serverId ||
-      (next.currentThreadId ?? null) !== mutation.currentThreadId)
-  ) {
-    throw new WindowStateControllerError("operationFailed");
-  }
-  if (
     mutation.type === "bindServer" &&
     (next.serverId ?? null) !== mutation.serverId
   ) {
     throw new WindowStateControllerError("operationFailed");
   }
+  if (mutation.type !== "bindServer") {
+    const expected = applyTabsMutation(previous, mutation);
+    if (
+      expected === null ||
+      next.serverId !== previous.serverId ||
+      next.activeTabId !== expected.activeTabId ||
+      !sameTabs(next.tabs, expected.tabs)
+    ) {
+      throw new WindowStateControllerError("operationFailed");
+    }
+  }
+}
+
+interface TabsMutationResult {
+  readonly tabs: readonly WindowTab[];
+  readonly activeTabId: string;
+}
+
+function applyTabsMutation(
+  state: WindowState,
+  mutation: Exclude<WindowMutation, { readonly type: "bindServer" }>,
+): TabsMutationResult | null {
+  const activeTabId = state.activeTabId;
+  if (state.serverId === undefined || activeTabId === undefined) {
+    throw new WindowStateControllerError("stateUnavailable");
+  }
+  switch (mutation.type) {
+    case "replaceActiveThread": {
+      const existing = mutation.threadId === null
+        ? undefined
+        : state.tabs.find(({ threadId }) => threadId === mutation.threadId);
+      if (existing !== undefined) {
+        return existing.id === activeTabId
+          ? null
+          : { tabs: state.tabs, activeTabId: existing.id };
+      }
+      const tabs = state.tabs.map((tab) =>
+        tab.id === activeTabId
+          ? Object.freeze({ ...tab, threadId: mutation.threadId })
+          : tab
+      );
+      return sameTabs(tabs, state.tabs)
+        ? null
+        : { tabs: Object.freeze(tabs), activeTabId };
+    }
+    case "openTab": {
+      const existing = mutation.tab.threadId === null
+        ? undefined
+        : state.tabs.find(({ threadId }) => threadId === mutation.tab.threadId);
+      if (existing !== undefined) {
+        return existing.id === activeTabId
+          ? null
+          : { tabs: state.tabs, activeTabId: existing.id };
+      }
+      const activeIndex = state.tabs.findIndex(({ id }) => id === activeTabId);
+      const insertionIndex = activeIndex < 0 ? state.tabs.length : activeIndex + 1;
+      return {
+        tabs: Object.freeze([
+          ...state.tabs.slice(0, insertionIndex),
+          mutation.tab,
+          ...state.tabs.slice(insertionIndex),
+        ]),
+        activeTabId: mutation.tab.id,
+      };
+    }
+    case "activateTab":
+      if (!state.tabs.some(({ id }) => id === mutation.tabId)) {
+        throw new WindowStateControllerError("operationFailed");
+      }
+      return mutation.tabId === activeTabId
+        ? null
+        : { tabs: state.tabs, activeTabId: mutation.tabId };
+    case "closeTab": {
+      const index = state.tabs.findIndex(({ id }) => id === mutation.tabId);
+      if (index < 0) {
+        return null;
+      }
+      if (state.tabs.length === 1) {
+        const tab = Object.freeze({
+          id: mutation.replacementTabId,
+          threadId: null,
+        });
+        return { tabs: Object.freeze([tab]), activeTabId: tab.id };
+      }
+      const tabs = Object.freeze(state.tabs.filter(({ id }) => id !== mutation.tabId));
+      if (mutation.tabId !== activeTabId) {
+        return { tabs, activeTabId };
+      }
+      const next = tabs[index] ?? tabs[index - 1];
+      if (next === undefined) {
+        throw new WindowStateControllerError("operationFailed");
+      }
+      return { tabs, activeTabId: next.id };
+    }
+    case "attachThread": {
+      const source = state.tabs.find(({ id }) => id === mutation.tabId);
+      if (source === undefined) {
+        throw new WindowStateControllerError("operationFailed");
+      }
+      const existing = state.tabs.find(
+        ({ id, threadId }) => id !== mutation.tabId && threadId === mutation.threadId,
+      );
+      if (existing !== undefined) {
+        const tabs = Object.freeze(
+          state.tabs.filter(({ id }) => id !== mutation.tabId),
+        );
+        return { tabs, activeTabId: existing.id };
+      }
+      if (source.threadId === mutation.threadId) {
+        return null;
+      }
+      return {
+        tabs: Object.freeze(state.tabs.map((tab) =>
+          tab.id === mutation.tabId
+            ? Object.freeze({ ...tab, threadId: mutation.threadId })
+            : tab
+        )),
+        activeTabId,
+      };
+    }
+  }
+}
+
+function sameTabs(
+  left: readonly WindowTab[],
+  right: readonly WindowTab[],
+): boolean {
+  return left.length === right.length && left.every(
+    (tab, index) =>
+      tab.id === right[index]?.id &&
+      tab.threadId === right[index]?.threadId,
+  );
 }

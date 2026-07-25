@@ -46,8 +46,9 @@ import {
 import { connectionReducer } from "./store/connectionSlice";
 import type { ServerNotification } from "./protocol/generated";
 import type {
-  UpdateWindowSessionRequest,
+  UpdateWindowTabsRequest,
   WindowServerReferenceSubscriber,
+  WindowStateSubscriber,
   WindowState,
 } from "./transport/windowState";
 import type { DeepLinkTargetSubscriber } from "./transport/deepLink";
@@ -157,6 +158,7 @@ function renderApp(
     readonly windowStateOptions?: WindowStateControllerOptions;
     readonly windowOpener?: AppWindowOpener;
     readonly windowReferenceSubscriber?: WindowServerReferenceSubscriber;
+    readonly windowStateSubscriber?: WindowStateSubscriber;
     readonly deepLinkSubscriber?: DeepLinkTargetSubscriber;
     readonly configuredServerStatusSubscriber?: ConfiguredServerStatusSubscriber;
     readonly draftStore?: DraftStore;
@@ -170,6 +172,7 @@ function renderApp(
   let authoritativeWindowState: WindowState = {
     windowId: "main",
     version: 1,
+    tabs: [],
     updatedAtMs: 1,
   };
   const windowStateOptions: WindowStateControllerOptions =
@@ -183,7 +186,23 @@ function renderApp(
           windowId: authoritativeWindowState.windowId,
           version: authoritativeWindowState.version + 1,
           updatedAtMs: authoritativeWindowState.updatedAtMs + 1,
-          ...(serverId === null ? {} : { serverId }),
+          ...(serverId === null
+            ? { tabs: [] }
+            : {
+                serverId,
+                tabs: [{ id: "tab-1", threadId: null }],
+                activeTabId: "tab-1",
+              }),
+        };
+        return authoritativeWindowState;
+      }),
+      tabsUpdater: vi.fn(async ({ tabs, activeTabId }: UpdateWindowTabsRequest) => {
+        authoritativeWindowState = {
+          ...authoritativeWindowState,
+          version: authoritativeWindowState.version + 1,
+          updatedAtMs: authoritativeWindowState.updatedAtMs + 1,
+          tabs,
+          activeTabId,
         };
         return authoritativeWindowState;
       }),
@@ -217,6 +236,10 @@ function renderApp(
         windowOpener={windowOpener}
         windowReferenceSubscriber={
           options.windowReferenceSubscriber ??
+          (async () => () => undefined)
+        }
+        windowStateSubscriber={
+          options.windowStateSubscriber ??
           (async () => () => undefined)
         }
         deepLinkSubscriber={
@@ -377,13 +400,12 @@ describe("App", () => {
       },
       subscribeNotifications: () => () => undefined,
     };
-    const sessionUpdater = vi.fn(async (request: UpdateWindowSessionRequest) => ({
+    const tabsUpdater = vi.fn(async (request: UpdateWindowTabsRequest) => ({
       windowId: "main",
       version: request.expectedVersion + 1,
       serverId: SERVER_ID,
-      ...(request.currentThreadId === null
-        ? {}
-        : { currentThreadId: request.currentThreadId }),
+      tabs: request.tabs,
+      activeTabId: request.activeTabId,
       updatedAtMs: 2,
     }));
     const sessionFactory: ConfiguredServerSessionFactory = (options) => ({
@@ -416,10 +438,11 @@ describe("App", () => {
           windowId: "main",
           version: 1,
           serverId: SERVER_ID,
-          currentThreadId: thread.id,
+          tabs: [{ id: "tab-current", threadId: thread.id }],
+          activeTabId: "tab-current",
           updatedAtMs: 1,
         })),
-        sessionUpdater,
+        tabsUpdater,
       },
     });
 
@@ -432,9 +455,10 @@ describe("App", () => {
     await user.keyboard("{Escape}");
     await user.click(screen.getByRole("button", { name: "新建任务" }));
 
-    await waitFor(() => expect(sessionUpdater).toHaveBeenCalledWith({
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledWith({
       expectedVersion: 1,
-      currentThreadId: null,
+      tabs: [{ id: "tab-current", threadId: null }],
+      activeTabId: "tab-current",
     }));
     await waitFor(() => {
       const newTaskCwd = screen.getByRole("button", { name: "项目" });
@@ -449,7 +473,7 @@ describe("App", () => {
       name: `在 ${otherThread.cwd} 中新建会话`,
     }));
 
-    expect(sessionUpdater).toHaveBeenCalledTimes(1);
+    expect(tabsUpdater).toHaveBeenCalledTimes(1);
     expect(editor).toHaveValue("新会话草稿");
     await waitFor(() => expect(
       screen.getByRole("button", { name: "项目" }),
@@ -518,13 +542,12 @@ describe("App", () => {
         return () => notificationHandlers.delete(handler);
       },
     };
-    const sessionUpdater = vi.fn(async (request: UpdateWindowSessionRequest) => ({
+    const tabsUpdater = vi.fn(async (request: UpdateWindowTabsRequest) => ({
       windowId: "main",
       version: 2,
       serverId: SERVER_ID,
-      ...(request.currentThreadId === null
-        ? {}
-        : { currentThreadId: request.currentThreadId }),
+      tabs: request.tabs,
+      activeTabId: request.activeTabId,
       updatedAtMs: 2,
     }));
     const sessionFactory: ConfiguredServerSessionFactory = (options) => ({
@@ -548,9 +571,11 @@ describe("App", () => {
           windowId: "main",
           version: 1,
           serverId: SERVER_ID,
+          tabs: [{ id: "tab-new", threadId: null }],
+          activeTabId: "tab-new",
           updatedAtMs: 1,
         })),
-        sessionUpdater,
+        tabsUpdater,
       },
     });
 
@@ -562,9 +587,10 @@ describe("App", () => {
 
     await waitFor(() => expect(requestMethods).toContain("turn/start"));
     expect(requestMethods).not.toContain("thread/resume");
-    expect(sessionUpdater).toHaveBeenCalledWith({
+    expect(tabsUpdater).toHaveBeenCalledWith({
       expectedVersion: 1,
-      currentThreadId: startedThread.id,
+      tabs: [{ id: "tab-new", threadId: startedThread.id }],
+      activeTabId: "tab-new",
     });
     await waitFor(() => expect(screen.getByText("首次问题")).toBeVisible());
     expect(screen.queryByRole("button", { name: "项目" })).not.toBeInTheDocument();
@@ -593,6 +619,194 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getByRole("button", { name: "发送" })).toBeVisible());
     expect(screen.getByText("首次问题")).toBeVisible();
+  });
+
+  it("同时恢复全部标签且切换时保持订阅，关闭后立即退订", async () => {
+    const user = userEvent.setup();
+    const threads = [
+      {
+        cliVersion: "1.0.0",
+        createdAt: 100,
+        cwd: "/workspace/a",
+        ephemeral: false,
+        id: "thread-a",
+        modelProvider: "openai",
+        name: "会话 A",
+        preview: "任务 A",
+        sessionId: "session-a",
+        source: "appServer",
+        status: { type: "idle" },
+        turns: [],
+        updatedAt: 200,
+      },
+      {
+        cliVersion: "1.0.0",
+        createdAt: 90,
+        cwd: "/workspace/b",
+        ephemeral: false,
+        id: "thread-b",
+        modelProvider: "openai",
+        name: "会话 B",
+        preview: "任务 B",
+        sessionId: "session-b",
+        source: "appServer",
+        status: { type: "active", activeFlags: [] },
+        turns: [],
+        updatedAt: 190,
+      },
+    ] as const;
+    const requests: Array<{
+      readonly method: string;
+      readonly params?: { readonly threadId?: string };
+    }> = [];
+    const notificationHandlers = new Set<
+      (notification: ServerNotification) => void
+    >();
+    const resumeResolvers = new Map<string, (value: unknown) => void>();
+    const requestSession = {
+      sendRequest(request: {
+        readonly method: string;
+        readonly params?: { readonly threadId?: string };
+      }) {
+        requests.push(request);
+        let result: Promise<unknown>;
+        if (request.method === "thread/resume") {
+          result = new Promise((resolve) => {
+            resumeResolvers.set(request.params?.threadId ?? "", resolve);
+          });
+        } else if (request.method === "thread/list") {
+          result = Promise.resolve({ data: threads, nextCursor: null });
+        } else if (request.method === "thread/backgroundTerminals/list") {
+          result = Promise.resolve({ data: [], nextCursor: null });
+        } else if (request.method === "thread/unsubscribe") {
+          result = Promise.resolve({ status: "unsubscribed" });
+        } else {
+          result = Promise.resolve({});
+        }
+        return {
+          cancel: () => undefined,
+          id: `request:${request.method}`,
+          result,
+        };
+      },
+      subscribeNotifications(handler: (notification: ServerNotification) => void) {
+        notificationHandlers.add(handler);
+        return () => notificationHandlers.delete(handler);
+      },
+    };
+    const sessionFactory: ConfiguredServerSessionFactory = (options) => ({
+      threadClient: new AppServerThreadClient(requestSession as never),
+      conversationClient: new AppServerConversationClient(requestSession as never),
+      async start() {
+        options.onStateChange({
+          phase: "ready",
+          connectionStage: null,
+          initializeResponse: null,
+          errorCode: null,
+        });
+      },
+      async close() {},
+    });
+    let authoritative: WindowState = {
+      windowId: "main",
+      version: 1,
+      serverId: SERVER_ID,
+      tabs: [
+        { id: "tab-a", threadId: "thread-a" },
+        { id: "tab-b", threadId: "thread-b" },
+      ],
+      activeTabId: "tab-a",
+      updatedAtMs: 1,
+    };
+    const tabsUpdater = vi.fn(async (request: UpdateWindowTabsRequest) => {
+      authoritative = {
+        ...authoritative,
+        version: authoritative.version + 1,
+        tabs: request.tabs,
+        activeTabId: request.activeTabId,
+        updatedAtMs: authoritative.updatedAtMs + 1,
+      };
+      return authoritative;
+    });
+
+    renderApp(() => ({ servers: [localServer()], proxies: [] }), {
+      sessionFactory,
+      windowStateOptions: {
+        loader: vi.fn(async () => authoritative),
+        tabsUpdater,
+      },
+    });
+
+    await waitFor(() => {
+      expect(requests.filter(({ method }) => method === "thread/resume"))
+        .toHaveLength(2);
+    });
+    expect([...resumeResolvers.keys()].sort()).toEqual(["thread-a", "thread-b"]);
+
+    act(() => {
+      const completed = {
+        method: "turn/completed",
+        params: {
+          threadId: "thread-b",
+          turn: {
+            id: "turn-b",
+            items: [{
+              id: "agent-b",
+              type: "agentMessage",
+              text: "后台标签已完成",
+            }],
+            itemsView: "full",
+            status: "completed",
+          },
+        },
+      } as ServerNotification;
+      for (const handler of notificationHandlers) {
+        handler(completed);
+      }
+    });
+
+    await act(async () => {
+      for (const thread of threads) {
+        resumeResolvers.get(thread.id)?.({
+          approvalPolicy: "on-request",
+          approvalsReviewer: "user",
+          cwd: thread.cwd,
+          model: "gpt-5",
+          modelProvider: "openai",
+          reasoningEffort: null,
+          sandbox: { type: "readOnly" },
+          serviceTier: null,
+          thread,
+        });
+      }
+      await Promise.resolve();
+    });
+
+    await user.click(await screen.findByRole("tab", { name: /会话 B/u }));
+    expect(await screen.findByText("后台标签已完成")).toBeVisible();
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledWith({
+      expectedVersion: 1,
+      tabs: authoritative.tabs,
+      activeTabId: "tab-b",
+    }));
+    expect(requests.filter(({ method }) => method === "thread/resume"))
+      .toHaveLength(2);
+    expect(requests.filter(({ method }) => method === "thread/unsubscribe"))
+      .toHaveLength(0);
+
+    await user.click(screen.getByRole("button", { name: "关闭“会话 B”" }));
+    await waitFor(() => {
+      expect(requests.filter(
+        ({ method, params }) =>
+          method === "thread/unsubscribe" &&
+          params?.threadId === "thread-b",
+      )).toHaveLength(1);
+    });
+    expect(requests.some(
+      ({ method, params }) =>
+        method === "thread/unsubscribe" &&
+        params?.threadId === "thread-a",
+    )).toBe(false);
   });
 
   it("已完成回合终止后台命令时不显示停止按钮", async () => {
@@ -714,7 +928,11 @@ describe("App", () => {
           windowId: "main",
           version: 1,
           serverId: SERVER_ID,
-          currentThreadId: thread.id,
+          tabs: [{
+            id: "tab-background",
+            threadId: thread.id,
+          }],
+          activeTabId: "tab-background",
           updatedAtMs: 1,
         })),
       },
@@ -727,11 +945,13 @@ describe("App", () => {
     expect(requests.filter(
       ({ method }) => method === "thread/backgroundTerminals/list",
     )).toHaveLength(1);
-    expect(requests.findIndex(
-      ({ method }) => method === "thread/backgroundTerminals/list",
-    )).toBeGreaterThan(requests.findIndex(
-      ({ method }) => method === "thread/resume",
-    ));
+    expect(requests).toContainEqual(expect.objectContaining({
+      method: "thread/backgroundTerminals/list",
+      params: {
+        threadId: thread.id,
+        limit: 100,
+      },
+    }));
     expect(screen.queryByRole("button", { name: /停止/u })).not.toBeInTheDocument();
 
     await user.click(within(backgroundCommands).getByRole("button", {
@@ -855,6 +1075,8 @@ describe("App", () => {
           windowId: "main",
           version: 1,
           serverId: SERVER_ID,
+          tabs: [{ id: "tab-new", threadId: null }],
+          activeTabId: "tab-new",
           updatedAtMs: 1,
         })),
       },
@@ -885,6 +1107,8 @@ describe("App", () => {
             windowId: "main",
             version: 1,
             serverId: SERVER_ID,
+            tabs: [{ id: "tab-new", threadId: null }],
+            activeTabId: "tab-new",
             updatedAtMs: 1,
           })),
         },
@@ -903,13 +1127,16 @@ describe("App", () => {
       windowId: "main",
       version: 2,
       serverId: SERVER_ID,
+      tabs: [{ id: "tab-new", threadId: null }],
+      activeTabId: "tab-new",
       updatedAtMs: 2,
     }));
-    const sessionUpdater = vi.fn(async () => ({
+    const tabsUpdater = vi.fn(async (request: UpdateWindowTabsRequest) => ({
       windowId: "main",
       version: 3,
       serverId: SERVER_ID,
-      currentThreadId: "thread-7",
+      tabs: request.tabs,
+      activeTabId: request.activeTabId,
       updatedAtMs: 3,
     }));
     const deepLinkSubscriber: DeepLinkTargetSubscriber = async (onTarget) => {
@@ -924,10 +1151,11 @@ describe("App", () => {
           loader: vi.fn(async () => ({
             windowId: "main",
             version: 1,
+            tabs: [],
             updatedAtMs: 1,
           })),
           binder,
-          sessionUpdater,
+          tabsUpdater,
         },
       },
     );
@@ -936,9 +1164,13 @@ describe("App", () => {
       expectedVersion: 1,
       serverId: SERVER_ID,
     }));
-    await waitFor(() => expect(sessionUpdater).toHaveBeenCalledWith({
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledWith({
       expectedVersion: 2,
-      currentThreadId: "thread-7",
+      tabs: [
+        { id: "tab-new", threadId: null },
+        expect.objectContaining({ threadId: "thread-7" }),
+      ],
+      activeTabId: expect.any(String),
     }));
   });
 
@@ -958,7 +1190,12 @@ describe("App", () => {
     expect(windowLoader).toHaveBeenCalledTimes(1);
     expect(loader).not.toHaveBeenCalled();
     await act(async () => {
-      finishWindowLoad?.({ windowId: "main", version: 1, updatedAtMs: 1 });
+      finishWindowLoad?.({
+        windowId: "main",
+        version: 1,
+        tabs: [],
+        updatedAtMs: 1,
+      });
     });
     await waitFor(() => expect(loader).toHaveBeenCalledTimes(1));
   });
@@ -988,6 +1225,8 @@ describe("App", () => {
           windowId: "main",
           version: 3,
           serverId: SERVER_ID,
+          tabs: [{ id: "tab-new", threadId: null }],
+          activeTabId: "tab-new",
           updatedAtMs: 3,
         })),
       },
@@ -1027,6 +1266,7 @@ describe("App", () => {
           loader: vi.fn(async () => ({
             windowId: "main",
             version: 1,
+            tabs: [],
             updatedAtMs: 1,
           })),
           binder,
@@ -1051,6 +1291,8 @@ describe("App", () => {
         windowId: "main",
         version: 2,
         serverId: SERVER_ID,
+        tabs: [{ id: "tab-new", threadId: null }],
+        activeTabId: "tab-new",
         updatedAtMs: 2,
       });
     });
@@ -1284,6 +1526,8 @@ describe("App", () => {
           windowId: "main",
           version: 2,
           serverId: SERVER_ID,
+          tabs: [{ id: "tab-new", threadId: null }],
+          activeTabId: "tab-new",
           updatedAtMs: 2,
         })),
       },

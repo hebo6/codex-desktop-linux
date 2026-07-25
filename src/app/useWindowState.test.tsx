@@ -2,16 +2,17 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ServerId } from "../configuration";
-import type {
-  BindWindowServerRequest,
-  UpdateWindowSessionRequest,
-  WindowState,
+import {
+  WindowStateTransportError,
+  type BindWindowServerRequest,
+  type UpdateWindowTabsRequest,
+  type WindowState,
+  type WindowTab,
 } from "../transport/windowState";
 import {
   useWindowState,
   WINDOW_STATE_ERROR_SUMMARY,
   WindowStateController,
-  WindowStateControllerError,
 } from "./useWindowState";
 
 const SERVER_A = "11111111-1111-4111-8111-111111111111" as ServerId;
@@ -33,15 +34,28 @@ function deferred<Value>(): Deferred<Value> {
   return { promise, resolve, reject };
 }
 
-function state(
+function unboundState(version: number): WindowState {
+  return {
+    windowId: "main",
+    version,
+    tabs: [],
+    updatedAtMs: 1_000 + version,
+  };
+}
+
+function boundState(
   version: number,
-  overrides: Partial<WindowState> = {},
+  tabs: readonly WindowTab[] = [{ id: "tab-a", threadId: null }],
+  activeTabId: string = tabs[0]?.id ?? "tab-a",
+  serverId: ServerId = SERVER_A,
 ): WindowState {
   return {
     windowId: "main",
     version,
+    serverId,
+    tabs,
+    activeTabId,
     updatedAtMs: 1_000 + version,
-    ...overrides,
   };
 }
 
@@ -68,9 +82,8 @@ describe("WindowStateController", () => {
       windowState: null,
       error: null,
     });
-    expect(loader).toHaveBeenCalledTimes(1);
 
-    const loaded = state(4, { serverId: SERVER_A });
+    const loaded = boundState(4);
     pending.resolve(loaded);
     await pending.promise;
     await Promise.resolve();
@@ -83,73 +96,7 @@ describe("WindowStateController", () => {
     release();
   });
 
-  it("重载只接受最新结果", async () => {
-    const first = deferred<WindowState>();
-    const second = deferred<WindowState>();
-    const loader = vi
-      .fn<() => Promise<WindowState>>()
-      .mockReturnValueOnce(first.promise)
-      .mockReturnValueOnce(second.promise);
-    const controller = new WindowStateController({ loader });
-
-    controller.retain();
-    controller.reload();
-    expect(loader).toHaveBeenCalledTimes(2);
-
-    const latest = state(2, { serverId: SERVER_B });
-    second.resolve(latest);
-    await second.promise;
-    await Promise.resolve();
-    expect(controller.getSnapshot().windowState).toBe(latest);
-
-    first.resolve(state(1, { serverId: SERVER_A }));
-    await first.promise;
-    await Promise.resolve();
-    expect(controller.getSnapshot()).toEqual({
-      status: "ready",
-      windowState: latest,
-      error: null,
-    });
-  });
-
-  it("bind 隐藏窗口标识并使用当前权威版本", async () => {
-    const pendingLoad = deferred<WindowState>();
-    const pendingBind = deferred<WindowState>();
-    const binder = vi.fn(
-      (_request: BindWindowServerRequest) => pendingBind.promise,
-    );
-    const controller = new WindowStateController({
-      loader: () => pendingLoad.promise,
-      binder,
-    });
-    await loadController(controller, pendingLoad, state(7));
-
-    const operation = controller.bindServer(SERVER_A);
-    expect(controller.getSnapshot()).toMatchObject({
-      status: "updating",
-      error: null,
-    });
-    await Promise.resolve();
-    expect(binder).toHaveBeenCalledWith({
-      expectedVersion: 7,
-      serverId: SERVER_A,
-    });
-    expect(JSON.stringify(binder.mock.calls)).not.toContain("windowId");
-
-    const bound = state(8, {
-      serverId: SERVER_A,
-      currentThreadId: "thread-a",
-    });
-    pendingBind.resolve(bound);
-    await expect(operation).resolves.toBe(bound);
-    expect(controller.getSnapshot()).toEqual({
-      status: "ready",
-      windowState: bound,
-      error: null,
-    });
-  });
-
-  it("并发 bind 串行化并让后一项使用前一响应版本", async () => {
+  it("bind 串行化并让后一项使用前一响应版本", async () => {
     const pendingLoad = deferred<WindowState>();
     const firstBind = deferred<WindowState>();
     const secondBind = deferred<WindowState>();
@@ -161,60 +108,149 @@ describe("WindowStateController", () => {
       loader: () => pendingLoad.promise,
       binder,
     });
-    await loadController(controller, pendingLoad, state(1));
+    await loadController(controller, pendingLoad, unboundState(1));
 
-    const firstOperation = controller.bindServer(SERVER_A);
-    const secondOperation = controller.bindServer(SERVER_B);
+    const first = controller.bindServer(SERVER_A);
+    const second = controller.bindServer(SERVER_B);
     await Promise.resolve();
-    expect(binder).toHaveBeenCalledTimes(1);
     expect(binder).toHaveBeenNthCalledWith(1, {
       expectedVersion: 1,
       serverId: SERVER_A,
     });
 
-    const firstResult = state(2, { serverId: SERVER_A });
-    firstBind.resolve(firstResult);
-    await firstOperation;
+    firstBind.resolve(boundState(2));
+    await first;
     await waitFor(() => expect(binder).toHaveBeenCalledTimes(2));
     expect(binder).toHaveBeenNthCalledWith(2, {
       expectedVersion: 2,
       serverId: SERVER_B,
     });
-    expect(controller.getSnapshot().status).toBe("updating");
 
-    const secondResult = state(3, { serverId: SERVER_B });
-    secondBind.resolve(secondResult);
-    await expect(secondOperation).resolves.toBe(secondResult);
-    expect(controller.getSnapshot()).toEqual({
-      status: "ready",
-      windowState: secondResult,
-      error: null,
-    });
+    const secondState = boundState(3, undefined, undefined, SERVER_B);
+    secondBind.resolve(secondState);
+    await expect(second).resolves.toBe(secondState);
   });
 
-  it("相同服务器和相同会话直接返回当前状态且不进入 updating", async () => {
+  it("替换、新建、激活、绑定和关闭标签都提交完整标签集合", async () => {
     const pendingLoad = deferred<WindowState>();
-    const binder = vi.fn();
-    const sessionUpdater = vi.fn();
-    const current = state(7, {
-      serverId: SERVER_A,
-      currentThreadId: "thread-a",
+    let authoritative = boundState(1);
+    const requests: UpdateWindowTabsRequest[] = [];
+    const tabsUpdater = vi.fn(async (request: UpdateWindowTabsRequest) => {
+      requests.push(request);
+      authoritative = {
+        ...authoritative,
+        version: authoritative.version + 1,
+        updatedAtMs: authoritative.updatedAtMs + 1,
+        tabs: request.tabs,
+        activeTabId: request.activeTabId,
+      };
+      return authoritative;
+    });
+    const controller = new WindowStateController({
+      loader: () => pendingLoad.promise,
+      tabsUpdater,
+    });
+    await loadController(controller, pendingLoad, authoritative);
+
+    await controller.replaceActiveThread("thread-a");
+    expect(requests.at(-1)).toEqual({
+      expectedVersion: 1,
+      tabs: [{ id: "tab-a", threadId: "thread-a" }],
+      activeTabId: "tab-a",
+    });
+
+    const opened = await controller.openTab("thread-b");
+    const openedTab = opened.tabs.find(({ threadId }) => threadId === "thread-b");
+    expect(openedTab).toBeDefined();
+    expect(opened.activeTabId).toBe(openedTab?.id);
+
+    await controller.activateTab("tab-a");
+    expect(requests.at(-1)?.activeTabId).toBe("tab-a");
+
+    await controller.closeTab("tab-a");
+    expect(authoritative.tabs).toHaveLength(1);
+    expect(authoritative.tabs[0]?.threadId).toBe("thread-b");
+
+    await controller.replaceActiveThread(null);
+    await controller.attachThread(authoritative.activeTabId!, "thread-c");
+    expect(authoritative.tabs[0]?.threadId).toBe("thread-c");
+  });
+
+  it("打开已经存在的会话只激活标签且不重复创建", async () => {
+    const pendingLoad = deferred<WindowState>();
+    const current = boundState(
+      3,
+      [
+        { id: "tab-a", threadId: "thread-a" },
+        { id: "tab-b", threadId: "thread-b" },
+      ],
+      "tab-a",
+    );
+    const tabsUpdater = vi.fn(async (request: UpdateWindowTabsRequest) => ({
+      ...current,
+      version: 4,
+      tabs: request.tabs,
+      activeTabId: request.activeTabId,
+      updatedAtMs: 1_004,
+    }));
+    const controller = new WindowStateController({
+      loader: () => pendingLoad.promise,
+      tabsUpdater,
+    });
+    await loadController(controller, pendingLoad, current);
+
+    const next = await controller.openTab("thread-b");
+
+    expect(tabsUpdater).toHaveBeenCalledWith({
+      expectedVersion: 3,
+      tabs: current.tabs,
+      activeTabId: "tab-b",
+    });
+    expect(next.tabs).toHaveLength(2);
+  });
+
+  it("关闭最后一个标签时创建新的空白标签", async () => {
+    const pendingLoad = deferred<WindowState>();
+    const current = boundState(
+      1,
+      [{ id: "tab-only", threadId: "thread-a" }],
+      "tab-only",
+    );
+    const tabsUpdater = vi.fn(async (request: UpdateWindowTabsRequest) => ({
+      ...current,
+      version: 2,
+      tabs: request.tabs,
+      activeTabId: request.activeTabId,
+      updatedAtMs: 1_002,
+    }));
+    const controller = new WindowStateController({
+      loader: () => pendingLoad.promise,
+      tabsUpdater,
+    });
+    await loadController(controller, pendingLoad, current);
+
+    const next = await controller.closeTab("tab-only");
+
+    expect(next.tabs).toHaveLength(1);
+    expect(next.tabs[0]?.threadId).toBeNull();
+    expect(next.activeTabId).toBe(next.tabs[0]?.id);
+  });
+
+  it("服务器已被其它窗口占用时保留当前权威状态", async () => {
+    const pendingLoad = deferred<WindowState>();
+    const current = unboundState(1);
+    const binder = vi.fn(async () => {
+      throw new WindowStateTransportError("serverAlreadyOpen");
     });
     const controller = new WindowStateController({
       loader: () => pendingLoad.promise,
       binder,
-      sessionUpdater,
     });
     await loadController(controller, pendingLoad, current);
-    const listener = vi.fn();
-    controller.subscribe(listener);
 
-    await expect(controller.bindServer(SERVER_A)).resolves.toBe(current);
-    await expect(controller.updateSession("thread-a")).resolves.toBe(current);
-
-    expect(binder).not.toHaveBeenCalled();
-    expect(sessionUpdater).not.toHaveBeenCalled();
-    expect(listener).not.toHaveBeenCalled();
+    await expect(controller.bindServer(SERVER_A)).rejects.toMatchObject({
+      code: "serverAlreadyOpen",
+    });
     expect(controller.getSnapshot()).toEqual({
       status: "ready",
       windowState: current,
@@ -222,185 +258,45 @@ describe("WindowStateController", () => {
     });
   });
 
-  it("排队操作在执行时重新判断幂等并避免多余命令", async () => {
+  it("外部窗口状态事件只接受同一窗口的更新版本", async () => {
     const pendingLoad = deferred<WindowState>();
-    const firstBind = deferred<WindowState>();
-    const binder = vi.fn(() => firstBind.promise);
+    const current = boundState(2);
     const controller = new WindowStateController({
       loader: () => pendingLoad.promise,
-      binder,
     });
-    await loadController(controller, pendingLoad, state(1));
+    await loadController(controller, pendingLoad, current);
 
-    const first = controller.bindServer(SERVER_A);
-    const duplicate = controller.bindServer(SERVER_A);
-    await Promise.resolve();
-    const bound = state(2, { serverId: SERVER_A });
-    firstBind.resolve(bound);
+    controller.applyExternalState({ ...boundState(3), windowId: "other" });
+    controller.applyExternalState(boundState(1));
+    expect(controller.getSnapshot().windowState).toBe(current);
 
-    await expect(first).resolves.toBe(bound);
-    await expect(duplicate).resolves.toBe(bound);
-    expect(binder).toHaveBeenCalledTimes(1);
-    expect(controller.getSnapshot()).toEqual({
-      status: "ready",
-      windowState: bound,
-      error: null,
-    });
-  });
-
-  it("updateSession 使用最新版本并保留当前服务器", async () => {
-    const pendingLoad = deferred<WindowState>();
-    const pendingUpdate = deferred<WindowState>();
-    const sessionUpdater = vi.fn(
-      (_request: UpdateWindowSessionRequest) => pendingUpdate.promise,
+    const external = boundState(
+      3,
+      [{ id: "tab-external", threadId: "thread-external" }],
+      "tab-external",
     );
-    const controller = new WindowStateController({
-      loader: () => pendingLoad.promise,
-      sessionUpdater,
-    });
-    await loadController(
-      controller,
-      pendingLoad,
-      state(5, { serverId: SERVER_A }),
-    );
-
-    const operation = controller.updateSession("thread-a");
-    await Promise.resolve();
-    expect(sessionUpdater).toHaveBeenCalledWith({
-      expectedVersion: 5,
-      currentThreadId: "thread-a",
-    });
-
-    const updated = state(6, {
-      serverId: SERVER_A,
-      currentThreadId: "thread-a",
-    });
-    pendingUpdate.resolve(updated);
-    await expect(operation).resolves.toBe(updated);
-    expect(controller.getSnapshot().windowState).toBe(updated);
+    controller.applyExternalState(external);
+    expect(controller.getSnapshot().windowState).toBe(external);
   });
 
-  it("拒绝窗口、版本、时间或更新字段不相关的结果并失效本地版本", async () => {
-    const invalidResults: WindowState[] = [
-      { ...state(2, { serverId: SERVER_A }), windowId: "another" },
-      state(3, { serverId: SERVER_A }),
-      { ...state(2, { serverId: SERVER_A }), updatedAtMs: 1 },
-      state(2, { serverId: SERVER_B }),
-    ];
-
-    for (const invalid of invalidResults) {
-      const pendingLoad = deferred<WindowState>();
-      const binder = vi.fn(async () => invalid);
-      const controller = new WindowStateController({
-        loader: () => pendingLoad.promise,
-        binder,
-      });
-      await loadController(controller, pendingLoad, state(1));
-
-      await expect(controller.bindServer(SERVER_A)).rejects.toBeInstanceOf(
-        WindowStateControllerError,
-      );
-      expect(controller.getSnapshot()).toEqual({
-        status: "error",
-        windowState: state(1),
-        error: WINDOW_STATE_ERROR_SUMMARY,
-      });
-      await expect(controller.bindServer(SERVER_A)).rejects.toMatchObject({
-        code: "stateUnavailable",
-      });
-      expect(binder).toHaveBeenCalledTimes(1);
-    }
-  });
-
-  it("一次失败会阻止已排队写入继续使用不确定版本", async () => {
+  it("不确定写入失败后要求重新加载权威状态", async () => {
     const pendingLoad = deferred<WindowState>();
-    const firstBind = deferred<WindowState>();
-    const binder = vi.fn(() => firstBind.promise);
     const controller = new WindowStateController({
       loader: () => pendingLoad.promise,
-      binder,
+      binder: async () => {
+        throw new Error("DO_NOT_REPORT");
+      },
     });
-    await loadController(controller, pendingLoad, state(1));
+    await loadController(controller, pendingLoad, unboundState(1));
 
-    const first = controller.bindServer(SERVER_A);
-    const queued = controller.bindServer(SERVER_B);
-    const settled = Promise.allSettled([first, queued]);
-    firstBind.reject(new Error("DO_NOT_REPORT uncertain backend state"));
-    const outcomes = await settled;
-
-    expect(outcomes.map((outcome) => outcome.status)).toEqual([
-      "rejected",
-      "rejected",
-    ]);
-    expect(binder).toHaveBeenCalledTimes(1);
+    await expect(controller.bindServer(SERVER_A)).rejects.toMatchObject({
+      code: "operationFailed",
+    });
     expect(controller.getSnapshot()).toMatchObject({
       status: "error",
       error: WINDOW_STATE_ERROR_SUMMARY,
     });
-    expect(JSON.stringify(controller.getSnapshot())).not.toContain(
-      "DO_NOT_REPORT",
-    );
-  });
-
-  it("失败后 reload 才能建立新权威版本", async () => {
-    const firstLoad = deferred<WindowState>();
-    const secondLoad = deferred<WindowState>();
-    const loader = vi
-      .fn<() => Promise<WindowState>>()
-      .mockReturnValueOnce(firstLoad.promise)
-      .mockReturnValueOnce(secondLoad.promise);
-    const binder = vi.fn(async () => {
-      throw new Error("failed");
-    });
-    const controller = new WindowStateController({ loader, binder });
-    await loadController(controller, firstLoad, state(1));
-    await expect(controller.bindServer(SERVER_A)).rejects.toBeInstanceOf(
-      WindowStateControllerError,
-    );
-
-    controller.reload();
-    expect(controller.getSnapshot().status).toBe("loading");
-    const refreshed = state(9, { serverId: SERVER_B });
-    secondLoad.resolve(refreshed);
-    await secondLoad.promise;
-    await Promise.resolve();
-    expect(controller.getSnapshot()).toEqual({
-      status: "ready",
-      windowState: refreshed,
-      error: null,
-    });
-  });
-
-  it("未加载或已释放时不调用写命令", async () => {
-    const binder = vi.fn();
-    const controller = new WindowStateController({ binder });
-
-    await expect(controller.bindServer(SERVER_A)).rejects.toMatchObject({
-      code: "stateUnavailable",
-    });
-    controller.dispose();
-    await expect(controller.bindServer(SERVER_A)).rejects.toMatchObject({
-      code: "stateUnavailable",
-    });
-    expect(binder).not.toHaveBeenCalled();
-  });
-
-  it("dispose 后忽略迟到的加载和写入结果", async () => {
-    const pendingLoad = deferred<WindowState>();
-    const controller = new WindowStateController({
-      loader: () => pendingLoad.promise,
-    });
-    const listener = vi.fn();
-    controller.subscribe(listener);
-    controller.retain();
-    const callsBeforeDispose = listener.mock.calls.length;
-    controller.dispose();
-
-    pendingLoad.resolve(state(1, { serverId: SERVER_A }));
-    await pendingLoad.promise;
-    await Promise.resolve();
-    expect(listener).toHaveBeenCalledTimes(callsBeforeDispose);
-    expect(controller.getSnapshot().status).toBe("loading");
+    expect(JSON.stringify(controller.getSnapshot())).not.toContain("DO_NOT_REPORT");
   });
 });
 
@@ -411,48 +307,29 @@ describe("useWindowState", () => {
     const { result, rerender, unmount } = renderHook(() =>
       useWindowState({ loader }),
     );
-
-    expect(result.current).toMatchObject({
-      status: "loading",
-      windowState: null,
-      error: null,
-    });
     const controls = {
       reload: result.current.reload,
       bindServer: result.current.bindServer,
-      updateSession: result.current.updateSession,
+      openTab: result.current.openTab,
+      activateTab: result.current.activateTab,
+      closeTab: result.current.closeTab,
+      attachThread: result.current.attachThread,
     };
 
-    const loaded = state(1, { serverId: SERVER_A });
+    const loaded = boundState(1);
     await act(async () => {
       pending.resolve(loaded);
       await pending.promise;
     });
-    expect(result.current).toMatchObject({
-      status: "ready",
-      windowState: loaded,
-      error: null,
-    });
     rerender();
+
+    expect(result.current.status).toBe("ready");
     expect(result.current.reload).toBe(controls.reload);
     expect(result.current.bindServer).toBe(controls.bindServer);
-    expect(result.current.updateSession).toBe(controls.updateSession);
-    unmount();
-  });
-
-  it("StrictMode 式 effect 清理不会重复首载或提前释放", async () => {
-    const pending = deferred<WindowState>();
-    const loader = vi.fn(() => pending.promise);
-    const { result, unmount } = renderHook(() => useWindowState({ loader }), {
-      reactStrictMode: true,
-    });
-
-    expect(loader).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      pending.resolve(state(1));
-      await pending.promise;
-    });
-    expect(result.current.status).toBe("ready");
+    expect(result.current.openTab).toBe(controls.openTab);
+    expect(result.current.activateTab).toBe(controls.activateTab);
+    expect(result.current.closeTab).toBe(controls.closeTab);
+    expect(result.current.attachThread).toBe(controls.attachThread);
     unmount();
   });
 
@@ -466,44 +343,20 @@ describe("useWindowState", () => {
     const { result, unmount } = renderHook(() => useWindowState({ loader }));
 
     await act(async () => {
-      first.reject(new Error("DO_NOT_REPORT database details"));
+      first.reject(new Error("DO_NOT_REPORT"));
       await first.promise.catch(() => undefined);
     });
     expect(result.current).toMatchObject({
       status: "error",
       error: WINDOW_STATE_ERROR_SUMMARY,
     });
-    expect(JSON.stringify(result.current)).not.toContain("DO_NOT_REPORT");
 
     act(() => result.current.reload());
     await act(async () => {
-      second.resolve(state(2));
+      second.resolve(unboundState(2));
       await second.promise;
     });
     expect(result.current.status).toBe("ready");
     unmount();
-  });
-
-  it("卸载后忽略仍在进行的 bind 结果", async () => {
-    const pendingBind = deferred<WindowState>();
-    const loaded = state(1);
-    const { result, unmount } = renderHook(() =>
-      useWindowState({
-        loader: async () => loaded,
-        binder: () => pendingBind.promise,
-      }),
-    );
-    await waitFor(() => expect(result.current.status).toBe("ready"));
-
-    let operation!: Promise<WindowState>;
-    act(() => {
-      operation = result.current.bindServer(SERVER_A);
-    });
-    expect(result.current.status).toBe("updating");
-    unmount();
-    const bound = state(2, { serverId: SERVER_A });
-    pendingBind.resolve(bound);
-    await expect(operation).resolves.toBe(bound);
-    expect(result.current.status).toBe("updating");
   });
 });

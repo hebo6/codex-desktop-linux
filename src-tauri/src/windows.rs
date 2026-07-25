@@ -19,7 +19,7 @@ use uuid::Uuid;
 use crate::{
     configuration::ServerId,
     window_state::{
-        BindWindowServerRequest, UpdateWindowSessionRequest, WindowGeometry, WindowState,
+        BindWindowServerRequest, UpdateWindowTabsRequest, WindowGeometry, WindowState,
         WindowStateRepository, WindowStateRepositoryError,
     },
 };
@@ -127,12 +127,15 @@ impl From<WindowStateRepositoryError> for CommandError {
                 "invalidWindowStateVersion",
                 "The window state version is invalid",
             ),
+            WindowStateRepositoryError::InvalidTabs => {
+                Self::new("invalidWindowTabs", "The window tabs are invalid")
+            }
             WindowStateRepositoryError::InvalidThreadId => {
                 Self::new("invalidThreadId", "The current thread ID is invalid")
             }
-            WindowStateRepositoryError::SessionWithoutServer => Self::new(
-                "windowSessionRequiresServer",
-                "A window without a server cannot select a session",
+            WindowStateRepositoryError::TabsWithoutServer => Self::new(
+                "windowTabsRequireServer",
+                "A window without a server cannot update tabs",
             ),
             WindowStateRepositoryError::WindowNotFound => {
                 Self::new("windowStateNotFound", "The window state does not exist")
@@ -140,6 +143,10 @@ impl From<WindowStateRepositoryError> for CommandError {
             WindowStateRepositoryError::ServerNotFound => {
                 Self::new("serverNotFound", "The server does not exist")
             }
+            WindowStateRepositoryError::ServerAlreadyOpen(_) => Self::new(
+                "serverAlreadyOpen",
+                "The server is already open in another window",
+            ),
             WindowStateRepositoryError::VersionConflict => Self::new(
                 "windowStateVersionConflict",
                 "The window state was modified concurrently",
@@ -483,10 +490,17 @@ pub(crate) async fn load_window_state<R: Runtime>(
     repository: State<'_, WindowStateRepository>,
 ) -> Result<WindowState, CommandError> {
     let window_id = WindowId::from_window_label(window.label())?;
-    let state = repository
-        .load_and_activate(window_id.as_str())
-        .await
-        .map_err(CommandError::from)?;
+    let state = match repository.load_and_activate(window_id.as_str()).await {
+        Ok(state) => state,
+        Err(WindowStateRepositoryError::ServerAlreadyOpen(active_window_id)) => {
+            activate_window_by_id(window.app_handle(), &active_window_id)?;
+            return Err(CommandError::new(
+                "serverAlreadyOpen",
+                "The server is already open in another window",
+            ));
+        }
+        Err(error) => return Err(CommandError::from(error)),
+    };
     complete_window_reference_update(&window, repository.inner(), &window_id, state).await
 }
 
@@ -497,22 +511,29 @@ pub(crate) async fn bind_window_server<R: Runtime>(
     request: BindWindowServerRequest,
 ) -> Result<WindowState, CommandError> {
     let window_id = WindowId::from_window_label(window.label())?;
-    let state = repository
-        .bind_server(window_id.as_str(), request)
-        .await
-        .map_err(CommandError::from)?;
+    let state = match repository.bind_server(window_id.as_str(), request).await {
+        Ok(state) => state,
+        Err(WindowStateRepositoryError::ServerAlreadyOpen(active_window_id)) => {
+            activate_window_by_id(window.app_handle(), &active_window_id)?;
+            return Err(CommandError::new(
+                "serverAlreadyOpen",
+                "The server is already open in another window",
+            ));
+        }
+        Err(error) => return Err(CommandError::from(error)),
+    };
     complete_window_reference_update(&window, repository.inner(), &window_id, state).await
 }
 
 #[tauri::command]
-pub(crate) async fn update_window_session<R: Runtime>(
+pub(crate) async fn update_window_tabs<R: Runtime>(
     window: WebviewWindow<R>,
     repository: State<'_, WindowStateRepository>,
-    request: UpdateWindowSessionRequest,
+    request: UpdateWindowTabsRequest,
 ) -> Result<WindowState, CommandError> {
     let window_id = WindowId::from_window_label(window.label())?;
     repository
-        .update_session(window_id.as_str(), request)
+        .update_tabs(window_id.as_str(), request)
         .await
         .map_err(Into::into)
 }
@@ -523,6 +544,26 @@ pub(crate) async fn open_app_window<R: Runtime>(
     repository: State<'_, WindowStateRepository>,
     request: OpenAppWindowRequest,
 ) -> Result<OpenAppWindowResponse, CommandError> {
+    if let Some(active_window_id) = repository
+        .active_window_for_server(request.server_id)
+        .await
+        .map_err(CommandError::from)?
+    {
+        let state = repository
+            .open_tab_for_server(
+                &active_window_id,
+                request.server_id,
+                request.thread_id.as_deref(),
+            )
+            .await
+            .map_err(CommandError::from)?;
+        let active_window = activate_window_by_id(&app, &active_window_id)?;
+        emit_window_state_change(&active_window, &state);
+        return Ok(OpenAppWindowResponse {
+            window_id: active_window_id,
+            label: active_window.label().to_owned(),
+        });
+    }
     let window_id = WindowId::new();
     let label = window_id.label();
     repository
@@ -675,6 +716,33 @@ fn emit_server_reference_change<R: Runtime>(app: &AppHandle<R>) {
     ) {
         tracing::warn!(%error, "failed to publish changed window server references");
     }
+}
+
+fn emit_window_state_change<R: Runtime>(window: &WebviewWindow<R>, state: &WindowState) {
+    if let Err(error) = window.emit("window-state-changed", state) {
+        tracing::warn!(window_label = window.label(), %error, "failed to publish changed window state");
+    }
+}
+
+fn activate_window_by_id<R: Runtime>(
+    app: &AppHandle<R>,
+    window_id: &str,
+) -> Result<WebviewWindow<R>, CommandError> {
+    let window_id =
+        WindowId::parse(window_id.to_owned()).map_err(|_| CommandError::activation_failed())?;
+    let label = if window_id.as_str() == MAIN_WINDOW_LABEL {
+        MAIN_WINDOW_LABEL.to_owned()
+    } else {
+        window_id.label()
+    };
+    let window = app
+        .get_webview_window(&label)
+        .ok_or_else(CommandError::activation_failed)?;
+    activate_window(&window).map_err(|error| {
+        tracing::warn!(window_label = %label, %error, "failed to focus existing application window");
+        CommandError::activation_failed()
+    })?;
+    Ok(window)
 }
 
 pub(crate) fn activate_main_window<R: Runtime>(app: &AppHandle<R>) {

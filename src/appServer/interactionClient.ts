@@ -10,6 +10,7 @@ export interface PendingInteraction {
   readonly key: string;
   readonly request: ServerRequest;
   readonly responding: boolean;
+  readonly threadId: string;
 }
 
 export interface InteractionSnapshot {
@@ -126,10 +127,27 @@ export class AppServerInteractionClient {
         key,
         request: value.request,
         responding: value.responding,
+        threadId: requestThreadId(value.request),
       }))),
       resolvedElsewhereCount: this.resolvedElsewhereCount,
     });
     for (const listener of this.listeners) listener();
+  }
+}
+
+function requestThreadId(request: ServerRequest): string {
+  switch (request.method) {
+    case "item/commandExecution/requestApproval":
+    case "item/fileChange/requestApproval":
+    case "item/permissions/requestApproval":
+    case "item/tool/requestUserInput":
+    case "mcpServer/elicitation/request":
+      return request.params.threadId;
+    case "applyPatchApproval":
+    case "execCommandApproval":
+      return request.params.conversationId;
+    default:
+      throw new TypeError(`server request is not user-facing: ${request.method}`);
   }
 }
 

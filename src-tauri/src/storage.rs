@@ -520,7 +520,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn migrates_the_current_temporary_draft_to_the_single_new_draft() {
+    async fn migrates_legacy_drafts_and_removes_blank_drafts() {
         let legacy_migrator = Migrator {
             migrations: MIGRATOR
                 .iter()
@@ -556,6 +556,22 @@ mod tests {
         .await
         .unwrap();
         sqlx::query(
+            "INSERT INTO window_states (window_id, server_id)
+             VALUES ('secondary', 'server-1')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO server_window_references (window_id, server_id)
+             VALUES
+                ('main', 'server-1'),
+                ('secondary', 'server-1')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
             "INSERT INTO window_server_states (window_id, server_id, draft_key)
              VALUES ('main', 'server-1', 'draft:current')",
         )
@@ -582,6 +598,12 @@ mod tests {
 
         MIGRATOR.run(&pool).await.unwrap();
 
+        let active_reference_count: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM server_window_references")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(active_reference_count, 0);
         let drafts: Vec<(String, String)> = sqlx::query_as(
             "SELECT draft_key, json_extract(draft_json, '$.text')
              FROM drafts ORDER BY draft_key",
@@ -591,10 +613,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             drafts,
-            vec![
-                ("main:server-1:new".to_owned(), "current".to_owned()),
-                ("main:server-1:thread-1".to_owned(), "thread".to_owned()),
-            ]
+            vec![("main:server-1:thread-1".to_owned(), "thread".to_owned())]
         );
         for table in ["window_states", "window_server_states"] {
             let legacy_column_count: i64 = sqlx::query_scalar(

@@ -5,10 +5,11 @@ import type { TauriIpc } from "./tauriIpc";
 
 const LOAD_WINDOW_STATE_COMMAND = "load_window_state";
 const BIND_WINDOW_SERVER_COMMAND = "bind_window_server";
-const UPDATE_WINDOW_SESSION_COMMAND = "update_window_session";
+const UPDATE_WINDOW_TABS_COMMAND = "update_window_tabs";
 const OPEN_APP_WINDOW_COMMAND = "open_app_window";
 const WINDOW_SERVER_REFERENCES_CHANGED_EVENT =
   "window-server-references-changed";
+const WINDOW_STATE_CHANGED_EVENT = "window-state-changed";
 
 const WINDOW_ID_PATTERN = /^(?=.{1,64}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u;
 const SERVER_ID_PATTERN =
@@ -20,8 +21,14 @@ export interface WindowState {
   readonly windowId: string;
   readonly version: number;
   readonly serverId?: ServerId;
-  readonly currentThreadId?: string;
+  readonly tabs: readonly WindowTab[];
+  readonly activeTabId?: string;
   readonly updatedAtMs: number;
+}
+
+export interface WindowTab {
+  readonly id: string;
+  readonly threadId: string | null;
 }
 
 export interface BindWindowServerRequest {
@@ -29,9 +36,10 @@ export interface BindWindowServerRequest {
   readonly serverId: ServerId | null;
 }
 
-export interface UpdateWindowSessionRequest {
+export interface UpdateWindowTabsRequest {
   readonly expectedVersion: number;
-  readonly currentThreadId: string | null;
+  readonly tabs: readonly WindowTab[];
+  readonly activeTabId: string;
 }
 
 export interface OpenAppWindowRequest {
@@ -56,6 +64,9 @@ export interface WindowStateEventApi {
 export type WindowServerReferenceSubscriber = (
   onChange: () => void,
 ) => Promise<() => void>;
+export type WindowStateSubscriber = (
+  onChange: (state: WindowState) => void,
+) => Promise<() => void>;
 
 const tauriWindowStateEvents: WindowStateEventApi = {
   listen(event, handler) {
@@ -64,7 +75,10 @@ const tauriWindowStateEvents: WindowStateEventApi = {
 };
 
 export type WindowStateTransportErrorCode =
-  "invalidRequest" | "invalidResponse" | "commandFailed";
+  | "invalidRequest"
+  | "invalidResponse"
+  | "commandFailed"
+  | "serverAlreadyOpen";
 
 export class WindowStateTransportError extends Error {
   readonly code: WindowStateTransportErrorCode;
@@ -108,14 +122,14 @@ export async function bindWindowServer(
   return state;
 }
 
-export async function updateWindowSession(
-  request: UpdateWindowSessionRequest,
+export async function updateWindowTabs(
+  request: UpdateWindowTabsRequest,
   ipc: WindowStateIpc = tauriIpc,
 ): Promise<WindowState> {
-  const normalizedRequest = normalizeUpdateWindowSessionRequest(request);
+  const normalizedRequest = normalizeUpdateWindowTabsRequest(request);
   const response = await invokeWindowCommand(
     ipc,
-    UPDATE_WINDOW_SESSION_COMMAND,
+    UPDATE_WINDOW_TABS_COMMAND,
     { request: normalizedRequest },
   );
   const state = parseWindowState(response);
@@ -124,11 +138,31 @@ export async function updateWindowSession(
       state.version,
       normalizedRequest.expectedVersion,
     ) ||
-    (state.currentThreadId ?? null) !== normalizedRequest.currentThreadId
+    state.activeTabId !== normalizedRequest.activeTabId ||
+    !sameTabs(state.tabs, normalizedRequest.tabs)
   ) {
     throw new WindowStateTransportError("invalidResponse");
   }
   return state;
+}
+
+export async function subscribeWindowStateChanges(
+  onChange: (state: WindowState) => void,
+  events: WindowStateEventApi = tauriWindowStateEvents,
+): Promise<() => void> {
+  return events.listen(WINDOW_STATE_CHANGED_EVENT, (event) => {
+    let state: WindowState;
+    try {
+      state = parseWindowState(event.payload);
+    } catch {
+      return;
+    }
+    try {
+      onChange(state);
+    } catch {
+      // A view callback cannot break delivery of later authoritative events.
+    }
+  });
 }
 
 export async function openAppWindow(
@@ -165,7 +199,15 @@ async function invokeWindowCommand(
 ): Promise<unknown> {
   try {
     return await ipc.invoke<unknown>(command, arguments_);
-  } catch {
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "serverAlreadyOpen"
+    ) {
+      throw new WindowStateTransportError("serverAlreadyOpen");
+    }
     throw new WindowStateTransportError("commandFailed");
   }
 }
@@ -189,21 +231,30 @@ function normalizeBindWindowServerRequest(
   return Object.freeze({ expectedVersion, serverId });
 }
 
-function normalizeUpdateWindowSessionRequest(
-  value: UpdateWindowSessionRequest,
-): UpdateWindowSessionRequest {
+function normalizeUpdateWindowTabsRequest(
+  value: UpdateWindowTabsRequest,
+): UpdateWindowTabsRequest {
   const record = expectExactRecord(
     value,
-    ["expectedVersion", "currentThreadId"],
+    ["expectedVersion", "tabs", "activeTabId"],
     "invalidRequest",
   );
+  const tabs = expectTabs(record.tabs, "invalidRequest");
+  if (tabs.length === 0) {
+    throw new WindowStateTransportError("invalidRequest");
+  }
+  const activeTabId = expectBoundedText(
+    record.activeTabId,
+    64,
+    "invalidRequest",
+  );
+  if (!tabs.some(({ id }) => id === activeTabId)) {
+    throw new WindowStateTransportError("invalidRequest");
+  }
   return Object.freeze({
     expectedVersion: expectVersion(record.expectedVersion, "invalidRequest"),
-    currentThreadId: expectNullableBoundedText(
-      record.currentThreadId,
-      MAX_THREAD_ID_BYTES,
-      "invalidRequest",
-    ),
+    tabs,
+    activeTabId,
   });
 }
 
@@ -236,34 +287,43 @@ function parseWindowState(value: unknown): WindowState {
       "windowId",
       "version",
       "serverId",
-      "currentThreadId",
+      "tabs",
+      "activeTabId",
       "updatedAtMs",
     ],
     "invalidResponse",
-    ["windowId", "version", "updatedAtMs"],
+    ["windowId", "version", "tabs", "updatedAtMs"],
   );
   const state: {
     windowId: string;
     version: number;
     serverId?: ServerId;
-    currentThreadId?: string;
+    tabs: readonly WindowTab[];
+    activeTabId?: string;
     updatedAtMs: number;
   } = {
     windowId: expectWindowId(record.windowId),
     version: expectVersion(record.version, "invalidResponse"),
+    tabs: expectTabs(record.tabs, "invalidResponse"),
     updatedAtMs: expectTimestamp(record.updatedAtMs),
   };
   if (hasOwn(record, "serverId")) {
     state.serverId = expectServerId(record.serverId, "invalidResponse");
   }
-  if (hasOwn(record, "currentThreadId")) {
-    state.currentThreadId = expectBoundedText(
-      record.currentThreadId,
-      MAX_THREAD_ID_BYTES,
+  if (hasOwn(record, "activeTabId")) {
+    state.activeTabId = expectBoundedText(
+      record.activeTabId,
+      64,
       "invalidResponse",
     );
   }
-  if (state.serverId === undefined && state.currentThreadId !== undefined) {
+  if (
+    state.serverId === undefined
+      ? state.tabs.length > 0 || state.activeTabId !== undefined
+      : state.tabs.length === 0 ||
+        state.activeTabId === undefined ||
+        !state.tabs.some(({ id }) => id === state.activeTabId)
+  ) {
     throw new WindowStateTransportError("invalidResponse");
   }
   return Object.freeze(state);
@@ -277,7 +337,8 @@ function parseOpenAppWindowResponse(value: unknown): OpenAppWindowResponse {
   );
   const windowId = expectWindowId(record.windowId);
   const label = expectNonEmptyString(record.label, "invalidResponse");
-  if (label !== `app-${windowId}`) {
+  const expectedLabel = windowId === "main" ? "main" : `app-${windowId}`;
+  if (label !== expectedLabel) {
     throw new WindowStateTransportError("invalidResponse");
   }
   return Object.freeze({ windowId, label });
@@ -362,6 +423,52 @@ function expectNullableBoundedText(
   code: "invalidRequest" | "invalidResponse",
 ): string | null {
   return value === null ? null : expectBoundedText(value, maximumBytes, code);
+}
+
+function expectTabs(
+  value: unknown,
+  code: "invalidRequest" | "invalidResponse",
+): readonly WindowTab[] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 100) {
+    if (Array.isArray(value) && value.length === 0) {
+      return Object.freeze([]);
+    }
+    throw new WindowStateTransportError(code);
+  }
+  const tabIds = new Set<string>();
+  const threadIds = new Set<string>();
+  const tabs = value.map((entry) => {
+    const record = expectExactRecord(entry, ["id", "threadId"], code);
+    const id = expectBoundedText(record.id, 64, code);
+    const threadId = expectNullableBoundedText(
+      record.threadId,
+      MAX_THREAD_ID_BYTES,
+      code,
+    );
+    if (
+      tabIds.has(id) ||
+      (threadId !== null && threadIds.has(threadId))
+    ) {
+      throw new WindowStateTransportError(code);
+    }
+    tabIds.add(id);
+    if (threadId !== null) {
+      threadIds.add(threadId);
+    }
+    return Object.freeze({ id, threadId });
+  });
+  return Object.freeze(tabs);
+}
+
+function sameTabs(
+  left: readonly WindowTab[],
+  right: readonly WindowTab[],
+): boolean {
+  return left.length === right.length && left.every(
+    (tab, index) =>
+      tab.id === right[index]?.id &&
+      tab.threadId === right[index]?.threadId,
+  );
 }
 
 function expectBoundedText(

@@ -58,7 +58,7 @@ interface ConnectionShellProps {
   onNewTask?: () => void;
   onNewTaskInProject?: (cwd: string) => void;
   onOpenThread?: (threadId: string) => void;
-  onOpenThreadInNewWindow?: (threadId: string) => void;
+  onOpenThreadInNewTab?: (threadId: string) => void;
   onUndoArchive?: () => void;
   onRetry?: () => void;
   onOpenDiagnostics?: () => void;
@@ -66,6 +66,7 @@ interface ConnectionShellProps {
   mainContent?: ReactNode;
   contentTitle?: string;
   contentSubtitle?: string;
+  topbarNavigation?: ReactNode;
   topbarAccessory?: ReactNode;
   reconnect?: ReconnectViewState | null;
   onStopReconnect?: () => void;
@@ -169,7 +170,7 @@ export function ConnectionShell({
   onNewTask,
   onNewTaskInProject,
   onOpenThread,
-  onOpenThreadInNewWindow,
+  onOpenThreadInNewTab,
   onUndoArchive,
   onRetry,
   onOpenDiagnostics,
@@ -177,6 +178,7 @@ export function ConnectionShell({
   mainContent,
   contentTitle = "Codex Desktop Linux",
   contentSubtitle,
+  topbarNavigation,
   topbarAccessory,
   reconnect = null,
   onStopReconnect,
@@ -503,9 +505,9 @@ export function ConnectionShell({
             onOpenThread?.(threadId);
             setIsSidebarOpen(false);
           }}
-          {...(onOpenThreadInNewWindow === undefined
+          {...(onOpenThreadInNewTab === undefined
             ? {}
-            : { onOpenThreadInNewWindow })}
+            : { onOpenThreadInNewTab })}
           onUndoArchive={() => onUndoArchive?.()}
           pendingThreadIds={pendingThreadIds}
           removingThreadIds={removingThreadIds}
@@ -617,11 +619,13 @@ export function ConnectionShell({
           >
             <SidebarCollapseIcon collapsed={!isSidebarOpen} />
           </button>
-          <div className={styles.topbarTitle} title={`${contentSubtitle ?? content.eyebrow} / ${contentTitle}`}>
-            <span className={styles.topbarSubtitle}>{contentSubtitle ?? content.eyebrow}</span>
-            <span className={styles.topbarSeparator}>/</span>
-            <strong>{contentTitle}</strong>
-          </div>
+          {topbarNavigation ?? (
+            <div className={styles.topbarTitle} title={`${contentSubtitle ?? content.eyebrow} / ${contentTitle}`}>
+              <span className={styles.topbarSubtitle}>{contentSubtitle ?? content.eyebrow}</span>
+              <span className={styles.topbarSeparator}>/</span>
+              <strong>{contentTitle}</strong>
+            </div>
+          )}
 
           {topbarAccessory}
           {onOpenSettings ? (

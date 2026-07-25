@@ -73,6 +73,110 @@ export function createDraftStore(
 
 export const draftStore = createDraftStore();
 
+export interface TransientDraftStore extends DraftStore {
+  discardTransient(draftKey: string): void;
+  resetTransient(draftKey: string): void;
+}
+
+export function createTransientDraftStore(
+  persistent: DraftStore,
+  transientKeyPrefix = "transient:",
+): TransientDraftStore {
+  const transient = new Map<string, StoredDraft>();
+  const discarded = new Set<string>();
+  const isTransient = (key: string) => key.startsWith(transientKeyPrefix);
+  return {
+    discardTransient(draftKey) {
+      if (!isTransient(draftKey)) {
+        throw new TypeError("only transient drafts can be discarded");
+      }
+      discarded.add(draftKey);
+      transient.delete(draftKey);
+    },
+    resetTransient(draftKey) {
+      if (!isTransient(draftKey)) {
+        throw new TypeError("only transient drafts can be reset");
+      }
+      discarded.delete(draftKey);
+      transient.delete(draftKey);
+    },
+    async listKeys(keyPrefix) {
+      const transientKeys = [...transient.keys()].filter((key) =>
+        key.startsWith(keyPrefix)
+      );
+      const persistedKeys = isTransient(keyPrefix)
+        ? []
+        : await persistent.listKeys(keyPrefix);
+      return Object.freeze([...persistedKeys, ...transientKeys]);
+    },
+    async load(draftKey) {
+      return isTransient(draftKey)
+        ? transient.get(draftKey) ?? null
+        : persistent.load(draftKey);
+    },
+    async save(draftKey, draft) {
+      if (isTransient(draftKey)) {
+        if (discarded.has(draftKey)) {
+          return;
+        }
+        transient.set(draftKey, Object.freeze({
+          text: draft.text,
+          tokens: Object.freeze([...draft.tokens]),
+        }));
+        return;
+      }
+      await persistent.save(draftKey, draft);
+    },
+    async delete(draftKey) {
+      if (isTransient(draftKey)) {
+        transient.delete(draftKey);
+        return;
+      }
+      await persistent.delete(draftKey);
+    },
+    async transition(sourceDraftKey, targetDraftKey, draft) {
+      const sourceTransient = isTransient(sourceDraftKey);
+      const targetTransient = isTransient(targetDraftKey);
+      if (sourceTransient && targetTransient) {
+        discarded.delete(sourceDraftKey);
+        discarded.delete(targetDraftKey);
+        transient.delete(sourceDraftKey);
+        if (draft !== null) {
+          transient.set(targetDraftKey, Object.freeze({
+            text: draft.text,
+            tokens: Object.freeze([...draft.tokens]),
+          }));
+        }
+        return;
+      }
+      if (!sourceTransient && !targetTransient) {
+        await persistent.transition(sourceDraftKey, targetDraftKey, draft);
+        return;
+      }
+      if (sourceTransient) {
+        discarded.delete(sourceDraftKey);
+        transient.delete(sourceDraftKey);
+        if (draft === null) {
+          await persistent.delete(targetDraftKey);
+        } else {
+          await persistent.save(targetDraftKey, draft);
+        }
+        return;
+      }
+      await persistent.delete(sourceDraftKey);
+      discarded.delete(targetDraftKey);
+      if (draft === null) {
+        transient.delete(targetDraftKey);
+      } else {
+        transient.set(targetDraftKey, Object.freeze({
+          text: draft.text,
+          tokens: Object.freeze([...draft.tokens]),
+        }));
+      }
+    },
+  };
+}
+
 export function parseDraftKeys(value: unknown): readonly string[] {
   if (
     !Array.isArray(value) ||

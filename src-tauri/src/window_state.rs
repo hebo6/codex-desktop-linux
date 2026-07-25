@@ -6,11 +6,14 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use sqlx::{Row, SqliteConnection, SqlitePool, sqlite::SqliteRow};
+use uuid::Uuid;
 
 use crate::configuration::ServerId;
 
 const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
 const MAX_THREAD_ID_BYTES: usize = 1_024;
+const MAX_TAB_ID_BYTES: usize = 64;
+const MAX_TABS: usize = 100;
 
 #[derive(Clone)]
 pub(crate) struct WindowStateRepository {
@@ -24,9 +27,17 @@ pub(crate) struct WindowState {
     pub(crate) version: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) server_id: Option<ServerId>,
+    pub(crate) tabs: Vec<WindowTab>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) current_thread_id: Option<String>,
+    pub(crate) active_tab_id: Option<String>,
     pub(crate) updated_at_ms: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct WindowTab {
+    pub(crate) id: String,
+    pub(crate) thread_id: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,19 +58,21 @@ pub(crate) struct BindWindowServerRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct UpdateWindowSessionRequest {
+pub(crate) struct UpdateWindowTabsRequest {
     pub(crate) expected_version: u64,
-    #[serde(deserialize_with = "deserialize_nullable_string")]
-    current_thread_id: Option<String>,
+    tabs: Vec<WindowTab>,
+    active_tab_id: String,
 }
 
 #[derive(Debug)]
 pub(crate) enum WindowStateRepositoryError {
     InvalidVersion,
+    InvalidTabs,
     InvalidThreadId,
-    SessionWithoutServer,
+    TabsWithoutServer,
     WindowNotFound,
     ServerNotFound,
+    ServerAlreadyOpen(String),
     VersionConflict,
     Corrupt,
     Database(sqlx::Error),
@@ -69,12 +82,16 @@ impl fmt::Display for WindowStateRepositoryError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidVersion => formatter.write_str("The window state version is invalid"),
+            Self::InvalidTabs => formatter.write_str("The window tabs are invalid"),
             Self::InvalidThreadId => formatter.write_str("The current thread ID is invalid"),
-            Self::SessionWithoutServer => {
-                formatter.write_str("A window without a server cannot select a session")
+            Self::TabsWithoutServer => {
+                formatter.write_str("A window without a server cannot update tabs")
             }
             Self::WindowNotFound => formatter.write_str("The window state does not exist"),
             Self::ServerNotFound => formatter.write_str("The server does not exist"),
+            Self::ServerAlreadyOpen(_) => {
+                formatter.write_str("The server is already open in another window")
+            }
             Self::VersionConflict => {
                 formatter.write_str("The window state was modified concurrently")
             }
@@ -175,7 +192,19 @@ impl WindowStateRepository {
             .execute(&mut *transaction)
             .await
             .map_err(database_error)?;
-        let state = load_window_state(&mut transaction, window_id).await?;
+        let mut state = load_window_state(&mut transaction, window_id).await?;
+        if let Some(server_id) = state.server_id {
+            if let Some(active_window_id) =
+                active_window_for_server(&mut transaction, server_id, Some(window_id)).await?
+            {
+                return Err(WindowStateRepositoryError::ServerAlreadyOpen(
+                    active_window_id,
+                ));
+            }
+            ensure_server_workspace(&mut transaction, window_id, server_id, state.updated_at_ms)
+                .await?;
+            state = load_window_state(&mut transaction, window_id).await?;
+        }
         set_active_reference(
             &mut transaction,
             window_id,
@@ -216,21 +245,25 @@ impl WindowStateRepository {
 
         if let Some(server_id) = request.server_id {
             require_server(&mut transaction, server_id).await?;
+            if let Some(active_window_id) =
+                active_window_for_server(&mut transaction, server_id, Some(window_id)).await?
+            {
+                return Err(WindowStateRepositoryError::ServerAlreadyOpen(
+                    active_window_id,
+                ));
+            }
         }
-        persist_current_server_session(&mut transaction, &current).await?;
-        let current_thread_id = match request.server_id {
-            Some(server_id) => load_server_session(&mut transaction, window_id, server_id).await?,
-            None => None,
-        };
         let now_ms = current_time_ms()?;
+        if let Some(server_id) = request.server_id {
+            ensure_server_workspace(&mut transaction, window_id, server_id, now_ms).await?;
+        }
         let updated = sqlx::query(
             "UPDATE window_states
-             SET server_id = ?, current_thread_id = ?, version = version + 1,
+             SET server_id = ?, version = version + 1,
                  updated_at_ms = MAX(updated_at_ms + 1, ?)
              WHERE window_id = ? AND version = ? AND version < ?",
         )
         .bind(request.server_id.map(server_id_string))
-        .bind(current_thread_id)
         .bind(now_ms)
         .bind(window_id)
         .bind(version_to_i64(request.expected_version)?)
@@ -257,17 +290,13 @@ impl WindowStateRepository {
         Ok(state)
     }
 
-    pub(crate) async fn update_session(
+    pub(crate) async fn update_tabs(
         &self,
         window_id: &str,
-        request: UpdateWindowSessionRequest,
+        request: UpdateWindowTabsRequest,
     ) -> Result<WindowState, WindowStateRepositoryError> {
         validate_expected_version(request.expected_version)?;
-        validate_optional_text(
-            request.current_thread_id.as_deref(),
-            MAX_THREAD_ID_BYTES,
-            WindowStateRepositoryError::InvalidThreadId,
-        )?;
+        validate_tabs(&request.tabs, &request.active_tab_id)?;
 
         let mut transaction = self
             .pool
@@ -278,22 +307,31 @@ impl WindowStateRepository {
         if current.version != request.expected_version {
             return Err(WindowStateRepositoryError::VersionConflict);
         }
-        if current.server_id.is_none() && request.current_thread_id.is_some() {
-            return Err(WindowStateRepositoryError::SessionWithoutServer);
-        }
-        if current.current_thread_id == request.current_thread_id {
+        let Some(server_id) = current.server_id else {
+            return Err(WindowStateRepositoryError::TabsWithoutServer);
+        };
+        if current.tabs == request.tabs
+            && current.active_tab_id.as_deref() == Some(request.active_tab_id.as_str())
+        {
             transaction.commit().await.map_err(database_error)?;
             return Ok(current);
         }
 
         let now_ms = current_time_ms()?;
+        persist_server_workspace(
+            &mut transaction,
+            window_id,
+            server_id,
+            &request.tabs,
+            &request.active_tab_id,
+            now_ms,
+        )
+        .await?;
         let updated = sqlx::query(
             "UPDATE window_states
-             SET current_thread_id = ?, version = version + 1,
-                 updated_at_ms = MAX(updated_at_ms + 1, ?)
+             SET version = version + 1, updated_at_ms = MAX(updated_at_ms + 1, ?)
              WHERE window_id = ? AND version = ? AND version < ?",
         )
-        .bind(&request.current_thread_id)
         .bind(now_ms)
         .bind(window_id)
         .bind(version_to_i64(request.expected_version)?)
@@ -305,16 +343,6 @@ impl WindowStateRepository {
         if updated != 1 {
             return Err(WindowStateRepositoryError::VersionConflict);
         }
-        if let Some(server_id) = current.server_id {
-            upsert_server_session(
-                &mut transaction,
-                window_id,
-                server_id,
-                request.current_thread_id.as_deref(),
-                now_ms,
-            )
-            .await?;
-        }
         let state = load_window_state(&mut transaction, window_id).await?;
         transaction.commit().await.map_err(database_error)?;
         Ok(state)
@@ -324,10 +352,10 @@ impl WindowStateRepository {
         &self,
         window_id: &str,
         server_id: ServerId,
-        current_thread_id: Option<&str>,
+        thread_id: Option<&str>,
     ) -> Result<WindowState, WindowStateRepositoryError> {
         validate_optional_text(
-            current_thread_id,
+            thread_id,
             MAX_THREAD_ID_BYTES,
             WindowStateRepositoryError::InvalidThreadId,
         )?;
@@ -337,15 +365,21 @@ impl WindowStateRepository {
             .await
             .map_err(database_error)?;
         require_server(&mut transaction, server_id).await?;
+        if let Some(active_window_id) =
+            active_window_for_server(&mut transaction, server_id, None).await?
+        {
+            return Err(WindowStateRepositoryError::ServerAlreadyOpen(
+                active_window_id,
+            ));
+        }
         let now_ms = current_time_ms()?;
         let inserted = sqlx::query(
             "INSERT INTO window_states
-             (window_id, server_id, current_thread_id, updated_at_ms)
-             VALUES (?, ?, ?, ?)",
+             (window_id, server_id, updated_at_ms)
+             VALUES (?, ?, ?)",
         )
         .bind(window_id)
         .bind(server_id_string(server_id))
-        .bind(current_thread_id)
         .bind(now_ms)
         .execute(&mut *transaction)
         .await
@@ -354,16 +388,114 @@ impl WindowStateRepository {
         if inserted != 1 {
             return Err(WindowStateRepositoryError::Corrupt);
         }
-        upsert_server_session(
+        let tab = WindowTab {
+            id: new_tab_id(),
+            thread_id: thread_id.map(str::to_owned),
+        };
+        persist_server_workspace(
             &mut transaction,
             window_id,
             server_id,
-            current_thread_id,
+            std::slice::from_ref(&tab),
+            &tab.id,
             now_ms,
         )
         .await?;
         set_active_reference(&mut transaction, window_id, Some(server_id), now_ms).await?;
         mark_server_used(&mut transaction, server_id, now_ms).await?;
+        let state = load_window_state(&mut transaction, window_id).await?;
+        transaction.commit().await.map_err(database_error)?;
+        Ok(state)
+    }
+
+    pub(crate) async fn active_window_for_server(
+        &self,
+        server_id: ServerId,
+    ) -> Result<Option<String>, WindowStateRepositoryError> {
+        let mut connection = self.pool.acquire().await.map_err(database_error)?;
+        active_window_for_server(&mut connection, server_id, None).await
+    }
+
+    pub(crate) async fn open_tab_for_server(
+        &self,
+        window_id: &str,
+        server_id: ServerId,
+        thread_id: Option<&str>,
+    ) -> Result<WindowState, WindowStateRepositoryError> {
+        validate_optional_text(
+            thread_id,
+            MAX_THREAD_ID_BYTES,
+            WindowStateRepositoryError::InvalidThreadId,
+        )?;
+        let mut transaction = self
+            .pool
+            .begin_with("BEGIN IMMEDIATE")
+            .await
+            .map_err(database_error)?;
+        let current = load_window_state(&mut transaction, window_id).await?;
+        if current.server_id != Some(server_id) {
+            return Err(WindowStateRepositoryError::Corrupt);
+        }
+        let (tabs, active_tab_id) = match thread_id {
+            Some(thread_id) => {
+                if let Some(tab) = current
+                    .tabs
+                    .iter()
+                    .find(|tab| tab.thread_id.as_deref() == Some(thread_id))
+                {
+                    (current.tabs.clone(), tab.id.clone())
+                } else {
+                    let tab = WindowTab {
+                        id: new_tab_id(),
+                        thread_id: Some(thread_id.to_owned()),
+                    };
+                    let mut tabs = current.tabs.clone();
+                    tabs.push(tab.clone());
+                    (tabs, tab.id)
+                }
+            }
+            None => {
+                let tab = WindowTab {
+                    id: new_tab_id(),
+                    thread_id: None,
+                };
+                let mut tabs = current.tabs.clone();
+                tabs.push(tab.clone());
+                (tabs, tab.id)
+            }
+        };
+        validate_tabs(&tabs, &active_tab_id)?;
+        if current.active_tab_id.as_deref() == Some(active_tab_id.as_str()) && current.tabs == tabs
+        {
+            transaction.commit().await.map_err(database_error)?;
+            return Ok(current);
+        }
+        let now_ms = current_time_ms()?;
+        persist_server_workspace(
+            &mut transaction,
+            window_id,
+            server_id,
+            &tabs,
+            &active_tab_id,
+            now_ms,
+        )
+        .await?;
+        let updated = sqlx::query(
+            "UPDATE window_states
+             SET version = version + 1, updated_at_ms = MAX(updated_at_ms + 1, ?)
+             WHERE window_id = ? AND version = ? AND version < ?",
+        )
+        .bind(now_ms)
+        .bind(window_id)
+        .bind(version_to_i64(current.version)?)
+        .bind(MAX_SAFE_INTEGER)
+        .execute(&mut *transaction)
+        .await
+        .map_err(database_error)?
+        .rows_affected();
+        if updated != 1 {
+            return Err(WindowStateRepositoryError::VersionConflict);
+        }
         let state = load_window_state(&mut transaction, window_id).await?;
         transaction.commit().await.map_err(database_error)?;
         Ok(state)
@@ -409,7 +541,7 @@ async fn load_window_state(
     window_id: &str,
 ) -> Result<WindowState, WindowStateRepositoryError> {
     let row = sqlx::query(
-        "SELECT window_id, version, server_id, current_thread_id, updated_at_ms
+        "SELECT window_id, version, server_id, updated_at_ms
          FROM window_states WHERE window_id = ?",
     )
     .bind(window_id)
@@ -417,7 +549,34 @@ async fn load_window_state(
     .await
     .map_err(database_error)?
     .ok_or(WindowStateRepositoryError::WindowNotFound)?;
-    decode_window_state(row)
+    let mut state = decode_window_state(row)?;
+    let Some(server_id) = state.server_id else {
+        return Ok(state);
+    };
+    let workspace = sqlx::query(
+        "SELECT tabs_json, active_tab_id
+         FROM window_server_states
+         WHERE window_id = ? AND server_id = ?",
+    )
+    .bind(window_id)
+    .bind(server_id_string(server_id))
+    .fetch_optional(&mut *connection)
+    .await
+    .map_err(database_error)?;
+    let Some(workspace) = workspace else {
+        return Ok(state);
+    };
+    let tabs_json: String = workspace.try_get("tabs_json").map_err(database_error)?;
+    let tabs: Vec<WindowTab> =
+        serde_json::from_str(&tabs_json).map_err(|_| WindowStateRepositoryError::Corrupt)?;
+    let active_tab_id = workspace
+        .try_get::<Option<String>, _>("active_tab_id")
+        .map_err(database_error)?
+        .ok_or(WindowStateRepositoryError::Corrupt)?;
+    validate_tabs(&tabs, &active_tab_id).map_err(|_| WindowStateRepositoryError::Corrupt)?;
+    state.tabs = tabs;
+    state.active_tab_id = Some(active_tab_id);
+    Ok(state)
 }
 
 fn decode_window_state(row: SqliteRow) -> Result<WindowState, WindowStateRepositoryError> {
@@ -435,17 +594,6 @@ fn decode_window_state(row: SqliteRow) -> Result<WindowState, WindowStateReposit
         .map_err(database_error)?
         .map(|value| ServerId::parse_persisted(&value).ok_or(WindowStateRepositoryError::Corrupt))
         .transpose()?;
-    let current_thread_id = row
-        .try_get::<Option<String>, _>("current_thread_id")
-        .map_err(database_error)?;
-    validate_optional_text(
-        current_thread_id.as_deref(),
-        MAX_THREAD_ID_BYTES,
-        WindowStateRepositoryError::Corrupt,
-    )?;
-    if server_id.is_none() && current_thread_id.is_some() {
-        return Err(WindowStateRepositoryError::Corrupt);
-    }
     let updated_at_ms: i64 = row.try_get("updated_at_ms").map_err(database_error)?;
     if !(0..=MAX_SAFE_INTEGER).contains(&updated_at_ms) {
         return Err(WindowStateRepositoryError::Corrupt);
@@ -454,7 +602,8 @@ fn decode_window_state(row: SqliteRow) -> Result<WindowState, WindowStateReposit
         window_id,
         version,
         server_id,
-        current_thread_id,
+        tabs: Vec::new(),
+        active_tab_id: None,
         updated_at_ms,
     })
 }
@@ -587,41 +736,28 @@ async fn set_active_reference(
     Ok(())
 }
 
-async fn persist_current_server_session(
-    connection: &mut SqliteConnection,
-    state: &WindowState,
-) -> Result<(), WindowStateRepositoryError> {
-    let Some(server_id) = state.server_id else {
-        return Ok(());
-    };
-    upsert_server_session(
-        connection,
-        &state.window_id,
-        server_id,
-        state.current_thread_id.as_deref(),
-        state.updated_at_ms,
-    )
-    .await
-}
-
-async fn upsert_server_session(
+async fn ensure_server_workspace(
     connection: &mut SqliteConnection,
     window_id: &str,
     server_id: ServerId,
-    current_thread_id: Option<&str>,
     updated_at_ms: i64,
 ) -> Result<(), WindowStateRepositoryError> {
+    let tab = WindowTab {
+        id: new_tab_id(),
+        thread_id: None,
+    };
+    let tabs_json = serde_json::to_string(std::slice::from_ref(&tab))
+        .map_err(|_| WindowStateRepositoryError::Corrupt)?;
     sqlx::query(
         "INSERT INTO window_server_states
-         (window_id, server_id, current_thread_id, updated_at_ms)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT(window_id, server_id) DO UPDATE SET
-             current_thread_id = excluded.current_thread_id,
-             updated_at_ms = excluded.updated_at_ms",
+         (window_id, server_id, tabs_json, active_tab_id, updated_at_ms)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(window_id, server_id) DO NOTHING",
     )
     .bind(window_id)
     .bind(server_id_string(server_id))
-    .bind(current_thread_id)
+    .bind(tabs_json)
+    .bind(&tab.id)
     .bind(updated_at_ms)
     .execute(&mut *connection)
     .await
@@ -629,32 +765,103 @@ async fn upsert_server_session(
     Ok(())
 }
 
-async fn load_server_session(
+async fn persist_server_workspace(
     connection: &mut SqliteConnection,
     window_id: &str,
     server_id: ServerId,
-) -> Result<Option<String>, WindowStateRepositoryError> {
-    let row = sqlx::query(
-        "SELECT current_thread_id FROM window_server_states
-         WHERE window_id = ? AND server_id = ?",
+    tabs: &[WindowTab],
+    active_tab_id: &str,
+    updated_at_ms: i64,
+) -> Result<(), WindowStateRepositoryError> {
+    validate_tabs(tabs, active_tab_id)?;
+    let tabs_json =
+        serde_json::to_string(tabs).map_err(|_| WindowStateRepositoryError::InvalidTabs)?;
+    let updated = sqlx::query(
+        "INSERT INTO window_server_states
+         (window_id, server_id, tabs_json, active_tab_id, updated_at_ms)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(window_id, server_id) DO UPDATE SET
+             tabs_json = excluded.tabs_json,
+             active_tab_id = excluded.active_tab_id,
+             updated_at_ms = excluded.updated_at_ms",
     )
     .bind(window_id)
     .bind(server_id_string(server_id))
+    .bind(tabs_json)
+    .bind(active_tab_id)
+    .bind(updated_at_ms)
+    .execute(&mut *connection)
+    .await
+    .map_err(database_error)?
+    .rows_affected();
+    if updated == 1 {
+        Ok(())
+    } else {
+        Err(WindowStateRepositoryError::Corrupt)
+    }
+}
+
+async fn active_window_for_server(
+    connection: &mut SqliteConnection,
+    server_id: ServerId,
+    excluded_window_id: Option<&str>,
+) -> Result<Option<String>, WindowStateRepositoryError> {
+    let row = sqlx::query_scalar::<_, String>(
+        "SELECT window_id
+         FROM server_window_references
+         WHERE server_id = ? AND (? IS NULL OR window_id != ?)",
+    )
+    .bind(server_id_string(server_id))
+    .bind(excluded_window_id)
+    .bind(excluded_window_id)
     .fetch_optional(&mut *connection)
     .await
     .map_err(database_error)?;
-    let Some(row) = row else {
-        return Ok(None);
-    };
-    let thread_id = row
-        .try_get::<Option<String>, _>("current_thread_id")
-        .map_err(database_error)?;
+    Ok(row)
+}
+
+fn validate_tabs(
+    tabs: &[WindowTab],
+    active_tab_id: &str,
+) -> Result<(), WindowStateRepositoryError> {
+    if tabs.is_empty() || tabs.len() > MAX_TABS {
+        return Err(WindowStateRepositoryError::InvalidTabs);
+    }
     validate_optional_text(
-        thread_id.as_deref(),
-        MAX_THREAD_ID_BYTES,
-        WindowStateRepositoryError::Corrupt,
+        Some(active_tab_id),
+        MAX_TAB_ID_BYTES,
+        WindowStateRepositoryError::InvalidTabs,
     )?;
-    Ok(thread_id)
+    let mut tab_ids = std::collections::HashSet::new();
+    let mut thread_ids = std::collections::HashSet::new();
+    for tab in tabs {
+        validate_optional_text(
+            Some(&tab.id),
+            MAX_TAB_ID_BYTES,
+            WindowStateRepositoryError::InvalidTabs,
+        )?;
+        validate_optional_text(
+            tab.thread_id.as_deref(),
+            MAX_THREAD_ID_BYTES,
+            WindowStateRepositoryError::InvalidThreadId,
+        )?;
+        if !tab_ids.insert(tab.id.as_str())
+            || tab
+                .thread_id
+                .as_deref()
+                .is_some_and(|thread_id| !thread_ids.insert(thread_id))
+        {
+            return Err(WindowStateRepositoryError::InvalidTabs);
+        }
+    }
+    if !tab_ids.contains(active_tab_id) {
+        return Err(WindowStateRepositoryError::InvalidTabs);
+    }
+    Ok(())
+}
+
+fn new_tab_id() -> String {
+    Uuid::new_v4().to_string()
 }
 
 fn validate_expected_version(version: u64) -> Result<(), WindowStateRepositoryError> {
@@ -712,13 +919,6 @@ where
     Option::<ServerId>::deserialize(deserializer)
 }
 
-fn deserialize_nullable_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    Option::<String>::deserialize(deserializer)
-}
-
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -730,8 +930,8 @@ mod tests {
     };
 
     use super::{
-        BindWindowServerRequest, UpdateWindowSessionRequest, WindowGeometry, WindowStateRepository,
-        WindowStateRepositoryError,
+        BindWindowServerRequest, UpdateWindowTabsRequest, WindowGeometry, WindowStateRepository,
+        WindowStateRepositoryError, WindowTab,
     };
 
     async fn repositories() -> (WindowStateRepository, ConfigurationRepository) {
@@ -773,13 +973,22 @@ mod tests {
         }
     }
 
-    fn session_request(
+    fn tabs_request(
         expected_version: u64,
-        current_thread_id: Option<&str>,
-    ) -> UpdateWindowSessionRequest {
-        UpdateWindowSessionRequest {
+        tabs: Vec<WindowTab>,
+        active_tab_id: &str,
+    ) -> UpdateWindowTabsRequest {
+        UpdateWindowTabsRequest {
             expected_version,
-            current_thread_id: current_thread_id.map(str::to_owned),
+            tabs,
+            active_tab_id: active_tab_id.to_owned(),
+        }
+    }
+
+    fn tab(id: &str, thread_id: Option<&str>) -> WindowTab {
+        WindowTab {
+            id: id.to_owned(),
+            thread_id: thread_id.map(str::to_owned),
         }
     }
 
@@ -856,7 +1065,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn restores_thread_per_window_and_server() {
+    async fn restores_tabs_per_window_and_server() {
         let (windows, configuration) = repositories().await;
         let server_a = create_server(&configuration, "A").await;
         let server_b = create_server(&configuration, "B").await;
@@ -866,39 +1075,46 @@ mod tests {
             .bind_server("main", bind_request(initial.version, Some(server_a)))
             .await
             .unwrap();
-        let server_a_session = windows
-            .update_session(
+        let server_a_tabs = windows
+            .update_tabs(
                 "main",
-                session_request(server_a_state.version, Some("thread-a")),
+                tabs_request(
+                    server_a_state.version,
+                    vec![tab("tab-a", Some("thread-a")), tab("tab-empty", None)],
+                    "tab-empty",
+                ),
             )
             .await
             .unwrap();
         let server_b_state = windows
-            .bind_server(
-                "main",
-                bind_request(server_a_session.version, Some(server_b)),
-            )
+            .bind_server("main", bind_request(server_a_tabs.version, Some(server_b)))
             .await
             .unwrap();
-        assert_eq!(server_b_state.current_thread_id, None);
-        let server_b_session = windows
-            .update_session(
+        assert_eq!(server_b_state.tabs.len(), 1);
+        assert_eq!(server_b_state.tabs[0].thread_id, None);
+        let server_b_tabs = windows
+            .update_tabs(
                 "main",
-                session_request(server_b_state.version, Some("thread-b")),
+                tabs_request(
+                    server_b_state.version,
+                    vec![tab("tab-b", Some("thread-b"))],
+                    "tab-b",
+                ),
             )
             .await
             .unwrap();
 
         let restored = windows
-            .bind_server(
-                "main",
-                bind_request(server_b_session.version, Some(server_a)),
-            )
+            .bind_server("main", bind_request(server_b_tabs.version, Some(server_a)))
             .await
             .unwrap();
 
         assert_eq!(restored.server_id, Some(server_a));
-        assert_eq!(restored.current_thread_id.as_deref(), Some("thread-a"));
+        assert_eq!(
+            restored.tabs,
+            vec![tab("tab-a", Some("thread-a")), tab("tab-empty", None),]
+        );
+        assert_eq!(restored.active_tab_id.as_deref(), Some("tab-empty"));
     }
 
     #[tokio::test]
@@ -912,11 +1128,14 @@ mod tests {
             .bind_server("first", bind_request(first.version, Some(server_a)))
             .await
             .unwrap();
-        windows
+        assert!(matches!(
+            windows
             .bind_server("second", bind_request(second.version, Some(server_a)))
-            .await
-            .unwrap();
-        assert_eq!(active_count(&windows, server_a).await, 2);
+            .await,
+            Err(WindowStateRepositoryError::ServerAlreadyOpen(window_id))
+                if window_id == "first"
+        ));
+        assert_eq!(active_count(&windows, server_a).await, 1);
         assert_eq!(
             configuration
                 .snapshot()
@@ -927,16 +1146,20 @@ mod tests {
                 .find(|server| server.server_id == server_a)
                 .unwrap()
                 .active_window_count,
-            2
+            1
         );
 
         windows
             .bind_server("first", bind_request(first.version, Some(server_b)))
             .await
             .unwrap();
-        assert_eq!(active_count(&windows, server_a).await, 1);
+        assert_eq!(active_count(&windows, server_a).await, 0);
         assert_eq!(active_count(&windows, server_b).await, 1);
 
+        windows
+            .bind_server("second", bind_request(second.version, Some(server_a)))
+            .await
+            .unwrap();
         windows.deactivate("second").await.unwrap();
         assert_eq!(active_count(&windows, server_a).await, 0);
         let restored = windows.load_and_activate("second").await.unwrap();
@@ -955,17 +1178,16 @@ mod tests {
             .unwrap();
 
         assert_eq!(reserved.server_id, Some(server));
-        assert_eq!(reserved.current_thread_id.as_deref(), Some("thread-a"));
-        assert_eq!(active_count(&windows, server).await, 1);
+        assert_eq!(reserved.tabs.len(), 1);
+        assert_eq!(reserved.tabs[0].thread_id.as_deref(), Some("thread-a"));
         assert_eq!(
-            windows
-                .load_and_activate("secondary")
-                .await
-                .unwrap()
-                .current_thread_id
-                .as_deref(),
-            Some("thread-a")
+            reserved.active_tab_id.as_deref(),
+            Some(reserved.tabs[0].id.as_str())
         );
+        assert_eq!(active_count(&windows, server).await, 1);
+        let restored = windows.load_and_activate("secondary").await.unwrap();
+        assert_eq!(restored.tabs, reserved.tabs);
+        assert_eq!(restored.active_tab_id, reserved.active_tab_id);
 
         windows.discard_reserved_window("secondary").await.unwrap();
         assert_eq!(active_count(&windows, server).await, 0);
@@ -975,6 +1197,47 @@ mod tests {
                 .await,
             Err(WindowStateRepositoryError::InvalidThreadId)
         ));
+    }
+
+    #[tokio::test]
+    async fn opening_a_target_activates_an_existing_tab_or_appends_a_new_one() {
+        let (windows, configuration) = repositories().await;
+        let server = create_server(&configuration, "A").await;
+        let initial = windows.load_and_activate("main").await.unwrap();
+        let bound = windows
+            .bind_server("main", bind_request(initial.version, Some(server)))
+            .await
+            .unwrap();
+        let original_tab_id = bound.tabs[0].id.clone();
+
+        let thread_a = windows
+            .open_tab_for_server("main", server, Some("thread-a"))
+            .await
+            .unwrap();
+        let thread_a_tab_id = thread_a.active_tab_id.clone().unwrap();
+        assert_eq!(thread_a.tabs.len(), 2);
+        assert_eq!(
+            thread_a.tabs.last().unwrap().thread_id.as_deref(),
+            Some("thread-a")
+        );
+
+        let blank = windows
+            .open_tab_for_server("main", server, None)
+            .await
+            .unwrap();
+        assert_eq!(blank.tabs.len(), 3);
+        assert_eq!(blank.tabs.last().unwrap().thread_id, None);
+
+        let reactivated = windows
+            .open_tab_for_server("main", server, Some("thread-a"))
+            .await
+            .unwrap();
+        assert_eq!(reactivated.tabs.len(), 3);
+        assert_eq!(
+            reactivated.active_tab_id.as_deref(),
+            Some(thread_a_tab_id.as_str())
+        );
+        assert_eq!(reactivated.tabs[0].id, original_tab_id);
     }
 
     #[tokio::test]
@@ -1034,7 +1297,8 @@ mod tests {
 
         let restored = windows.load_and_activate("main").await.unwrap();
         assert_eq!(restored.server_id, None);
-        assert_eq!(restored.current_thread_id, None);
+        assert!(restored.tabs.is_empty());
+        assert_eq!(restored.active_tab_id, None);
         assert_eq!(restored.version, bound.version + 1);
     }
 
@@ -1102,24 +1366,56 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rejects_session_values_without_a_bound_server_or_outside_contract_limits() {
-        let (windows, _) = repositories().await;
+    async fn rejects_tab_values_without_a_bound_server_or_outside_contract_limits() {
+        let (windows, configuration) = repositories().await;
         let initial = windows.load_and_activate("main").await.unwrap();
 
         assert!(matches!(
             windows
-                .update_session("main", session_request(initial.version, Some("thread-a")),)
+                .update_tabs(
+                    "main",
+                    tabs_request(
+                        initial.version,
+                        vec![tab("tab-a", Some("thread-a"))],
+                        "tab-a",
+                    ),
+                )
                 .await,
-            Err(WindowStateRepositoryError::SessionWithoutServer)
+            Err(WindowStateRepositoryError::TabsWithoutServer)
         ));
+        let server = create_server(&configuration, "A").await;
+        let bound = windows
+            .bind_server("main", bind_request(initial.version, Some(server)))
+            .await
+            .unwrap();
         assert!(matches!(
             windows
-                .update_session(
+                .update_tabs(
                     "main",
-                    session_request(initial.version, Some(&"a".repeat(1_025))),
+                    tabs_request(
+                        bound.version,
+                        vec![tab("tab-a", Some(&"a".repeat(1_025)))],
+                        "tab-a",
+                    ),
                 )
                 .await,
             Err(WindowStateRepositoryError::InvalidThreadId)
+        ));
+        assert!(matches!(
+            windows
+                .update_tabs(
+                    "main",
+                    tabs_request(
+                        bound.version,
+                        vec![
+                            tab("tab-a", Some("thread-a")),
+                            tab("tab-b", Some("thread-a")),
+                        ],
+                        "tab-a",
+                    ),
+                )
+                .await,
+            Err(WindowStateRepositoryError::InvalidTabs)
         ));
     }
 
@@ -1132,7 +1428,7 @@ mod tests {
             .is_err()
         );
         assert!(
-            serde_json::from_value::<UpdateWindowSessionRequest>(json!({
+            serde_json::from_value::<UpdateWindowTabsRequest>(json!({
                 "expectedVersion": 1
             }))
             .is_err()

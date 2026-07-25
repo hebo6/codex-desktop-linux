@@ -35,16 +35,14 @@ export function useBackgroundTerminals(
   client: BackgroundTerminalClient | null,
   currentThreadId: string | null,
   resumedThreadId: string | null,
+  subscribedThreadIds: readonly string[] = [],
 ) {
   const [state, setState] = useState<BackgroundTerminalState>(EMPTY_STATE);
   const clientRef = useRef(client);
   const currentThreadIdRef = useRef(currentThreadId);
   const generationClientRef = useRef<BackgroundTerminalClient | null>(null);
   const connectionGenerationRef = useRef(0);
-  const snapshotSourceRef = useRef<{
-    readonly client: BackgroundTerminalClient;
-    readonly threadId: string;
-  } | null>(null);
+  const snapshotThreadIdsRef = useRef(new Set<string>());
   const refreshSequencesRef = useRef(new Map<string, number>());
   const pendingRefreshesRef = useRef(new Map<string, PendingRefresh>());
   clientRef.current = client;
@@ -105,7 +103,7 @@ export function useBackgroundTerminals(
       connectionGenerationRef.current += 1;
       refreshSequencesRef.current.clear();
       pendingRefreshesRef.current.clear();
-      snapshotSourceRef.current = null;
+      snapshotThreadIdsRef.current.clear();
       setState(EMPTY_STATE);
     }
     if (client === null) {
@@ -141,24 +139,31 @@ export function useBackgroundTerminals(
   }, [client]);
 
   useEffect(() => {
-    if (client === null || resumedThreadId === null) {
-      snapshotSourceRef.current = null;
+    if (client === null) {
+      snapshotThreadIdsRef.current.clear();
       return;
     }
-    const previous = snapshotSourceRef.current;
-    if (
-      previous?.client === client &&
-      previous.threadId === resumedThreadId
-    ) {
-      return;
+    const targetThreadIds = new Set(subscribedThreadIds);
+    if (resumedThreadId !== null) {
+      targetThreadIds.add(resumedThreadId);
     }
-    snapshotSourceRef.current = { client, threadId: resumedThreadId };
-    refreshThread(
-      client,
-      resumedThreadId,
-      connectionGenerationRef.current,
-    );
-  }, [client, refreshThread, resumedThreadId]);
+    for (const threadId of targetThreadIds) {
+      if (!snapshotThreadIdsRef.current.has(threadId)) {
+        snapshotThreadIdsRef.current.add(threadId);
+        refreshThread(
+          client,
+          threadId,
+          connectionGenerationRef.current,
+        );
+      }
+    }
+    for (const threadId of snapshotThreadIdsRef.current) {
+      if (!targetThreadIds.has(threadId)) {
+        snapshotThreadIdsRef.current.delete(threadId);
+      }
+    }
+    setState((current) => retainThreads(current, targetThreadIds));
+  }, [client, refreshThread, resumedThreadId, subscribedThreadIds]);
 
   const terminate = useCallback(async (processId: string): Promise<boolean> => {
     const target = clientRef.current;
@@ -432,6 +437,24 @@ function removeThread(
     errorsByThread,
     loadedThreadIds,
   };
+}
+
+function retainThreads(
+  state: BackgroundTerminalState,
+  threadIds: ReadonlySet<string>,
+): BackgroundTerminalState {
+  const knownThreadIds = new Set([
+    ...state.byThread.keys(),
+    ...state.errorsByThread.keys(),
+    ...state.loadedThreadIds,
+  ]);
+  let next = state;
+  for (const threadId of knownThreadIds) {
+    if (!threadIds.has(threadId)) {
+      next = removeThread(next, threadId);
+    }
+  }
+  return next;
 }
 
 function withThreadError(
