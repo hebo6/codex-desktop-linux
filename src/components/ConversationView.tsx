@@ -6,8 +6,12 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type TouchEvent as ReactTouchEvent,
   type UIEvent,
+  type WheelEvent as ReactWheelEvent,
 } from "react";
 
 import type { RestoredThread, ThreadTurn } from "../app/useServerThreads";
@@ -176,6 +180,8 @@ export function ConversationView({
   const contentRef = useRef<HTMLDivElement>(null);
   const pendingQuestionPositionRef = useRef<string | null>(null);
   const followBottomRef = useRef(true);
+  const scrollbarDragRef = useRef(false);
+  const touchPositionRef = useRef<{ x: number; y: number } | null>(null);
   const observedThreadIdRef = useRef(restoredThread.metadata.id);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [scrollerHeight, setScrollerHeight] = useState(0);
@@ -238,14 +244,40 @@ export function ConversationView({
     [historyQuestions],
   );
 
-  const updateBottomState = useCallback((scroller: HTMLDivElement) => {
-    const atBottom =
-      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <=
-        BOTTOM_THRESHOLD;
-    followBottomRef.current = atBottom;
-    setShowJumpToBottom(!atBottom);
-    return atBottom;
-  }, []);
+  const updateBottomState = useCallback(
+    (scroller: HTMLDivElement, allowExitFollowing = true) => {
+      const atBottom =
+        scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <=
+          BOTTOM_THRESHOLD;
+      if (atBottom) {
+        followBottomRef.current = true;
+        setShowJumpToBottom(false);
+      } else if (allowExitFollowing || !followBottomRef.current) {
+        followBottomRef.current = false;
+        setShowJumpToBottom(true);
+      }
+      return atBottom;
+    },
+    [],
+  );
+
+  const stopFollowingForUserScroll = useCallback(
+    (scroller: HTMLDivElement, direction: -1 | 1) => {
+      const maximumScrollTop = Math.max(
+        0,
+        scroller.scrollHeight - scroller.clientHeight,
+      );
+      const canScroll = direction < 0
+        ? scroller.scrollTop > BOTTOM_THRESHOLD
+        : scroller.scrollTop < maximumScrollTop - BOTTOM_THRESHOLD;
+      if (!canScroll) {
+        return;
+      }
+      followBottomRef.current = false;
+      setShowJumpToBottom(true);
+    },
+    [],
+  );
 
   const scrollToBottom = useCallback((scroller: HTMLDivElement) => {
     scroller.scrollTop = Math.max(
@@ -531,6 +563,18 @@ export function ConversationView({
   }, [restoredThread.metadata.id, scrollToBottom]);
 
   useEffect(() => {
+    const finishScrollbarDrag = () => {
+      scrollbarDragRef.current = false;
+    };
+    window.addEventListener("pointerup", finishScrollbarDrag);
+    window.addEventListener("pointercancel", finishScrollbarDrag);
+    return () => {
+      window.removeEventListener("pointerup", finishScrollbarDrag);
+      window.removeEventListener("pointercancel", finishScrollbarDrag);
+    };
+  }, []);
+
+  useEffect(() => {
     if (commandLocationRequest === null) {
       return;
     }
@@ -578,7 +622,86 @@ export function ConversationView({
   }, [commandLocationRequest, updateBottomState]);
 
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
-    updateBottomState(event.currentTarget);
+    updateBottomState(event.currentTarget, scrollbarDragRef.current);
+  };
+
+  const handleWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+    if (event.deltaY === 0) {
+      return;
+    }
+    stopFollowingForUserScroll(
+      event.currentTarget,
+      event.deltaY < 0 ? -1 : 1,
+    );
+  };
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      (target.isContentEditable ||
+        target.matches("input, textarea, select"))
+    ) {
+      return;
+    }
+    const direction =
+      event.key === "ArrowUp" ||
+        event.key === "PageUp" ||
+        event.key === "Home" ||
+        (event.key === " " && event.shiftKey)
+        ? -1
+        : event.key === "ArrowDown" ||
+            event.key === "PageDown" ||
+            event.key === "End" ||
+            (event.key === " " && event.target === event.currentTarget)
+          ? 1
+          : null;
+    if (direction !== null) {
+      stopFollowingForUserScroll(event.currentTarget, direction);
+    }
+  };
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (
+      event.pointerType !== "mouse" ||
+      event.target !== event.currentTarget
+    ) {
+      return;
+    }
+    const scroller = event.currentTarget;
+    const rect = scroller.getBoundingClientRect();
+    const scrollbarWidth = scroller.offsetWidth - scroller.clientWidth;
+    scrollbarDragRef.current =
+      scrollbarWidth > 0 &&
+      event.clientX >= rect.right - scrollbarWidth;
+  };
+
+  const handleTouchStart = (event: ReactTouchEvent<HTMLDivElement>) => {
+    const touch = event.touches.item(0);
+    touchPositionRef.current = touch === null
+      ? null
+      : { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchMove = (event: ReactTouchEvent<HTMLDivElement>) => {
+    const previous = touchPositionRef.current;
+    const touch = event.touches.item(0);
+    if (previous === null || touch === null) {
+      return;
+    }
+    const deltaX = previous.x - touch.clientX;
+    const deltaY = previous.y - touch.clientY;
+    touchPositionRef.current = { x: touch.clientX, y: touch.clientY };
+    if (Math.abs(deltaY) > Math.abs(deltaX) && deltaY !== 0) {
+      stopFollowingForUserScroll(
+        event.currentTarget,
+        deltaY < 0 ? -1 : 1,
+      );
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchPositionRef.current = null;
   };
 
   return (
@@ -586,7 +709,14 @@ export function ConversationView({
       <div
         aria-label="会话消息"
         className={styles.scroller}
+        onKeyDown={handleKeyDown}
+        onPointerDown={handlePointerDown}
         onScroll={handleScroll}
+        onTouchCancel={handleTouchEnd}
+        onTouchEnd={handleTouchEnd}
+        onTouchMove={handleTouchMove}
+        onTouchStart={handleTouchStart}
+        onWheel={handleWheel}
         ref={scrollerRef}
       >
         <div

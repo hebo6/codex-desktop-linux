@@ -36,6 +36,14 @@ function render(ui: ReactElement) {
   return testingLibraryRender(ui, { wrapper: TestConversationWorkspace });
 }
 
+function userScroll(scroller: HTMLElement, scrollTop: number) {
+  fireEvent.wheel(scroller, {
+    deltaY: scrollTop < scroller.scrollTop ? -1 : 1,
+  });
+  scroller.scrollTop = scrollTop;
+  fireEvent.scroll(scroller);
+}
+
 function mockOverflowingTitle(text: string) {
   Object.defineProperties(HTMLElement.prototype, {
     clientWidth: {
@@ -616,14 +624,59 @@ describe("ConversationView", () => {
       scrollHeight: { configurable: true, value: 1_500 },
     });
 
-    scroller.scrollTop = 1_000;
+    userScroll(scroller, 1_000);
+    expect(screen.queryByRole("button", { name: "回到底部" }))
+      .not.toBeInTheDocument();
+
+    userScroll(scroller, 900);
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+  });
+
+  it("布局变化产生的滚动事件不关闭自动跟随", () => {
+    const { rerender } = render(
+      <ConversationView
+        restoredThread={RESTORED}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    let scrollHeight = 1_000;
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 200 },
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+    });
+    scroller.scrollTop = 800;
+    fireEvent.scroll(scroller);
+
+    scrollHeight = 1_200;
+    scroller.scrollTop = 790;
     fireEvent.scroll(scroller);
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
 
-    scroller.scrollTop = 900;
-    fireEvent.scroll(scroller);
-    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+    const expandedTurn = {
+      ...TURN,
+      items: TURN.items.flatMap((item) => item.id === "hook"
+        ? [
+            item,
+            {
+              id: "commentary-after-layout",
+              phase: "commentary" as const,
+              text: "布局变化后继续检查",
+              type: "agentMessage" as const,
+            },
+          ]
+        : [item]),
+    } satisfies ThreadTurn;
+    scrollHeight = 1_400;
+    rerender(
+      <ConversationView
+        restoredThread={{ ...RESTORED, turns: [expandedTurn] }}
+      />,
+    );
+
+    expect(scroller.scrollTop).toBe(1_200);
+    expect(screen.queryByRole("button", { name: "回到底部" }))
+      .not.toBeInTheDocument();
   });
 
   it("离开底部后内容增长保持当前滚动位置", () => {
@@ -660,8 +713,7 @@ describe("ConversationView", () => {
       scrollHeight: { configurable: true, get: () => scrollHeight },
     });
 
-    scroller.scrollTop = 400;
-    fireEvent.scroll(scroller);
+    userScroll(scroller, 400);
     scrollHeight = 1_900;
     rerender(
       <ConversationView
@@ -1056,8 +1108,7 @@ describe("ConversationView", () => {
     );
     expect(scroller.scrollTop).toBe(1_340);
 
-    scroller.scrollTop = 900;
-    fireEvent.scroll(scroller);
+    userScroll(scroller, 900);
     contentDocumentBottom = 1_800;
     rerender(
       <ConversationView
@@ -1080,8 +1131,7 @@ describe("ConversationView", () => {
     expect(scroller.scrollTop).toBe(900);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
 
-    scroller.scrollTop = 1_600;
-    fireEvent.scroll(scroller);
+    userScroll(scroller, 1_600);
     contentDocumentBottom = 2_210;
     rerender(
       <ConversationView
@@ -1262,8 +1312,7 @@ describe("ConversationView", () => {
       />,
     );
     const scroller = screen.getByLabelText("会话消息");
-    scroller.scrollTop = 100;
-    fireEvent.scroll(scroller);
+    userScroll(scroller, 100);
     scroller.scrollTop = 320;
     fireEvent.scroll(scroller);
     expect(screen.getAllByText("历史问题 1")).toHaveLength(1);
@@ -1396,8 +1445,7 @@ describe("ConversationView", () => {
       clientHeight: { configurable: true, value: 500 },
       scrollHeight: { configurable: true, value: 1_500 },
     });
-    scroller.scrollTop = 100;
-    fireEvent.scroll(scroller);
+    userScroll(scroller, 100);
 
     rerender(
       <ConversationView
@@ -1453,8 +1501,7 @@ describe("ConversationView", () => {
       clientHeight: { configurable: true, value: 500 },
       scrollHeight: { configurable: true, get: () => scrollHeight },
     });
-    scroller.scrollTop = 100;
-    fireEvent.scroll(scroller);
+    userScroll(scroller, 100);
 
     fireEvent.click(screen.getByRole("button", { name: "回到底部" }));
 
@@ -1506,8 +1553,7 @@ describe("ConversationView", () => {
       clientHeight: { configurable: true, value: 500 },
       scrollHeight: { configurable: true, value: 2_000 },
     });
-    scroller.scrollTop = 100;
-    fireEvent.scroll(scroller);
+    userScroll(scroller, 100);
 
     fireEvent.click(screen.getByRole("button", { name: "回到底部" }));
 
@@ -1614,8 +1660,7 @@ describe("ConversationView", () => {
     await waitFor(() => expect(scroller.scrollTop).toBe(6_760));
     const visibleHistoryAnswers = new Set<string>();
     historyTurns.forEach((_turn, index) => {
-      scroller.scrollTop = index * 276;
-      fireEvent.scroll(scroller);
+      userScroll(scroller, index * 276);
       const answer = `历史 AI 回答 ${index}`;
       const answerRow = scroller.querySelector<HTMLElement>(
         `[data-row-key="turn-ai-history-${index}:segment:answer-ai-history-${index}"]`,
@@ -1626,8 +1671,7 @@ describe("ConversationView", () => {
     });
     expect(visibleHistoryAnswers.size).toBe(20);
 
-    scroller.scrollTop = 0;
-    fireEvent.scroll(scroller);
+    userScroll(scroller, 0);
     fireEvent.click(screen.getByRole("button", { name: "回到底部" }));
     expect(scroller.scrollTop).toBe(6_760);
     fireEvent.scroll(scroller);
@@ -1668,8 +1712,7 @@ describe("ConversationView", () => {
       clientHeight: { configurable: true, value: 500 },
       scrollHeight: { configurable: true, get: () => scrollHeight },
     });
-    scroller.scrollTop = 600;
-    fireEvent.scroll(scroller);
+    userScroll(scroller, 600);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
 
     const activeTurn = {
@@ -1699,8 +1742,7 @@ describe("ConversationView", () => {
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
 
-    scroller.scrollTop = 600;
-    fireEvent.scroll(scroller);
+    userScroll(scroller, 600);
     const streamingTurn = {
       ...activeTurn,
       items: [
