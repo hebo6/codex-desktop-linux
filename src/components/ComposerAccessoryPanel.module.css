@@ -11,6 +11,12 @@
   pointer-events: auto;
 }
 
+.panel > :first-child,
+.panel > :first-child .summary {
+  border-top-left-radius: 27px;
+  border-top-right-radius: 27px;
+}
+
 .panel:empty {
   display: none;
 }
