@@ -16,6 +16,7 @@ commands.allow = [
     "list_draft_keys",
     "load_draft",
     "save_draft",
+    "transition_draft",
     "delete_draft",
     "list_saved_prompts",
     "create_saved_prompt",

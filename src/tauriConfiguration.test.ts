@@ -21,6 +21,18 @@ describe("Tauri 发布配置", () => {
     expect(windowPermission).not.toContain('"update_window_session"');
   });
 
+  it("允许应用窗口管理草稿", () => {
+    for (const command of [
+      "list_draft_keys",
+      "load_draft",
+      "save_draft",
+      "transition_draft",
+      "delete_draft",
+    ]) {
+      expect(windowPermission).toContain(`"${command}"`);
+    }
+  });
+
   it("允许应用窗口订阅和退订应用事件", () => {
     expect(tauriConfiguration.app.security.capabilities).toContain("app-events");
     expect(eventCapability.windows).toEqual(["main", "app-*"]);
