@@ -118,7 +118,6 @@ describe("windowState transport", () => {
         version: Number.MAX_SAFE_INTEGER,
         serverId: SERVER_A,
         currentThreadId: "线程-1",
-        draftKey: "草稿-1",
         updatedAtMs: Number.MAX_SAFE_INTEGER,
       }),
     );
@@ -128,7 +127,6 @@ describe("windowState transport", () => {
       version: Number.MAX_SAFE_INTEGER,
       serverId: SERVER_A,
       currentThreadId: "线程-1",
-      draftKey: "草稿-1",
       updatedAtMs: Number.MAX_SAFE_INTEGER,
     });
   });
@@ -141,7 +139,6 @@ describe("windowState transport", () => {
         version: 8,
         serverId: SERVER_A,
         currentThreadId: "thread-a",
-        draftKey: "draft-a",
         updatedAtMs: 1_001,
       }),
     );
@@ -177,7 +174,7 @@ describe("windowState transport", () => {
     ).resolves.toMatchObject({ version: 9, serverId: SERVER_A });
   });
 
-  it("显式传递 nullable 会话字段并校验响应相关性", async () => {
+  it("显式传递 nullable 会话并校验响应相关性", async () => {
     const ipc = new FakeIpc();
     ipc.responses.set(
       "update_window_session",
@@ -185,7 +182,6 @@ describe("windowState transport", () => {
         version: 3,
         serverId: SERVER_A,
         currentThreadId: "thread-2",
-        draftKey: "draft-2",
         updatedAtMs: 2_000,
       }),
     );
@@ -194,7 +190,6 @@ describe("windowState transport", () => {
       {
         expectedVersion: 2,
         currentThreadId: "thread-2",
-        draftKey: "draft-2",
       },
       ipc,
     );
@@ -204,7 +199,6 @@ describe("windowState transport", () => {
         request: {
           expectedVersion: 2,
           currentThreadId: "thread-2",
-          draftKey: "draft-2",
         },
       },
     });
@@ -215,7 +209,7 @@ describe("windowState transport", () => {
     );
     await expect(
       updateWindowSession(
-        { expectedVersion: 3, currentThreadId: null, draftKey: null },
+        { expectedVersion: 3, currentThreadId: null },
         ipc,
       ),
     ).resolves.toMatchObject({ version: 4 });
@@ -223,7 +217,6 @@ describe("windowState transport", () => {
       request: {
         expectedVersion: 3,
         currentThreadId: null,
-        draftKey: null,
       },
     });
 
@@ -237,7 +230,7 @@ describe("windowState transport", () => {
     );
     await expect(
       updateWindowSession(
-        { expectedVersion: 4, currentThreadId: null, draftKey: null },
+        { expectedVersion: 4, currentThreadId: null },
         ipc,
       ),
     ).rejects.toMatchObject({ code: "invalidResponse" });
@@ -248,7 +241,6 @@ describe("windowState transport", () => {
         version: 5,
         serverId: SERVER_A,
         currentThreadId: "thread-5",
-        draftKey: "draft-5",
         updatedAtMs: 2_003,
       }),
     );
@@ -257,7 +249,6 @@ describe("windowState transport", () => {
         {
           expectedVersion: 5,
           currentThreadId: "thread-5",
-          draftKey: "draft-5",
         },
         ipc,
       ),
@@ -316,13 +307,10 @@ describe("windowState transport", () => {
       windowState({ serverId: "not-a-server" }),
       windowState({ serverId: null }),
       windowState({ currentThreadId: null }),
-      windowState({ draftKey: "" }),
+      windowState({ draftKey: "draft" }),
       windowState({ currentThreadId: "thread-without-server" }),
-      windowState({ draftKey: "draft-without-server" }),
       windowState({ serverId: SERVER_A, currentThreadId: "nul\0thread" }),
-      windowState({ serverId: SERVER_A, draftKey: "nul\0draft" }),
       windowState({ currentThreadId: "中".repeat(342) }),
-      windowState({ draftKey: "中".repeat(86) }),
       [],
       null,
     ];
@@ -344,7 +332,6 @@ describe("windowState transport", () => {
         version: 2,
         serverId: SERVER_A,
         currentThreadId: "中".repeat(341),
-        draftKey: "中".repeat(85),
         updatedAtMs: 2,
       }),
     );
@@ -353,35 +340,25 @@ describe("windowState transport", () => {
         {
           expectedVersion: 1,
           currentThreadId: "中".repeat(341),
-          draftKey: "中".repeat(85),
         },
         ipc,
       ),
     ).resolves.toMatchObject({ version: 2 });
 
     const invalidRequests: unknown[] = [
-      { expectedVersion: 1, currentThreadId: null },
       { expectedVersion: 1, draftKey: null },
-      { currentThreadId: null, draftKey: null },
+      { currentThreadId: null },
       {
         expectedVersion: 1,
         currentThreadId: null,
-        draftKey: null,
         windowId: "main",
       },
       {
         expectedVersion: 1,
         currentThreadId: "中".repeat(342),
-        draftKey: null,
       },
-      {
-        expectedVersion: 1,
-        currentThreadId: null,
-        draftKey: "中".repeat(86),
-      },
-      { expectedVersion: 1, currentThreadId: "", draftKey: null },
-      { expectedVersion: 1, currentThreadId: "nul\0thread", draftKey: null },
-      { expectedVersion: 1, currentThreadId: null, draftKey: "nul\0draft" },
+      { expectedVersion: 1, currentThreadId: "" },
+      { expectedVersion: 1, currentThreadId: "nul\0thread" },
     ];
     for (const invalid of invalidRequests) {
       await expect(

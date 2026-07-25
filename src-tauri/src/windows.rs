@@ -130,9 +130,6 @@ impl From<WindowStateRepositoryError> for CommandError {
             WindowStateRepositoryError::InvalidThreadId => {
                 Self::new("invalidThreadId", "The current thread ID is invalid")
             }
-            WindowStateRepositoryError::InvalidDraftKey => {
-                Self::new("invalidDraftKey", "The draft key is invalid")
-            }
             WindowStateRepositoryError::SessionWithoutServer => Self::new(
                 "windowSessionRequiresServer",
                 "A window without a server cannot select a session",

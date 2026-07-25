@@ -2587,8 +2587,8 @@ async fn clear_persisted_window_server(
     let referenced_count = decode_count(referenced_count)?;
     let updated = sqlx::query(
         "UPDATE window_states
-         SET server_id = NULL, current_thread_id = NULL, draft_key = NULL,
-             version = version + 1, updated_at_ms = MAX(updated_at_ms + 1, ?)
+         SET server_id = NULL, current_thread_id = NULL, version = version + 1,
+             updated_at_ms = MAX(updated_at_ms + 1, ?)
          WHERE server_id = ? AND version < ?",
     )
     .bind(now_ms)

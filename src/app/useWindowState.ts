@@ -28,7 +28,6 @@ export interface WindowStateControls extends WindowStateSnapshot {
   readonly bindServer: (serverId: ServerId | null) => Promise<WindowState>;
   readonly updateSession: (
     currentThreadId: string | null,
-    draftKey: string | null,
   ) => Promise<WindowState>;
 }
 
@@ -71,7 +70,6 @@ type WindowMutation =
   | {
       readonly type: "updateSession";
       readonly currentThreadId: string | null;
-      readonly draftKey: string | null;
     };
 
 export class WindowStateController {
@@ -137,12 +135,10 @@ export class WindowStateController {
 
   readonly updateSession = (
     currentThreadId: string | null,
-    draftKey: string | null,
   ): Promise<WindowState> =>
     this.enqueueMutation({
       type: "updateSession",
       currentThreadId,
-      draftKey,
     });
 
   retain(): () => void {
@@ -248,7 +244,6 @@ export class WindowStateController {
           : await this.sessionUpdater({
               expectedVersion: previous.version,
               currentThreadId: mutation.currentThreadId,
-              draftKey: mutation.draftKey,
             });
       assertMutationResult(previous, next, mutation);
     } catch {
@@ -319,8 +314,7 @@ function mutationMatchesState(
 ): boolean {
   return mutation.type === "bindServer"
     ? (state.serverId ?? null) === mutation.serverId
-    : (state.currentThreadId ?? null) === mutation.currentThreadId &&
-        (state.draftKey ?? null) === mutation.draftKey;
+    : (state.currentThreadId ?? null) === mutation.currentThreadId;
 }
 
 export function useWindowState(
@@ -361,8 +355,7 @@ function assertMutationResult(
   if (
     mutation.type === "updateSession" &&
     (next.serverId !== previous.serverId ||
-      (next.currentThreadId ?? null) !== mutation.currentThreadId ||
-      (next.draftKey ?? null) !== mutation.draftKey)
+      (next.currentThreadId ?? null) !== mutation.currentThreadId)
   ) {
     throw new WindowStateControllerError("operationFailed");
   }

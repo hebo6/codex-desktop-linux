@@ -219,9 +219,13 @@ mod tests {
         sync::atomic::{AtomicU64, Ordering},
     };
 
-    use sqlx::{Connection, Row, SqliteConnection, sqlite::SqliteConnectOptions};
+    use sqlx::{
+        Connection, Row, SqliteConnection,
+        migrate::Migrator,
+        sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+    };
 
-    use super::{StorageError, open_database};
+    use super::{MIGRATOR, StorageError, open_database};
 
     static TEST_PATH_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -513,6 +517,95 @@ mod tests {
         .unwrap();
         assert_eq!(partially_migrated_table_count, 0);
         connection.close().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn migrates_the_current_temporary_draft_to_the_single_new_draft() {
+        let legacy_migrator = Migrator {
+            migrations: MIGRATOR
+                .iter()
+                .filter(|migration| migration.version < 9)
+                .cloned()
+                .collect::<Vec<_>>()
+                .into(),
+            ..Migrator::DEFAULT
+        };
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .create_if_missing(true),
+            )
+            .await
+            .unwrap();
+        legacy_migrator.run(&pool).await.unwrap();
+
+        sqlx::query(
+            "INSERT INTO servers (server_id, name, server_type)
+             VALUES ('server-1', 'Server', 'local')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO window_states (window_id, server_id, draft_key)
+             VALUES ('main', 'server-1', 'draft:current')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO window_server_states (window_id, server_id, draft_key)
+             VALUES ('main', 'server-1', 'draft:current')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        for (key, text, updated_at_ms) in [
+            ("main:server-1:new", "old", 1),
+            ("main:server-1:draft:current", "current", 2),
+            ("main:server-1:draft:orphan", "orphan", 3),
+            ("main:server-1:thread-1", "thread", 4),
+        ] {
+            sqlx::query(
+                "INSERT INTO drafts (draft_key, draft_json, updated_at_ms)
+                 VALUES (?, json_object('text', ?, 'tokens', json_array()), ?)",
+            )
+            .bind(key)
+            .bind(text)
+            .bind(updated_at_ms)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        MIGRATOR.run(&pool).await.unwrap();
+
+        let drafts: Vec<(String, String)> = sqlx::query_as(
+            "SELECT draft_key, json_extract(draft_json, '$.text')
+             FROM drafts ORDER BY draft_key",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            drafts,
+            vec![
+                ("main:server-1:new".to_owned(), "current".to_owned()),
+                ("main:server-1:thread-1".to_owned(), "thread".to_owned()),
+            ]
+        );
+        for table in ["window_states", "window_server_states"] {
+            let legacy_column_count: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM pragma_table_info(?) WHERE name = 'draft_key'",
+            )
+            .bind(table)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(legacy_column_count, 0);
+        }
     }
 
     #[cfg(unix)]

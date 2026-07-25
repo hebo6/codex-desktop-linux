@@ -337,7 +337,7 @@ describe("App", () => {
     ])).toEqual(["/workspace/alpha", "/workspace/beta"]);
   });
 
-  it("顶部新建继承当前目录并支持从项目组新建", async () => {
+  it("顶部新建继承当前目录且重复新建保留单份草稿", async () => {
     const user = userEvent.setup();
     const thread = {
       cliVersion: "1.0.0",
@@ -384,7 +384,6 @@ describe("App", () => {
       ...(request.currentThreadId === null
         ? {}
         : { currentThreadId: request.currentThreadId }),
-      ...(request.draftKey === null ? {} : { draftKey: request.draftKey }),
       updatedAtMs: 2,
     }));
     const sessionFactory: ConfiguredServerSessionFactory = (options) => ({
@@ -435,24 +434,22 @@ describe("App", () => {
     await waitFor(() => expect(sessionUpdater).toHaveBeenCalledWith({
       expectedVersion: 1,
       currentThreadId: null,
-      draftKey: expect.stringMatching(/^draft:/u),
     }));
     await waitFor(() => {
       const newTaskCwd = screen.getByRole("button", { name: "项目" });
       expect(newTaskCwd).toBeEnabled();
       expect(newTaskCwd).toHaveAttribute("title", thread.cwd);
     });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    await user.type(editor, "新会话草稿");
 
     await user.click(screen.getByRole("button", { name: "按项目分组" }));
     await user.click(screen.getByRole("button", {
       name: `在 ${otherThread.cwd} 中新建会话`,
     }));
 
-    await waitFor(() => expect(sessionUpdater).toHaveBeenLastCalledWith({
-      expectedVersion: 2,
-      currentThreadId: null,
-      draftKey: expect.stringMatching(/^draft:/u),
-    }));
+    expect(sessionUpdater).toHaveBeenCalledTimes(1);
+    expect(editor).toHaveValue("新会话草稿");
     await waitFor(() => expect(
       screen.getByRole("button", { name: "项目" }),
     ).toHaveAttribute("title", otherThread.cwd));
@@ -527,7 +524,6 @@ describe("App", () => {
       ...(request.currentThreadId === null
         ? {}
         : { currentThreadId: request.currentThreadId }),
-      ...(request.draftKey === null ? {} : { draftKey: request.draftKey }),
       updatedAtMs: 2,
     }));
     const sessionFactory: ConfiguredServerSessionFactory = (options) => ({
@@ -568,7 +564,6 @@ describe("App", () => {
     expect(sessionUpdater).toHaveBeenCalledWith({
       expectedVersion: 1,
       currentThreadId: startedThread.id,
-      draftKey: null,
     });
     await waitFor(() => expect(screen.getByText("首次问题")).toBeVisible());
     expect(screen.queryByRole("button", { name: "项目" })).not.toBeInTheDocument();
@@ -942,7 +937,6 @@ describe("App", () => {
     await waitFor(() => expect(sessionUpdater).toHaveBeenCalledWith({
       expectedVersion: 2,
       currentThreadId: "thread-7",
-      draftKey: null,
     }));
   });
 

@@ -14,7 +14,6 @@ const WINDOW_ID_PATTERN = /^(?=.{1,64}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u;
 const SERVER_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const MAX_THREAD_ID_BYTES = 1_024;
-const MAX_DRAFT_KEY_BYTES = 256;
 const textEncoder = new TextEncoder();
 
 export interface WindowState {
@@ -22,7 +21,6 @@ export interface WindowState {
   readonly version: number;
   readonly serverId?: ServerId;
   readonly currentThreadId?: string;
-  readonly draftKey?: string;
   readonly updatedAtMs: number;
 }
 
@@ -34,7 +32,6 @@ export interface BindWindowServerRequest {
 export interface UpdateWindowSessionRequest {
   readonly expectedVersion: number;
   readonly currentThreadId: string | null;
-  readonly draftKey: string | null;
 }
 
 export interface OpenAppWindowRequest {
@@ -127,8 +124,7 @@ export async function updateWindowSession(
       state.version,
       normalizedRequest.expectedVersion,
     ) ||
-    (state.currentThreadId ?? null) !== normalizedRequest.currentThreadId ||
-    (state.draftKey ?? null) !== normalizedRequest.draftKey
+    (state.currentThreadId ?? null) !== normalizedRequest.currentThreadId
   ) {
     throw new WindowStateTransportError("invalidResponse");
   }
@@ -198,7 +194,7 @@ function normalizeUpdateWindowSessionRequest(
 ): UpdateWindowSessionRequest {
   const record = expectExactRecord(
     value,
-    ["expectedVersion", "currentThreadId", "draftKey"],
+    ["expectedVersion", "currentThreadId"],
     "invalidRequest",
   );
   return Object.freeze({
@@ -206,11 +202,6 @@ function normalizeUpdateWindowSessionRequest(
     currentThreadId: expectNullableBoundedText(
       record.currentThreadId,
       MAX_THREAD_ID_BYTES,
-      "invalidRequest",
-    ),
-    draftKey: expectNullableBoundedText(
-      record.draftKey,
-      MAX_DRAFT_KEY_BYTES,
       "invalidRequest",
     ),
   });
@@ -246,7 +237,6 @@ function parseWindowState(value: unknown): WindowState {
       "version",
       "serverId",
       "currentThreadId",
-      "draftKey",
       "updatedAtMs",
     ],
     "invalidResponse",
@@ -257,7 +247,6 @@ function parseWindowState(value: unknown): WindowState {
     version: number;
     serverId?: ServerId;
     currentThreadId?: string;
-    draftKey?: string;
     updatedAtMs: number;
   } = {
     windowId: expectWindowId(record.windowId),
@@ -274,17 +263,7 @@ function parseWindowState(value: unknown): WindowState {
       "invalidResponse",
     );
   }
-  if (hasOwn(record, "draftKey")) {
-    state.draftKey = expectBoundedText(
-      record.draftKey,
-      MAX_DRAFT_KEY_BYTES,
-      "invalidResponse",
-    );
-  }
-  if (
-    state.serverId === undefined &&
-    (state.currentThreadId !== undefined || state.draftKey !== undefined)
-  ) {
+  if (state.serverId === undefined && state.currentThreadId !== undefined) {
     throw new WindowStateTransportError("invalidResponse");
   }
   return Object.freeze(state);

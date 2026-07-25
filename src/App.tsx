@@ -259,7 +259,7 @@ export function App({
     onThreadCreated: async (response) => {
       const cancelPreparation = serverThreads.prepareStartedThread(response);
       try {
-        await windowState.updateSession(response.thread.id, null);
+        await windowState.updateSession(response.thread.id);
       } catch (error) {
         cancelPreparation();
         throw error;
@@ -761,7 +761,7 @@ export function App({
           profiles.reload();
         }
         if (target.threadId !== undefined) {
-          await windowState.updateSession(target.threadId, null);
+          await windowState.updateSession(target.threadId);
         }
         setWindowActionError(null);
       } catch {
@@ -1184,7 +1184,7 @@ export function App({
     }
     setWindowActionError(null);
     try {
-      await windowState.updateSession(threadId, null);
+      await windowState.updateSession(threadId);
     } catch {
       setWindowActionError("无法打开会话，请重试");
     }
@@ -1200,7 +1200,7 @@ export function App({
     const previousDraftCwd = draftCwd;
     setDraftCwd(targetCwd);
     try {
-      await windowState.updateSession(null, `draft:${crypto.randomUUID()}`);
+      await windowState.updateSession(null);
     } catch {
       setDraftCwd(previousDraftCwd);
       setWindowActionError("无法新建任务，请重试");
@@ -1321,7 +1321,7 @@ export function App({
       (windowState.windowState?.currentThreadId ?? null) === threadId
     ) {
       try {
-        await windowState.updateSession(null, `draft:${crypto.randomUUID()}`);
+        await windowState.updateSession(null);
       } catch {
         setWindowActionError("会话已删除，但无法更新当前窗口状态");
       }
@@ -1342,7 +1342,7 @@ export function App({
     setForkError(null);
     try {
       const response = await connection.threadClient.forkThread(threadId, turnId).result;
-      await windowState.updateSession(response.thread.id, null);
+      await windowState.updateSession(response.thread.id);
       setPendingForkTurnId(null);
     } catch {
       setForkError("无法创建会话分支，原会话未受影响，请重试");
@@ -1498,7 +1498,6 @@ export function App({
                   draftKey={composerDraftKey(
                     windowState.windowState?.windowId ?? null,
                     boundServerId,
-                    windowState.windowState?.draftKey ?? null,
                     windowState.windowState?.currentThreadId ?? null,
                   )}
                   draftStore={draftStore}
@@ -1949,13 +1948,12 @@ export function recentWorkingDirectories(
 function composerDraftKey(
   windowId: string | null,
   serverId: string | null,
-  draftKey: string | null,
   threadId: string | null,
 ): string | null {
   const keyPrefix = composerDraftKeyPrefix(windowId, serverId);
   return keyPrefix === null
     ? null
-    : `${keyPrefix}${draftKey ?? threadId ?? "new"}`;
+    : `${keyPrefix}${threadId ?? "new"}`;
 }
 
 const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();

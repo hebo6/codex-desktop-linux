@@ -139,7 +139,6 @@ describe("WindowStateController", () => {
     const bound = state(8, {
       serverId: SERVER_A,
       currentThreadId: "thread-a",
-      draftKey: "draft-a",
     });
     pendingBind.resolve(bound);
     await expect(operation).resolves.toBe(bound);
@@ -200,7 +199,6 @@ describe("WindowStateController", () => {
     const current = state(7, {
       serverId: SERVER_A,
       currentThreadId: "thread-a",
-      draftKey: "draft-a",
     });
     const controller = new WindowStateController({
       loader: () => pendingLoad.promise,
@@ -212,9 +210,7 @@ describe("WindowStateController", () => {
     controller.subscribe(listener);
 
     await expect(controller.bindServer(SERVER_A)).resolves.toBe(current);
-    await expect(controller.updateSession("thread-a", "draft-a")).resolves.toBe(
-      current,
-    );
+    await expect(controller.updateSession("thread-a")).resolves.toBe(current);
 
     expect(binder).not.toHaveBeenCalled();
     expect(sessionUpdater).not.toHaveBeenCalled();
@@ -268,18 +264,16 @@ describe("WindowStateController", () => {
       state(5, { serverId: SERVER_A }),
     );
 
-    const operation = controller.updateSession("thread-a", "draft-a");
+    const operation = controller.updateSession("thread-a");
     await Promise.resolve();
     expect(sessionUpdater).toHaveBeenCalledWith({
       expectedVersion: 5,
       currentThreadId: "thread-a",
-      draftKey: "draft-a",
     });
 
     const updated = state(6, {
       serverId: SERVER_A,
       currentThreadId: "thread-a",
-      draftKey: "draft-a",
     });
     pendingUpdate.resolve(updated);
     await expect(operation).resolves.toBe(updated);

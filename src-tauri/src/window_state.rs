@@ -11,7 +11,6 @@ use crate::configuration::ServerId;
 
 const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
 const MAX_THREAD_ID_BYTES: usize = 1_024;
-const MAX_DRAFT_KEY_BYTES: usize = 256;
 
 #[derive(Clone)]
 pub(crate) struct WindowStateRepository {
@@ -27,8 +26,6 @@ pub(crate) struct WindowState {
     pub(crate) server_id: Option<ServerId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) current_thread_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) draft_key: Option<String>,
     pub(crate) updated_at_ms: i64,
 }
 
@@ -54,15 +51,12 @@ pub(crate) struct UpdateWindowSessionRequest {
     pub(crate) expected_version: u64,
     #[serde(deserialize_with = "deserialize_nullable_string")]
     current_thread_id: Option<String>,
-    #[serde(deserialize_with = "deserialize_nullable_string")]
-    draft_key: Option<String>,
 }
 
 #[derive(Debug)]
 pub(crate) enum WindowStateRepositoryError {
     InvalidVersion,
     InvalidThreadId,
-    InvalidDraftKey,
     SessionWithoutServer,
     WindowNotFound,
     ServerNotFound,
@@ -76,7 +70,6 @@ impl fmt::Display for WindowStateRepositoryError {
         match self {
             Self::InvalidVersion => formatter.write_str("The window state version is invalid"),
             Self::InvalidThreadId => formatter.write_str("The current thread ID is invalid"),
-            Self::InvalidDraftKey => formatter.write_str("The draft key is invalid"),
             Self::SessionWithoutServer => {
                 formatter.write_str("A window without a server cannot select a session")
             }
@@ -225,20 +218,19 @@ impl WindowStateRepository {
             require_server(&mut transaction, server_id).await?;
         }
         persist_current_server_session(&mut transaction, &current).await?;
-        let (current_thread_id, draft_key) = match request.server_id {
+        let current_thread_id = match request.server_id {
             Some(server_id) => load_server_session(&mut transaction, window_id, server_id).await?,
-            None => (None, None),
+            None => None,
         };
         let now_ms = current_time_ms()?;
         let updated = sqlx::query(
             "UPDATE window_states
-             SET server_id = ?, current_thread_id = ?, draft_key = ?, version = version + 1,
+             SET server_id = ?, current_thread_id = ?, version = version + 1,
                  updated_at_ms = MAX(updated_at_ms + 1, ?)
              WHERE window_id = ? AND version = ? AND version < ?",
         )
         .bind(request.server_id.map(server_id_string))
         .bind(current_thread_id)
-        .bind(draft_key)
         .bind(now_ms)
         .bind(window_id)
         .bind(version_to_i64(request.expected_version)?)
@@ -276,11 +268,6 @@ impl WindowStateRepository {
             MAX_THREAD_ID_BYTES,
             WindowStateRepositoryError::InvalidThreadId,
         )?;
-        validate_optional_text(
-            request.draft_key.as_deref(),
-            MAX_DRAFT_KEY_BYTES,
-            WindowStateRepositoryError::InvalidDraftKey,
-        )?;
 
         let mut transaction = self
             .pool
@@ -291,14 +278,10 @@ impl WindowStateRepository {
         if current.version != request.expected_version {
             return Err(WindowStateRepositoryError::VersionConflict);
         }
-        if current.server_id.is_none()
-            && (request.current_thread_id.is_some() || request.draft_key.is_some())
-        {
+        if current.server_id.is_none() && request.current_thread_id.is_some() {
             return Err(WindowStateRepositoryError::SessionWithoutServer);
         }
-        if current.current_thread_id == request.current_thread_id
-            && current.draft_key == request.draft_key
-        {
+        if current.current_thread_id == request.current_thread_id {
             transaction.commit().await.map_err(database_error)?;
             return Ok(current);
         }
@@ -306,12 +289,11 @@ impl WindowStateRepository {
         let now_ms = current_time_ms()?;
         let updated = sqlx::query(
             "UPDATE window_states
-             SET current_thread_id = ?, draft_key = ?, version = version + 1,
+             SET current_thread_id = ?, version = version + 1,
                  updated_at_ms = MAX(updated_at_ms + 1, ?)
              WHERE window_id = ? AND version = ? AND version < ?",
         )
         .bind(&request.current_thread_id)
-        .bind(&request.draft_key)
         .bind(now_ms)
         .bind(window_id)
         .bind(version_to_i64(request.expected_version)?)
@@ -329,7 +311,6 @@ impl WindowStateRepository {
                 window_id,
                 server_id,
                 request.current_thread_id.as_deref(),
-                request.draft_key.as_deref(),
                 now_ms,
             )
             .await?;
@@ -378,7 +359,6 @@ impl WindowStateRepository {
             window_id,
             server_id,
             current_thread_id,
-            None,
             now_ms,
         )
         .await?;
@@ -429,7 +409,7 @@ async fn load_window_state(
     window_id: &str,
 ) -> Result<WindowState, WindowStateRepositoryError> {
     let row = sqlx::query(
-        "SELECT window_id, version, server_id, current_thread_id, draft_key, updated_at_ms
+        "SELECT window_id, version, server_id, current_thread_id, updated_at_ms
          FROM window_states WHERE window_id = ?",
     )
     .bind(window_id)
@@ -458,20 +438,12 @@ fn decode_window_state(row: SqliteRow) -> Result<WindowState, WindowStateReposit
     let current_thread_id = row
         .try_get::<Option<String>, _>("current_thread_id")
         .map_err(database_error)?;
-    let draft_key = row
-        .try_get::<Option<String>, _>("draft_key")
-        .map_err(database_error)?;
     validate_optional_text(
         current_thread_id.as_deref(),
         MAX_THREAD_ID_BYTES,
         WindowStateRepositoryError::Corrupt,
     )?;
-    validate_optional_text(
-        draft_key.as_deref(),
-        MAX_DRAFT_KEY_BYTES,
-        WindowStateRepositoryError::Corrupt,
-    )?;
-    if server_id.is_none() && (current_thread_id.is_some() || draft_key.is_some()) {
+    if server_id.is_none() && current_thread_id.is_some() {
         return Err(WindowStateRepositoryError::Corrupt);
     }
     let updated_at_ms: i64 = row.try_get("updated_at_ms").map_err(database_error)?;
@@ -483,7 +455,6 @@ fn decode_window_state(row: SqliteRow) -> Result<WindowState, WindowStateReposit
         version,
         server_id,
         current_thread_id,
-        draft_key,
         updated_at_ms,
     })
 }
@@ -628,7 +599,6 @@ async fn persist_current_server_session(
         &state.window_id,
         server_id,
         state.current_thread_id.as_deref(),
-        state.draft_key.as_deref(),
         state.updated_at_ms,
     )
     .await
@@ -639,22 +609,19 @@ async fn upsert_server_session(
     window_id: &str,
     server_id: ServerId,
     current_thread_id: Option<&str>,
-    draft_key: Option<&str>,
     updated_at_ms: i64,
 ) -> Result<(), WindowStateRepositoryError> {
     sqlx::query(
         "INSERT INTO window_server_states
-         (window_id, server_id, current_thread_id, draft_key, updated_at_ms)
-         VALUES (?, ?, ?, ?, ?)
+         (window_id, server_id, current_thread_id, updated_at_ms)
+         VALUES (?, ?, ?, ?)
          ON CONFLICT(window_id, server_id) DO UPDATE SET
              current_thread_id = excluded.current_thread_id,
-             draft_key = excluded.draft_key,
              updated_at_ms = excluded.updated_at_ms",
     )
     .bind(window_id)
     .bind(server_id_string(server_id))
     .bind(current_thread_id)
-    .bind(draft_key)
     .bind(updated_at_ms)
     .execute(&mut *connection)
     .await
@@ -666,9 +633,9 @@ async fn load_server_session(
     connection: &mut SqliteConnection,
     window_id: &str,
     server_id: ServerId,
-) -> Result<(Option<String>, Option<String>), WindowStateRepositoryError> {
+) -> Result<Option<String>, WindowStateRepositoryError> {
     let row = sqlx::query(
-        "SELECT current_thread_id, draft_key FROM window_server_states
+        "SELECT current_thread_id FROM window_server_states
          WHERE window_id = ? AND server_id = ?",
     )
     .bind(window_id)
@@ -677,25 +644,17 @@ async fn load_server_session(
     .await
     .map_err(database_error)?;
     let Some(row) = row else {
-        return Ok((None, None));
+        return Ok(None);
     };
     let thread_id = row
         .try_get::<Option<String>, _>("current_thread_id")
-        .map_err(database_error)?;
-    let draft_key = row
-        .try_get::<Option<String>, _>("draft_key")
         .map_err(database_error)?;
     validate_optional_text(
         thread_id.as_deref(),
         MAX_THREAD_ID_BYTES,
         WindowStateRepositoryError::Corrupt,
     )?;
-    validate_optional_text(
-        draft_key.as_deref(),
-        MAX_DRAFT_KEY_BYTES,
-        WindowStateRepositoryError::Corrupt,
-    )?;
-    Ok((thread_id, draft_key))
+    Ok(thread_id)
 }
 
 fn validate_expected_version(version: u64) -> Result<(), WindowStateRepositoryError> {
@@ -817,12 +776,10 @@ mod tests {
     fn session_request(
         expected_version: u64,
         current_thread_id: Option<&str>,
-        draft_key: Option<&str>,
     ) -> UpdateWindowSessionRequest {
         UpdateWindowSessionRequest {
             expected_version,
             current_thread_id: current_thread_id.map(str::to_owned),
-            draft_key: draft_key.map(str::to_owned),
         }
     }
 
@@ -899,7 +856,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn restores_thread_and_draft_per_window_and_server() {
+    async fn restores_thread_per_window_and_server() {
         let (windows, configuration) = repositories().await;
         let server_a = create_server(&configuration, "A").await;
         let server_b = create_server(&configuration, "B").await;
@@ -912,7 +869,7 @@ mod tests {
         let server_a_session = windows
             .update_session(
                 "main",
-                session_request(server_a_state.version, Some("thread-a"), Some("draft-a")),
+                session_request(server_a_state.version, Some("thread-a")),
             )
             .await
             .unwrap();
@@ -924,11 +881,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(server_b_state.current_thread_id, None);
-        assert_eq!(server_b_state.draft_key, None);
         let server_b_session = windows
             .update_session(
                 "main",
-                session_request(server_b_state.version, Some("thread-b"), Some("draft-b")),
+                session_request(server_b_state.version, Some("thread-b")),
             )
             .await
             .unwrap();
@@ -943,7 +899,6 @@ mod tests {
 
         assert_eq!(restored.server_id, Some(server_a));
         assert_eq!(restored.current_thread_id.as_deref(), Some("thread-a"));
-        assert_eq!(restored.draft_key.as_deref(), Some("draft-a"));
     }
 
     #[tokio::test]
@@ -1001,7 +956,6 @@ mod tests {
 
         assert_eq!(reserved.server_id, Some(server));
         assert_eq!(reserved.current_thread_id.as_deref(), Some("thread-a"));
-        assert_eq!(reserved.draft_key, None);
         assert_eq!(active_count(&windows, server).await, 1);
         assert_eq!(
             windows
@@ -1081,7 +1035,6 @@ mod tests {
         let restored = windows.load_and_activate("main").await.unwrap();
         assert_eq!(restored.server_id, None);
         assert_eq!(restored.current_thread_id, None);
-        assert_eq!(restored.draft_key, None);
         assert_eq!(restored.version, bound.version + 1);
     }
 
@@ -1155,10 +1108,7 @@ mod tests {
 
         assert!(matches!(
             windows
-                .update_session(
-                    "main",
-                    session_request(initial.version, Some("thread-a"), None),
-                )
+                .update_session("main", session_request(initial.version, Some("thread-a")),)
                 .await,
             Err(WindowStateRepositoryError::SessionWithoutServer)
         ));
@@ -1166,7 +1116,7 @@ mod tests {
             windows
                 .update_session(
                     "main",
-                    session_request(initial.version, Some(&"a".repeat(1_025)), None),
+                    session_request(initial.version, Some(&"a".repeat(1_025))),
                 )
                 .await,
             Err(WindowStateRepositoryError::InvalidThreadId)
@@ -1174,7 +1124,7 @@ mod tests {
     }
 
     #[test]
-    fn nullable_request_fields_must_be_explicit() {
+    fn nullable_request_field_must_be_explicit() {
         assert!(
             serde_json::from_value::<BindWindowServerRequest>(json!({
                 "expectedVersion": 1
@@ -1183,8 +1133,7 @@ mod tests {
         );
         assert!(
             serde_json::from_value::<UpdateWindowSessionRequest>(json!({
-                "expectedVersion": 1,
-                "currentThreadId": null
+                "expectedVersion": 1
             }))
             .is_err()
         );
