@@ -2021,6 +2021,10 @@ export function App({
                 commandLocationRequest={commandLocationRequest}
                 onOpenDiff={openDiff}
                 onOpenLink={openContentLink}
+                onOpenImage={(url, name) => {
+                  setContentError(null);
+                  setPreviewRequest({ dataUrl: url, name, type: "dataImage" });
+                }}
                 {...(serverThreads.offline || activeThreadSession?.offline
                   ? {}
                   : { onForkTurn: (turnId: string, isLatest: boolean) => {

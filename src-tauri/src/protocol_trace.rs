@@ -529,8 +529,26 @@ fn redact_sensitive_fields(value: &mut Value) {
                 }
             }
         }
+        Value::String(text) => {
+            if let Some(summary) = media_data_url_summary(text) {
+                *text = summary;
+            }
+        }
         _ => {}
     }
+}
+
+fn media_data_url_summary(value: &str) -> Option<String> {
+    let (metadata, data) = value.split_once(',')?;
+    let metadata = metadata.to_ascii_lowercase();
+    let kind = if metadata.starts_with("data:image/") && metadata.ends_with(";base64") {
+        "图片"
+    } else if metadata.starts_with("data:audio/") && metadata.ends_with(";base64") {
+        "音频"
+    } else {
+        return None;
+    };
+    Some(format!("[{kind}数据已省略：{} 字节]", data.len()))
 }
 
 fn sensitive_field_name(name: &str) -> bool {
@@ -818,6 +836,28 @@ mod tests {
         assert_eq!(value["nested"]["Proxy-Authorization"], REDACTED_VALUE);
         assert_eq!(value["nested"]["token"], REDACTED_VALUE);
         assert_eq!(value["nested"]["tokenUsage"]["totalTokens"], 42);
+        assert!(!payload.truncated);
+    }
+
+    #[test]
+    fn summarizes_media_data_urls_before_retention() {
+        let payload = sanitize_payload(
+            &json!({
+                "input": [
+                    { "type": "image", "url": "data:image/png;base64,QUJDRA==" },
+                    { "type": "audio", "url": "data:audio/wav;base64,QUJD" },
+                    { "type": "text", "text": "data:text/plain;base64,QUJD" }
+                ]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let value = serde_json::from_str::<Value>(&payload.text).unwrap();
+
+        assert_eq!(value["input"][0]["url"], "[图片数据已省略：8 字节]");
+        assert_eq!(value["input"][1]["url"], "[音频数据已省略：4 字节]");
+        assert_eq!(value["input"][2]["text"], "data:text/plain;base64,QUJD");
+        assert!(!payload.text.contains("QUJDRA=="));
         assert!(!payload.truncated);
     }
 

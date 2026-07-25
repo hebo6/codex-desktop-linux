@@ -59,6 +59,20 @@ function deferred() {
   return { promise, resolve };
 }
 
+function imageFile(
+  name: string,
+  type: "image/gif" | "image/jpeg" | "image/png" | "image/webp" = "image/png",
+): File {
+  const bytes = type === "image/png"
+    ? [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+    : type === "image/jpeg"
+      ? [0xff, 0xd8, 0xff]
+      : type === "image/gif"
+        ? [...new TextEncoder().encode("GIF89a")]
+        : [...new TextEncoder().encode("RIFF"), 0, 0, 0, 0, ...new TextEncoder().encode("WEBP")];
+  return new File([new Uint8Array(bytes)], name, { type });
+}
+
 function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}) {
   const onSend = vi.fn(async () => true);
   const onStop = vi.fn(async () => true);
@@ -73,6 +87,7 @@ function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}
       blobUrlFactory={blobUrlFactory}
       cwd="/workspace/project"
       error={null}
+      imageValidator={async () => undefined}
       onSend={onSend}
       onStop={onStop}
       showProjectPicker={true}
@@ -211,7 +226,7 @@ describe("Composer", () => {
       }],
     });
     const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
-    const image = new File([new Uint8Array([1, 2])], "history.png", { type: "image/png" });
+    const image = imageFile("history.png");
 
     await user.type(editor, "$dep");
     await user.click(screen.getByRole("option", { name: /\$deploy/u }));
@@ -227,6 +242,7 @@ describe("Composer", () => {
 
     fireEvent.keyDown(editor, { ctrlKey: true, key: "y" });
     expect(screen.getByLabelText("附件")).toHaveTextContent("history.png");
+    expect(screen.getByLabelText("附件")).not.toHaveTextContent("正在读取图片");
 
     await user.click(screen.getByRole("button", { name: "移除 history.png" }));
     editor.focus();
@@ -404,7 +420,7 @@ describe("Composer", () => {
     const { onSend } = renderComposer({ savedPromptStore: store });
     const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
     await user.type(editor, "尚未发送的草稿");
-    const image = new File([new Uint8Array([137, 80, 78, 71])], "draft.png", { type: "image/png" });
+    const image = imageFile("draft.png");
     fireEvent.change(screen.getByLabelText("选择图片附件"), { target: { files: [image] } });
     await waitFor(() => expect(screen.getByLabelText("附件")).toHaveTextContent("draft.png"));
     editor.setSelectionRange(2, 6, "forward");
@@ -912,7 +928,7 @@ describe("Composer", () => {
     const user = userEvent.setup();
     const { blobUrlFactory, onSend } = renderComposer();
     const picker = screen.getByLabelText("选择图片附件");
-    const image = new File([new Uint8Array([137, 80, 78, 71])], "screen.png", { type: "image/png" });
+    const image = imageFile("screen.png");
 
     fireEvent.change(picker, { target: { files: [image] } });
     await waitFor(() => expect(screen.getByLabelText("附件")).toHaveTextContent("screen.png"));
@@ -924,7 +940,7 @@ describe("Composer", () => {
       { cwd: "/workspace/project" },
     ));
 
-    const clipboardImage = new File([new Uint8Array([1, 2])], "paste.webp", { type: "image/webp" });
+    const clipboardImage = imageFile("paste.webp", "image/webp");
     const getAsFile = vi.fn(() => clipboardImage);
     fireEvent.paste(screen.getByRole("textbox"), {
       clipboardData: {
@@ -950,10 +966,102 @@ describe("Composer", () => {
     expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
   });
 
+  it("图片读取期间立即保留顺序并阻止发送", async () => {
+    const firstReady = deferred();
+    const imageValidator = vi.fn((blob: Blob) =>
+      blob.type === "image/png" ? firstReady.promise : Promise.resolve(),
+    );
+    renderComposer({ imageValidator });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [{
+          getAsFile: () => imageFile("first.png"),
+          kind: "file",
+          type: "image/png",
+        }],
+      },
+    });
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [{
+          getAsFile: () => imageFile("second.webp", "image/webp"),
+          kind: "file",
+          type: "image/webp",
+        }],
+      },
+    });
+
+    const attachmentArea = screen.getByLabelText("附件");
+    expect([...attachmentArea.querySelectorAll("article")].map((item) => item.textContent))
+      .toEqual([
+        expect.stringContaining("first.png"),
+        expect.stringContaining("second.webp"),
+      ]);
+    expect(attachmentArea).toHaveTextContent("正在读取图片");
+    expect(screen.getByRole("button", { name: "发送" })).toBeDisabled();
+    await waitFor(() => expect(attachmentArea).toHaveTextContent("second.webp"));
+
+    firstReady.resolve();
+    await waitFor(() => expect(attachmentArea).not.toHaveTextContent("正在读取图片"));
+    expect(screen.getByRole("button", { name: "发送" })).toBeEnabled();
+  });
+
+  it("按图片内容识别格式并拒绝 SVG 和无法解码的图片", async () => {
+    const pngBytes = imageFile("source.png").slice();
+    const mislabeled = new File([pngBytes], "mislabeled.svg", { type: "image/svg+xml" });
+    const invalid = imageFile("invalid.png");
+    const imageValidator = vi.fn(async (blob: Blob) => {
+      if (blob === invalid) throw new TypeError("decode failed");
+    });
+    renderComposer({ imageValidator });
+    const picker = screen.getByLabelText("选择图片附件");
+
+    fireEvent.change(picker, { target: { files: [mislabeled] } });
+    await waitFor(() =>
+      expect(screen.getByLabelText("附件")).toHaveTextContent("mislabeled.svg"),
+    );
+    expect(imageValidator).toHaveBeenCalledWith(expect.objectContaining({ type: "image/png" }));
+    expect(screen.getByRole("button", { name: "发送" })).toBeEnabled();
+
+    const svg = new File(
+      ['<svg xmlns="http://www.w3.org/2000/svg"/>'],
+      "vector.svg",
+      { type: "image/svg+xml" },
+    );
+    fireEvent.change(picker, { target: { files: [svg] } });
+    await waitFor(() =>
+      expect(screen.getByText("不支持或无法识别此图片格式")).toBeVisible(),
+    );
+    expect(screen.getByRole("button", { name: "发送" })).toBeDisabled();
+
+    fireEvent.change(picker, { target: { files: [invalid] } });
+    await waitFor(() =>
+      expect(screen.getByText("图片内容无效或无法解码")).toBeVisible(),
+    );
+  });
+
+  it("为没有文件名的剪贴板图片生成稳定名称", async () => {
+    renderComposer();
+    const unnamed = imageFile("", "image/png");
+
+    fireEvent.paste(screen.getByRole("textbox", { name: "任务输入" }), {
+      clipboardData: {
+        items: [{ getAsFile: () => unnamed, kind: "file", type: "image/png" }],
+      },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("附件")).toHaveTextContent("粘贴图片.png"),
+    );
+    expect(screen.getByRole("button", { name: "移除 粘贴图片.png" })).toBeVisible();
+  });
+
   it("拖放图片复用附件处理并在移除时释放 Blob URL", async () => {
     const user = userEvent.setup();
     const { blobUrlFactory } = renderComposer();
-    const image = new File([new Uint8Array([1, 2])], "drop.png", { type: "image/png" });
+    const image = imageFile("drop.png");
 
     fireEvent.drop(screen.getByRole("textbox").closest("div")!, {
       dataTransfer: { files: [image] },
@@ -978,7 +1086,7 @@ describe("Composer", () => {
       supportedReasoningEfforts: [],
     }];
     renderComposer({ models });
-    const image = new File([new Uint8Array([137, 80, 78, 71])], "screen.png", { type: "image/png" });
+    const image = imageFile("screen.png");
 
     fireEvent.change(screen.getByLabelText("选择图片附件"), { target: { files: [image] } });
 

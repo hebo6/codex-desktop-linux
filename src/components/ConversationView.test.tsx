@@ -197,6 +197,46 @@ describe("ConversationView", () => {
     expect(onOpenLink).toHaveBeenCalledWith("src/App.tsx");
   });
 
+  it("用户消息图片显示缩略图并打开统一预览", () => {
+    const onOpenImage = vi.fn();
+    const imageUrl = "data:image/png;base64,QUJDRA==";
+    const imageTurn = {
+      ...TURN,
+      items: [
+        {
+          content: [
+            { type: "text" as const, text: "检查截图" },
+            { type: "image" as const, url: imageUrl },
+            {
+              type: "image" as const,
+              url: "data:image/svg+xml;base64,PHN2Zy8+",
+            },
+          ],
+          id: "user-image",
+          type: "userMessage" as const,
+        },
+      ],
+    } satisfies ThreadTurn;
+
+    render(
+      <ConversationView
+        onOpenImage={onOpenImage}
+        restoredThread={{ ...RESTORED, turns: [imageTurn] }}
+      />,
+    );
+
+    const image = screen.getByRole("img", { name: "粘贴图片.png" });
+    expect(image).toHaveAttribute("src", imageUrl);
+    fireEvent.click(screen.getByRole("button", { name: "预览粘贴图片.png" }));
+    expect(onOpenImage).toHaveBeenCalledWith(imageUrl, "粘贴图片.png");
+    expect(screen.getByText("图片附件不可预览")).toBeVisible();
+
+    fireEvent.error(image);
+    expect(screen.getByText("粘贴图片.png加载失败")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+    expect(screen.getByRole("img", { name: "粘贴图片.png" })).toBeVisible();
+  });
+
   it("覆盖全部持久化 ThreadItem 的稳定展示", async () => {
     render(
       <ConversationView

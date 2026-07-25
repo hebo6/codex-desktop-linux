@@ -15,7 +15,6 @@ import {
 import type { ConversationTurnConfiguration } from "../app/useConversation";
 import type { ComposerMentionReference } from "../app/useComposerCapabilities";
 import { useSavedPrompts } from "../app/useSavedPrompts";
-import { sanitizeSvg } from "../content/sanitizeSvg";
 import {
   browserBlobUrls,
   useBlobUrl,
@@ -95,6 +94,7 @@ interface DraftAttachment {
   readonly size: number;
   readonly blob: Blob | null;
   readonly error: string | null;
+  readonly status: "preparing" | "ready" | "error";
 }
 
 interface ComposerContent {
@@ -109,10 +109,11 @@ const SUPPORTED_IMAGE_TYPES = Object.freeze([
   "image/jpeg",
   "image/gif",
   "image/webp",
-  "image/svg+xml",
 ] as const);
-const SUPPORTED_IMAGE_TYPE_SET: ReadonlySet<string> = new Set(SUPPORTED_IMAGE_TYPES);
 const IMAGE_ACCEPT = SUPPORTED_IMAGE_TYPES.join(",");
+type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
+type AttachmentSource = "drop" | "paste" | "picker";
+type ImageValidator = (blob: Blob) => Promise<void>;
 
 export interface ComposerProps {
   readonly activeTurn: boolean;
@@ -121,6 +122,7 @@ export interface ComposerProps {
   readonly draftStore?: DraftStore;
   readonly savedPromptStore?: SavedPromptStore;
   readonly blobUrlFactory?: BlobUrlFactory;
+  readonly imageValidator?: ImageValidator;
   readonly initialText?: string;
   readonly error: string | null;
   readonly models?: readonly Model[];
@@ -169,6 +171,7 @@ export function Composer({
   draftStore = persistentDraftStore,
   savedPromptStore = persistentSavedPromptStore,
   blobUrlFactory = browserBlobUrls,
+  imageValidator = validateBrowserImage,
   initialText = "",
   error,
   models = [],
@@ -258,6 +261,7 @@ export function Composer({
   const savedPromptSearchRef = useRef<HTMLInputElement>(null);
   const copiedPromptTimeoutRef = useRef<number | null>(null);
   const fileSearchRef = useRef(0);
+  const preparedAttachmentsRef = useRef(new Map<string, DraftAttachment>());
   const composingRef = useRef(false);
   const sendingRef = useRef(false);
   const draftKeyRef = useRef(draftKey);
@@ -307,13 +311,14 @@ export function Composer({
       : null;
   const selectedModelRejectsImages = activeModel !== null
     && !(activeModel.inputModalities ?? ["text"]).includes("image");
+  const hasPreparingAttachment = attachments.some(({ status }) => status === "preparing");
   const hasInvalidAttachment = (selectedModelRejectsImages && attachments.length > 0)
     || attachments.some(({ error }) => error !== null);
   const canSend = (
     normalized.length > 0 ||
     tokens.length > 0 ||
     attachments.some(({ blob }) => blob !== null)
-  ) && !hasInvalidAttachment && !preparingAttachments && !serviceTierUpdating &&
+  ) && !hasInvalidAttachment && !hasPreparingAttachment && !preparingAttachments && !serviceTierUpdating &&
     !submitting && !stopping;
   const normalizedSavedPromptQuery = savedPromptQuery.trim().toLocaleLowerCase();
   const filteredSavedPrompts = useMemo(() => normalizedSavedPromptQuery.length === 0
@@ -422,6 +427,7 @@ export function Composer({
       }
       return () => { disposed = true; };
     }
+    preparedAttachmentsRef.current.clear();
     if (
       previousDraftKey !== null &&
       previousDraftKey !== draftKey &&
@@ -665,7 +671,12 @@ export function Composer({
           ...current,
           attachments: current.attachments.map((attachment) =>
             failed.has(attachment.id)
-              ? { ...attachment, error: "无法读取此图片" }
+              ? {
+                  ...attachment,
+                  blob: null,
+                  error: "无法读取此图片",
+                  status: "error",
+                }
               : attachment),
         }));
         return;
@@ -696,6 +707,7 @@ export function Composer({
           { text: "", tokens: [], attachments: [] },
           collapsedSelection(0),
         );
+        preparedAttachmentsRef.current.clear();
         setSelectedTokenIndex(null);
         setTrigger(null);
         setMarkdownPreview(false);
@@ -725,6 +737,17 @@ export function Composer({
     snapshot: ComposerHistorySnapshot<ComposerContent> | null,
   ) => {
     if (snapshot === null) return;
+    const hydratedAttachments = snapshot.value.attachments.map((attachment) =>
+      preparedAttachmentsRef.current.get(attachment.id) ?? attachment
+    );
+    if (hydratedAttachments.some((attachment, index) =>
+      attachment !== snapshot.value.attachments[index]
+    )) {
+      replaceComposerContent(
+        () => ({ ...snapshot.value, attachments: hydratedAttachments }),
+        snapshot.selection,
+      );
+    }
     setSelectedTokenIndex(null);
     updateTrigger(snapshot.value.text, snapshot.selection.start);
     focusComposerSelection(snapshot.selection);
@@ -984,15 +1007,37 @@ export function Composer({
     }, 0);
   };
 
-  const addFiles = async (files: FileList | readonly File[]) => {
-    const pending = await Promise.all([...files].map(readAttachment));
+  const addFiles = async (
+    files: FileList | readonly File[],
+    source: AttachmentSource,
+  ) => {
+    const queued = [...files].map((file, index) => ({
+      file,
+      attachment: pendingAttachment(file, source, index),
+    }));
+    if (queued.length === 0) return;
     changeComposerContent(
       (current) => ({
         ...current,
-        attachments: [...current.attachments, ...pending],
+        attachments: [
+          ...current.attachments,
+          ...queued.map(({ attachment }) => attachment),
+        ],
       }),
       getComposerSelection(),
     );
+    const prepared = await Promise.all(queued.map(({ attachment, file }) =>
+      readAttachment(file, attachment, imageValidator)
+    ));
+    for (const attachment of prepared) {
+      preparedAttachmentsRef.current.set(attachment.id, attachment);
+    }
+    const preparedById = new Map(prepared.map((attachment) => [attachment.id, attachment]));
+    replaceComposerContent((current) => ({
+      ...current,
+      attachments: current.attachments.map((attachment) =>
+        preparedById.get(attachment.id) ?? attachment),
+    }));
   };
 
   const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -1004,7 +1049,7 @@ export function Composer({
       return;
     }
     event.preventDefault();
-    void addFiles(files);
+    void addFiles(files, "paste");
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -1013,7 +1058,7 @@ export function Composer({
       return;
     }
     if (event.dataTransfer.files.length > 0) {
-      void addFiles(event.dataTransfer.files);
+      void addFiles(event.dataTransfer.files, "drop");
     }
   };
 
@@ -1186,7 +1231,7 @@ export function Composer({
           multiple
           onChange={(event) => {
             if (event.target.files !== null) {
-              void addFiles(event.target.files);
+              void addFiles(event.target.files, "picker");
             }
             event.target.value = "";
           }}
@@ -1196,11 +1241,18 @@ export function Composer({
         {attachments.length === 0 ? null : (
           <div aria-label="附件" className={styles.attachments}>
             {attachments.map((attachment) => (
-              <article className={styles.attachmentCard} data-error={attachment.error !== null} key={attachment.id}>
+              <article className={styles.attachmentCard} data-error={attachment.status === "error"} key={attachment.id}>
                 <AttachmentThumbnail attachment={attachment} blobUrlFactory={blobUrlFactory} />
                 <span>
                   <strong>{attachment.name}</strong>
-                  <small>{attachment.error ?? (selectedModelRejectsImages ? "当前模型不支持图片输入" : formatFileSize(attachment.size))}</small>
+                  <small>
+                    {attachment.status === "preparing"
+                      ? "正在读取图片"
+                      : attachment.error
+                        ?? (selectedModelRejectsImages
+                          ? "当前模型不支持图片输入"
+                          : formatFileSize(attachment.size))}
+                  </small>
                 </span>
                 <button
                   aria-label={`移除 ${attachment.name}`}
@@ -2356,28 +2408,130 @@ function isComposingEvent(event: Event): boolean {
   return "isComposing" in event && event.isComposing === true;
 }
 
-async function readAttachment(file: File): Promise<DraftAttachment> {
-  const base = {
+function pendingAttachment(
+  file: File,
+  source: AttachmentSource,
+  index: number,
+): DraftAttachment {
+  return {
     id: crypto.randomUUID(),
-    name: file.name || "未命名附件",
+    name: file.name || (source === "paste"
+      ? `粘贴图片${index === 0 ? "" : ` ${index + 1}`}`
+      : "未命名图片"),
     size: file.size,
+    blob: null,
+    error: null,
+    status: "preparing",
   };
-  if (!file.type.startsWith("image/")) {
-    return { ...base, blob: null, error: "当前服务器输入仅支持图片附件" };
-  }
-  if (!SUPPORTED_IMAGE_TYPE_SET.has(file.type)) {
-    return { ...base, blob: null, error: "不支持此图片格式" };
-  }
+}
+
+async function readAttachment(
+  file: File,
+  pending: DraftAttachment,
+  validateImage: ImageValidator,
+): Promise<DraftAttachment> {
   if (file.size > MAX_IMAGE_SIZE) {
-    return { ...base, blob: null, error: "图片超过 16 MiB 上限" };
+    return attachmentError(pending, "图片超过 16 MiB 上限");
   }
   try {
-    const blob = file.type === "image/svg+xml"
-      ? new Blob([sanitizeSvg(await file.text())], { type: "image/svg+xml;charset=utf-8" })
-      : file;
-    return { ...base, blob, error: null };
+    const detectedType = await detectSupportedImageType(file);
+    if (detectedType === null) {
+      return attachmentError(
+        pending,
+        file.type.startsWith("image/")
+          ? "不支持或无法识别此图片格式"
+          : "当前服务器输入仅支持图片附件",
+      );
+    }
+    const blob = file.type === detectedType
+      ? file
+      : new Blob([file], { type: detectedType });
+    await validateImage(blob);
+    return {
+      ...pending,
+      name: file.name || `${pending.name}.${extensionForImageType(detectedType)}`,
+      blob,
+      error: null,
+      status: "ready",
+    };
   } catch {
-    return { ...base, blob: null, error: "无法读取此图片" };
+    return attachmentError(pending, "图片内容无效或无法解码");
+  }
+}
+
+function attachmentError(
+  pending: DraftAttachment,
+  error: string,
+): DraftAttachment {
+  return { ...pending, blob: null, error, status: "error" };
+}
+
+async function detectSupportedImageType(
+  file: Blob,
+): Promise<SupportedImageType | null> {
+  const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  if (
+    bytes.length >= 8
+    && bytes[0] === 0x89
+    && bytes[1] === 0x50
+    && bytes[2] === 0x4e
+    && bytes[3] === 0x47
+    && bytes[4] === 0x0d
+    && bytes[5] === 0x0a
+    && bytes[6] === 0x1a
+    && bytes[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  if (
+    bytes.length >= 3
+    && bytes[0] === 0xff
+    && bytes[1] === 0xd8
+    && bytes[2] === 0xff
+  ) {
+    return "image/jpeg";
+  }
+  const header = new TextDecoder("ascii").decode(bytes);
+  if (header.startsWith("GIF87a") || header.startsWith("GIF89a")) {
+    return "image/gif";
+  }
+  if (header.startsWith("RIFF") && header.slice(8, 12) === "WEBP") {
+    return "image/webp";
+  }
+  return null;
+}
+
+function extensionForImageType(type: SupportedImageType): string {
+  switch (type) {
+    case "image/png": return "png";
+    case "image/jpeg": return "jpg";
+    case "image/gif": return "gif";
+    case "image/webp": return "webp";
+  }
+}
+
+async function validateBrowserImage(blob: Blob): Promise<void> {
+  if (typeof createImageBitmap === "function") {
+    const bitmap = await createImageBitmap(blob);
+    try {
+      if (bitmap.width === 0 || bitmap.height === 0) {
+        throw new TypeError("empty image");
+      }
+    } finally {
+      bitmap.close();
+    }
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    if (image.naturalWidth === 0 || image.naturalHeight === 0) {
+      throw new TypeError("empty image");
+    }
+  } finally {
+    URL.revokeObjectURL(url);
   }
 }
 
@@ -2404,6 +2558,9 @@ function AttachmentThumbnail({
   readonly blobUrlFactory: BlobUrlFactory;
 }) {
   const url = useBlobUrl(attachment.blob, blobUrlFactory);
+  if (attachment.status === "preparing") {
+    return <span aria-hidden="true" className={styles.attachmentPlaceholder}>…</span>;
+  }
   return url === null
     ? <span aria-hidden="true" className={styles.attachmentPlaceholder}>!</span>
     : <img alt="" src={url} />;

@@ -193,6 +193,33 @@ describe("FilePreviewDialog", () => {
     expect(revoke).toHaveBeenCalledWith("blob:controlled-preview");
   });
 
+  it("复用文件预览窗口显示用户消息中的 Data URL 图片", async () => {
+    const create = vi.fn(() => "blob:user-message-image");
+    render(
+      <FilePreviewDialog
+        blobUrlFactory={{ create, revoke: vi.fn() }}
+        client={null}
+        onClose={vi.fn()}
+        request={{
+          dataUrl: "data:image/png;base64,aW1hZ2UtYnl0ZXM=",
+          name: "粘贴图片.png",
+          type: "dataImage",
+        }}
+        serverName="服务器"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("img", { name: "粘贴图片.png" })).toHaveAttribute(
+        "src",
+        "blob:user-message-image",
+      ),
+    );
+    expect(screen.getByText("用户消息中的图片")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "复制路径" })).not.toBeInTheDocument();
+    expect(create).toHaveBeenCalledWith(expect.any(Blob));
+  });
+
   it("图片支持原始尺寸和以指针位置为中心缩放", async () => {
     render(
       <FilePreviewDialog

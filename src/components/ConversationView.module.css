@@ -264,6 +264,51 @@
   font-size: 12px;
 }
 
+.imageAttachment {
+  display: block;
+  width: min(220px, 100%);
+  padding: 0;
+  margin: var(--space-2) 0;
+  overflow: hidden;
+  border: 1px solid var(--color-divider-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-content-bg);
+}
+
+button.imageAttachment {
+  cursor: zoom-in;
+}
+
+.imageAttachment img {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+}
+
+.imageAttachmentError {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  margin: var(--space-1) 0;
+  border: 1px solid color-mix(in srgb, var(--color-status-danger) 30%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--color-status-danger);
+  background: var(--color-danger-surface);
+  font-size: 12px;
+}
+
+.imageAttachmentError button {
+  padding: 2px 6px;
+  border: 1px solid currentcolor;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
 .activityGroup {
   overflow: clip;
 }

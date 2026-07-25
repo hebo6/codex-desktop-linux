@@ -27,6 +27,7 @@ export interface ConversationViewProps {
   readonly actionError?: string | null;
   readonly onOpenLink?: (link: string) => void;
   readonly onOpenDiff?: (path: string, diff: string) => void;
+  readonly onOpenImage?: (url: string, name: string) => void;
 }
 
 export function ConversationPlaceholder({
@@ -168,6 +169,7 @@ export function ConversationView({
   actionError = null,
   onOpenLink,
   onOpenDiff,
+  onOpenImage,
   restoredThread,
 }: ConversationViewProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -627,6 +629,7 @@ export function ConversationView({
                   {...(onForkTurn === undefined ? {} : { onForkTurn })}
                   {...(onOpenLink === undefined ? {} : { onOpenLink })}
                   {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
+                  {...(onOpenImage === undefined ? {} : { onOpenImage })}
                   row={row}
                 />
               </div>
@@ -692,6 +695,7 @@ function ConversationRowView({
   onForkTurn,
   onOpenLink,
   onOpenDiff,
+  onOpenImage,
   row,
 }: {
   readonly actionError: string | null;
@@ -699,6 +703,7 @@ function ConversationRowView({
   readonly onForkTurn?: (turnId: string, isLatest: boolean) => void;
   readonly onOpenLink?: (link: string) => void;
   readonly onOpenDiff?: (path: string, diff: string) => void;
+  readonly onOpenImage?: (url: string, name: string) => void;
   readonly row: ConversationRow;
 }) {
   if (row.type === "actionError") {
@@ -722,6 +727,7 @@ function ConversationRowView({
         : { onFork: () => onForkTurn(row.turn.id, row.isLatestTurn) })}
       {...(onOpenLink === undefined ? {} : { onOpenLink })}
       {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
+      {...(onOpenImage === undefined ? {} : { onOpenImage })}
     />
   ) : (
     <ActivityGroup
@@ -772,6 +778,7 @@ function ItemView({
   onFork,
   onOpenLink,
   onOpenDiff,
+  onOpenImage,
   turnCompletedAt,
   turnStartedAt,
 }: {
@@ -780,6 +787,7 @@ function ItemView({
   readonly onFork?: () => void;
   readonly onOpenLink?: (link: string) => void;
   readonly onOpenDiff?: (path: string, diff: string) => void;
+  readonly onOpenImage?: (url: string, name: string) => void;
   readonly turnCompletedAt?: number | null;
   readonly turnStartedAt?: number | null;
 }) {
@@ -789,6 +797,7 @@ function ItemView({
         <UserMessage
           item={item}
           {...(onOpenLink === undefined ? {} : { onOpenLink })}
+          {...(onOpenImage === undefined ? {} : { onOpenImage })}
           {...(turnStartedAt === undefined ? {} : { turnStartedAt })}
         />
       );
@@ -931,10 +940,12 @@ function ItemView({
 function UserMessage({
   item,
   onOpenLink,
+  onOpenImage,
   turnStartedAt,
 }: {
   readonly item: Extract<ThreadItem, { type: "userMessage" }>;
   readonly onOpenLink?: (link: string) => void;
+  readonly onOpenImage?: (url: string, name: string) => void;
   readonly turnStartedAt?: number | null;
 }) {
   const [now, setNow] = useState(() => Date.now());
@@ -950,7 +961,11 @@ function UserMessage({
       tabIndex={0}
       onMouseEnter={() => setNow(Date.now())}
     >
-      <UserMessageBody item={item} {...(onOpenLink === undefined ? {} : { onOpenLink })} />
+      <UserMessageBody
+        item={item}
+        {...(onOpenLink === undefined ? {} : { onOpenLink })}
+        {...(onOpenImage === undefined ? {} : { onOpenImage })}
+      />
       <div className={styles.userActions}>
         {timestamp === null || startedAt === null ? null : (
           <time
@@ -975,10 +990,12 @@ function UserMessage({
 function UserMessageBody({
   item,
   onOpenLink,
+  onOpenImage,
   variant = "document",
 }: {
   readonly item: UserMessageItem;
   readonly onOpenLink?: (link: string) => void;
+  readonly onOpenImage?: (url: string, name: string) => void;
   readonly variant?: "compact" | "document";
 }) {
   return (
@@ -999,7 +1016,13 @@ function UserMessageBody({
           case "mention":
             return <span className={styles.chip} key={index}>@{input.name}</span>;
           case "image":
-            return <span className={styles.attachment} key={index}>图片附件</span>;
+            return (
+              <UserImageAttachment
+                key={index}
+                url={input.url}
+                {...(onOpenImage === undefined ? {} : { onOpen: onOpenImage })}
+              />
+            );
           case "localImage":
             return <span className={styles.attachment} key={index}>{pathName(input.path)}</span>;
           case "audio":
@@ -1010,6 +1033,79 @@ function UserMessageBody({
       })}
     </div>
   );
+}
+
+function UserImageAttachment({
+  onOpen,
+  url,
+}: {
+  readonly onOpen?: (url: string, name: string) => void;
+  readonly url: string;
+}) {
+  const [attempt, setAttempt] = useState(0);
+  const [failed, setFailed] = useState(false);
+  const image = userMessageImage(url);
+  useEffect(() => {
+    setAttempt(0);
+    setFailed(false);
+  }, [url]);
+
+  if (image === null) {
+    return <span className={styles.attachment}>图片附件不可预览</span>;
+  }
+  if (failed) {
+    return (
+      <span className={styles.imageAttachmentError}>
+        <span>{image.name}加载失败</span>
+        <button
+          onClick={() => {
+            setAttempt((value) => value + 1);
+            setFailed(false);
+          }}
+          type="button"
+        >
+          重试
+        </button>
+      </span>
+    );
+  }
+  const thumbnail = (
+    <img
+      alt={image.name}
+      decoding="async"
+      key={attempt}
+      onError={() => setFailed(true)}
+      src={url}
+    />
+  );
+  return onOpen === undefined ? (
+    <span className={styles.imageAttachment}>{thumbnail}</span>
+  ) : (
+    <button
+      aria-label={`预览${image.name}`}
+      className={styles.imageAttachment}
+      onClick={() => onOpen(url, image.name)}
+      type="button"
+    >
+      {thumbnail}
+    </button>
+  );
+}
+
+function userMessageImage(
+  url: string,
+): { readonly name: string } | null {
+  const prefix = url.slice(0, url.indexOf(",") + 1).toLocaleLowerCase();
+  const extension = prefix === "data:image/png;base64,"
+    ? "png"
+    : prefix === "data:image/jpeg;base64,"
+      ? "jpg"
+      : prefix === "data:image/gif;base64,"
+        ? "gif"
+        : prefix === "data:image/webp;base64,"
+          ? "webp"
+          : null;
+  return extension === null ? null : { name: `粘贴图片.${extension}` };
 }
 
 function AgentMessage({

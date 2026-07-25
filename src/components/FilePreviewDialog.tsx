@@ -36,13 +36,24 @@ import styles from "./FilePreviewDialog.module.css";
 
 const MAX_PREVIEW_BYTES = 16 * 1024 * 1024;
 
-export interface FilePreviewRequest {
+export interface RemoteFilePreviewRequest {
+  readonly type?: "file";
   readonly path: string;
   readonly line?: number | null;
   readonly endLine?: number | null;
   readonly column?: number | null;
   readonly diff?: string | null;
 }
+
+export interface DataImagePreviewRequest {
+  readonly type: "dataImage";
+  readonly dataUrl: string;
+  readonly name: string;
+}
+
+export type FilePreviewRequest =
+  | RemoteFilePreviewRequest
+  | DataImagePreviewRequest;
 
 interface LoadedFile {
   readonly dataBase64: string;
@@ -107,6 +118,9 @@ export function FilePreviewDialog({
     readonly lines: HighlightedLines;
     readonly source: string;
   } | null>(null);
+  const fileRequest = request?.type === "dataImage" ? null : request;
+  const dataImageRequest = request?.type === "dataImage" ? request : null;
+  const previewPath = dataImageRequest?.name ?? fileRequest?.path ?? null;
   const isTopmostModal = useModalLayer(request !== null);
 
   useEffect(() => {
@@ -120,14 +134,32 @@ export function FilePreviewDialog({
     setImagePan({ x: 0, y: 0 });
     setImageSize({ width: 0, height: 0 });
     setCanPanImage(false);
-    setActiveLine(request?.line ?? null);
-    setActiveEndLine(request?.endLine ?? null);
-    setJumpLine(request?.line === undefined || request.line === null ? "" : String(request.line));
+    setActiveLine(fileRequest?.line ?? null);
+    setActiveEndLine(fileRequest?.endLine ?? null);
+    setJumpLine(fileRequest?.line === undefined || fileRequest.line === null
+      ? ""
+      : String(fileRequest.line));
     setJumpError(null);
     setDiffMode("unified");
     setSaveStatus(null);
     if (request === null) {
       setLoading(false);
+      return;
+    }
+    if (dataImageRequest !== null) {
+      const parsed = parseDataImageUrl(dataImageRequest.dataUrl);
+      if (parsed === null) {
+        setLoading(false);
+        setError("此用户消息不包含可预览的图片数据");
+      } else {
+        setLoaded({ dataBase64: parsed.dataBase64, modifiedAtMs: 0 });
+        setLoading(false);
+      }
+      return;
+    }
+    if (fileRequest === null) {
+      setLoading(false);
+      setError("缺少文件预览请求");
       return;
     }
     if (client === null) {
@@ -138,8 +170,8 @@ export function FilePreviewDialog({
     let disposed = false;
     setLoading(true);
     void Promise.all([
-      client.getMetadata(request.path).result,
-      client.readFile(request.path).result,
+      client.getMetadata(fileRequest.path).result,
+      client.readFile(fileRequest.path).result,
     ]).then(
       ([metadata, response]) => {
         if (disposed) return;
@@ -161,7 +193,7 @@ export function FilePreviewDialog({
     return () => {
       disposed = true;
     };
-  }, [attempt, client, defaultWrap, request]);
+  }, [attempt, client, dataImageRequest, defaultWrap, fileRequest, request]);
 
   useEffect(() => {
     if (request === null) return;
@@ -203,8 +235,10 @@ export function FilePreviewDialog({
   }, [isTopmostModal, onClose, request]);
 
   const decoded = useMemo(
-    () => request === null || loaded === null ? null : decodePreview(request.path, loaded.dataBase64),
-    [loaded, request],
+    () => previewPath === null || loaded === null
+      ? null
+      : decodePreview(previewPath, loaded.dataBase64),
+    [loaded, previewPath],
   );
   const imageUrl = useBlobUrl(
     decoded?.type === "image" ? decoded.blob : null,
@@ -216,7 +250,7 @@ export function FilePreviewDialog({
     setFormattedText(null);
     setFormattingJson(false);
     if (sourceText === null) return;
-    if (request === null || !isJson(request.path)) {
+    if (fileRequest === null || !isJson(fileRequest.path)) {
       setFormattedText(sourceText);
       return;
     }
@@ -239,18 +273,18 @@ export function FilePreviewDialog({
     return () => {
       disposed = true;
     };
-  }, [contentProcessor, request, sourceText]);
+  }, [contentProcessor, fileRequest, sourceText]);
 
   const displayedText = formattedText ?? sourceText;
   const sourceLanguage =
-    request === null ? null : sourceLanguageForPath(request.path);
+    previewPath === null ? null : sourceLanguageForPath(previewPath);
 
   useEffect(() => {
     setHighlightedSource(null);
     if (
       displayedText === null ||
       sourceLanguage === null ||
-      (request?.diff !== undefined && request.diff !== null)
+      (fileRequest?.diff !== undefined && fileRequest.diff !== null)
     ) {
       return;
     }
@@ -273,7 +307,7 @@ export function FilePreviewDialog({
     return () => {
       disposed = true;
     };
-  }, [displayedText, request?.diff, sourceLanguage, syntaxHighlighter]);
+  }, [displayedText, fileRequest?.diff, sourceLanguage, syntaxHighlighter]);
 
   useEffect(() => {
     setMatchingLines(new Set());
@@ -335,9 +369,11 @@ export function FilePreviewDialog({
   if (request === null) {
     return null;
   }
-  const name = fileName(request.path);
-  const relativePath = relativeRemotePath(request.path, workspacePath);
-  const language = languageForPath(request.path);
+  const name = dataImageRequest?.name ?? fileName(fileRequest?.path ?? "");
+  const relativePath = dataImageRequest === null
+    ? relativeRemotePath(fileRequest?.path ?? "", workspacePath)
+    : "用户消息中的图片";
+  const language = languageForPath(previewPath ?? "");
   const highlightedLines =
     highlightedSource?.source === displayedText &&
     highlightedSource.language === sourceLanguage?.id
@@ -421,7 +457,10 @@ export function FilePreviewDialog({
     <div className={styles.backdrop}>
       <section aria-labelledby={titleId} aria-modal="true" className={styles.dialog} ref={dialogRef} role="dialog" tabIndex={-1}>
         <header className={styles.header}>
-          <div><h2 id={titleId}>{name}</h2><p>{serverName} · {relativePath}</p></div>
+          <div>
+            <h2 id={titleId}>{name}</h2>
+            <p>{dataImageRequest === null ? `${serverName} · ${relativePath}` : relativePath}</p>
+          </div>
           <div className={styles.headerActions}>
             <button disabled={loaded === null || saving} onClick={() => void save()} type="button">{saving ? "正在保存" : "另存为"}</button>
             <button aria-label="关闭文件预览" onClick={onClose} type="button">×</button>
@@ -435,7 +474,7 @@ export function FilePreviewDialog({
           {loaded !== null && loaded.modifiedAtMs > 0 ? <span>{new Date(loaded.modifiedAtMs).toLocaleString()}</span> : null}
         </div>
         <div className={styles.toolbar}>
-          {request.diff !== undefined && request.diff !== null ? (
+          {fileRequest?.diff !== undefined && fileRequest.diff !== null ? (
             <>
               <button aria-pressed={diffMode === "unified"} onClick={() => setDiffMode("unified")} type="button">统一差异</button>
               <button aria-pressed={diffMode === "split"} onClick={() => setDiffMode("split")} type="button">左右对照</button>
@@ -449,7 +488,7 @@ export function FilePreviewDialog({
               {jumpError === null ? null : <span className={styles.inlineError} role="alert">{jumpError}</span>}
               <button onClick={() => void navigator.clipboard.writeText(window.getSelection()?.toString() ?? "")} type="button">复制选区</button>
               <button aria-pressed={wrap} onClick={() => setWrap((value) => !value)} type="button">{wrap ? "不折行" : "折行"}</button>
-              {isMarkdown(request.path) ? <button aria-pressed={markdownView} onClick={() => setMarkdownView((value) => !value)} type="button">{markdownView ? "查看源码" : "渲染预览"}</button> : null}
+              {fileRequest !== null && isMarkdown(fileRequest.path) ? <button aria-pressed={markdownView} onClick={() => setMarkdownView((value) => !value)} type="button">{markdownView ? "查看源码" : "渲染预览"}</button> : null}
             </>
           ) : decoded?.type === "image" ? (
             <>
@@ -461,11 +500,13 @@ export function FilePreviewDialog({
               <span>{Math.round(zoom * 100)}%</span>
             </>
           ) : null}
-          <button onClick={() => void navigator.clipboard.writeText(request.path)} type="button">复制路径</button>
+          {fileRequest === null
+            ? null
+            : <button onClick={() => void navigator.clipboard.writeText(fileRequest.path)} type="button">复制路径</button>}
         </div>
         <main className={styles.content}>
-          {request.diff !== undefined && request.diff !== null ? (
-            <DiffView diff={request.diff} mode={diffMode} />
+          {fileRequest?.diff !== undefined && fileRequest.diff !== null ? (
+            <DiffView diff={fileRequest.diff} mode={diffMode} />
           ) : loading ? <div className={styles.placeholder} role="status">正在读取 {name}</div> : error !== null ? (
             <div className={styles.placeholder} role="alert"><strong>{error}</strong><button onClick={() => setAttempt((value) => value + 1)} type="button">重试</button></div>
           ) : decoded?.type === "tooLarge" ? (
@@ -476,10 +517,10 @@ export function FilePreviewDialog({
             <div className={styles.imageViewport} data-pannable={canPanImage} onPointerCancel={endPan} onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={endPan} onWheel={zoomAtPointer} ref={imageViewportRef}><img alt={name} data-fit={imageFit} decoding="async" draggable={false} onLoad={(event) => setImageSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} src={imageUrl} style={{ transform: `translate(${imagePan.x}px, ${imagePan.y}px) scale(${zoom}) rotate(${rotation}deg)` }} /></div>
           ) : decoded?.type === "image" ? (
             <div className={styles.placeholder} role="status">正在解码图片</div>
-          ) : displayedText !== null && isMarkdown(request.path) && markdownView ? (
+          ) : displayedText !== null && fileRequest !== null && isMarkdown(fileRequest.path) && markdownView ? (
             <article className={styles.markdownPreview}><SafeMarkdown {...(onOpenLink === undefined ? {} : { onOpenLink })} source={displayedText} /></article>
           ) : displayedText !== null ? (
-            <TextSource column={activeLine === request.line ? request.column ?? null : null} endLine={activeEndLine} highlightedLines={highlightedLines} line={activeLine} matchingLines={matchingLines} query={search} text={displayedText} wrap={wrap} />
+            <TextSource column={activeLine === fileRequest?.line ? fileRequest?.column ?? null : null} endLine={activeEndLine} highlightedLines={highlightedLines} line={activeLine} matchingLines={matchingLines} query={search} text={displayedText} wrap={wrap} />
           ) : null}
         </main>
       </section>
@@ -491,6 +532,29 @@ type DecodedPreview =
   | { readonly type: "text"; readonly text: string }
   | { readonly type: "image"; readonly blob: Blob }
   | { readonly type: "binary" | "tooLarge" };
+
+function parseDataImageUrl(
+  dataUrl: string,
+): { readonly dataBase64: string } | null {
+  const separator = dataUrl.indexOf(",");
+  if (separator < 0) return null;
+  const metadata = dataUrl.slice(0, separator).toLocaleLowerCase();
+  if (
+    !metadata.endsWith(";base64")
+    || ![
+      "data:image/gif;base64",
+      "data:image/jpeg;base64",
+      "data:image/png;base64",
+      "data:image/webp;base64",
+    ].includes(metadata)
+  ) {
+    return null;
+  }
+  const dataBase64 = dataUrl.slice(separator + 1);
+  return /^[a-z\d+/]*={0,2}$/iu.test(dataBase64)
+    ? { dataBase64 }
+    : null;
+}
 
 function decodePreview(path: string, dataBase64: string): DecodedPreview {
   const size = decodedSize(dataBase64);
