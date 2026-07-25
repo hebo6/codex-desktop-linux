@@ -145,7 +145,9 @@ interface RunningTurnReserve {
   readonly contentHeight: number;
   readonly fullHeight: number;
   readonly height: number;
+  readonly kind: "page" | "question";
   readonly turnId: string;
+  readonly viewportHeight: number;
 }
 
 type ConversationRow =
@@ -170,7 +172,9 @@ export function ConversationView({
 }: ConversationViewProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const pendingQuestionPositionRef = useRef<string | null>(null);
   const followBottomRef = useRef(true);
+  const observedThreadIdRef = useRef(restoredThread.metadata.id);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [scrollerHeight, setScrollerHeight] = useState(0);
   useLayoutEffect(() => {
@@ -252,6 +256,9 @@ export function ConversationView({
 
   const followContent = useCallback(
     (scroller: HTMLDivElement) => {
+      if (pendingQuestionPositionRef.current !== null) {
+        return;
+      }
       if (runningTurnId === null && followBottomRef.current) {
         scrollToBottom(scroller);
         return;
@@ -284,8 +291,11 @@ export function ConversationView({
         if (activeReserve === null) {
           return;
         }
-        const fullHeight =
-          scroller.clientHeight * RUNNING_TURN_RESERVE_RATIO;
+        const fullHeight = activeReserve.kind === "question"
+          ? activeReserve.fullHeight +
+            scroller.clientHeight -
+            activeReserve.viewportHeight
+          : scroller.clientHeight * RUNNING_TURN_RESERVE_RATIO;
         const consumedHeight =
           activeReserve.fullHeight -
           activeReserve.height +
@@ -307,11 +317,19 @@ export function ConversationView({
           contentHeight,
           fullHeight,
           height,
+          kind: activeReserve.kind,
           turnId: runningTurnId,
+          viewportHeight: scroller.clientHeight,
         });
         return;
       }
       const fullHeight = scroller.clientHeight * RUNNING_TURN_RESERVE_RATIO;
+      if (
+        activeReserve?.kind === "question" &&
+        Math.abs(activeReserve.contentHeight - contentHeight) <= BOTTOM_THRESHOLD
+      ) {
+        return;
+      }
       if (
         activeReserve === null ||
         Math.abs(activeReserve.contentHeight - contentHeight) >
@@ -323,7 +341,9 @@ export function ConversationView({
           contentHeight,
           fullHeight,
           height: fullHeight,
+          kind: "page",
           turnId: runningTurnId,
+          viewportHeight: scroller.clientHeight,
         });
         return;
       }
@@ -338,16 +358,109 @@ export function ConversationView({
   );
 
   useLayoutEffect(() => {
+    const currentThreadId = restoredThread.metadata.id;
+    if (observedThreadIdRef.current !== currentThreadId) {
+      observedThreadIdRef.current = currentThreadId;
+      previousQuestionCountRef.current = historyQuestions.length;
+      return;
+    }
     const previousQuestionCount = previousQuestionCountRef.current;
     previousQuestionCountRef.current = historyQuestions.length;
     if (historyQuestions.length <= previousQuestionCount) {
       return;
     }
     const scroller = scrollerRef.current;
-    if (scroller !== null) {
-      scrollToBottom(scroller);
+    const content = contentRef.current;
+    const latestQuestion = historyQuestions.at(-1);
+    const latestQuestionRow = latestQuestion === undefined
+      ? undefined
+      : rows[latestQuestion.rowIndex];
+    if (
+      scroller === null ||
+      content === null ||
+      latestQuestion === undefined ||
+      runningTurnId === null ||
+      latestQuestionRow?.type !== "segment" ||
+      latestQuestionRow.turn.id !== runningTurnId
+    ) {
+      if (scroller !== null) {
+        scrollToBottom(scroller);
+      }
+      return;
     }
-  }, [historyQuestions.length, scrollToBottom]);
+    const height = scroller.clientHeight;
+    pendingQuestionPositionRef.current = latestQuestion.itemId;
+    followBottomRef.current = true;
+    setShowJumpToBottom(false);
+    setRunningTurnReserve({
+      contentHeight: content.getBoundingClientRect().height,
+      fullHeight: height,
+      height,
+      kind: "question",
+      turnId: runningTurnId,
+      viewportHeight: scroller.clientHeight,
+    });
+  }, [
+    historyQuestions,
+    restoredThread.metadata.id,
+    rows,
+    runningTurnId,
+    scrollToBottom,
+  ]);
+
+  useLayoutEffect(() => {
+    const pendingQuestionId = pendingQuestionPositionRef.current;
+    const scroller = scrollerRef.current;
+    if (
+      pendingQuestionId === null ||
+      scroller === null ||
+      !runningTurnReserveVisible ||
+      runningTurnReserve?.kind !== "question"
+    ) {
+      return;
+    }
+    const question = historyQuestions.find(
+      ({ itemId }) => itemId === pendingQuestionId,
+    );
+    if (question === undefined) {
+      pendingQuestionPositionRef.current = null;
+      return;
+    }
+    const top = questionTop(question);
+    if (top === null) {
+      return;
+    }
+    const targetTop = Math.max(
+      0,
+      top - initialQuestionTop(scroller),
+    );
+    const scrollHeightWithoutReserve =
+      scroller.scrollHeight - runningTurnReserve.height;
+    const height = Math.max(
+      0,
+      targetTop + scroller.clientHeight - scrollHeightWithoutReserve,
+    );
+    if (
+      Math.abs(runningTurnReserve.height - height) > BOTTOM_THRESHOLD ||
+      Math.abs(runningTurnReserve.fullHeight - height) > BOTTOM_THRESHOLD
+    ) {
+      setRunningTurnReserve({
+        ...runningTurnReserve,
+        fullHeight: height,
+        height,
+        viewportHeight: scroller.clientHeight,
+      });
+      return;
+    }
+    scroller.scrollTop = targetTop;
+    pendingQuestionPositionRef.current = null;
+  }, [
+    historyQuestions,
+    questionTop,
+    runningTurnReserve,
+    runningTurnReserveVisible,
+    scrollerHeight,
+  ]);
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
@@ -401,6 +514,8 @@ export function ConversationView({
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
+    pendingQuestionPositionRef.current = null;
+    setRunningTurnReserve(null);
     followBottomRef.current = true;
     setShowJumpToBottom(false);
     if (scroller === null) {
@@ -1583,6 +1698,10 @@ function conversationListTop(scroller: HTMLElement): number {
     return scroller.scrollTop + listRect.top - scroller.getBoundingClientRect().top;
   }
   return list.offsetTop;
+}
+
+function initialQuestionTop(scroller: HTMLElement): number {
+  return conversationListTop(scroller) + FIRST_TURN_ROW_PADDING;
 }
 
 function isWorkActivity(item: ThreadItem): boolean {
