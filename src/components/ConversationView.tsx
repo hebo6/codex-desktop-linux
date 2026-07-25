@@ -189,7 +189,7 @@ export function ConversationView({
     restoredThread.turns.findLast(({ status }) => status === "inProgress")?.id ??
     null;
   const [reservedTurnId, setReservedTurnId] = useState<string | null>(null);
-  const runningTurnReserveActive =
+  const runningTurnReserveVisible =
     runningTurnId !== null && reservedTurnId === runningTurnId;
   const previousQuestionCountRef = useRef(historyQuestions.length);
 
@@ -260,13 +260,13 @@ export function ConversationView({
       if (contentBottom < viewportBottom - BOTTOM_THRESHOLD) {
         return;
       }
-      if (!runningTurnReserveActive) {
+      if (!runningTurnReserveVisible) {
         setReservedTurnId(runningTurnId);
         return;
       }
       scrollToBottom(scroller);
     },
-    [runningTurnId, runningTurnReserveActive, scrollToBottom],
+    [runningTurnId, runningTurnReserveVisible, scrollToBottom],
   );
 
   useLayoutEffect(() => {
@@ -330,7 +330,7 @@ export function ConversationView({
     followContent,
     itemCount,
     restoredThread.turns,
-    runningTurnReserveActive,
+    runningTurnReserveVisible,
     scrollerHeight,
   ]);
 
@@ -413,15 +413,7 @@ export function ConversationView({
               ? ` ${styles.messageColumnWithQuestionNavigation}`
               : ""
           }`}
-          data-running-turn-reserve={runningTurnReserveActive}
-          style={
-            runningTurnReserveActive
-              ? {
-                  paddingBlockEnd:
-                    scrollerHeight * RUNNING_TURN_RESERVE_RATIO,
-                }
-              : undefined
-          }
+          data-running-turn-reserve={runningTurnReserveVisible}
         >
           <div
             aria-label="会话内容列表"
@@ -460,6 +452,14 @@ export function ConversationView({
               </div>
             ))}
           </div>
+          {runningTurnReserveVisible ? (
+            <div
+              aria-hidden="true"
+              className={styles.runningTurnReserve}
+              data-running-turn-reserve-space
+              style={{ height: scrollerHeight * RUNNING_TURN_RESERVE_RATIO }}
+            />
+          ) : null}
         </div>
       </div>
       {historyQuestions.length >= 4 ? (

@@ -666,13 +666,8 @@ describe("ConversationView", () => {
         if (this.getAttribute("aria-label") !== "会话消息") {
           return originalScrollHeight?.call(this) ?? 0;
         }
-        const messageColumn = this.querySelector<HTMLElement>(
-          '[data-running-turn-reserve="true"]',
-        );
-        const reserveHeight = messageColumn === null
-          ? 120
-          : Number.parseFloat(messageColumn.style.paddingBlockEnd);
-        return contentDocumentBottom + reserveHeight;
+        const reserve = this.querySelector("[data-running-turn-reserve-space]");
+        return contentDocumentBottom + (reserve === null ? 120 : 400);
       });
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function (this: HTMLElement) {
@@ -753,7 +748,7 @@ describe("ConversationView", () => {
     );
 
     expect(scroller.scrollTop).toBe(520);
-    expect(scroller.querySelector('[data-running-turn-reserve="true"]'))
+    expect(scroller.querySelector("[data-running-turn-reserve-space]"))
       .not.toBeInTheDocument();
 
     const activityTurn = {
@@ -774,10 +769,10 @@ describe("ConversationView", () => {
       />,
     );
 
-    const messageColumn = scroller.querySelector<HTMLElement>(
-      '[data-running-turn-reserve="true"]',
+    const reserve = scroller.querySelector<HTMLElement>(
+      "[data-running-turn-reserve-space]",
     );
-    expect(messageColumn).toHaveStyle({ paddingBlockEnd: "400px" });
+    expect(reserve).toHaveStyle({ height: "400px" });
     expect(scroller.scrollTop).toBe(930);
 
     const answeringTurn = {
@@ -879,7 +874,7 @@ describe("ConversationView", () => {
         }}
       />,
     );
-    expect(scroller.querySelector('[data-running-turn-reserve="true"]'))
+    expect(scroller.querySelector("[data-running-turn-reserve-space]"))
       .not.toBeInTheDocument();
     expect(scroller.scrollTop).toBe(1_730);
   });
