@@ -25,6 +25,9 @@ export interface BackgroundCommandPanelProps {
   readonly loaded: boolean;
   readonly onLocate: (itemId: string) => void;
   readonly onTerminate: (processId: string) => void;
+  readonly onTerminateAll: (
+    processIds: readonly string[],
+  ) => Promise<void>;
   readonly terminals: readonly ObservedBackgroundTerminal[];
   readonly terminatingProcessIds: ReadonlySet<string>;
   readonly turns: readonly ThreadTurn[];
@@ -35,12 +38,14 @@ export function BackgroundCommandPanel({
   loaded,
   onLocate,
   onTerminate,
+  onTerminateAll,
   terminals,
   terminatingProcessIds,
   turns,
 }: BackgroundCommandPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [terminatingAll, setTerminatingAll] = useState(false);
   const fallbackObservedAtRef = useRef(new Map<string, number>());
   const running = useMemo(
     () => runningCommands(
@@ -73,6 +78,11 @@ export function BackgroundCommandPanel({
     ...commands.map(({ durationMs }) => durationMs),
   );
   const summary = `${commands.length} 个命令正在运行 · ${formatDuration(longestDuration)}`;
+  const visibleProcessIds = commandProcessIds(commands);
+  const allProcessIds = commandProcessIds(running);
+  const anyCommandTerminating = allProcessIds.some((processId) =>
+    terminatingProcessIds.has(processId)
+  );
 
   return (
     <ComposerAccessoryDisclosure
@@ -84,6 +94,23 @@ export function BackgroundCommandPanel({
       summary={summary}
     >
       <div className={styles.commandList}>
+        {visibleProcessIds.length < 2 ? null : (
+          <div className={styles.bulkActions}>
+            <button
+              disabled={terminatingAll || anyCommandTerminating}
+              onClick={() => {
+                setTerminatingAll(true);
+                void onTerminateAll(allProcessIds).then(
+                  () => setTerminatingAll(false),
+                  () => setTerminatingAll(false),
+                );
+              }}
+              type="button"
+            >
+              {terminatingAll ? "正在终止所有命令" : "终止所有命令"}
+            </button>
+          </div>
+        )}
         {commands.map((command) => {
           const terminating = command.processId !== null &&
             terminatingProcessIds.has(command.processId);
@@ -213,6 +240,12 @@ function commandOutput(output: string | null | undefined): string | null {
     return null;
   }
   return output.length === 0 ? null : output;
+}
+
+function commandProcessIds(commands: readonly RunningCommand[]): string[] {
+  return Array.from(new Set(commands.flatMap(({ processId }) =>
+    processId === null ? [] : [processId]
+  )));
 }
 
 function formatDuration(durationMs: number): string {

@@ -13,6 +13,12 @@
   padding: 0 var(--space-2) var(--space-2);
 }
 
+.bulkActions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 var(--space-2) var(--space-1);
+}
+
 .command {
   display: grid;
   min-width: 0;
@@ -68,7 +74,8 @@
   gap: var(--space-1);
 }
 
-.actions button {
+.actions button,
+.bulkActions button {
   min-height: 30px;
   padding: 0 var(--space-2);
   border: 1px solid var(--color-divider-strong);
@@ -81,12 +88,15 @@
 }
 
 .actions button:hover:not(:disabled),
-.actions button:focus-visible:not(:disabled) {
+.actions button:focus-visible:not(:disabled),
+.bulkActions button:hover:not(:disabled),
+.bulkActions button:focus-visible:not(:disabled) {
   color: var(--color-text-primary);
   background: var(--color-fill-hover);
 }
 
-.actions button:disabled {
+.actions button:disabled,
+.bulkActions button:disabled {
   cursor: default;
   opacity: 0.5;
 }

@@ -29,6 +29,7 @@ describe("BackgroundCommandPanel", () => {
         loaded
         onLocate={vi.fn()}
         onTerminate={vi.fn()}
+        onTerminateAll={vi.fn(async () => undefined)}
         terminals={[{
           command: command.command,
           cwd: command.cwd,
@@ -83,6 +84,7 @@ describe("BackgroundCommandPanel", () => {
         loaded
         onLocate={vi.fn()}
         onTerminate={vi.fn()}
+        onTerminateAll={vi.fn(async () => undefined)}
         terminals={[{
           command: command.command,
           cwd: command.cwd,
@@ -110,4 +112,86 @@ describe("BackgroundCommandPanel", () => {
       command.aggregatedOutput,
     );
   });
+
+  it("可以终止当前会话中的所有运行命令", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-24T00:00:00Z"));
+    const termination = deferred<void>();
+    const onTerminateAll = vi.fn(() => termination.promise);
+    const commands = [
+      {
+        command: "sleep 60",
+        commandActions: [] as never[],
+        cwd: "/workspace/project",
+        durationMs: 3_000,
+        id: "command-running-1",
+        processId: "42",
+        status: "inProgress",
+        type: "commandExecution",
+      },
+      {
+        command: "pnpm test",
+        commandActions: [] as never[],
+        cwd: "/workspace/project",
+        durationMs: 3_000,
+        id: "command-running-2",
+        processId: "43",
+        status: "inProgress",
+        type: "commandExecution",
+      },
+    ] as const;
+
+    render(
+      <BackgroundCommandPanel
+        error={null}
+        loaded
+        onLocate={vi.fn()}
+        onTerminate={vi.fn()}
+        onTerminateAll={onTerminateAll}
+        terminals={commands.map((command) => ({
+          command: command.command,
+          cwd: command.cwd,
+          itemId: command.id,
+          observedAt: Date.now(),
+          processId: command.processId,
+        }))}
+        terminatingProcessIds={new Set()}
+        turns={[{
+          id: "turn-running",
+          items: [...commands],
+          itemsView: "full",
+          status: "inProgress",
+        }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", {
+      name: /2 个命令正在运行/u,
+    }));
+    fireEvent.click(screen.getByRole("button", {
+      name: "终止所有命令",
+    }));
+
+    expect(onTerminateAll).toHaveBeenCalledWith(["42", "43"]);
+    expect(screen.getByRole("button", {
+      name: "正在终止所有命令",
+    })).toBeDisabled();
+
+    await act(async () => {
+      termination.resolve();
+      await termination.promise;
+    });
+
+    expect(screen.getByRole("button", {
+      name: "终止所有命令",
+    })).toBeEnabled();
+  });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}

@@ -1952,6 +1952,11 @@ export function App({
                         onTerminate={(processId) => {
                           void backgroundTerminals.terminate(processId);
                         }}
+                        onTerminateAll={async (processIds) => {
+                          await Promise.all(processIds.map((processId) =>
+                            backgroundTerminals.terminate(processId)
+                          ));
+                        }}
                         terminals={backgroundTerminals.currentTerminals}
                         terminatingProcessIds={
                           backgroundTerminals.terminatingProcessIds
