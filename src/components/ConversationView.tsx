@@ -184,6 +184,7 @@ export function ConversationView({
     () => new Map(historyQuestions.map((question, index) => [question.rowIndex, index])),
     [historyQuestions],
   );
+  const previousQuestionCountRef = useRef(historyQuestions.length);
 
   const questionTop = useCallback(
     (question: HistoryQuestion): number | null => {
@@ -233,6 +234,18 @@ export function ConversationView({
     followBottomRef.current = true;
     setShowJumpToBottom(false);
   }, []);
+
+  useLayoutEffect(() => {
+    const previousQuestionCount = previousQuestionCountRef.current;
+    previousQuestionCountRef.current = historyQuestions.length;
+    if (historyQuestions.length <= previousQuestionCount) {
+      return;
+    }
+    const scroller = scrollerRef.current;
+    if (scroller !== null) {
+      scrollToBottom(scroller);
+    }
+  }, [historyQuestions.length, scrollToBottom]);
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;

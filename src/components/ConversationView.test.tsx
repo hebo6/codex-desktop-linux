@@ -1162,7 +1162,7 @@ describe("ConversationView", () => {
       .not.toBeInTheDocument();
   });
 
-  it("新问题和流式内容仅在原本位于底部时自动跟随", () => {
+  it("新问题始终回到底部，后续流式内容仅在位于底部时自动跟随", () => {
     const firstTurn = {
       id: "turn-follow-1",
       items: [
@@ -1192,8 +1192,9 @@ describe("ConversationView", () => {
       clientHeight: { configurable: true, value: 500 },
       scrollHeight: { configurable: true, get: () => scrollHeight },
     });
-    scroller.scrollTop = 1_220;
+    scroller.scrollTop = 600;
     fireEvent.scroll(scroller);
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
 
     const activeTurn = {
       id: "turn-follow-2",
@@ -1202,11 +1203,6 @@ describe("ConversationView", () => {
           content: [{ text: "新问题", type: "text" as const }],
           id: "user-follow-2",
           type: "userMessage" as const,
-        },
-        {
-          id: "answer-follow-2",
-          text: "正在流式回答",
-          type: "agentMessage" as const,
         },
       ],
       itemsView: "full" as const,
@@ -1224,11 +1220,24 @@ describe("ConversationView", () => {
     );
 
     expect(scroller.scrollTop).toBe(1_500);
+    expect(screen.queryByRole("button", { name: "回到底部" }))
+      .not.toBeInTheDocument();
 
+    const streamingTurn = {
+      ...activeTurn,
+      items: [
+        ...activeTurn.items,
+        {
+          id: "answer-follow-2",
+          text: "正在流式回答",
+          type: "agentMessage" as const,
+        },
+      ],
+    } satisfies ThreadTurn;
     scrollHeight = 2_300;
     rerender(
       <ConversationView
-        restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
+        restoredThread={{ ...activeThread, turns: [firstTurn, streamingTurn] }}
       />,
     );
 
@@ -1239,7 +1248,20 @@ describe("ConversationView", () => {
     scrollHeight = 2_600;
     rerender(
       <ConversationView
-        restoredThread={{ ...activeThread, turns: [firstTurn, { ...activeTurn }] }}
+        restoredThread={{
+          ...activeThread,
+          turns: [
+            firstTurn,
+            {
+              ...streamingTurn,
+              items: streamingTurn.items.map((item) =>
+                item.id === "answer-follow-2"
+                  ? { ...item, text: "正在流式回答，内容继续增长" }
+                  : item
+              ),
+            },
+          ],
+        }}
       />,
     );
     expect(scroller.scrollTop).toBe(600);
