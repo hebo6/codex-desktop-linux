@@ -643,6 +643,242 @@ describe("ConversationView", () => {
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });
 
+  it("运行中活动和回答填满留白后分段跟随，手动离底后暂停", () => {
+    let contentDocumentBottom = 880;
+    const viewportHeight = 600;
+    const originalBoundingRect = HTMLElement.prototype.getBoundingClientRect;
+    const originalClientHeight = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "clientHeight",
+    )?.get;
+    const originalScrollHeight = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "scrollHeight",
+    )?.get;
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        return this.getAttribute("aria-label") === "会话消息"
+          ? viewportHeight
+          : originalClientHeight?.call(this) ?? 0;
+      });
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.getAttribute("aria-label") !== "会话消息") {
+          return originalScrollHeight?.call(this) ?? 0;
+        }
+        const reserve = this.querySelector("[data-running-turn-reserve-space]");
+        return contentDocumentBottom + (reserve === null ? 120 : 400);
+      });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.getAttribute("aria-label") === "会话消息") {
+          return {
+            bottom: viewportHeight,
+            height: viewportHeight,
+            left: 0,
+            right: 880,
+            top: 0,
+            width: 880,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+          };
+        }
+        if (this.matches("[data-conversation-list]")) {
+          const scroller = this.closest<HTMLElement>('[aria-label="会话消息"]');
+          const bottom = contentDocumentBottom - (scroller?.scrollTop ?? 0);
+          return {
+            bottom,
+            height: contentDocumentBottom,
+            left: 0,
+            right: 880,
+            top: bottom - contentDocumentBottom,
+            width: 880,
+            x: 0,
+            y: bottom - contentDocumentBottom,
+            toJSON: () => ({}),
+          };
+        }
+        return originalBoundingRect.call(this);
+      });
+
+    const completedTurn = {
+      id: "turn-paged-follow-completed",
+      items: [
+        {
+          content: [{ text: "历史问题", type: "text" as const }],
+          id: "user-paged-follow-completed",
+          type: "userMessage" as const,
+        },
+        {
+          id: "answer-paged-follow-completed",
+          phase: "final_answer" as const,
+          text: "历史回答",
+          type: "agentMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "completed" as const,
+    } satisfies ThreadTurn;
+    const { rerender } = render(
+      <ConversationView
+        restoredThread={{ ...RESTORED, turns: [completedTurn] }}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    expect(scroller.scrollTop).toBe(400);
+
+    const runningTurn = {
+      id: "turn-paged-follow-running",
+      items: [
+        {
+          content: [{ text: "检查分页跟随", type: "text" as const }],
+          id: "user-paged-follow-running",
+          type: "userMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "inProgress" as const,
+    } satisfies ThreadTurn;
+    contentDocumentBottom = 1_000;
+    rerender(
+      <ConversationView
+        restoredThread={{ ...RESTORED, turns: [completedTurn, runningTurn] }}
+      />,
+    );
+
+    expect(scroller.scrollTop).toBe(520);
+    expect(scroller.querySelector("[data-running-turn-reserve-space]"))
+      .not.toBeInTheDocument();
+
+    const activityTurn = {
+      ...runningTurn,
+      items: [
+        ...runningTurn.items,
+        {
+          id: "reasoning-paged-follow",
+          summary: ["活动到达底边"],
+          type: "reasoning" as const,
+        },
+      ],
+    } satisfies ThreadTurn;
+    contentDocumentBottom = 1_130;
+    rerender(
+      <ConversationView
+        restoredThread={{ ...RESTORED, turns: [completedTurn, activityTurn] }}
+      />,
+    );
+
+    const reserve = scroller.querySelector<HTMLElement>(
+      "[data-running-turn-reserve-space]",
+    );
+    expect(reserve).toHaveStyle({ height: "400px" });
+    expect(scroller.scrollTop).toBe(930);
+
+    const answeringTurn = {
+      ...activityTurn,
+      items: [
+        ...activityTurn.items,
+        {
+          id: "answer-paged-follow-running",
+          phase: "final_answer" as const,
+          text: "回答继续填充留白",
+          type: "agentMessage" as const,
+        },
+      ],
+    } satisfies ThreadTurn;
+    contentDocumentBottom = 1_400;
+    rerender(
+      <ConversationView
+        restoredThread={{ ...RESTORED, turns: [completedTurn, answeringTurn] }}
+      />,
+    );
+    expect(scroller.scrollTop).toBe(930);
+
+    contentDocumentBottom = 1_540;
+    rerender(
+      <ConversationView
+        restoredThread={{
+          ...RESTORED,
+          turns: [
+            completedTurn,
+            {
+              ...answeringTurn,
+              items: answeringTurn.items.map((item) =>
+                item.id === "answer-paged-follow-running"
+                  ? { ...item, text: "回答填满留白并再次到达底边" }
+                  : item
+              ),
+            },
+          ],
+        }}
+      />,
+    );
+    expect(scroller.scrollTop).toBe(1_340);
+
+    scroller.scrollTop = 900;
+    fireEvent.scroll(scroller);
+    contentDocumentBottom = 1_800;
+    rerender(
+      <ConversationView
+        restoredThread={{
+          ...RESTORED,
+          turns: [
+            completedTurn,
+            {
+              ...answeringTurn,
+              items: answeringTurn.items.map((item) =>
+                item.id === "answer-paged-follow-running"
+                  ? { ...item, text: "手动离底后继续输出" }
+                  : item
+              ),
+            },
+          ],
+        }}
+      />,
+    );
+    expect(scroller.scrollTop).toBe(900);
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+
+    scroller.scrollTop = 1_600;
+    fireEvent.scroll(scroller);
+    contentDocumentBottom = 2_210;
+    rerender(
+      <ConversationView
+        restoredThread={{
+          ...RESTORED,
+          turns: [
+            completedTurn,
+            {
+              ...answeringTurn,
+              items: answeringTurn.items.map((item) =>
+                item.id === "answer-paged-follow-running"
+                  ? { ...item, text: "回到底部后再次填满留白" }
+                  : item
+              ),
+            },
+          ],
+        }}
+      />,
+    );
+    expect(scroller.scrollTop).toBe(2_010);
+
+    rerender(
+      <ConversationView
+        restoredThread={{
+          ...RESTORED,
+          turns: [
+            completedTurn,
+            { ...answeringTurn, status: "completed" },
+          ],
+        }}
+      />,
+    );
+    expect(scroller.querySelector("[data-running-turn-reserve-space]"))
+      .not.toBeInTheDocument();
+    expect(scroller.scrollTop).toBe(1_730);
+  });
+
   it("思考项目没有摘要时显示占位，工具到达后不保留占位", async () => {
     const thinkingTurn = {
       id: "turn-thinking",
@@ -1162,7 +1398,7 @@ describe("ConversationView", () => {
       .not.toBeInTheDocument();
   });
 
-  it("新问题始终回到底部，后续流式内容仅在位于底部时自动跟随", () => {
+  it("新问题始终回到底部，手动离底后运行中内容保持位置", () => {
     const firstTurn = {
       id: "turn-follow-1",
       items: [
@@ -1223,6 +1459,8 @@ describe("ConversationView", () => {
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
 
+    scroller.scrollTop = 600;
+    fireEvent.scroll(scroller);
     const streamingTurn = {
       ...activeTurn,
       items: [
@@ -1241,29 +1479,6 @@ describe("ConversationView", () => {
       />,
     );
 
-    expect(scroller.scrollTop).toBe(1_800);
-
-    scroller.scrollTop = 600;
-    fireEvent.scroll(scroller);
-    scrollHeight = 2_600;
-    rerender(
-      <ConversationView
-        restoredThread={{
-          ...activeThread,
-          turns: [
-            firstTurn,
-            {
-              ...streamingTurn,
-              items: streamingTurn.items.map((item) =>
-                item.id === "answer-follow-2"
-                  ? { ...item, text: "正在流式回答，内容继续增长" }
-                  : item
-              ),
-            },
-          ],
-        }}
-      />,
-    );
     expect(scroller.scrollTop).toBe(600);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });

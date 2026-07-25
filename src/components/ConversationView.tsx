@@ -70,6 +70,7 @@ type ReasoningItem = Extract<ThreadItem, { type: "reasoning" }>;
 const PANEL_TRANSITION_MS = 210;
 const FIRST_TURN_ROW_PADDING = 24;
 const BOTTOM_THRESHOLD = 1;
+const RUNNING_TURN_RESERVE_RATIO = 2 / 3;
 
 function useCollapsibleContent(initiallyExpanded: boolean) {
   const [expanded, setExpanded] = useState(initiallyExpanded);
@@ -184,6 +185,12 @@ export function ConversationView({
     () => new Map(historyQuestions.map((question, index) => [question.rowIndex, index])),
     [historyQuestions],
   );
+  const runningTurnId =
+    restoredThread.turns.findLast(({ status }) => status === "inProgress")?.id ??
+    null;
+  const [reservedTurnId, setReservedTurnId] = useState<string | null>(null);
+  const runningTurnReserveVisible =
+    runningTurnId !== null && reservedTurnId === runningTurnId;
   const previousQuestionCountRef = useRef(historyQuestions.length);
 
   const questionTop = useCallback(
@@ -235,6 +242,33 @@ export function ConversationView({
     setShowJumpToBottom(false);
   }, []);
 
+  const followContent = useCallback(
+    (scroller: HTMLDivElement) => {
+      if (!followBottomRef.current) {
+        return;
+      }
+      if (runningTurnId === null) {
+        scrollToBottom(scroller);
+        return;
+      }
+      const content = contentRef.current;
+      if (content === null) {
+        return;
+      }
+      const contentBottom = content.getBoundingClientRect().bottom;
+      const viewportBottom = scroller.getBoundingClientRect().bottom;
+      if (contentBottom < viewportBottom - BOTTOM_THRESHOLD) {
+        return;
+      }
+      if (!runningTurnReserveVisible) {
+        setReservedTurnId(runningTurnId);
+        return;
+      }
+      scrollToBottom(scroller);
+    },
+    [runningTurnId, runningTurnReserveVisible, scrollToBottom],
+  );
+
   useLayoutEffect(() => {
     const previousQuestionCount = previousQuestionCountRef.current;
     previousQuestionCountRef.current = historyQuestions.length;
@@ -277,13 +311,11 @@ export function ConversationView({
       return;
     }
     const observer = new ResizeObserver(() => {
-      if (followBottomRef.current) {
-        scrollToBottom(scroller);
-      }
+      followContent(scroller);
     });
     observer.observe(content);
     return () => observer.disconnect();
-  }, [scrollToBottom]);
+  }, [followContent]);
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
@@ -293,12 +325,13 @@ export function ConversationView({
     ) {
       return;
     }
-    scrollToBottom(scroller);
+    followContent(scroller);
   }, [
+    followContent,
     itemCount,
     restoredThread.turns,
+    runningTurnReserveVisible,
     scrollerHeight,
-    scrollToBottom,
   ]);
 
   useLayoutEffect(() => {
@@ -380,6 +413,7 @@ export function ConversationView({
               ? ` ${styles.messageColumnWithQuestionNavigation}`
               : ""
           }`}
+          data-running-turn-reserve={runningTurnReserveVisible}
         >
           <div
             aria-label="会话内容列表"
@@ -418,6 +452,14 @@ export function ConversationView({
               </div>
             ))}
           </div>
+          {runningTurnReserveVisible ? (
+            <div
+              aria-hidden="true"
+              className={styles.runningTurnReserve}
+              data-running-turn-reserve-space
+              style={{ height: scrollerHeight * RUNNING_TURN_RESERVE_RATIO }}
+            />
+          ) : null}
         </div>
       </div>
       {historyQuestions.length >= 4 ? (
