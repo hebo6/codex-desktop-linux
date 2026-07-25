@@ -666,8 +666,13 @@ describe("ConversationView", () => {
         if (this.getAttribute("aria-label") !== "会话消息") {
           return originalScrollHeight?.call(this) ?? 0;
         }
-        const reserve = this.querySelector("[data-running-turn-reserve-space]");
-        return contentDocumentBottom + (reserve === null ? 120 : 400);
+        const reserve = this.querySelector<HTMLElement>(
+          "[data-running-turn-reserve-space]",
+        );
+        const reserveHeight = reserve === null
+          ? 120
+          : Number.parseFloat(reserve.style.height);
+        return contentDocumentBottom + reserveHeight;
       });
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function (this: HTMLElement) {
@@ -793,7 +798,12 @@ describe("ConversationView", () => {
         restoredThread={{ ...RESTORED, turns: [completedTurn, answeringTurn] }}
       />,
     );
+    expect(reserve).toHaveStyle({ height: "130px" });
+    expect(scroller.scrollHeight).toBe(1_530);
     expect(scroller.scrollTop).toBe(930);
+    expect(scroller.scrollTop).toBe(
+      scroller.scrollHeight - scroller.clientHeight,
+    );
 
     contentDocumentBottom = 1_540;
     rerender(

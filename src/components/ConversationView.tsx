@@ -141,6 +141,13 @@ interface HistoryQuestion {
   readonly rowKey: string;
 }
 
+interface RunningTurnReserve {
+  readonly contentHeight: number;
+  readonly fullHeight: number;
+  readonly height: number;
+  readonly turnId: string;
+}
+
 type ConversationRow =
   | { readonly key: "action-error"; readonly type: "actionError" }
   | { readonly key: "empty"; readonly type: "empty" }
@@ -188,9 +195,10 @@ export function ConversationView({
   const runningTurnId =
     restoredThread.turns.findLast(({ status }) => status === "inProgress")?.id ??
     null;
-  const [reservedTurnId, setReservedTurnId] = useState<string | null>(null);
+  const [runningTurnReserve, setRunningTurnReserve] =
+    useState<RunningTurnReserve | null>(null);
   const runningTurnReserveVisible =
-    runningTurnId !== null && reservedTurnId === runningTurnId;
+    runningTurnId !== null && runningTurnReserve?.turnId === runningTurnId;
   const previousQuestionCountRef = useRef(historyQuestions.length);
 
   const questionTop = useCallback(
@@ -244,29 +252,89 @@ export function ConversationView({
 
   const followContent = useCallback(
     (scroller: HTMLDivElement) => {
-      if (!followBottomRef.current) {
-        return;
-      }
-      if (runningTurnId === null) {
+      if (runningTurnId === null && followBottomRef.current) {
         scrollToBottom(scroller);
         return;
       }
       const content = contentRef.current;
-      if (content === null) {
+      if (content === null || runningTurnId === null) {
         return;
       }
-      const contentBottom = content.getBoundingClientRect().bottom;
+      const contentRect = content.getBoundingClientRect();
+      const contentHeight = contentRect.height;
+      const activeReserve = runningTurnReserveVisible
+        ? runningTurnReserve
+        : null;
+      if (!followBottomRef.current) {
+        if (
+          activeReserve !== null &&
+          Math.abs(activeReserve.contentHeight - contentHeight) >
+            BOTTOM_THRESHOLD
+        ) {
+          setRunningTurnReserve({
+            ...activeReserve,
+            contentHeight,
+          });
+        }
+        return;
+      }
+      const contentBottom = contentRect.bottom;
       const viewportBottom = scroller.getBoundingClientRect().bottom;
       if (contentBottom < viewportBottom - BOTTOM_THRESHOLD) {
+        if (activeReserve === null) {
+          return;
+        }
+        const fullHeight =
+          scroller.clientHeight * RUNNING_TURN_RESERVE_RATIO;
+        const consumedHeight =
+          activeReserve.fullHeight -
+          activeReserve.height +
+          contentHeight -
+          activeReserve.contentHeight;
+        const height = Math.min(
+          fullHeight,
+          Math.max(0, fullHeight - consumedHeight),
+        );
+        if (
+          Math.abs(activeReserve.contentHeight - contentHeight) <=
+            BOTTOM_THRESHOLD &&
+          Math.abs(activeReserve.fullHeight - fullHeight) <= BOTTOM_THRESHOLD &&
+          Math.abs(activeReserve.height - height) <= BOTTOM_THRESHOLD
+        ) {
+          return;
+        }
+        setRunningTurnReserve({
+          contentHeight,
+          fullHeight,
+          height,
+          turnId: runningTurnId,
+        });
         return;
       }
-      if (!runningTurnReserveVisible) {
-        setReservedTurnId(runningTurnId);
+      const fullHeight = scroller.clientHeight * RUNNING_TURN_RESERVE_RATIO;
+      if (
+        activeReserve === null ||
+        Math.abs(activeReserve.contentHeight - contentHeight) >
+          BOTTOM_THRESHOLD ||
+        Math.abs(activeReserve.fullHeight - fullHeight) > BOTTOM_THRESHOLD ||
+        Math.abs(activeReserve.height - fullHeight) > BOTTOM_THRESHOLD
+      ) {
+        setRunningTurnReserve({
+          contentHeight,
+          fullHeight,
+          height: fullHeight,
+          turnId: runningTurnId,
+        });
         return;
       }
       scrollToBottom(scroller);
     },
-    [runningTurnId, runningTurnReserveVisible, scrollToBottom],
+    [
+      runningTurnId,
+      runningTurnReserve,
+      runningTurnReserveVisible,
+      scrollToBottom,
+    ],
   );
 
   useLayoutEffect(() => {
@@ -319,10 +387,7 @@ export function ConversationView({
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
-    if (
-      scroller === null ||
-      !followBottomRef.current
-    ) {
+    if (scroller === null) {
       return;
     }
     followContent(scroller);
@@ -457,7 +522,7 @@ export function ConversationView({
               aria-hidden="true"
               className={styles.runningTurnReserve}
               data-running-turn-reserve-space
-              style={{ height: scrollerHeight * RUNNING_TURN_RESERVE_RATIO }}
+              style={{ height: runningTurnReserve?.height ?? 0 }}
             />
           ) : null}
         </div>

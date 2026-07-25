@@ -63,6 +63,7 @@
 
 .runningTurnReserve {
   width: 100%;
+  overflow-anchor: none;
   pointer-events: none;
 }
 
