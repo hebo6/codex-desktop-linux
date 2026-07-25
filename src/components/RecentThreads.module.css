@@ -5,16 +5,19 @@
   min-height: 0;
   grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
-  padding: var(--space-3);
+  padding: 0;
 }
 
 .sectionHeader {
   display: flex;
-  min-height: 36px;
+  height: 48px;
+  min-height: 48px;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: 0 var(--space-1) var(--space-1) var(--space-2);
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--color-divider-subtle);
+  box-sizing: border-box;
 }
 
 .titleGroup {
@@ -32,8 +35,8 @@
 }
 
 .empty {
-  margin: 0;
-  padding: var(--space-3) var(--space-2);
+  margin: var(--space-2) var(--space-3);
+  padding: var(--space-2) 0;
   color: var(--color-text-tertiary);
   font-size: 13px;
   line-height: 1.5;
@@ -44,7 +47,7 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2);
-  margin-bottom: var(--space-1);
+  margin: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--color-status-danger);
   background: var(--color-fill-subtle);
@@ -67,7 +70,7 @@
 .skeleton {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
 }
 
 .skeleton span {
@@ -80,7 +83,7 @@
 .scroller {
   position: relative;
   min-height: 0;
-  padding-inline-end: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-3) var(--space-3);
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;

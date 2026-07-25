@@ -256,10 +256,12 @@
   display: flex;
   align-items: center;
   min-width: 0;
+  height: 48px;
   min-height: 48px;
   gap: var(--space-3);
-  padding: 0 var(--space-6);
+  padding: 0 var(--space-3);
   border-bottom: 1px solid var(--color-divider-subtle);
+  box-sizing: border-box;
   cursor: default;
   user-select: none;
 }
@@ -342,8 +344,8 @@
 .sidebarInnerToggle {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   flex: none;
   padding: 0;
   border: 0;
@@ -355,17 +357,6 @@
               background-color 0.2s ease,
               color 0.2s ease,
               box-shadow 0.2s ease;
-}
-
-.sidebarInnerToggle:hover {
-  background: var(--color-fill-hover);
-  color: var(--color-text-primary);
-  transform: scale(1.04);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.sidebarInnerToggle:active {
-  transform: scale(0.96);
 }
 
 .settingsButton {
@@ -395,7 +386,8 @@
 }
 
 .desktopSidebarButton:hover,
-.menuButton:hover {
+.menuButton:hover,
+.sidebarInnerToggle:hover {
   background: var(--color-fill-hover);
   color: var(--color-text-primary);
   transform: scale(1.04);
@@ -403,7 +395,8 @@
 }
 
 .desktopSidebarButton:active,
-.menuButton:active {
+.menuButton:active,
+.sidebarInnerToggle:active {
   transform: scale(0.96);
 }
 
