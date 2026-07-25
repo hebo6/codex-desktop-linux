@@ -27,6 +27,11 @@ const SHUTDOWN_IN_PROGRESS: u8 = 1;
 const SHUTDOWN_READY_TO_EXIT: u8 = 2;
 const RELEASE_SMOKE_ENVIRONMENT: &str = "CODEX_DESKTOP_RELEASE_SMOKE";
 
+#[tauri::command]
+fn quit_application(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 pub fn run() {
     diagnostics::init();
     let deep_link_state = deep_link::DeepLinkState::from_environment();
@@ -267,7 +272,8 @@ pub fn run() {
             protocol_trace::subscribe_protocol_trace,
             protocol_trace::unsubscribe_protocol_trace,
             protocol_trace::clear_protocol_trace,
-            windows::get_window_button_layout
+            windows::get_window_button_layout,
+            quit_application
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Codex Desktop");

@@ -3,5 +3,8 @@
   "identifier": "app-windows",
   "description": "Allows application windows to manage their own state and create a server-bound window",
   "windows": ["main", "app-*"],
-  "permissions": ["allow-open-app-window"]
+  "permissions": [
+    "allow-open-app-window",
+    "allow-quit-application"
+  ]
 }

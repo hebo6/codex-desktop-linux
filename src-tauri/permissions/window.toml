@@ -33,3 +33,8 @@ commands.allow = [
     "record_proxy_test",
     "get_window_button_layout",
 ]
+
+[[permission]]
+identifier = "allow-quit-application"
+description = "Allows an application or protocol debugger window to request a graceful application exit"
+commands.allow = ["quit_application"]

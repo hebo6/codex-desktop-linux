@@ -15,6 +15,10 @@ describe("KeyboardShortcutsDialog", () => {
     expect(screen.getByText("停止正在进行中的会话")).toBeVisible();
     expect(screen.getByText("打开项目选择器（仅新会话）")).toBeVisible();
     expect(screen.getByText("显示或隐藏侧边栏")).toBeVisible();
+    expect(screen.getByText("关闭当前窗口")).toBeVisible();
+    expect(screen.getByText("Ctrl+Shift+W")).toBeVisible();
+    expect(screen.getByText("退出程序")).toBeVisible();
+    expect(screen.getByText("Ctrl+Q")).toBeVisible();
 
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索键盘快捷键" }), {
       target: { value: "Ctrl+O" },

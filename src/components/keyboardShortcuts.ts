@@ -45,6 +45,8 @@ export const KEYBOARD_SHORTCUT_GROUPS: readonly KeyboardShortcutGroup[] = [
     shortcuts: [
       { label: "打开设置", keys: ["Ctrl+,"] },
       { label: "显示键盘快捷键", keys: ["Ctrl+/"] },
+      { label: "关闭当前窗口", keys: ["Ctrl+Shift+W"] },
+      { label: "退出程序", keys: ["Ctrl+Q"] },
       { label: "关闭最上层浮层", keys: ["Esc"] },
     ],
   },

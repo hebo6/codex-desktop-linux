@@ -2,6 +2,7 @@ import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 
+import { ApplicationShortcuts } from "./components/ApplicationShortcuts";
 import { store } from "./store/store";
 import { parseVisualRegressionQuery } from "./visual/visualRegressionQuery";
 import "./styles/global.css";
@@ -34,6 +35,7 @@ const protocolDebug =
 
 createRoot(rootElement).render(
   <StrictMode>
+    <ApplicationShortcuts />
     <Suspense fallback={<StartupShell />}>
       {protocolDebug && ProtocolDebugWindow !== null
         ? <ProtocolDebugWindow />

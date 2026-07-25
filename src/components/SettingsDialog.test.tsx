@@ -74,6 +74,8 @@ describe("SettingsDialog", () => {
     expect(screen.getByText("Ctrl+PageUp")).toBeVisible();
     expect(screen.getByText("Ctrl+PageDown")).toBeVisible();
     expect(screen.getByText("Ctrl+B")).toBeVisible();
+    expect(screen.getByText("Ctrl+Shift+W")).toBeVisible();
+    expect(screen.getByText("Ctrl+Q")).toBeVisible();
     expect(screen.getByText("打开项目选择器（仅新会话）")).toBeVisible();
   });
 
