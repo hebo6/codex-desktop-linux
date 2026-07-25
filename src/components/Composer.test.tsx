@@ -4,7 +4,13 @@ import { useState, type ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { Composer } from "./Composer";
+import {
+  createDraftStore,
+  type DraftStore,
+  type StoredDraft,
+} from "../transport/drafts";
 import type { SavedPrompt, SavedPromptStore } from "../transport/savedPrompts";
+import type { TauriIpc } from "../transport/tauriIpc";
 
 const SAVED_PROMPT: SavedPrompt = {
   promptId: "11111111-1111-4111-8111-111111111111",
@@ -45,6 +51,14 @@ function savedPromptStore(initial: readonly SavedPrompt[] = [SAVED_PROMPT]): Sav
   };
 }
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}) {
   const onSend = vi.fn(async () => true);
   const onStop = vi.fn(async () => true);
@@ -81,6 +95,7 @@ describe("Composer", () => {
       })),
       save: vi.fn(async () => undefined),
       delete: vi.fn(async () => undefined),
+      transition: vi.fn(async () => undefined),
     };
     renderComposer({ draftKey: "window:server:draft", draftStore });
 
@@ -232,6 +247,7 @@ describe("Composer", () => {
         : null),
       save: vi.fn(async () => undefined),
       delete: vi.fn(async () => undefined),
+      transition: vi.fn(async () => undefined),
     };
 
     function Harness() {
@@ -261,10 +277,113 @@ describe("Composer", () => {
     fireEvent.keyDown(editor, { key: "Enter" });
 
     await waitFor(() => expect(editor).toHaveValue("需要保留"));
-    await waitFor(() => expect(draftStore.save).toHaveBeenCalledWith(
+    await waitFor(() => expect(draftStore.transition).toHaveBeenCalledWith(
+      "window:server:draft",
       "window:server:thread",
       { text: "需要保留", tokens: [] },
     ));
+  });
+
+  it("草稿迁移期间再次新建时等待发送清理完成", async () => {
+    const migrationStarted = deferred();
+    const releaseMigration = deferred();
+    const releaseTurn = deferred();
+    const clearQueued = deferred();
+    const drafts = new Map<string, StoredDraft>([
+      ["window:server:new", { text: "已经发送的问题", tokens: [] }],
+    ]);
+    let transitionCount = 0;
+    const invoke = vi.fn(async (command: string, payload?: unknown) => {
+      const request = (payload as {
+        readonly request: {
+          readonly draftKey?: string;
+          readonly sourceDraftKey?: string;
+          readonly targetDraftKey?: string;
+          readonly draft?: StoredDraft | null;
+        };
+      }).request;
+      if (command === "load_draft") {
+        return drafts.get(request.draftKey!) ?? null;
+      }
+      if (command === "save_draft") {
+        drafts.set(request.draftKey!, request.draft!);
+        return null;
+      }
+      if (command === "delete_draft") {
+        drafts.delete(request.draftKey!);
+        return null;
+      }
+      if (command === "transition_draft") {
+        transitionCount += 1;
+        if (transitionCount === 1) {
+          migrationStarted.resolve();
+          await releaseMigration.promise;
+        }
+        drafts.delete(request.sourceDraftKey!);
+        if (request.draft === null) {
+          drafts.delete(request.targetDraftKey!);
+        } else {
+          drafts.set(request.targetDraftKey!, request.draft!);
+        }
+        return null;
+      }
+      if (command === "list_draft_keys") {
+        return [];
+      }
+      throw new Error(`unexpected command: ${command}`);
+    });
+    const queuedStore = createDraftStore({ invoke } as Pick<TauriIpc, "invoke">);
+    const draftStore: DraftStore = {
+      ...queuedStore,
+      transition(sourceDraftKey, targetDraftKey, draft) {
+        if (draft === null) {
+          clearQueued.resolve();
+        }
+        return queuedStore.transition(sourceDraftKey, targetDraftKey, draft);
+      },
+    };
+
+    function Harness() {
+      const [draftKey, setDraftKey] = useState("window:server:new");
+      return (
+        <>
+          <button onClick={() => setDraftKey("window:server:new")} type="button">
+            新建
+          </button>
+          <Composer
+            activeTurn={false}
+            cwd="/workspace/project"
+            draftKey={draftKey}
+            draftStore={draftStore}
+            error={null}
+            onSend={async () => {
+              setDraftKey("window:server:thread");
+              await releaseTurn.promise;
+              return true;
+            }}
+            onStop={async () => true}
+            showProjectPicker={draftKey.endsWith(":new")}
+            stopping={false}
+            submitting={false}
+          />
+        </>
+      );
+    }
+
+    render(<Harness />);
+    const editor = await screen.findByRole("textbox", { name: "任务输入" });
+    await waitFor(() => expect(editor).toHaveValue("已经发送的问题"));
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+    await migrationStarted.promise;
+
+    releaseTurn.resolve();
+    await clearQueued.promise;
+    fireEvent.click(screen.getByRole("button", { name: "新建" }));
+    releaseMigration.resolve();
+
+    await waitFor(() => expect(editor).toHaveValue(""));
+    expect(drafts.has("window:server:new")).toBe(false);
+    expect(transitionCount).toBe(2);
   });
 
   it("从底栏添加入口打开图片选择器", async () => {
@@ -336,6 +455,7 @@ describe("Composer", () => {
         : null),
       save: vi.fn(async () => undefined),
       delete: vi.fn(async () => undefined),
+      transition: vi.fn(async () => undefined),
     };
     const onSend = vi.fn<ComponentProps<typeof Composer>["onSend"]>(async () => true);
 
@@ -369,11 +489,11 @@ describe("Composer", () => {
     await user.click(await screen.findByRole("button", { name: "发送 代码审查" }));
 
     await waitFor(() => expect(editor).toHaveValue("需要稍后发送"));
-    await waitFor(() => expect(draftStore.save).toHaveBeenCalledWith(
+    await waitFor(() => expect(draftStore.transition).toHaveBeenCalledWith(
+      "window:server:draft",
       "window:server:thread",
       { text: "需要稍后发送", tokens: [] },
     ));
-    await waitFor(() => expect(draftStore.delete).toHaveBeenCalledWith("window:server:draft"));
   });
 
   it("管理常用提示词支持增删改查和手动排序", async () => {

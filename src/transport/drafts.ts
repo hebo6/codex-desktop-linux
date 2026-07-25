@@ -16,30 +16,56 @@ export interface DraftStore {
   load(draftKey: string): Promise<StoredDraft | null>;
   save(draftKey: string, draft: StoredDraft): Promise<void>;
   delete(draftKey: string): Promise<void>;
+  transition(
+    sourceDraftKey: string,
+    targetDraftKey: string,
+    draft: StoredDraft | null,
+  ): Promise<void>;
 }
 
 export function createDraftStore(
   ipc: Pick<TauriIpc, "invoke"> = tauriIpc,
 ): DraftStore {
+  let operationTail = Promise.resolve();
+  const enqueue = <Result>(operation: () => Promise<Result>): Promise<Result> => {
+    const result = operationTail.then(operation);
+    operationTail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  };
+
   return {
-    async listKeys(keyPrefix) {
-      return parseDraftKeys(await ipc.invoke<unknown>("list_draft_keys", {
+    listKeys(keyPrefix) {
+      return enqueue(async () => parseDraftKeys(await ipc.invoke<unknown>("list_draft_keys", {
         request: { keyPrefix },
-      }));
+      })));
     },
-    async load(draftKey) {
-      return parseStoredDraft(await ipc.invoke<unknown>("load_draft", {
+    load(draftKey) {
+      return enqueue(async () => parseStoredDraft(await ipc.invoke<unknown>("load_draft", {
         request: { draftKey },
-      }));
+      })));
     },
-    async save(draftKey, draft) {
-      await ipc.invoke<unknown>("save_draft", {
-        request: { draftKey, draft },
+    save(draftKey, draft) {
+      return enqueue(async () => {
+        await ipc.invoke<unknown>("save_draft", {
+          request: { draftKey, draft },
+        });
       });
     },
-    async delete(draftKey) {
-      await ipc.invoke<unknown>("delete_draft", {
-        request: { draftKey },
+    delete(draftKey) {
+      return enqueue(async () => {
+        await ipc.invoke<unknown>("delete_draft", {
+          request: { draftKey },
+        });
+      });
+    },
+    transition(sourceDraftKey, targetDraftKey, draft) {
+      return enqueue(async () => {
+        await ipc.invoke<unknown>("transition_draft", {
+          request: { sourceDraftKey, targetDraftKey, draft },
+        });
       });
     },
   };

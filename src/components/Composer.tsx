@@ -228,6 +228,7 @@ export function Composer({
   const [fileResults, setFileResults] = useState<readonly FuzzyFileSearchResult[]>([]);
   const [fileSearchLoading, setFileSearchLoading] = useState(false);
   const [fileSearchError, setFileSearchError] = useState<string | null>(null);
+  const [draftPersistenceError, setDraftPersistenceError] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [selectedEffort, setSelectedEffort] = useState<string | null>(null);
   const [selectedServiceTier, setSelectedServiceTier] = useState<string | null>(null);
@@ -400,12 +401,18 @@ export function Composer({
       setLoadedDraftKey(draftKey);
       const preserved = currentDraftRef.current;
       if (draftKey !== null) {
-        const persistence = preserved.text.length === 0 && preserved.tokens.length === 0
-          ? draftStore.delete(draftKey)
-          : draftStore.save(draftKey, preserved);
+        const persisted = preserved.text.length === 0 && preserved.tokens.length === 0
+          ? null
+          : preserved;
+        const persistence = previousDraftKey === null
+          ? persisted === null
+            ? draftStore.delete(draftKey)
+            : draftStore.save(draftKey, persisted)
+          : draftStore.transition(previousDraftKey, draftKey, persisted);
         void persistence.then(
-          () => previousDraftKey === null ? undefined : draftStore.delete(previousDraftKey),
-        ).catch(() => undefined);
+          () => setDraftPersistenceError(null),
+          () => setDraftPersistenceError("草稿保存失败，当前内容可能无法恢复"),
+        );
       }
       return () => { disposed = true; };
     }
@@ -419,7 +426,10 @@ export function Composer({
       const persistence = previous.text.length === 0 && previous.tokens.length === 0
         ? draftStore.delete(previousDraftKey)
         : draftStore.save(previousDraftKey, previous);
-      void persistence.catch(() => undefined);
+      void persistence.then(
+        () => setDraftPersistenceError(null),
+        () => setDraftPersistenceError("草稿保存失败，当前内容可能无法恢复"),
+      );
     }
     setSelectedModel(null);
     setSelectedEffort(null);
@@ -441,6 +451,7 @@ export function Composer({
       (stored) => {
         if (disposed) return;
         const restored = stored ?? { text: "", tokens: [] };
+        setDraftPersistenceError(null);
         resetComposerContent(
           { ...restored, attachments: [] },
           collapsedSelection(restored.text.length),
@@ -450,6 +461,7 @@ export function Composer({
       },
       () => {
         if (disposed) return;
+        setDraftPersistenceError("草稿读取失败，请切换会话后重试");
         resetComposerContent(
           { text: "", tokens: [], attachments: [] },
           collapsedSelection(0),
@@ -469,7 +481,10 @@ export function Composer({
       const persistence = text.length === 0 && tokens.length === 0
         ? draftStore.delete(draftKey)
         : draftStore.save(draftKey, { text, tokens });
-      void persistence.catch(() => undefined);
+      void persistence.then(
+        () => setDraftPersistenceError(null),
+        () => setDraftPersistenceError("草稿保存失败，当前内容可能无法恢复"),
+      );
     }, 500);
     return () => window.clearTimeout(timeout);
   }, [draftKey, draftStore, loadedDraftKey, text, tokens]);
@@ -604,6 +619,7 @@ export function Composer({
     if (!canSend || sendingRef.current) {
       return;
     }
+    const sourceDraftKey = draftKey;
     preserveDraftForNextKeyRef.current = false;
     sendingRef.current = true;
     setPreparingAttachments(true);
@@ -640,6 +656,19 @@ export function Composer({
       ];
       if (showProjectPicker) preserveDraftForNextKeyRef.current = true;
       if (await onSend(input, turnConfiguration())) {
+        preserveDraftForNextKeyRef.current = false;
+        if (sourceDraftKey !== null) {
+          try {
+            await draftStore.transition(
+              sourceDraftKey,
+              draftKeyRef.current ?? sourceDraftKey,
+              null,
+            );
+            setDraftPersistenceError(null);
+          } catch {
+            setDraftPersistenceError("消息已发送，但草稿清理失败");
+          }
+        }
         resetComposerContent(
           { text: "", tokens: [], attachments: [] },
           collapsedSelection(0),
@@ -998,6 +1027,9 @@ export function Composer({
     <section className={styles.composer} data-conversation-composer>
       {interactionPanel}
       {error === null ? null : <div className={styles.error} role="alert">{error}</div>}
+      {draftPersistenceError === null
+        ? null
+        : <div className={styles.error} role="alert">{draftPersistenceError}</div>}
       {capabilitiesError === null ? null : <div className={styles.capabilityError} role="status">{capabilitiesError}</div>}
       {showProjectPicker ? (
         <div className={styles.projectBar}>

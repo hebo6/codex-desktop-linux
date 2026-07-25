@@ -36,6 +36,14 @@ pub(crate) struct SaveDraftRequest {
     draft: Value,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct TransitionDraftRequest {
+    source_draft_key: String,
+    target_draft_key: String,
+    draft: Value,
+}
+
 #[derive(Debug)]
 enum DraftError {
     Invalid,
@@ -111,10 +119,7 @@ impl DraftRepository {
             .transpose()
     }
 
-    async fn list_keys(
-        &self,
-        request: DraftKeyPrefixRequest,
-    ) -> Result<Vec<String>, DraftError> {
+    async fn list_keys(&self, request: DraftKeyPrefixRequest) -> Result<Vec<String>, DraftError> {
         validate_draft_key(&request.key_prefix)?;
         sqlx::query_scalar(
             "SELECT draft_key FROM drafts
@@ -136,13 +141,7 @@ impl DraftRepository {
 
     async fn save(&self, request: SaveDraftRequest) -> Result<(), DraftError> {
         validate_draft_key(&request.draft_key)?;
-        if !request.draft.is_object() {
-            return Err(DraftError::Invalid);
-        }
-        let serialized = serde_json::to_string(&request.draft).map_err(|_| DraftError::Invalid)?;
-        if serialized.len() > MAX_DRAFT_BYTES {
-            return Err(DraftError::Invalid);
-        }
+        let serialized = serialize_draft(&request.draft)?;
         sqlx::query(
             "INSERT INTO drafts (draft_key, draft_json, updated_at_ms) VALUES (?, ?, ?)
              ON CONFLICT (draft_key) DO UPDATE SET
@@ -158,6 +157,53 @@ impl DraftRepository {
         Ok(())
     }
 
+    async fn transition(&self, request: TransitionDraftRequest) -> Result<(), DraftError> {
+        validate_draft_key(&request.source_draft_key)?;
+        validate_draft_key(&request.target_draft_key)?;
+        let persisted = (!request.draft.is_null())
+            .then(|| Ok((serialize_draft(&request.draft)?, now_ms()?)))
+            .transpose()?;
+        let mut transaction = self
+            .pool
+            .begin_with("BEGIN IMMEDIATE")
+            .await
+            .map_err(DraftError::Database)?;
+
+        if request.source_draft_key != request.target_draft_key {
+            sqlx::query("DELETE FROM drafts WHERE draft_key = ?")
+                .bind(&request.source_draft_key)
+                .execute(&mut *transaction)
+                .await
+                .map_err(DraftError::Database)?;
+        }
+
+        match persisted {
+            Some((serialized, updated_at_ms)) => {
+                sqlx::query(
+                    "INSERT INTO drafts (draft_key, draft_json, updated_at_ms) VALUES (?, ?, ?)
+                     ON CONFLICT (draft_key) DO UPDATE SET
+                       draft_json = excluded.draft_json,
+                       updated_at_ms = excluded.updated_at_ms",
+                )
+                .bind(&request.target_draft_key)
+                .bind(serialized)
+                .bind(updated_at_ms)
+                .execute(&mut *transaction)
+                .await
+                .map_err(DraftError::Database)?;
+            }
+            None => {
+                sqlx::query("DELETE FROM drafts WHERE draft_key = ?")
+                    .bind(&request.target_draft_key)
+                    .execute(&mut *transaction)
+                    .await
+                    .map_err(DraftError::Database)?;
+            }
+        }
+
+        transaction.commit().await.map_err(DraftError::Database)
+    }
+
     async fn delete(&self, request: DraftKeyRequest) -> Result<(), DraftError> {
         validate_draft_key(&request.draft_key)?;
         sqlx::query("DELETE FROM drafts WHERE draft_key = ?")
@@ -167,6 +213,17 @@ impl DraftRepository {
             .map_err(DraftError::Database)?;
         Ok(())
     }
+}
+
+fn serialize_draft(draft: &Value) -> Result<String, DraftError> {
+    if !draft.is_object() {
+        return Err(DraftError::Invalid);
+    }
+    let serialized = serde_json::to_string(draft).map_err(|_| DraftError::Invalid)?;
+    if serialized.len() > MAX_DRAFT_BYTES {
+        return Err(DraftError::Invalid);
+    }
+    Ok(serialized)
 }
 
 fn validate_draft_key(key: &str) -> Result<(), DraftError> {
@@ -208,6 +265,14 @@ pub(crate) async fn save_draft(
 }
 
 #[tauri::command]
+pub(crate) async fn transition_draft(
+    repository: State<'_, DraftRepository>,
+    request: TransitionDraftRequest,
+) -> Result<(), DraftCommandError> {
+    repository.transition(request).await.map_err(Into::into)
+}
+
+#[tauri::command]
 pub(crate) async fn delete_draft(
     repository: State<'_, DraftRepository>,
     request: DraftKeyRequest,
@@ -217,11 +282,12 @@ pub(crate) async fn delete_draft(
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use serde_json::{Value, json};
     use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
     use super::{
         DraftError, DraftKeyPrefixRequest, DraftKeyRequest, DraftRepository, SaveDraftRequest,
+        TransitionDraftRequest,
     };
 
     async fn repository() -> DraftRepository {
@@ -317,5 +383,70 @@ mod tests {
                 .await,
             Err(DraftError::Invalid),
         ));
+    }
+
+    #[tokio::test]
+    async fn transitions_draft_atomically_to_the_requested_state() {
+        let repository = repository().await;
+        repository
+            .save(SaveDraftRequest {
+                draft_key: "window:server:new".to_owned(),
+                draft: json!({"text":"旧内容","tokens":[]}),
+            })
+            .await
+            .unwrap();
+        repository
+            .save(SaveDraftRequest {
+                draft_key: "window:server:thread".to_owned(),
+                draft: json!({"text":"目标旧内容","tokens":[]}),
+            })
+            .await
+            .unwrap();
+
+        repository
+            .transition(TransitionDraftRequest {
+                source_draft_key: "window:server:new".to_owned(),
+                target_draft_key: "window:server:thread".to_owned(),
+                draft: json!({"text":"迁移内容","tokens":[]}),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(
+            repository
+                .load(DraftKeyRequest {
+                    draft_key: "window:server:new".to_owned(),
+                })
+                .await
+                .unwrap(),
+            None,
+        );
+        assert_eq!(
+            repository
+                .load(DraftKeyRequest {
+                    draft_key: "window:server:thread".to_owned(),
+                })
+                .await
+                .unwrap(),
+            Some(json!({"text":"迁移内容","tokens":[]})),
+        );
+
+        repository
+            .transition(TransitionDraftRequest {
+                source_draft_key: "window:server:thread".to_owned(),
+                target_draft_key: "window:server:thread".to_owned(),
+                draft: Value::Null,
+            })
+            .await
+            .unwrap();
+        assert_eq!(
+            repository
+                .load(DraftKeyRequest {
+                    draft_key: "window:server:thread".to_owned(),
+                })
+                .await
+                .unwrap(),
+            None,
+        );
     }
 }

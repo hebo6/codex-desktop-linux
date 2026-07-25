@@ -256,6 +256,7 @@ pub fn run() {
             drafts::list_draft_keys,
             drafts::load_draft,
             drafts::save_draft,
+            drafts::transition_draft,
             drafts::delete_draft,
             preferences::load_preferences,
             preferences::save_preferences,

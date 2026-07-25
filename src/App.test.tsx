@@ -405,6 +405,7 @@ describe("App", () => {
         : null),
       save: vi.fn(async () => undefined),
       delete: vi.fn(async () => undefined),
+      transition: vi.fn(async () => undefined),
     };
 
     renderApp(() => ({ servers: [localServer()], proxies: [] }), {
@@ -702,6 +703,7 @@ describe("App", () => {
       load: vi.fn(async () => null),
       save: vi.fn(async () => undefined),
       delete: vi.fn(async () => undefined),
+      transition: vi.fn(async () => undefined),
     };
 
     renderApp(() => ({ servers: [localServer()], proxies: [] }), {
