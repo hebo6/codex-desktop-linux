@@ -25,6 +25,11 @@ import type { Model } from "../protocol/generated/types/ModelListResponse";
 import type { PermissionProfileSummary } from "../protocol/generated/types/PermissionProfileListResponse";
 import type { SkillMetadata } from "../protocol/generated/types/SkillsListResponse";
 import type { TurnStartParams } from "../protocol/generated";
+import {
+  readClipboardFiles,
+  type ClipboardFileResult,
+  type ClipboardFilesReader,
+} from "../transport/clipboard";
 import { draftStore as persistentDraftStore, type DraftStore } from "../transport/drafts";
 import {
   savedPromptStore as persistentSavedPromptStore,
@@ -122,6 +127,7 @@ export interface ComposerProps {
   readonly draftStore?: DraftStore;
   readonly savedPromptStore?: SavedPromptStore;
   readonly blobUrlFactory?: BlobUrlFactory;
+  readonly clipboardFilesReader?: ClipboardFilesReader;
   readonly imageValidator?: ImageValidator;
   readonly initialText?: string;
   readonly error: string | null;
@@ -171,6 +177,7 @@ export function Composer({
   draftStore = persistentDraftStore,
   savedPromptStore = persistentSavedPromptStore,
   blobUrlFactory = browserBlobUrls,
+  clipboardFilesReader = readClipboardFiles,
   imageValidator = validateBrowserImage,
   initialText = "",
   error,
@@ -1007,6 +1014,23 @@ export function Composer({
     }, 0);
   };
 
+  const prepareQueuedFiles = async (
+    queued: readonly { readonly file: File; readonly attachment: DraftAttachment }[],
+  ) => {
+    const prepared = await Promise.all(queued.map(({ attachment, file }) =>
+      readAttachment(file, attachment, imageValidator)
+    ));
+    for (const attachment of prepared) {
+      preparedAttachmentsRef.current.set(attachment.id, attachment);
+    }
+    const preparedById = new Map(prepared.map((attachment) => [attachment.id, attachment]));
+    replaceComposerContent((current) => ({
+      ...current,
+      attachments: current.attachments.map((attachment) =>
+        preparedById.get(attachment.id) ?? attachment),
+    }));
+  };
+
   const addFiles = async (
     files: FileList | readonly File[],
     source: AttachmentSource,
@@ -1026,18 +1050,79 @@ export function Composer({
       }),
       getComposerSelection(),
     );
-    const prepared = await Promise.all(queued.map(({ attachment, file }) =>
-      readAttachment(file, attachment, imageValidator)
-    ));
-    for (const attachment of prepared) {
-      preparedAttachmentsRef.current.set(attachment.id, attachment);
+    await prepareQueuedFiles(queued);
+  };
+
+  const addClipboardFiles = async () => {
+    const placeholder = pendingClipboardAttachment();
+    changeComposerContent(
+      (current) => ({
+        ...current,
+        attachments: [...current.attachments, placeholder],
+      }),
+      getComposerSelection(),
+    );
+
+    let results: readonly ClipboardFileResult[];
+    try {
+      results = await clipboardFilesReader();
+    } catch {
+      replaceComposerContent((current) => ({
+        ...current,
+        attachments: current.attachments.map((attachment) =>
+          attachment.id === placeholder.id
+            ? attachmentError(attachment, "无法读取系统剪贴板")
+            : attachment),
+      }));
+      return;
     }
-    const preparedById = new Map(prepared.map((attachment) => [attachment.id, attachment]));
-    replaceComposerContent((current) => ({
-      ...current,
-      attachments: current.attachments.map((attachment) =>
-        preparedById.get(attachment.id) ?? attachment),
-    }));
+    if (results.length === 0) {
+      replaceComposerContent((current) => ({
+        ...current,
+        attachments: current.attachments.map((attachment) =>
+          attachment.id === placeholder.id
+            ? attachmentError(attachment, "剪贴板中没有可读取的本地文件")
+            : attachment),
+      }));
+      return;
+    }
+
+    const queued = results.flatMap((result, index) => {
+      if (result.file === null) {
+        return [];
+      }
+      return [{
+        file: result.file,
+        attachment: pendingAttachment(result.file, "paste", index),
+      }];
+    });
+    const queuedByResult = new Map(queued.map((item) => [item.file, item.attachment]));
+    const replacements = results.map((result) => {
+      if (result.file !== null) {
+        return queuedByResult.get(result.file)!;
+      }
+      return {
+        id: crypto.randomUUID(),
+        name: result.name,
+        size: result.size,
+        blob: null,
+        error: result.error,
+        status: "error" as const,
+      };
+    });
+    const replaced = replaceComposerContent((current) => {
+      if (!current.attachments.some(({ id }) => id === placeholder.id)) {
+        return current;
+      }
+      return {
+        ...current,
+        attachments: current.attachments.flatMap((attachment) =>
+          attachment.id === placeholder.id ? replacements : [attachment]),
+      };
+    });
+    if (replaced) {
+      await prepareQueuedFiles(queued);
+    }
   };
 
   const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -1046,6 +1131,11 @@ export function Composer({
       .map((item) => item.getAsFile())
       .filter((file): file is File => file !== null);
     if (files.length === 0) {
+      if (!clipboardContainsLocalFileUris(event.clipboardData)) {
+        return;
+      }
+      event.preventDefault();
+      void addClipboardFiles();
       return;
     }
     event.preventDefault();
@@ -2423,6 +2513,41 @@ function pendingAttachment(
     error: null,
     status: "preparing",
   };
+}
+
+function pendingClipboardAttachment(): DraftAttachment {
+  return {
+    id: crypto.randomUUID(),
+    name: "粘贴图片",
+    size: 0,
+    blob: null,
+    error: null,
+    status: "preparing",
+  };
+}
+
+function clipboardContainsLocalFileUris(clipboardData: DataTransfer): boolean {
+  const types = Array.from(clipboardData.types ?? []);
+  const uriTypes = ["text/uri-list", "x-special/gnome-copied-files"]
+    .filter((type) => types.includes(type));
+  if (uriTypes.length === 0 || typeof clipboardData.getData !== "function") {
+    return false;
+  }
+  return uriTypes.some((type) =>
+    clipboardData.getData(type)
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .some((line) => {
+        if (line.length === 0 || line.startsWith("#") || line === "copy" || line === "cut") {
+          return false;
+        }
+        try {
+          return new URL(line).protocol === "file:";
+        } catch {
+          return false;
+        }
+      })
+  );
 }
 
 async function readAttachment(

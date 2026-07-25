@@ -1,4 +1,5 @@
 mod authentication_policy;
+mod clipboard;
 mod configuration;
 mod connection;
 mod credentials;
@@ -244,6 +245,7 @@ pub fn run() {
             configuration::commands::remove_proxy_ssh_host_key,
             configuration::commands::confirm_proxy_ssh_host_key,
             configuration::commands::record_proxy_test,
+            clipboard::read_clipboard_files,
             windows::load_window_state,
             windows::bind_window_server,
             windows::update_window_tabs,

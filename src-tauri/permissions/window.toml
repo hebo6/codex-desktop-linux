@@ -11,6 +11,7 @@ commands.allow = [
     "pick_local_directory",
     "open_external_url",
     "save_remote_file",
+    "read_clipboard_files",
     "load_thread_cache",
     "save_thread_cache",
     "list_draft_keys",

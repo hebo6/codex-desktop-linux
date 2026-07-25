@@ -33,6 +33,10 @@ describe("Tauri 发布配置", () => {
     }
   });
 
+  it("允许应用窗口读取明确粘贴的本机文件", () => {
+    expect(windowPermission).toContain('"read_clipboard_files"');
+  });
+
   it("允许应用窗口订阅和退订应用事件", () => {
     expect(tauriConfiguration.app.security.capabilities).toContain("app-events");
     expect(eventCapability.windows).toEqual(["main", "app-*"]);

@@ -952,17 +952,70 @@ describe("Composer", () => {
   });
 
   it("普通文本粘贴不阻止浏览器默认行为", () => {
-    renderComposer();
+    const clipboardFilesReader = vi.fn(async () => []);
+    renderComposer({ clipboardFilesReader });
     const editor = screen.getByRole("textbox", { name: "任务输入" });
     const event = createEvent.paste(editor, {
       clipboardData: {
+        getData: () => "/tmp/screen.png",
         items: [{ getAsFile: () => null, kind: "string", type: "text/plain" }],
+        types: ["text/plain"],
       },
     });
 
     fireEvent(editor, event);
 
     expect(event.defaultPrevented).toBe(false);
+    expect(clipboardFilesReader).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+  });
+
+  it("将 Linux 文件 URI 剪贴板读取为图片而不是粘贴路径", async () => {
+    const clipboardImage = imageFile("linux-paste.png");
+    const clipboardFilesReader = vi.fn(async () => [{
+      name: clipboardImage.name,
+      size: clipboardImage.size,
+      file: clipboardImage,
+      error: null,
+    }]);
+    renderComposer({ clipboardFilesReader });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    const event = createEvent.paste(editor, {
+      clipboardData: {
+        getData: (type: string) => type === "text/uri-list"
+          ? "file:///tmp/linux-paste.png\r\n"
+          : "/tmp/linux-paste.png",
+        items: [{ getAsFile: () => null, kind: "string", type: "text/plain" }],
+        types: ["text/plain", "text/uri-list"],
+      },
+    });
+
+    fireEvent(editor, event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(clipboardFilesReader).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(screen.getByLabelText("附件")).toHaveTextContent("linux-paste.png"),
+    );
+    expect(editor).toHaveValue("");
+  });
+
+  it("URI 剪贴板中的网页链接仍按普通文本粘贴", () => {
+    const clipboardFilesReader = vi.fn(async () => []);
+    renderComposer({ clipboardFilesReader });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    const event = createEvent.paste(editor, {
+      clipboardData: {
+        getData: () => "https://example.com/image.png",
+        items: [{ getAsFile: () => null, kind: "string", type: "text/uri-list" }],
+        types: ["text/plain", "text/uri-list"],
+      },
+    });
+
+    fireEvent(editor, event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(clipboardFilesReader).not.toHaveBeenCalled();
     expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
   });
 

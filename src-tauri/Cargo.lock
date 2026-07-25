@@ -696,6 +696,7 @@ dependencies = [
  "base64 0.22.1",
  "fast-socks5",
  "futures-util",
+ "gtk",
  "http-body-util",
  "hyper",
  "hyper-util",
