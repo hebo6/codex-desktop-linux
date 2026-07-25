@@ -86,8 +86,9 @@
   font-weight: 550;
   line-height: 16px;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  mask-image: linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
   transition: color 0.15s ease;
 }
 
@@ -102,8 +103,9 @@
   background: var(--color-fill-subtle);
   border-radius: var(--radius-sm);
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  mask-image: linear-gradient(to right, #000 calc(100% - 8px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 8px), transparent 100%);
   transition: color 0.15s ease, background-color 0.15s ease;
 }
 
