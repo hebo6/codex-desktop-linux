@@ -4,7 +4,7 @@ description = "Allows application windows to manage their own state and create a
 commands.allow = [
     "load_window_state",
     "bind_window_server",
-    "update_window_session",
+    "update_window_tabs",
     "open_app_window",
     "open_protocol_debug_window",
     "protocol_debug_availability",

@@ -1,12 +1,24 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import tauriConfiguration from "../src-tauri/tauri.conf.json";
 import eventCapability from "../src-tauri/capabilities/app-events.json";
 import protocolDebugCapability from "../src-tauri/capabilities/protocol-debug.json";
 
+const windowPermission = readFileSync(
+  "src-tauri/permissions/window.toml",
+  "utf8",
+);
+
 describe("Tauri 发布配置", () => {
   it("保留由前端封装间接调用的 IPC 命令", () => {
     expect(tauriConfiguration.build.removeUnusedCommands).toBe(false);
+  });
+
+  it("允许应用窗口更新标签状态", () => {
+    expect(windowPermission).toContain('"update_window_tabs"');
+    expect(windowPermission).not.toContain('"update_window_session"');
   });
 
   it("允许应用窗口订阅和退订应用事件", () => {
