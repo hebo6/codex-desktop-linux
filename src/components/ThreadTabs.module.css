@@ -79,20 +79,17 @@
   flex-shrink: 0;
 }
 
-.statusWrapper [data-status]:not([data-status="running"]) {
-  line-height: 14px;
-}
-
 .title {
   flex: 1 1 0;
   min-width: 0;
   font-size: 12px;
   font-weight: 550;
-  line-height: 18px;
+  line-height: 16px;
   overflow: hidden;
   white-space: nowrap;
   mask-image: linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
   -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
+  transform: translateY(1px);
   transition: color 0.15s ease;
 }
 
@@ -102,7 +99,7 @@
   padding: 1px 5px;
   font-size: 10px;
   font-weight: 500;
-  line-height: 16px;
+  line-height: 14px;
   color: var(--color-text-tertiary);
   background: var(--color-fill-subtle);
   border-radius: var(--radius-sm);
