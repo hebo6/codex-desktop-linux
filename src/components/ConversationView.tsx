@@ -767,6 +767,10 @@ function UserMessageBody({
             return <span className={styles.attachment} key={index}>图片附件</span>;
           case "localImage":
             return <span className={styles.attachment} key={index}>{pathName(input.path)}</span>;
+          case "audio":
+            return <span className={styles.attachment} key={index}>音频附件</span>;
+          case "localAudio":
+            return <span className={styles.attachment} key={index}>{pathName(input.path)}</span>;
         }
       })}
     </div>
@@ -1535,6 +1539,8 @@ function userInputText(input: Extract<ThreadItem, { type: "userMessage" }>["cont
     case "mention": return `@${input.name}`;
     case "image": return "[图片]";
     case "localImage": return `[图片 ${pathName(input.path)}]`;
+    case "audio": return "[音频]";
+    case "localAudio": return `[音频 ${pathName(input.path)}]`;
   }
 }
 

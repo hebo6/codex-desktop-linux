@@ -2,7 +2,7 @@
 
 set -eu
 
-readonly expected_commit="ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c"
+readonly expected_commit="a4535884169be8da2f81b8a4debecbd4dc11aa97"
 
 project_dir=$(realpath "$(dirname "$0")/..")
 schema_dir="$project_dir/protocol/schema"

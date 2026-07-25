@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c
+// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
 
 /**
  * This translation layer make sure that we expose codex error code in camel case.
@@ -46,11 +46,19 @@ export type ThreadItem =
   | ExitedReviewModeThreadItem
   | ContextCompactionThreadItem;
 export type UserInput =
-  TextUserInput | ImageUserInput | LocalImageUserInput | SkillUserInput | MentionUserInput;
+  | TextUserInput
+  | ImageUserInput
+  | LocalImageUserInput
+  | AudioUserInput
+  | LocalAudioUserInput
+  | SkillUserInput
+  | MentionUserInput;
 export type TextUserInputType = "text";
 export type ImageDetail = "auto" | "low" | "high" | "original";
 export type ImageUserInputType = "image";
 export type LocalImageUserInputType = "localImage";
+export type AudioUserInputType = "audio";
+export type LocalAudioUserInputType = "localAudio";
 export type SkillUserInputType = "skill";
 export type MentionUserInputType = "mention";
 export type UserMessageThreadItemType = "userMessage";
@@ -90,9 +98,12 @@ export type FileChangeThreadItemType = "fileChange";
 export type McpToolCallStatus = "inProgress" | "completed" | "failed";
 export type McpToolCallThreadItemType = "mcpToolCall";
 export type DynamicToolCallOutputContentItem =
-  InputTextDynamicToolCallOutputContentItem | InputImageDynamicToolCallOutputContentItem;
+  | InputTextDynamicToolCallOutputContentItem
+  | InputImageDynamicToolCallOutputContentItem
+  | InputAudioDynamicToolCallOutputContentItem;
 export type InputTextDynamicToolCallOutputContentItemType = "inputText";
 export type InputImageDynamicToolCallOutputContentItemType = "inputImage";
+export type InputAudioDynamicToolCallOutputContentItemType = "inputAudio";
 export type DynamicToolCallStatus = "inProgress" | "completed" | "failed";
 export type DynamicToolCallThreadItemType = "dynamicToolCall";
 export type CollabAgentStatus =
@@ -261,6 +272,16 @@ export interface LocalImageUserInput {
   type: LocalImageUserInputType;
   [k: string]: unknown | undefined;
 }
+export interface AudioUserInput {
+  type: AudioUserInputType;
+  url: string;
+  [k: string]: unknown | undefined;
+}
+export interface LocalAudioUserInput {
+  path: string;
+  type: LocalAudioUserInputType;
+  [k: string]: unknown | undefined;
+}
 export interface SkillUserInput {
   name: string;
   path: string;
@@ -347,9 +368,17 @@ export interface CommandExecutionThreadItem {
   exitCode?: number | null;
   id: string;
   /**
+   * Trusted first-party plugin id when this command resolves to one plugin script.
+   */
+  pluginId?: string | null;
+  /**
    * Identifier for the underlying PTY process (when available).
    */
   processId?: string | null;
+  /**
+   * Safe plugin-relative path when this command resolves to one plugin script.
+   */
+  scriptPath?: string | null;
   source?: CommandExecutionSource & string;
   status: CommandExecutionStatus;
   type: CommandExecutionThreadItemType;
@@ -433,7 +462,6 @@ export interface McpToolCallAppContext {
   connectorId: string;
   linkId?: string | null;
   resourceUri?: string | null;
-  templateId?: string | null;
   [k: string]: unknown | undefined;
 }
 export interface McpToolCallError {
@@ -469,6 +497,11 @@ export interface InputTextDynamicToolCallOutputContentItem {
 export interface InputImageDynamicToolCallOutputContentItem {
   imageUrl: string;
   type: InputImageDynamicToolCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface InputAudioDynamicToolCallOutputContentItem {
+  audioUrl: string;
+  type: InputAudioDynamicToolCallOutputContentItemType;
   [k: string]: unknown | undefined;
 }
 export interface CollabAgentToolCallThreadItem {
@@ -530,6 +563,12 @@ export interface WebSearchThreadItem {
   action?: WebSearchAction | null;
   id: string;
   query: string;
+  /**
+   * Structured search results returned out-of-band by standalone web search.
+   *
+   * These stay as opaque JSON at the extension/app-server boundary so new result fields and result types can pass through without a Codex release.
+   */
+  results?: unknown[] | null;
   type: WebSearchThreadItemType;
   [k: string]: unknown | undefined;
 }
@@ -560,6 +599,9 @@ export interface ImageViewThreadItem {
   type: ImageViewThreadItemType;
   [k: string]: unknown | undefined;
 }
+/**
+ * Display item emitted by the interruptible `clock.sleep` tool.
+ */
 export interface SleepThreadItem {
   durationMs: number;
   id: string;

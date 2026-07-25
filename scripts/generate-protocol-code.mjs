@@ -366,7 +366,7 @@ const ajv = new Ajv({
 const standaloneExports = {};
 for (const { validatorName, typeName, schemaPath } of validatorDeclarations) {
   const schemaId = `urn:codex-app-server:${upstreamCommit}:${typeName}`;
-  const validationSchema = tightenNumericFormats(structuredClone(schemas.get(schemaPath)));
+  const validationSchema = prepareValidationSchema(structuredClone(schemas.get(schemaPath)));
   validationSchema.$id = schemaId;
   ajv.addSchema(validationSchema, schemaId);
   standaloneExports[validatorName] = schemaId;
@@ -562,6 +562,12 @@ function lowerFirst(value) {
   return `${value[0].toLowerCase()}${value.slice(1)}`;
 }
 
+function prepareValidationSchema(value) {
+  tightenNumericFormats(value);
+  addImpliedObjectTypes(value);
+  return value;
+}
+
 function tightenNumericFormats(value) {
   if (Array.isArray(value)) {
     for (const item of value) {
@@ -589,6 +595,34 @@ function tightenNumericFormats(value) {
     tightenNumericFormats(child);
   }
   return value;
+}
+
+function addImpliedObjectTypes(value) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      addImpliedObjectTypes(item);
+    }
+    return;
+  }
+
+  if (value === null || typeof value !== "object") {
+    return;
+  }
+
+  if (value.properties !== undefined && value.type === undefined) {
+    if (
+      !Array.isArray(value.oneOf) ||
+      value.oneOf.length === 0 ||
+      value.oneOf.some((variant) => variant?.type !== "object")
+    ) {
+      throw new Error("包含 properties 的 Schema 缺少可由 object oneOf 确定的类型");
+    }
+    value.type = "object";
+  }
+
+  for (const child of Object.values(value)) {
+    addImpliedObjectTypes(child);
+  }
 }
 
 function makeBrowserCompatibleStandalone(source) {

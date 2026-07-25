@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c
+// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
 
 export type FileSystemAccessMode = "read" | "write" | "deny";
 export type FileSystemPath = PathFileSystemPath | GlobPatternFileSystemPath | SpecialFileSystemPath;
@@ -16,7 +16,7 @@ export type FileSystemSpecialPath =
   | {
       kind: "unknown";
       path: string;
-      subpath?: string | null;
+      subpath?: LegacyAppPathString | null;
       [k: string]: unknown | undefined;
     };
 export type PermissionGrantScope = "turn" | "session";
@@ -78,7 +78,7 @@ export interface MinimalFileSystemSpecialPath {
 }
 export interface KindFileSystemSpecialPath {
   kind: "project_roots";
-  subpath?: string | null;
+  subpath?: LegacyAppPathString | null;
   [k: string]: unknown | undefined;
 }
 export interface TmpdirFileSystemSpecialPath {

@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c
+// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
 
 /**
  * User's decision in response to an ExecApprovalRequest.
@@ -9,7 +9,7 @@ export type ReviewDecision =
   | ApprovedExecpolicyAmendmentReviewDecision
   | "approved_for_session"
   | NetworkPolicyAmendmentReviewDecision
-  | "denied"
+  | DeniedReviewDecision
   | "timed_out"
   | "abort";
 export type NetworkPolicyRuleAction = "allow" | "deny";
@@ -40,4 +40,13 @@ export interface NetworkPolicyAmendment {
   action: NetworkPolicyRuleAction;
   host: string;
   [k: string]: unknown | undefined;
+}
+/**
+ * User has denied this command and the agent should not execute it, but it should continue the session and try something else.
+ */
+export interface DeniedReviewDecision {
+  denied: {
+    rejection: string;
+    [k: string]: unknown | undefined;
+  };
 }

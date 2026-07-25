@@ -5,7 +5,7 @@
 | 项目 | 值 |
 | --- | --- |
 | 上游仓库 | [openai/codex](https://github.com/openai/codex) |
-| 上游提交 | `ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c` |
+| 上游提交 | `a4535884169be8da2f81b8a4debecbd4dc11aa97` |
 | 上游生成命令 | `codex app-server generate-json-schema --experimental` |
 | 本项目导出器 | `codex-app-server-protocol` 的 `export` 二进制 |
 | 固化目录 | `protocol/schema` |
@@ -44,14 +44,14 @@ CODEX_SOURCE_DIR=/path/to/codex ./scripts/generate-protocol-schema.sh --check
 
 ## 固化产物
 
-`protocol/schema/UPSTREAM_COMMIT` 记录上游完整提交号，`protocol/schema/SHA256SUMS` 记录全部 337 个 JSON 文件按相对路径排序后的 SHA256
+`protocol/schema/UPSTREAM_COMMIT` 记录上游完整提交号，`protocol/schema/SHA256SUMS` 记录全部 349 个 JSON 文件按相对路径排序后的 SHA256
 
 两个聚合入口的校验值如下
 
 | 文件 | SHA256 |
 | --- | --- |
-| `codex_app_server_protocol.schemas.json` | `779a796ba5b62acd96fb7d16fa5e463388856d2541ff83fab63e3ffc1a481d44` |
-| `codex_app_server_protocol.v2.schemas.json` | `d27764fb5d77022250c2520b7605bd25b6ee9ceb2da6503fbacd0f1bb5eefa35` |
+| `codex_app_server_protocol.schemas.json` | `88bcda93daca473b790c0089b28910275a947de601d9de4cec7e01dc65771fc2` |
+| `codex_app_server_protocol.v2.schemas.json` | `3d7098928a08e2cbe60de7588f0de890598de947cfc82d3c9a01fccd85752630` |
 
 `codex_app_server_protocol.schemas.json` 是完整命名空间聚合包，`codex_app_server_protocol.v2.schemas.json` 是扁平化 v2 聚合包，目录内其余 JSON 文件是请求、响应、通知及共享负载的独立 Schema
 
@@ -92,7 +92,7 @@ app-server 在语义上使用 JSON-RPC 2.0，但 stdio 行与 WebSocket 文本�
 
 客户端不得在 stdio 或 WebSocket 传输中自行补入 `jsonrpc` 字段，也不得把生成的 Schema 当成标准 JSON-RPC envelope 后再套一层
 
-当前通知 envelope 没有事件序号，归并顺序只能使用同一物理连接上的传输到达顺序，断线后通过 thread 快照重新对账
+当前通知 envelope 包含服务端发出通知时记录的 `emittedAtMs`，但没有事件序号，归并顺序仍只能使用同一物理连接上的传输到达顺序，断线后通过 thread 快照重新对账
 
 ## 实验能力
 
@@ -112,15 +112,15 @@ Schema 必须使用 `--experimental` 生成，保留固定提交中标记为实�
 
 客户端应在 `initialize` 成功后发送 `initialized`，初始化完成前不得发送业务请求
 
-## `rawResponseItem/completed` 不对称
+## `rawResponse*/completed` 不对称
 
-固定提交的 Rust `ServerNotification` 枚举包含内部通知 `rawResponseItem/completed`，但 JSON Schema 导出器通过明确排除清单将这个方法从 `ServerNotification` 判别联合中移除，即使启用 `--experimental` 也不会成为合法通知方法
+固定提交的 Rust `ServerNotification` 枚举包含内部通知 `rawResponseItem/completed` 与 `rawResponse/completed`，但 JSON Schema 导出器通过明确排除清单将这两个方法从 `ServerNotification` 判别联合中移除，即使启用 `--experimental` 也不会成为合法通知方法
 
-导出器仍会生成独立的 `v2/RawResponseItemCompletedNotification.json` 负载 Schema，并在聚合包的定义区保留该负载类型，这正说明负载类型存在不等于 wire 方法对客户端开放
+导出器仍会生成独立的 `v2/RawResponseItemCompletedNotification.json` 与 `v2/RawResponseCompletedNotification.json` 负载 Schema，并在聚合包的定义区保留对应负载类型，这正说明负载类型存在不等于 wire 方法对客户端开放
 
-因此该通知不是 Desktop 可依赖的公开协议面，不为它手写 TypeScript 类型或绕过 Schema 添加专用业务处理
+因此这两个通知不是 Desktop 可依赖的公开协议面，不为它们手写 TypeScript 类型或绕过 Schema 添加专用业务处理
 
-若 wire 上出现该方法，路由器按未知通知记录诊断计数并忽略，不能把其中的原始 Responses API item 当作可持久化 `ThreadItem` 展示
+若 wire 上出现这些方法，路由器按未知通知记录诊断计数并忽略，不能把其中的原始 Responses API 数据当作公开协议负载处理
 
 ## 方法边界
 
@@ -131,7 +131,7 @@ Schema 必须使用 `--experimental` 生成，保留固定提交中标记为实�
 | `ClientRequest` | 客户端到服务端 | `id` `method` `params` |
 | `ServerRequest` | 服务端到客户端 | `id` `method` `params` |
 | `ClientNotification` | 客户端到服务端 | `method` 与可选 `params` |
-| `ServerNotification` | 服务端到客户端 | `method` `params` |
+| `ServerNotification` | 服务端到客户端 | `method` `params` 与可选 `emittedAtMs` |
 
 独立的 `*Params.json` 和 `*Response.json` 只描述负载，不能仅因文件存在就推断它对应可调用方法或方向
 

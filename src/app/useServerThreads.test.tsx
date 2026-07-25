@@ -355,6 +355,8 @@ describe("useServerThreads", () => {
               { name: "review", path: "/skills/review", type: "skill" },
               { text: "检查会话标题\n并给出建议", type: "text" },
               { path: "/tmp/reference.png", type: "localImage" },
+              { type: "audio", url: "data:audio/wav;base64,AAAA" },
+              { path: "/tmp/recording.ogg", type: "localAudio" },
             ],
             id: "user-message-1",
             type: "userMessage",
@@ -366,7 +368,7 @@ describe("useServerThreads", () => {
       });
     });
 
-    const preview = "$review\n检查会话标题\n并给出建议\n[图片 reference.png]";
+    const preview = "$review\n检查会话标题\n并给出建议\n[图片 reference.png]\n[音频]\n[音频 recording.ogg]";
     expect(result.current.threads[0]?.preview).toBe(preview);
     expect(result.current.restoredThread?.metadata.preview).toBe(preview);
 

@@ -1,10 +1,16 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c
+// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
 
 /**
  * Notification sent from the server to the client.
  */
-export type ServerNotification =
+export type ServerNotification = {
+  /**
+   * Unix timestamp (in milliseconds) when app-server emitted this notification.
+   */
+  emittedAtMs?: number;
+  [k: string]: unknown | undefined;
+} & (
   | ErrorNotification
   | ThreadStartedNotification
   | ThreadStatusChangedNotification
@@ -16,6 +22,8 @@ export type ServerNotification =
   | ThreadNameUpdatedNotification
   | ThreadGoalUpdatedNotification
   | ThreadGoalClearedNotification
+  | ThreadEnvironmentConnectedNotification
+  | ThreadEnvironmentDisconnectedNotification
   | ThreadSettingsUpdatedNotification
   | ThreadTokenUsageUpdatedNotification
   | TurnStartedNotification
@@ -72,7 +80,8 @@ export type ServerNotification =
   | ThreadRealtimeClosedNotification
   | WindowsWorldWritableWarningNotification
   | WindowsSandboxSetupCompletedNotification
-  | AccountLoginCompletedNotification;
+  | AccountLoginCompletedNotification
+);
 export type ErrorNotificationMethod = "error";
 /**
  * This translation layer make sure that we expose codex error code in camel case.
@@ -143,11 +152,19 @@ export type ThreadItem =
   | ExitedReviewModeThreadItem
   | ContextCompactionThreadItem;
 export type UserInput =
-  TextUserInput | ImageUserInput | LocalImageUserInput | SkillUserInput | MentionUserInput;
+  | TextUserInput
+  | ImageUserInput
+  | LocalImageUserInput
+  | AudioUserInput
+  | LocalAudioUserInput
+  | SkillUserInput
+  | MentionUserInput;
 export type TextUserInputType = "text";
 export type ImageDetail = "auto" | "low" | "high" | "original";
 export type ImageUserInputType = "image";
 export type LocalImageUserInputType = "localImage";
+export type AudioUserInputType = "audio";
+export type LocalAudioUserInputType = "localAudio";
 export type SkillUserInputType = "skill";
 export type MentionUserInputType = "mention";
 export type UserMessageThreadItemType = "userMessage";
@@ -181,9 +198,12 @@ export type FileChangeThreadItemType = "fileChange";
 export type McpToolCallStatus = "inProgress" | "completed" | "failed";
 export type McpToolCallThreadItemType = "mcpToolCall";
 export type DynamicToolCallOutputContentItem =
-  InputTextDynamicToolCallOutputContentItem | InputImageDynamicToolCallOutputContentItem;
+  | InputTextDynamicToolCallOutputContentItem
+  | InputImageDynamicToolCallOutputContentItem
+  | InputAudioDynamicToolCallOutputContentItem;
 export type InputTextDynamicToolCallOutputContentItemType = "inputText";
 export type InputImageDynamicToolCallOutputContentItemType = "inputImage";
+export type InputAudioDynamicToolCallOutputContentItemType = "inputAudio";
 export type DynamicToolCallStatus = "inProgress" | "completed" | "failed";
 export type DynamicToolCallThreadItemType = "dynamicToolCall";
 export type CollabAgentStatus =
@@ -226,6 +246,8 @@ export type ThreadGoalUpdatedNotificationMethod = "thread/goal/updated";
 export type ThreadGoalStatus =
   "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
 export type ThreadGoalClearedNotificationMethod = "thread/goal/cleared";
+export type ThreadEnvironmentConnectedNotificationMethod = "thread/environment/connected";
+export type ThreadEnvironmentDisconnectedNotificationMethod = "thread/environment/disconnected";
 export type ThreadSettingsUpdatedNotificationMethod = "thread/settings/updated";
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
 /**
@@ -266,6 +288,7 @@ export type HookEventName =
   | "preCompact"
   | "postCompact"
   | "sessionStart"
+  | "sessionEnd"
   | "userPromptSubmit"
   | "subagentStart"
   | "subagentStop"
@@ -321,7 +344,7 @@ export type FileSystemSpecialPath =
   | {
       kind: "unknown";
       path: string;
-      subpath?: string | null;
+      subpath?: LegacyAppPathString | null;
       [k: string]: unknown | undefined;
     };
 export type RequestPermissionsGuardianApprovalReviewActionType = "requestPermissions";
@@ -390,6 +413,7 @@ export type PlanType =
   | "team"
   | "self_serve_business_usage_based"
   | "business"
+  | "ent26"
   | "enterprise_cbp_usage_based"
   | "enterprise"
   | "edu"
@@ -415,6 +439,7 @@ export type ExternalAgentConfigMigrationItemType =
   | "SUBAGENTS"
   | "HOOKS"
   | "COMMANDS"
+  | "MEMORY"
   | "SESSIONS";
 export type ExternalAgentConfigImportCompletedNotificationMethod =
   "externalAgentConfig/import/completed";
@@ -437,7 +462,7 @@ export type FuzzyFileSearchSessionUpdatedNotificationMethod = "fuzzyFileSearch/s
 export type FuzzyFileSearchMatchType = "file" | "directory";
 export type FuzzyFileSearchSessionCompletedNotificationMethod = "fuzzyFileSearch/sessionCompleted";
 export type ThreadRealtimeStartedNotificationMethod = "thread/realtime/started";
-export type RealtimeConversationVersion = "v1" | "v2";
+export type RealtimeConversationVersion = "v1" | "v2" | "v3";
 export type ThreadRealtimeItemAddedNotificationMethod = "thread/realtime/itemAdded";
 export type ThreadRealtimeTranscriptDeltaNotificationMethod = "thread/realtime/transcript/delta";
 export type ThreadRealtimeTranscriptDoneNotificationMethod = "thread/realtime/transcript/done";
@@ -532,6 +557,10 @@ export interface Thread {
    */
   agentRole?: string | null;
   /**
+   * Whether the app server accepts direct turn input for this loaded thread. `None` means the capability is unavailable, such as for an unloaded stored thread.
+   */
+  canAcceptDirectInput?: boolean | null;
+  /**
    * Version of the CLI that created the thread.
    */
   cliVersion: string;
@@ -567,6 +596,10 @@ export interface Thread {
    * Identifier for this thread. Codex-generated thread IDs are UUIDv7.
    */
   id: string;
+  /**
+   * Whether the thread has been pinned by the user.
+   */
+  isPinned?: boolean;
   /**
    * Model provider used for this thread (for example, 'openai').
    */
@@ -741,6 +774,16 @@ export interface LocalImageUserInput {
   type: LocalImageUserInputType;
   [k: string]: unknown | undefined;
 }
+export interface AudioUserInput {
+  type: AudioUserInputType;
+  url: string;
+  [k: string]: unknown | undefined;
+}
+export interface LocalAudioUserInput {
+  path: string;
+  type: LocalAudioUserInputType;
+  [k: string]: unknown | undefined;
+}
 export interface SkillUserInput {
   name: string;
   path: string;
@@ -827,9 +870,17 @@ export interface CommandExecutionThreadItem {
   exitCode?: number | null;
   id: string;
   /**
+   * Trusted first-party plugin id when this command resolves to one plugin script.
+   */
+  pluginId?: string | null;
+  /**
    * Identifier for the underlying PTY process (when available).
    */
   processId?: string | null;
+  /**
+   * Safe plugin-relative path when this command resolves to one plugin script.
+   */
+  scriptPath?: string | null;
   source?: CommandExecutionSource & string;
   status: CommandExecutionStatus;
   type: CommandExecutionThreadItemType;
@@ -913,7 +964,6 @@ export interface McpToolCallAppContext {
   connectorId: string;
   linkId?: string | null;
   resourceUri?: string | null;
-  templateId?: string | null;
   [k: string]: unknown | undefined;
 }
 export interface McpToolCallError {
@@ -949,6 +999,11 @@ export interface InputTextDynamicToolCallOutputContentItem {
 export interface InputImageDynamicToolCallOutputContentItem {
   imageUrl: string;
   type: InputImageDynamicToolCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface InputAudioDynamicToolCallOutputContentItem {
+  audioUrl: string;
+  type: InputAudioDynamicToolCallOutputContentItemType;
   [k: string]: unknown | undefined;
 }
 export interface CollabAgentToolCallThreadItem {
@@ -1010,6 +1065,12 @@ export interface WebSearchThreadItem {
   action?: WebSearchAction | null;
   id: string;
   query: string;
+  /**
+   * Structured search results returned out-of-band by standalone web search.
+   *
+   * These stay as opaque JSON at the extension/app-server boundary so new result fields and result types can pass through without a Codex release.
+   */
+  results?: unknown[] | null;
   type: WebSearchThreadItemType;
   [k: string]: unknown | undefined;
 }
@@ -1040,6 +1101,9 @@ export interface ImageViewThreadItem {
   type: ImageViewThreadItemType;
   [k: string]: unknown | undefined;
 }
+/**
+ * Display item emitted by the interruptible `clock.sleep` tool.
+ */
 export interface SleepThreadItem {
   durationMs: number;
   id: string;
@@ -1172,6 +1236,21 @@ export interface ThreadGoalClearedNotification1 {
   threadId: string;
   [k: string]: unknown | undefined;
 }
+export interface ThreadEnvironmentConnectedNotification {
+  method: ThreadEnvironmentConnectedNotificationMethod;
+  params: EnvironmentConnectionNotification;
+  [k: string]: unknown | undefined;
+}
+export interface EnvironmentConnectionNotification {
+  environmentId: string;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadEnvironmentDisconnectedNotification {
+  method: ThreadEnvironmentDisconnectedNotificationMethod;
+  params: EnvironmentConnectionNotification;
+  [k: string]: unknown | undefined;
+}
 export interface ThreadSettingsUpdatedNotification {
   method: ThreadSettingsUpdatedNotificationMethod;
   params: ThreadSettingsUpdatedNotification1;
@@ -1282,6 +1361,7 @@ export interface ThreadTokenUsage {
   [k: string]: unknown | undefined;
 }
 export interface TokenUsageBreakdown {
+  cacheWriteInputTokens?: number;
   cachedInputTokens: number;
   inputTokens: number;
   outputTokens: number;
@@ -1521,7 +1601,7 @@ export interface MinimalFileSystemSpecialPath {
 }
 export interface KindFileSystemSpecialPath {
   kind: "project_roots";
-  subpath?: string | null;
+  subpath?: LegacyAppPathString | null;
   [k: string]: unknown | undefined;
 }
 export interface TmpdirFileSystemSpecialPath {
@@ -1872,6 +1952,10 @@ export interface RateLimitSnapshot {
   primary?: RateLimitWindow | null;
   rateLimitReachedType?: RateLimitReachedType | null;
   secondary?: RateLimitWindow | null;
+  /**
+   * Backend-reported spend-control state. `None` is unavailable, not a sparse-update recovery.
+   */
+  spendControlReached?: boolean | null;
   [k: string]: unknown | undefined;
 }
 export interface CreditsSnapshot {
@@ -1939,7 +2023,6 @@ export interface AppMetadata {
   categories?: string[] | null;
   developer?: string | null;
   firstPartyRequiresInstall?: boolean | null;
-  firstPartyType?: string | null;
   review?: AppReview | null;
   screenshots?: AppScreenshot[] | null;
   seoDescription?: string | null;
@@ -2010,6 +2093,7 @@ export interface ExternalAgentConfigImportItemTypeFailure {
   itemType: ExternalAgentConfigMigrationItemType;
   message: string;
   source?: string | null;
+  subErrorType?: string | null;
   [k: string]: unknown | undefined;
 }
 export interface ExternalAgentConfigImportItemTypeSuccess {

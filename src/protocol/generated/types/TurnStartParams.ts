@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c
+// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
 
 export type AdditionalContextKind = "untrusted" | "application";
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
@@ -17,11 +17,19 @@ export type ModeKind = "plan" | "default";
 export type ReasoningEffort = string;
 export type LegacyAppPathString = string;
 export type UserInput =
-  TextUserInput | ImageUserInput | LocalImageUserInput | SkillUserInput | MentionUserInput;
+  | TextUserInput
+  | ImageUserInput
+  | LocalImageUserInput
+  | AudioUserInput
+  | LocalAudioUserInput
+  | SkillUserInput
+  | MentionUserInput;
 export type TextUserInputType = "text";
 export type ImageDetail = "auto" | "low" | "high" | "original";
 export type ImageUserInputType = "image";
 export type LocalImageUserInputType = "localImage";
+export type AudioUserInputType = "audio";
+export type LocalAudioUserInputType = "localAudio";
 export type SkillUserInputType = "skill";
 export type MentionUserInputType = "mention";
 /**
@@ -173,6 +181,10 @@ export interface Settings {
 export interface TurnEnvironmentParams {
   cwd: LegacyAppPathString;
   environmentId: string;
+  /**
+   * Environment-native runtime workspace roots. Omitted defaults to `cwd`.
+   */
+  runtimeWorkspaceRoots?: LegacyAppPathString[] | null;
   [k: string]: unknown | undefined;
 }
 export interface TextUserInput {
@@ -210,6 +222,16 @@ export interface LocalImageUserInput {
   detail?: ImageDetail | null;
   path: string;
   type: LocalImageUserInputType;
+  [k: string]: unknown | undefined;
+}
+export interface AudioUserInput {
+  type: AudioUserInputType;
+  url: string;
+  [k: string]: unknown | undefined;
+}
+export interface LocalAudioUserInput {
+  path: string;
+  type: LocalAudioUserInputType;
   [k: string]: unknown | undefined;
 }
 export interface SkillUserInput {

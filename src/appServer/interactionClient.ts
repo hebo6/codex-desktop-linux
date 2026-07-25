@@ -145,7 +145,9 @@ function declineResponse(request: ServerRequest): unknown {
     case "item/tool/requestUserInput": return { answers: {} };
     case "mcpServer/elicitation/request": return { action: "decline", content: null, _meta: null };
     case "applyPatchApproval":
-    case "execCommandApproval": return { decision: "denied" };
+    case "execCommandApproval": return {
+      decision: { denied: { rejection: "用户拒绝了请求" } },
+    };
     default: return {};
   }
 }

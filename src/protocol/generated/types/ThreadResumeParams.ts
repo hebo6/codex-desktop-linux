@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c
+// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
 
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
 /**
@@ -23,10 +23,12 @@ export type ResponseItem =
   | CompactionTriggerResponseItem
   | ContextCompactionResponseItem
   | OtherResponseItem;
-export type ContentItem = InputTextContentItem | InputImageContentItem | OutputTextContentItem;
+export type ContentItem =
+  InputTextContentItem | InputImageContentItem | InputAudioContentItem | OutputTextContentItem;
 export type InputTextContentItemType = "input_text";
 export type ImageDetail = "auto" | "low" | "high" | "original";
 export type InputImageContentItemType = "input_image";
+export type InputAudioContentItemType = "input_audio";
 export type OutputTextContentItemType = "output_text";
 /**
  * Classifies an assistant message as interim commentary or final answer text.
@@ -59,9 +61,11 @@ export type FunctionCallOutputBody = string | FunctionCallOutputContentItem[];
 export type FunctionCallOutputContentItem =
   | InputTextFunctionCallOutputContentItem
   | InputImageFunctionCallOutputContentItem
+  | InputAudioFunctionCallOutputContentItem
   | EncryptedContentFunctionCallOutputContentItem;
 export type InputTextFunctionCallOutputContentItemType = "input_text";
 export type InputImageFunctionCallOutputContentItemType = "input_image";
+export type InputAudioFunctionCallOutputContentItemType = "input_audio";
 export type EncryptedContentFunctionCallOutputContentItemType = "encrypted_content";
 export type FunctionCallOutputResponseItemType = "function_call_output";
 export type CustomToolCallResponseItemType = "custom_tool_call";
@@ -177,6 +181,11 @@ export interface InputImageContentItem {
   detail?: ImageDetail | null;
   image_url: string;
   type: InputImageContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface InputAudioContentItem {
+  audio_url: string;
+  type: InputAudioContentItemType;
   [k: string]: unknown | undefined;
 }
 export interface OutputTextContentItem {
@@ -299,6 +308,11 @@ export interface InputImageFunctionCallOutputContentItem {
   detail?: ImageDetail | null;
   image_url: string;
   type: InputImageFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface InputAudioFunctionCallOutputContentItem {
+  audio_url: string;
+  type: InputAudioFunctionCallOutputContentItemType;
   [k: string]: unknown | undefined;
 }
 export interface EncryptedContentFunctionCallOutputContentItem {

@@ -906,6 +906,12 @@ function userMessagePreview(
         const name = input.path.split(/[\\/]/u).at(-1) || "图片";
         return `[图片 ${name}]`;
       }
+      case "audio":
+        return "[音频]";
+      case "localAudio": {
+        const name = input.path.split(/[\\/]/u).at(-1) || "音频";
+        return `[音频 ${name}]`;
+      }
     }
   }).join("\n").trim();
   return preview.length === 0 ? null : preview;

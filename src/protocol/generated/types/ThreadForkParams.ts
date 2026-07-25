@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c
+// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
 
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
 /**
@@ -29,10 +29,18 @@ export interface ThreadForkParams {
    */
   approvalsReviewer?: ApprovalsReviewer | null;
   baseInstructions?: string | null;
+  /**
+   * Optional turn id to fork before, excluding that turn and all later turns. Cannot be combined with `last_turn_id`.
+   */
+  beforeTurnId?: string | null;
   config?: {
     [k: string]: unknown | undefined;
   } | null;
   cwd?: string | null;
+  /**
+   * When true, carry the source thread's current goal into the fork without starting its initial automatic continuation. The next explicit turn owns the goal lifecycle, and normal automatic continuation resumes after it.
+   */
+  deferGoalContinuation?: boolean;
   developerInstructions?: string | null;
   ephemeral?: boolean;
   /**

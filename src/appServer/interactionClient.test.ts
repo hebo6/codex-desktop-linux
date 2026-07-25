@@ -66,4 +66,27 @@ describe("AppServerInteractionClient", () => {
     await expect(Promise.resolve(session.handlers.get("currentTime/read")?.({} as ServerRequest))).resolves.toMatchObject({ currentTimeAt: expect.any(Number) });
     await expect(Promise.resolve(session.handlers.get("item/tool/call")?.({} as ServerRequest))).resolves.toEqual({ contentItems: [], success: false });
   });
+
+  it("销毁时使用当前 legacy 审批拒绝结构", async () => {
+    const session = new FakeSession();
+    const client = new AppServerInteractionClient(session);
+    const request = {
+      id: 9,
+      method: "execCommandApproval",
+      params: {
+        callId: "call-1",
+        command: ["pnpm", "test"],
+        conversationId: "thread-1",
+        cwd: "/workspace/project",
+        parsedCmd: [],
+      },
+    } as ServerRequest;
+    const result = session.handlers.get(request.method)?.(request) as Promise<unknown>;
+
+    client.dispose();
+
+    await expect(result).resolves.toEqual({
+      decision: { denied: { rejection: "用户拒绝了请求" } },
+    });
+  });
 });

@@ -4,6 +4,10 @@ import type { PendingInteraction } from "../appServer";
 import type { ServerRequest } from "../protocol/generated";
 import styles from "./ApprovalPanel.module.css";
 
+const LEGACY_DENIAL_RESPONSE = {
+  decision: { denied: { rejection: "用户拒绝了请求" } },
+} as const;
+
 type CommandRequest = Extract<ServerRequest, { method: "item/commandExecution/requestApproval" }>;
 type FileRequest = Extract<ServerRequest, { method: "item/fileChange/requestApproval" }>;
 type PermissionsRequest = Extract<ServerRequest, { method: "item/permissions/requestApproval" }>;
@@ -308,11 +312,11 @@ function McpField({ disabled, name, onChange, required, schema, value }: { reado
 
 function LegacyPatchApproval({ disabled, onConfirmSession, onRespond, request }: ApprovalProps<LegacyPatchRequest>) {
   const paths = Object.keys(request.params.fileChanges);
-  return <>{request.params.reason ? <p className={styles.reason}>{request.params.reason}</p> : null}<Detail label="变更文件"><code>{paths.join("\n") || "未提供文件列表"}</code></Detail>{request.params.grantRoot ? <Detail label="请求范围"><code>{request.params.grantRoot}</code></Detail> : null}<ApprovalActions disabled={disabled} onAllow={() => onRespond({ decision: "approved" })} onAllowSession={() => onConfirmSession("允许本次连接会话继续修改文件", { decision: "approved_for_session" })} onDecline={() => onRespond({ decision: "denied" })} /></>;
+  return <>{request.params.reason ? <p className={styles.reason}>{request.params.reason}</p> : null}<Detail label="变更文件"><code>{paths.join("\n") || "未提供文件列表"}</code></Detail>{request.params.grantRoot ? <Detail label="请求范围"><code>{request.params.grantRoot}</code></Detail> : null}<ApprovalActions disabled={disabled} onAllow={() => onRespond({ decision: "approved" })} onAllowSession={() => onConfirmSession("允许本次连接会话继续修改文件", { decision: "approved_for_session" })} onDecline={() => onRespond(LEGACY_DENIAL_RESPONSE)} /></>;
 }
 
 function LegacyCommandApproval({ disabled, onConfirmSession, onRespond, request }: ApprovalProps<LegacyCommandRequest>) {
-  return <>{request.params.reason ? <p className={styles.reason}>{request.params.reason}</p> : null}<Detail label="命令"><code>{request.params.command.join(" ")}</code></Detail><Detail label="工作目录"><code>{request.params.cwd}</code></Detail><ApprovalActions disabled={disabled} onAllow={() => onRespond({ decision: "approved" })} onAllowSession={() => onConfirmSession("允许本次连接会话中的同类命令", { decision: "approved_for_session" })} onDecline={() => onRespond({ decision: "denied" })} /></>;
+  return <>{request.params.reason ? <p className={styles.reason}>{request.params.reason}</p> : null}<Detail label="命令"><code>{request.params.command.join(" ")}</code></Detail><Detail label="工作目录"><code>{request.params.cwd}</code></Detail><ApprovalActions disabled={disabled} onAllow={() => onRespond({ decision: "approved" })} onAllowSession={() => onConfirmSession("允许本次连接会话中的同类命令", { decision: "approved_for_session" })} onDecline={() => onRespond(LEGACY_DENIAL_RESPONSE)} /></>;
 }
 
 function ApprovalActions({ disabled, onAllow, onAllowSession, onDecline }: { readonly disabled: boolean; readonly onAllow: () => void; readonly onAllowSession?: (() => void) | undefined; readonly onDecline: () => void }) {

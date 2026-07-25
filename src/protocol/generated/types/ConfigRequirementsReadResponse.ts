@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c
+// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
 
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
 /**
@@ -31,6 +31,7 @@ export interface ConfigRequirementsReadResponse {
 }
 export interface ConfigRequirements {
   allowAppshots?: boolean | null;
+  allowLoginShell?: boolean | null;
   allowManagedHooksOnly?: boolean | null;
   allowRemoteControl?: boolean | null;
   allowedApprovalPolicies?: AskForApproval[] | null;
@@ -41,15 +42,22 @@ export interface ConfigRequirements {
   allowedSandboxModes?: SandboxMode[] | null;
   allowedWebSearchModes?: WebSearchMode[] | null;
   allowedWindowsSandboxImplementations?: WindowsSandboxSetupMode[] | null;
+  browserUse?: BrowserUseRequirements | null;
+  checkForUpdateOnStartup?: boolean | null;
   computerUse?: ComputerUseRequirements | null;
   defaultPermissions?: string | null;
   enforceResidency?: ResidencyRequirement | null;
   featureRequirements?: {
     [k: string]: boolean | undefined;
   } | null;
+  feedback?: FeedbackRequirements | null;
   hooks?: ManagedHooksRequirements | null;
+  logDir?: string | null;
+  modelCatalogJson?: string | null;
   models?: ModelsRequirements | null;
   network?: NetworkRequirements | null;
+  sqliteHome?: string | null;
+  windowsSandboxPrivateDesktop?: boolean | null;
   [k: string]: unknown | undefined;
 }
 export interface GranularAskForApproval {
@@ -62,8 +70,16 @@ export interface GranularAskForApproval {
     [k: string]: unknown | undefined;
   };
 }
+export interface BrowserUseRequirements {
+  disableAutoReview?: boolean | null;
+  [k: string]: unknown | undefined;
+}
 export interface ComputerUseRequirements {
   allowLockedComputerUse?: boolean | null;
+  [k: string]: unknown | undefined;
+}
+export interface FeedbackRequirements {
+  enabled?: boolean | null;
   [k: string]: unknown | undefined;
 }
 export interface ManagedHooksRequirements {
@@ -72,6 +88,7 @@ export interface ManagedHooksRequirements {
   PostToolUse: ConfiguredHookMatcherGroup[];
   PreCompact: ConfiguredHookMatcherGroup[];
   PreToolUse: ConfiguredHookMatcherGroup[];
+  SessionEnd?: ConfiguredHookMatcherGroup[];
   SessionStart: ConfiguredHookMatcherGroup[];
   Stop: ConfiguredHookMatcherGroup[];
   SubagentStart: ConfiguredHookMatcherGroup[];
@@ -87,6 +104,10 @@ export interface ConfiguredHookMatcherGroup {
   [k: string]: unknown | undefined;
 }
 export interface CommandConfiguredHookHandler {
+  /**
+   * Approximate token threshold for spilling this hook's `additionalContext` to disk. `null` uses 2,500 tokens; `0` disables spilling for this hook. The threshold is evaluated against the original context; a spilled preview also includes recovery metadata.
+   */
+  additionalContextLimit?: number | null;
   async: boolean;
   command: string;
   commandWindows?: string | null;

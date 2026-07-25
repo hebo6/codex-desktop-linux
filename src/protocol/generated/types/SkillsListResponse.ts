@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c
+// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
 
 /**
  * A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).
@@ -56,7 +56,15 @@ export interface SkillInterface {
   defaultPrompt?: string | null;
   displayName?: string | null;
   iconLarge?: AbsolutePathBuf | null;
+  /**
+   * Remote large icon URL from the plugin catalog.
+   */
+  iconLargeUrl?: string | null;
   iconSmall?: AbsolutePathBuf | null;
+  /**
+   * Remote small icon URL from the plugin catalog.
+   */
+  iconSmallUrl?: string | null;
   shortDescription?: string | null;
   [k: string]: unknown | undefined;
 }

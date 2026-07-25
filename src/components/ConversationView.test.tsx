@@ -169,6 +169,8 @@ describe("ConversationView", () => {
               type: "text" as const,
             },
             { name: "README", path: "/workspace/README.md", type: "mention" as const },
+            { type: "audio" as const, url: "data:audio/wav;base64,AAAA" },
+            { path: "/workspace/recording.ogg", type: "localAudio" as const },
           ],
           id: "user-markdown",
           type: "userMessage" as const,
@@ -189,6 +191,8 @@ describe("ConversationView", () => {
     expect(screen.getByText("危险")).toBeVisible();
     expect(document.querySelector("script")).toBeNull();
     expect(screen.getByText("@README")).toBeVisible();
+    expect(screen.getByText("音频附件")).toBeVisible();
+    expect(screen.getByText("recording.ogg")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "源码" }));
     expect(onOpenLink).toHaveBeenCalledWith("src/App.tsx");
   });

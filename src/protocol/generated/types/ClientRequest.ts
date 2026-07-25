@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c
+// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
 
 /**
  * Request from the client to the server.
@@ -32,6 +32,7 @@ export type ClientRequest =
   | ThreadRollbackRequest
   | ThreadListRequest
   | ThreadSearchRequest
+  | ThreadSearchOccurrencesRequest
   | ThreadLoadedListRequest
   | ThreadReadRequest
   | ThreadTurnsListRequest
@@ -52,7 +53,9 @@ export type ClientRequest =
   | PluginShareListRequest
   | PluginShareCheckoutRequest
   | PluginShareDeleteRequest
+  | AppReadRequest
   | AppListRequest
+  | AppInstalledRequest
   | FsReadFileRequest
   | FsWriteFileRequest
   | FsCreateDirectoryRequest
@@ -91,6 +94,7 @@ export type ClientRequest =
   | MockExperimentalMethodRequest
   | EnvironmentAddRequest
   | EnvironmentInfoRequest
+  | EnvironmentStatusRequest
   | McpServerOauthLoginRequest
   | ConfigMcpServerReloadRequest
   | McpServerStatusListRequest
@@ -118,6 +122,7 @@ export type ClientRequest =
   | ConfigReadRequest
   | ExternalAgentConfigDetectRequest
   | ExternalAgentConfigImportRequest
+  | ExternalAgentConfigImportRecordHistoryRequest
   | ExternalAgentConfigImportReadHistoriesRequest
   | ConfigValueWriteRequest
   | ConfigBatchWriteRequest
@@ -179,10 +184,12 @@ export type ResponseItem =
   | CompactionTriggerResponseItem
   | ContextCompactionResponseItem
   | OtherResponseItem;
-export type ContentItem = InputTextContentItem | InputImageContentItem | OutputTextContentItem;
+export type ContentItem =
+  InputTextContentItem | InputImageContentItem | InputAudioContentItem | OutputTextContentItem;
 export type InputTextContentItemType = "input_text";
 export type ImageDetail = "auto" | "low" | "high" | "original";
 export type InputImageContentItemType = "input_image";
+export type InputAudioContentItemType = "input_audio";
 export type OutputTextContentItemType = "output_text";
 /**
  * Classifies an assistant message as interim commentary or final answer text.
@@ -215,9 +222,11 @@ export type FunctionCallOutputBody = string | FunctionCallOutputContentItem[];
 export type FunctionCallOutputContentItem =
   | InputTextFunctionCallOutputContentItem
   | InputImageFunctionCallOutputContentItem
+  | InputAudioFunctionCallOutputContentItem
   | EncryptedContentFunctionCallOutputContentItem;
 export type InputTextFunctionCallOutputContentItemType = "input_text";
 export type InputImageFunctionCallOutputContentItemType = "input_image";
+export type InputAudioFunctionCallOutputContentItemType = "input_audio";
 export type EncryptedContentFunctionCallOutputContentItemType = "encrypted_content";
 export type FunctionCallOutputResponseItemType = "function_call_output";
 export type CustomToolCallResponseItemType = "custom_tool_call";
@@ -303,6 +312,7 @@ export type ThreadSourceKind =
   | "subAgentOther"
   | "unknown";
 export type ThreadSearchRequestMethod = "thread/search";
+export type ThreadSearchOccurrencesRequestMethod = "thread/searchOccurrences";
 export type ThreadLoadedListRequestMethod = "thread/loaded/list";
 export type ThreadReadRequestMethod = "thread/read";
 export type ThreadTurnsListRequestMethod = "thread/turns/list";
@@ -325,11 +335,13 @@ export type PluginShareDiscoverability = "LISTED" | "UNLISTED" | "PRIVATE";
 export type PluginSharePrincipalType = "user" | "group" | "workspace";
 export type PluginShareTargetRole = "reader" | "editor";
 export type PluginShareUpdateTargetsRequestMethod = "plugin/share/updateTargets";
-export type PluginShareUpdateDiscoverability = "UNLISTED" | "PRIVATE";
+export type PluginShareUpdateDiscoverability = "UNLISTED" | "PRIVATE" | "LISTED";
 export type PluginShareListRequestMethod = "plugin/share/list";
 export type PluginShareCheckoutRequestMethod = "plugin/share/checkout";
 export type PluginShareDeleteRequestMethod = "plugin/share/delete";
+export type AppReadRequestMethod = "app/read";
 export type AppListRequestMethod = "app/list";
+export type AppInstalledRequestMethod = "app/installed";
 export type FsReadFileRequestMethod = "fs/readFile";
 export type FsWriteFileRequestMethod = "fs/writeFile";
 export type FsCreateDirectoryRequestMethod = "fs/createDirectory";
@@ -345,15 +357,25 @@ export type PluginUninstallRequestMethod = "plugin/uninstall";
 export type TurnStartRequestMethod = "turn/start";
 export type AdditionalContextKind = "untrusted" | "application";
 export type UserInput =
-  TextUserInput | ImageUserInput | LocalImageUserInput | SkillUserInput | MentionUserInput;
+  | TextUserInput
+  | ImageUserInput
+  | LocalImageUserInput
+  | AudioUserInput
+  | LocalAudioUserInput
+  | SkillUserInput
+  | MentionUserInput;
 export type TextUserInputType = "text";
 export type ImageUserInputType = "image";
 export type LocalImageUserInputType = "localImage";
+export type AudioUserInputType = "audio";
+export type LocalAudioUserInputType = "localAudio";
 export type SkillUserInputType = "skill";
 export type MentionUserInputType = "mention";
 export type TurnSteerRequestMethod = "turn/steer";
 export type TurnInterruptRequestMethod = "turn/interrupt";
 export type ThreadRealtimeStartRequestMethod = "thread/realtime/start";
+export type CodexResponseHandoffMode = "thinking" | "commentary" | "bemTags";
+export type ConversationTextRole = "user" | "developer" | "assistant";
 export type RealtimeOutputModality = "text" | "audio";
 /**
  * EXPERIMENTAL - transport used by thread realtime.
@@ -362,7 +384,7 @@ export type ThreadRealtimeStartTransport =
   WebsocketThreadRealtimeStartTransport | WebrtcThreadRealtimeStartTransport;
 export type WebsocketThreadRealtimeStartTransportType = "websocket";
 export type WebrtcThreadRealtimeStartTransportType = "webrtc";
-export type RealtimeConversationVersion = "v1" | "v2";
+export type RealtimeConversationVersion = "v1" | "v2" | "v3";
 export type RealtimeVoice =
   | "alloy"
   | "arbor"
@@ -385,7 +407,6 @@ export type RealtimeVoice =
   | "verse";
 export type ThreadRealtimeAppendAudioRequestMethod = "thread/realtime/appendAudio";
 export type ThreadRealtimeAppendTextRequestMethod = "thread/realtime/appendText";
-export type ConversationTextRole = "user" | "developer" | "assistant";
 export type ThreadRealtimeAppendSpeechRequestMethod = "thread/realtime/appendSpeech";
 export type ThreadRealtimeStopRequestMethod = "thread/realtime/stop";
 export type ThreadRealtimeListVoicesRequestMethod = "thread/realtime/listVoices";
@@ -414,6 +435,7 @@ export type CollaborationModeListRequestMethod = "collaborationMode/list";
 export type MockExperimentalMethodRequestMethod = "mock/experimentalMethod";
 export type EnvironmentAddRequestMethod = "environment/add";
 export type EnvironmentInfoRequestMethod = "environment/info";
+export type EnvironmentStatusRequestMethod = "environment/status";
 export type McpServerOauthLoginRequestMethod = "mcpServer/oauth/login";
 export type ConfigMcpServerReloadRequestMethod = "config/mcpServer/reload";
 export type McpServerStatusListRequestMethod = "mcpServerStatus/list";
@@ -428,12 +450,14 @@ export type LoginAccountParams =
   | ApiKeyLoginAccountParams
   | ChatgptLoginAccountParams
   | ChatgptDeviceCodeLoginAccountParams
-  | ChatgptAuthTokensLoginAccountParams;
+  | ChatgptAuthTokensLoginAccountParams
+  | AmazonBedrockLoginAccountParams;
 export type ApiKeyLoginAccountParamsType = "apiKey";
 export type LoginAppBrand = "codex" | "chatgpt";
 export type ChatgptLoginAccountParamsType = "chatgpt";
 export type ChatgptDeviceCodeLoginAccountParamsType = "chatgptDeviceCode";
 export type ChatgptAuthTokensLoginAccountParamsType = "chatgptAuthTokens";
+export type AmazonBedrockLoginAccountParamsType = "amazonBedrock";
 export type AccountLoginCancelRequestMethod = "account/login/cancel";
 export type AccountLogoutRequestMethod = "account/logout";
 export type AccountRateLimitsReadRequestMethod = "account/rateLimits/read";
@@ -464,7 +488,10 @@ export type ExternalAgentConfigMigrationItemType =
   | "SUBAGENTS"
   | "HOOKS"
   | "COMMANDS"
+  | "MEMORY"
   | "SESSIONS";
+export type ExternalAgentConfigImportRecordHistoryRequestMethod =
+  "externalAgentConfig/import/recordHistory";
 export type ExternalAgentConfigImportReadHistoriesRequestMethod =
   "externalAgentConfig/import/readHistories";
 export type ConfigValueWriteRequestMethod = "config/value/write";
@@ -626,6 +653,10 @@ export interface FunctionDynamicToolNamespaceTool {
 export interface TurnEnvironmentParams {
   cwd: LegacyAppPathString;
   environmentId: string;
+  /**
+   * Environment-native runtime workspace roots. Omitted defaults to `cwd`.
+   */
+  runtimeWorkspaceRoots?: LegacyAppPathString[] | null;
   [k: string]: unknown | undefined;
 }
 export interface CustomMultiAgentMode {
@@ -737,6 +768,11 @@ export interface InputImageContentItem {
   detail?: ImageDetail | null;
   image_url: string;
   type: InputImageContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface InputAudioContentItem {
+  audio_url: string;
+  type: InputAudioContentItemType;
   [k: string]: unknown | undefined;
 }
 export interface OutputTextContentItem {
@@ -859,6 +895,11 @@ export interface InputImageFunctionCallOutputContentItem {
   detail?: ImageDetail | null;
   image_url: string;
   type: InputImageFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface InputAudioFunctionCallOutputContentItem {
+  audio_url: string;
+  type: InputAudioFunctionCallOutputContentItemType;
   [k: string]: unknown | undefined;
 }
 export interface EncryptedContentFunctionCallOutputContentItem {
@@ -991,10 +1032,18 @@ export interface ThreadForkParams {
    */
   approvalsReviewer?: ApprovalsReviewer | null;
   baseInstructions?: string | null;
+  /**
+   * Optional turn id to fork before, excluding that turn and all later turns. Cannot be combined with `last_turn_id`.
+   */
+  beforeTurnId?: string | null;
   config?: {
     [k: string]: unknown | undefined;
   } | null;
   cwd?: string | null;
+  /**
+   * When true, carry the source thread's current goal into the fork without starting its initial automatic continuation. The next explicit turn owns the goal lifecycle, and normal automatic continuation resumes after it.
+   */
+  deferGoalContinuation?: boolean;
   developerInstructions?: string | null;
   ephemeral?: boolean;
   /**
@@ -1160,6 +1209,10 @@ export interface ThreadMetadataUpdateParams {
    * Patch the stored Git metadata for this thread. Omit a field to leave it unchanged, set it to `null` to clear it, or provide a string to replace the stored value.
    */
   gitInfo?: ThreadMetadataGitInfoUpdateParams | null;
+  /**
+   * Patch whether this thread is pinned. Omit to leave the stored value unchanged.
+   */
+  isPinned?: boolean | null;
   threadId: string;
   [k: string]: unknown | undefined;
 }
@@ -1426,6 +1479,10 @@ export interface ThreadListParams {
    */
   cwd?: ThreadListCwdFilter | null;
   /**
+   * Optional pinned filter; when set, only threads matching this value are returned.
+   */
+  isPinned?: boolean | null;
+  /**
    * Optional page size; defaults to a reasonable server-side value.
    */
   limit?: number | null;
@@ -1494,6 +1551,31 @@ export interface ThreadSearchParams {
    * Optional source filter; when set, only sessions from these source kinds are returned. When omitted or empty, defaults to interactive sources.
    */
   sourceKinds?: ThreadSourceKind[] | null;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadSearchOccurrencesRequest {
+  id: RequestId;
+  method: ThreadSearchOccurrencesRequestMethod;
+  params: ThreadSearchOccurrencesParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Parameters for searching visible message occurrences within one paginated thread.
+ */
+export interface ThreadSearchOccurrencesParams {
+  /**
+   * Opaque cursor returned by a previous call for the same thread and search term.
+   */
+  cursor?: string | null;
+  /**
+   * Optional occurrence page size.
+   */
+  limit?: number | null;
+  /**
+   * Case-insensitive literal substring to find in visible user messages and final assistant messages.
+   */
+  searchTerm: string;
+  threadId: string;
   [k: string]: unknown | undefined;
 }
 export interface ThreadLoadedListRequest {
@@ -1680,6 +1762,10 @@ export interface PluginListParams {
    */
   cwds?: AbsolutePathBuf[] | null;
   /**
+   * Whether the client requests a fresh remote plugin catalog fetch.
+   */
+  forceRefetch?: boolean;
+  /**
    * Optional marketplace kind filter. When omitted, only local marketplaces are queried, plus the default remote catalog when enabled by feature flag.
    */
   marketplaceKinds?: PluginListMarketplaceKind[] | null;
@@ -1786,6 +1872,26 @@ export interface PluginShareDeleteParams {
   remotePluginId: string;
   [k: string]: unknown | undefined;
 }
+export interface AppReadRequest {
+  id: RequestId;
+  method: AppReadRequestMethod;
+  params: AppsReadParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * EXPERIMENTAL - read metadata for specific apps/connectors.
+ */
+export interface AppsReadParams {
+  /**
+   * App ids to read. The server accepts at most 100 ids and deduplicates repeated ids while preserving their first-request order.
+   */
+  appIds: string[];
+  /**
+   * When true, include display-only public tool summaries in the returned metadata.
+   */
+  includeTools?: boolean;
+  [k: string]: unknown | undefined;
+}
 export interface AppListRequest {
   id: RequestId;
   method: AppListRequestMethod;
@@ -1810,6 +1916,26 @@ export interface AppsListParams {
   limit?: number | null;
   /**
    * Optional thread id used to evaluate app feature gating from that thread's config.
+   */
+  threadId?: string | null;
+  [k: string]: unknown | undefined;
+}
+export interface AppInstalledRequest {
+  id: RequestId;
+  method: AppInstalledRequestMethod;
+  params: AppsInstalledParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Read the committed installed connector runtime snapshot.
+ */
+export interface AppsInstalledParams {
+  /**
+   * When true and Apps are permitted, refresh and publish the hosted connector runtime tool snapshot first.
+   */
+  forceRefresh?: boolean;
+  /**
+   * Optional loaded thread id used to evaluate effective app configuration.
    */
   threadId?: string | null;
   [k: string]: unknown | undefined;
@@ -2162,6 +2288,16 @@ export interface LocalImageUserInput {
   type: LocalImageUserInputType;
   [k: string]: unknown | undefined;
 }
+export interface AudioUserInput {
+  type: AudioUserInputType;
+  url: string;
+  [k: string]: unknown | undefined;
+}
+export interface LocalAudioUserInput {
+  path: string;
+  type: LocalAudioUserInputType;
+  [k: string]: unknown | undefined;
+}
 export interface SkillUserInput {
   name: string;
   path: string;
@@ -2232,9 +2368,15 @@ export interface ThreadRealtimeStartParams {
    */
   clientManagedHandoffs?: boolean | null;
   /**
-   * Optional prefix added to automatic V1 Codex commentary sent with `conversation.handoff.append` when `codexResponsesAsItems` is not true. Final answers are sent without the prefix.
+   * Overrides BEM channel prefixes by `analysis`, `commentary`, or `final`. Omitted channels retain their default uppercase bracketed prefixes.
    */
-  codexResponseHandoffPrefix?: string | null;
+  codexResponseHandoffChannelPrefixes?: {
+    [k: string]: string[] | undefined;
+  } | null;
+  /**
+   * Selects how automatic Codex responses are routed in Frameless Bidi sessions. Omitted values default to `thinking`. Realtime V1 and V2 ignore this setting.
+   */
+  codexResponseHandoffMode?: CodexResponseHandoffMode | null;
   /**
    * Optional prefix added to automatic Codex response items when `codexResponsesAsItems` is true.
    */
@@ -2252,6 +2394,10 @@ export interface ThreadRealtimeStartParams {
    */
   includeStartupContext?: boolean | null;
   /**
+   * Adds complete role-bearing text items to the initial Frameless Bidi session history. This is only supported by realtime V3 and is sent during session startup. Requests are limited to 128 items and 8,192 estimated text tokens in total.
+   */
+  initialItems?: ThreadRealtimeInitialItem[] | null;
+  /**
    * Overrides the configured realtime model for this session only.
    */
   model?: string | null;
@@ -2268,6 +2414,14 @@ export interface ThreadRealtimeStartParams {
    */
   version?: RealtimeConversationVersion | null;
   voice?: RealtimeVoice | null;
+  [k: string]: unknown | undefined;
+}
+/**
+ * EXPERIMENTAL - role-bearing text item included when a realtime V3 session starts.
+ */
+export interface ThreadRealtimeInitialItem {
+  role: ConversationTextRole;
+  text: string;
   [k: string]: unknown | undefined;
 }
 export interface WebsocketThreadRealtimeStartTransport {
@@ -2633,6 +2787,25 @@ export interface EnvironmentInfoParams {
   environmentId: string;
   [k: string]: unknown | undefined;
 }
+/**
+ * Reads the current status of a configured execution environment.
+ */
+export interface EnvironmentStatusRequest {
+  id: RequestId;
+  method: EnvironmentStatusRequestMethod;
+  params: EnvironmentStatusParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Parameters for reading the current status of one configured environment.
+ */
+export interface EnvironmentStatusParams {
+  /**
+   * Environment id to inspect.
+   */
+  environmentId: string;
+  [k: string]: unknown | undefined;
+}
 export interface McpServerOauthLoginRequest {
   id: RequestId;
   method: McpServerOauthLoginRequestMethod;
@@ -2758,6 +2931,15 @@ export interface ChatgptAuthTokensLoginAccountParams {
    */
   chatgptPlanType?: string | null;
   type: ChatgptAuthTokensLoginAccountParamsType;
+  [k: string]: unknown | undefined;
+}
+/**
+ * [UNSTABLE] Managed Amazon Bedrock login is experimental.
+ */
+export interface AmazonBedrockLoginAccountParams {
+  apiKey: string;
+  region: string;
+  type: AmazonBedrockLoginAccountParamsType;
   [k: string]: unknown | undefined;
 }
 export interface AccountLoginCancelRequest {
@@ -3201,6 +3383,22 @@ export interface ExternalAgentConfigDetectParams {
    * If true, include detection under the user's home directory.
    */
   includeHome?: boolean;
+  /**
+   * Maximum age in days for detected sessions. Missing values use the default limit.
+   */
+  maxSessionAgeDays?: number | null;
+  /**
+   * Maximum number of sessions to detect. Missing values use the default limit.
+   */
+  maxSessions?: number | null;
+  /**
+   * Optional migration-source selector. Missing or unrecognized values use the default source.
+   */
+  migrationSource?: string | null;
+  /**
+   * Deprecated field retained for compatibility. This field is ignored; use `migrationSource` to select the migration source.
+   */
+  source?: string | null;
   [k: string]: unknown | undefined;
 }
 export interface ExternalAgentConfigImportRequest {
@@ -3212,7 +3410,15 @@ export interface ExternalAgentConfigImportRequest {
 export interface ExternalAgentConfigImportParams {
   migrationItems: ExternalAgentConfigMigrationItem[];
   /**
-   * Source product that produced the migration items. Missing means unspecified.
+   * Migration-source selector used to produce the migration items. Pass the same value to detection and import; missing or unrecognized values use the default source.
+   */
+  migrationSource?: string | null;
+  /**
+   * Opaque provider identifier supplied by the caller for analytics attribution and import history display. This does not select the migration source.
+   */
+  providerId?: string | null;
+  /**
+   * Optional identifier for the product that initiated the import.
    */
   source?: string | null;
   [k: string]: unknown | undefined;
@@ -3231,6 +3437,7 @@ export interface MigrationDetails {
   commands?: CommandMigration[];
   hooks?: HookMigration[];
   mcpServers?: McpServerMigration[];
+  memory?: string[];
   plugins?: PluginsMigration[];
   sessions?: SessionMigration[];
   skills?: SkillMigration[];
@@ -3266,6 +3473,46 @@ export interface SkillMigration {
 }
 export interface SubagentMigration {
   name: string;
+  [k: string]: unknown | undefined;
+}
+export interface ExternalAgentConfigImportRecordHistoryRequest {
+  id: RequestId;
+  method: ExternalAgentConfigImportRecordHistoryRequestMethod;
+  params: ExternalAgentConfigImportHistoryRecordParams;
+  [k: string]: unknown | undefined;
+}
+export interface ExternalAgentConfigImportHistoryRecordParams {
+  /**
+   * Completed results grouped by imported item type.
+   */
+  itemTypeResults: ExternalAgentConfigImportTypeResult[];
+  /**
+   * Opaque provider identifier for the externally completed import.
+   */
+  providerId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ExternalAgentConfigImportTypeResult {
+  failures: ExternalAgentConfigImportItemTypeFailure[];
+  itemType: ExternalAgentConfigMigrationItemType;
+  successes: ExternalAgentConfigImportItemTypeSuccess[];
+  [k: string]: unknown | undefined;
+}
+export interface ExternalAgentConfigImportItemTypeFailure {
+  cwd?: string | null;
+  errorType?: string | null;
+  failureStage: string;
+  itemType: ExternalAgentConfigMigrationItemType;
+  message: string;
+  source?: string | null;
+  subErrorType?: string | null;
+  [k: string]: unknown | undefined;
+}
+export interface ExternalAgentConfigImportItemTypeSuccess {
+  cwd?: string | null;
+  itemType: ExternalAgentConfigMigrationItemType;
+  source?: string | null;
+  target?: string | null;
   [k: string]: unknown | undefined;
 }
 export interface ExternalAgentConfigImportReadHistoriesRequest {
@@ -3305,7 +3552,7 @@ export interface ConfigBatchWriteParams {
    */
   filePath?: string | null;
   /**
-   * When true, hot-reload the updated user config into all loaded threads after writing.
+   * When true, hot-reload updated runtime settings into loaded threads after writing. Session-static model, reasoning-effort, Plan-mode reasoning-effort, service-tier, and personality defaults are not reloaded.
    */
   reloadUserConfig?: boolean;
   [k: string]: unknown | undefined;

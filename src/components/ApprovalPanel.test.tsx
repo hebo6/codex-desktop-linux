@@ -69,6 +69,26 @@ describe("ApprovalPanel", () => {
     expect(onRespond).toHaveBeenCalledWith("number:1", { decision: "acceptForSession" });
   });
 
+  it("legacy 审批拒绝时提交拒绝原因", () => {
+    const request = {
+      id: 1,
+      method: "execCommandApproval",
+      params: {
+        callId: "call-1",
+        command: ["pnpm", "test"],
+        conversationId: "thread-1",
+        cwd: "/workspace/project",
+        parsedCmd: [],
+      },
+    } as ServerRequest;
+    const { onRespond } = renderPanel(request);
+
+    fireEvent.click(screen.getByRole("button", { name: "拒绝" }));
+    expect(onRespond).toHaveBeenCalledWith("number:1", {
+      decision: { denied: { rejection: "用户拒绝了请求" } },
+    });
+  });
+
   it("收集结构化用户回答", () => {
     const request = {
       id: 1,

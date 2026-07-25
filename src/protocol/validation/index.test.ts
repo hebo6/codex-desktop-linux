@@ -7,6 +7,7 @@ import {
   validateConfigRequirementsReadResponse,
   validateInitializeResponse,
   validateJsonRpcMessage,
+  validateModelListResponse,
   validateServerNotification,
   validateServerRequest,
   validateThreadListResponse,
@@ -41,16 +42,51 @@ describe("协议运行时边界", () => {
     expect(request.method).toBe("thread/turns/list");
   });
 
-  it("不把独立负载 rawResponseItem/completed 当作合法服务端通知", () => {
-    const result = validateServerNotification({
-      method: "rawResponseItem/completed",
-      params: { threadId: "thread-1", turnId: "turn-1", item: {} },
-    });
+  it("不把 raw response 独立负载当作合法服务端通知", () => {
+    for (const method of ["rawResponseItem/completed", "rawResponse/completed"]) {
+      expect(
+        validateServerNotification({
+          method,
+          params: { threadId: "thread-1", turnId: "turn-1" },
+        }),
+      ).toMatchObject({
+        ok: false,
+        error: { code: "unknown_method", stage: "method" },
+      });
+    }
+  });
 
-    expect(result).toMatchObject({
-      ok: false,
-      error: { code: "unknown_method", stage: "method" },
-    });
+  it("接受当前通知 envelope、账户计划和模型输入模态", () => {
+    expect(
+      validateServerNotification({
+        emittedAtMs: 1,
+        method: "thread/environment/connected",
+        params: { environmentId: "environment-1", threadId: "thread-1" },
+      }).ok,
+    ).toBe(true);
+    expect(
+      validateServerNotification({
+        emittedAtMs: 2,
+        method: "account/updated",
+        params: { authMode: null, planType: "ent26" },
+      }).ok,
+    ).toBe(true);
+    expect(
+      validateModelListResponse({
+        data: [{
+          defaultReasoningEffort: "medium",
+          description: "支持音频输入",
+          displayName: "Codex",
+          hidden: false,
+          id: "codex",
+          inputModalities: ["text", "audio"],
+          isDefault: true,
+          model: "codex",
+          supportedReasoningEfforts: [],
+        }],
+        nextCursor: null,
+      }).ok,
+    ).toBe(true);
   });
 
   it("拒绝非法 JSON、非法 envelope 和已知方法的非法 params", () => {
