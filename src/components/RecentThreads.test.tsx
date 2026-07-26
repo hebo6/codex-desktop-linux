@@ -119,6 +119,23 @@ describe("RecentThreads", () => {
     expect(screen.getByRole("img", { name: "等待审批" })).toBeVisible();
   });
 
+  it("加载运行中会话后复用圆环节点并保持独立动画层", () => {
+    const { rerenderThreads } = renderThreads({
+      currentThreadId: THREAD_TWO.id,
+    });
+    const indicator = screen.getByRole("img", { name: "正在运行" });
+
+    rerenderThreads({
+      backgroundCommandCounts: new Map([[THREAD_ONE.id, 1]]),
+      currentThreadId: THREAD_ONE.id,
+      threads: [{ ...THREAD_ONE }, THREAD_TWO],
+    });
+
+    expect(screen.getByRole("img", { name: "正在运行" })).toBe(indicator);
+    expect(getComputedStyle(indicator).transform).toBe("rotate(0deg)");
+    expect(getComputedStyle(indicator).willChange).toBe("transform");
+  });
+
   it("在固定槽位展示可与运行状态并存的草稿标识", () => {
     renderThreads({ draftThreadIds: new Set([THREAD_ONE.id]) });
 

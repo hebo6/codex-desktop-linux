@@ -19,6 +19,8 @@
   padding: 0;
   border: 2px solid color-mix(in srgb, var(--color-status-progress) 28%, transparent);
   border-top-color: var(--color-status-progress);
+  transform: rotate(0deg);
+  will-change: transform;
   animation: spin 800ms linear infinite;
 }
 
@@ -41,6 +43,10 @@
 }
 
 @keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
   to {
     transform: rotate(360deg);
   }
