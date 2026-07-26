@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ThreadTabs, type ThreadTabView } from "./ThreadTabs";
@@ -15,7 +21,7 @@ function renderTabs(tabs: readonly ThreadTabView[] = [TAB]) {
   const onActivate = vi.fn();
   const onClose = vi.fn();
   const onNew = vi.fn();
-  render(
+  const rendered = render(
     <ThreadTabs
       activeTabId={TAB.id}
       onActivate={onActivate}
@@ -24,7 +30,22 @@ function renderTabs(tabs: readonly ThreadTabView[] = [TAB]) {
       tabs={tabs}
     />,
   );
-  return { onActivate, onClose, onNew };
+  return {
+    onActivate,
+    onClose,
+    onNew,
+    rerenderTabs(nextTabs: readonly ThreadTabView[]) {
+      rendered.rerender(
+        <ThreadTabs
+          activeTabId={TAB.id}
+          onActivate={onActivate}
+          onClose={onClose}
+          onNew={onNew}
+          tabs={nextTabs}
+        />,
+      );
+    },
+  };
 }
 
 describe("ThreadTabs", () => {
@@ -51,6 +72,38 @@ describe("ThreadTabs", () => {
     expect(screen.getByRole("img", { name: "等待审批" })).toHaveTextContent("审批");
     expect(screen.getByRole("img", { name: "等待输入" })).toHaveTextContent("待回复");
     expect(screen.getByRole("img", { name: "会话失败" })).toHaveTextContent("失败");
+  });
+
+  it("使用静态圆圈勾选图标提示完成结果等待查看", () => {
+    renderTabs([{ ...TAB, status: "resultReady" }]);
+
+    const indicator = screen.getByRole("img", {
+      name: "任务已完成，等待查看",
+    });
+    expect(indicator).toHaveAttribute("data-status", "resultReady");
+    expect(indicator).toHaveAttribute("title", "任务已完成，等待查看");
+    expect(indicator.querySelector("circle")).not.toBeNull();
+  });
+
+  it("查看完成结果后淡出提示图标", async () => {
+    const { rerenderTabs } = renderTabs([{ ...TAB, status: "resultReady" }]);
+    const viewedTab = {
+      id: TAB.id,
+      projectName: TAB.projectName,
+      projectPath: TAB.projectPath,
+      title: TAB.title,
+    } satisfies ThreadTabView;
+
+    rerenderTabs([viewedTab]);
+
+    expect(
+      screen.getByRole("img", { name: "任务已完成，等待查看" }),
+    ).toHaveAttribute("data-dismissing", "true");
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("img", { name: "任务已完成，等待查看" }),
+      ).not.toBeInTheDocument()
+    );
   });
 
   it("保留激活、关闭和新建标签操作", () => {

@@ -10,6 +10,7 @@ mod dialogs;
 mod drafts;
 mod header_policy;
 mod local_data;
+mod pending_thread_results;
 mod preferences;
 mod protocol_trace;
 mod saved_prompts;
@@ -115,9 +116,17 @@ pub fn run() {
                 )
                 .into());
             }
-            if !app.manage(saved_prompts::SavedPromptRepository::new(pool)) {
+            if !app.manage(saved_prompts::SavedPromptRepository::new(pool.clone())) {
                 return Err(std::io::Error::other(
                     "saved prompt repository was already initialized",
+                )
+                .into());
+            }
+            if !app.manage(pending_thread_results::PendingThreadResultRepository::new(
+                pool,
+            )) {
+                return Err(std::io::Error::other(
+                    "pending thread result repository was already initialized",
                 )
                 .into());
             }
@@ -264,6 +273,10 @@ pub fn run() {
             drafts::save_draft,
             drafts::transition_draft,
             drafts::delete_draft,
+            pending_thread_results::list_pending_thread_results,
+            pending_thread_results::record_pending_thread_result,
+            pending_thread_results::acknowledge_pending_thread_result,
+            pending_thread_results::clear_pending_thread_result,
             preferences::load_preferences,
             preferences::save_preferences,
             preferences::clear_application_logs,

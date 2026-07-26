@@ -35,6 +35,8 @@ import { useServerInteractions } from "./app/useServerInteractions";
 import { useAccountRateLimits } from "./app/useAccountRateLimits";
 import { useAccountTokenUsage } from "./app/useAccountTokenUsage";
 import { usePreferences } from "./app/usePreferences";
+import { usePendingThreadResults } from "./app/usePendingThreadResults";
+import { threadIndicatorStatus } from "./app/threadIndicatorStatus";
 import {
   useServerConnectionTest,
   type ServerConnectionTestControllerOptions,
@@ -132,6 +134,14 @@ import {
   openProtocolDebugWindow,
   protocolDebugAvailable,
 } from "./transport/protocolTrace";
+import {
+  pendingThreadResultStore as persistentPendingThreadResultStore,
+  type PendingThreadResultStore,
+} from "./transport/pendingThreadResults";
+import {
+  windowFocusSource as defaultWindowFocusSource,
+  type WindowFocusSource,
+} from "./transport/windowFocus";
 
 export type AppWindowOpener = typeof openAppWindow;
 export type CredentialStorageStatusLoader = () => Promise<CredentialStorageStatus>;
@@ -152,6 +162,8 @@ export interface AppProps {
   readonly deepLinkSubscriber?: DeepLinkTargetSubscriber;
   readonly configuredServerStatusSubscriber?: ConfiguredServerStatusSubscriber;
   readonly draftStore?: DraftStore;
+  readonly pendingThreadResultStore?: PendingThreadResultStore;
+  readonly windowFocusSource?: WindowFocusSource;
   readonly protocolDebugAvailabilityLoader?: () => Promise<boolean>;
   readonly protocolDebugWindowOpener?: () => Promise<void>;
 }
@@ -258,6 +270,8 @@ export function App({
   deepLinkSubscriber = subscribeDeepLinkTargets,
   configuredServerStatusSubscriber = subscribeConfiguredServerStatuses,
   draftStore = persistentDraftStore,
+  pendingThreadResultStore = persistentPendingThreadResultStore,
+  windowFocusSource = defaultWindowFocusSource,
   protocolDebugAvailabilityLoader = protocolDebugAvailable,
   protocolDebugWindowOpener = openProtocolDebugWindow,
 }: AppProps = {}) {
@@ -605,6 +619,16 @@ export function App({
         }),
     [conversation.turns, restoredThread],
   );
+  const pendingThreadResults = usePendingThreadResults({
+    activeThreadId: currentThreadId,
+    activeThreadReady:
+      threadRestorePhase === "ready" && displayedRestoredThread !== null,
+    activeTurns: displayedRestoredThread?.turns ?? EMPTY_THREAD_TURNS,
+    client: connection.threadClient,
+    serverId: boundServerId,
+    store: pendingThreadResultStore,
+    windowFocusSource,
+  });
 
   useEffect(() => {
     setCommandLocationRequest(null);
@@ -1673,6 +1697,7 @@ export function App({
     if (!deleted) {
       return;
     }
+    pendingThreadResults.clear(threadId);
     setDeletingThreadId((current) => (current === threadId ? null : current));
     const tab = windowState.windowState?.tabs.find(
       (candidate) => candidate.threadId === threadId,
@@ -1691,6 +1716,7 @@ export function App({
     if (!archived) {
       return;
     }
+    pendingThreadResults.clear(threadId);
     const tab = windowState.windowState?.tabs.find(
       (candidate) => candidate.threadId === threadId,
     );
@@ -1834,6 +1860,12 @@ export function App({
         : serverInteractions.pending.find(
             ({ threadId }) => threadId === tab.threadId,
           );
+      const status = threadIndicatorStatus(thread, {
+        approvalPending: waiting !== undefined,
+        resultPending:
+          tab.threadId !== null
+          && pendingThreadResults.pendingThreadIds.has(tab.threadId),
+      });
       return {
         id: tab.id,
         projectName: cwd ? getBasename(cwd) : boundServerName,
@@ -1843,9 +1875,7 @@ export function App({
           : thread === undefined
             ? "正在恢复会话"
             : threadDisplayTitle(thread),
-        ...(waiting === undefined
-          ? threadTabStatus(thread)
-          : { status: "approval" as const }),
+        ...(status === null ? {} : { status }),
       };
     }),
     [
@@ -1853,6 +1883,7 @@ export function App({
       configuredCwd,
       draftCwds,
       recentCwds,
+      pendingThreadResults.pendingThreadIds,
       serverInteractions.pending,
       serverThreads.threads,
       windowTabs,
@@ -2071,6 +2102,7 @@ export function App({
         onOpenThreadInNewTab={(threadId) => void openThreadInNewTab(threadId)}
         onUndoArchive={() => void serverThreads.undoArchive()}
         pendingThreadIds={serverThreads.pendingThreadIds}
+        pendingResultThreadIds={pendingThreadResults.pendingThreadIds}
         removingThreadIds={serverThreads.removingThreadIds}
         {...(shellDetail === null ? {} : { detail: shellDetail })}
         {...(applicationError !== null
@@ -2437,6 +2469,7 @@ function transientDraftKey(
 }
 
 const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();
+const EMPTY_THREAD_TURNS = Object.freeze([]);
 const EMPTY_WINDOW_TABS: readonly WindowTab[] = Object.freeze([]);
 
 function composerDraftKeyPrefix(
@@ -2537,22 +2570,4 @@ function adjacentTabId(
     ? direction === 1 ? 0 : tabs.length - 1
     : (activeIndex + direction + tabs.length) % tabs.length;
   return tabs[index]?.id ?? null;
-}
-
-function threadTabStatus(
-  thread: ThreadSummary | undefined,
-): Pick<ThreadTabView, "status"> {
-  if (thread?.status.type === "systemError") {
-    return { status: "error" };
-  }
-  if (thread?.status.type !== "active") {
-    return {};
-  }
-  if (thread.status.activeFlags.includes("waitingOnApproval")) {
-    return { status: "approval" };
-  }
-  if (thread.status.activeFlags.includes("waitingOnUserInput")) {
-    return { status: "input" };
-  }
-  return { status: "running" };
 }

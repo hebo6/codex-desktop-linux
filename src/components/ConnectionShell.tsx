@@ -43,6 +43,7 @@ interface ConnectionShellProps {
   loadingMoreThreads?: boolean;
   refreshingThreads?: boolean;
   pendingThreadIds?: readonly string[];
+  pendingResultThreadIds?: ReadonlySet<string>;
   removingThreadIds?: readonly string[];
   archivedThread?: ThreadSummary | null;
   backgroundCommandCounts?: ReadonlyMap<string, number>;
@@ -158,6 +159,7 @@ export function ConnectionShell({
   loadingMoreThreads = false,
   refreshingThreads = false,
   pendingThreadIds = [],
+  pendingResultThreadIds = EMPTY_THREAD_IDS,
   removingThreadIds = [],
   archivedThread = null,
   backgroundCommandCounts,
@@ -487,6 +489,7 @@ export function ConnectionShell({
             : { onOpenThreadInNewTab })}
           onUndoArchive={() => onUndoArchive?.()}
           pendingThreadIds={pendingThreadIds}
+          pendingResultThreadIds={pendingResultThreadIds}
           removingThreadIds={removingThreadIds}
           phase={threadListPhase}
           readOnly={offline}

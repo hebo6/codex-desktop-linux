@@ -352,6 +352,10 @@
   gap: var(--space-1);
 }
 
+.threadIndicators:empty {
+  display: none;
+}
+
 .backgroundCommands {
   display: inline-flex;
   min-height: 18px;

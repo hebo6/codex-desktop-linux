@@ -58,11 +58,9 @@ export function ThreadTabs({
               >
                 <span className={styles.labels}>
                   <span className={styles.titleRow}>
-                    {tab.status === undefined ? null : (
-                      <span className={styles.statusWrapper}>
-                        <ThreadStatusIndicator status={tab.status} />
-                      </span>
-                    )}
+                    <span className={styles.statusWrapper}>
+                      <ThreadStatusIndicator status={tab.status ?? null} />
+                    </span>
                     <span className={styles.title}>{tab.title}</span>
                     <span
                       className={styles.projectBadge}

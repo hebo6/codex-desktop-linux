@@ -16,6 +16,7 @@ import type {
   ThreadSummary,
   ServerThreadsPhase,
 } from "../app/useServerThreads";
+import { threadIndicatorStatus } from "../app/threadIndicatorStatus";
 import { useVirtualRows } from "./useVirtualRows";
 import {
   ArchiveIcon,
@@ -23,10 +24,7 @@ import {
   DraftIcon,
   TerminalIcon,
 } from "./SidebarIcons";
-import {
-  ThreadStatusIndicator,
-  type ThreadStatusKind,
-} from "./ThreadStatusIndicator";
+import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import styles from "./RecentThreads.module.css";
 
 export interface RecentThreadsProps {
@@ -39,6 +37,7 @@ export interface RecentThreadsProps {
   readonly hasMore: boolean;
   readonly loadingMore: boolean;
   readonly pendingThreadIds: readonly string[];
+  readonly pendingResultThreadIds?: ReadonlySet<string>;
   readonly removingThreadIds: readonly string[];
   readonly archivedThread: ThreadSummary | null;
   readonly backgroundCommandCounts?: ReadonlyMap<string, number>;
@@ -109,6 +108,7 @@ interface StickyGroupHeadingState {
 const GROUP_HEADING_HEIGHT = 32;
 const INITIAL_GROUP_THREAD_COUNT = 3;
 const GROUP_THREAD_PAGE_SIZE = 3;
+const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();
 
 export function RecentThreads({
   currentThreadId,
@@ -120,6 +120,7 @@ export function RecentThreads({
   hasMore,
   loadingMore,
   pendingThreadIds,
+  pendingResultThreadIds = EMPTY_THREAD_IDS,
   removingThreadIds,
   archivedThread,
   backgroundCommandCounts = EMPTY_COMMAND_COUNTS,
@@ -532,6 +533,7 @@ export function RecentThreads({
                       operationDisabled={
                         readOnly || pendingThreadIds.includes(entry.thread.id)
                       }
+                      resultPending={pendingResultThreadIds.has(entry.thread.id)}
                       onArchive={() => onArchiveThread(entry.thread.id)}
                       onDelete={() => onDeleteThread(entry.thread.id)}
                       onNavigate={(direction) =>
@@ -686,6 +688,7 @@ function ThreadRow({
   disabled,
   hasDraft,
   operationDisabled,
+  resultPending,
   onArchive,
   onDelete,
   onNavigate,
@@ -699,6 +702,7 @@ function ThreadRow({
   readonly disabled: boolean;
   readonly hasDraft: boolean;
   readonly operationDisabled: boolean;
+  readonly resultPending: boolean;
   readonly onArchive: () => void;
   readonly onDelete: () => void;
   readonly onNavigate: (direction: 1 | -1) => void;
@@ -708,7 +712,7 @@ function ThreadRow({
   readonly thread: ThreadSummary;
 }) {
   const title = threadTitle(thread);
-  const status = threadStatus(thread);
+  const status = threadIndicatorStatus(thread, { resultPending });
   return (
     <div className={styles.threadRowContainer} data-pending={disabled} role="listitem">
       <button
@@ -770,24 +774,20 @@ function ThreadRow({
           </span>
         ) : null}
         <span className={styles.threadTitle}>{title}</span>
-        {status === null && backgroundCommandCount === 0 ? null : (
-          <span className={styles.threadIndicators}>
-            {status === null ? null : (
-              <ThreadStatusIndicator status={status} />
-            )}
-            {backgroundCommandCount === 0 ? null : (
-              <span
-                aria-label={`${backgroundCommandCount} 个后台命令正在运行`}
-                className={styles.backgroundCommands}
-                role="img"
-                title={`${backgroundCommandCount} 个后台命令正在运行`}
-              >
-                <TerminalIcon />
-                <span>{backgroundCommandCount}</span>
-              </span>
-            )}
-          </span>
-        )}
+        <span className={styles.threadIndicators}>
+          <ThreadStatusIndicator status={status} />
+          {backgroundCommandCount === 0 ? null : (
+            <span
+              aria-label={`${backgroundCommandCount} 个后台命令正在运行`}
+              className={styles.backgroundCommands}
+              role="img"
+              title={`${backgroundCommandCount} 个后台命令正在运行`}
+            >
+              <TerminalIcon />
+              <span>{backgroundCommandCount}</span>
+            </span>
+          )}
+        </span>
       </button>
       <span className={styles.rowActions}>
         <button
@@ -829,22 +829,6 @@ function threadTitle(thread: ThreadSummary): string {
   }
   const preview = thread.preview.trim().split(/\r?\n/u, 1)[0]?.trim();
   return preview === undefined || preview.length === 0 ? "未命名会话" : preview;
-}
-
-function threadStatus(thread: ThreadSummary): ThreadStatusKind | null {
-  if (thread.status.type === "systemError") {
-    return "error";
-  }
-  if (thread.status.type !== "active") {
-    return null;
-  }
-  if (thread.status.activeFlags.includes("waitingOnApproval")) {
-    return "approval";
-  }
-  if (thread.status.activeFlags.includes("waitingOnUserInput")) {
-    return "input";
-  }
-  return "running";
 }
 
 function groupThreads(

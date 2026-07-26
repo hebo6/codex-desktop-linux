@@ -54,6 +54,11 @@ import type {
 import type { DeepLinkTargetSubscriber } from "./transport/deepLink";
 import type { ConfiguredServerStatusSubscriber } from "./transport/configuredServerStatuses";
 import type { DraftStore } from "./transport/drafts";
+import type {
+  PendingThreadResult,
+  PendingThreadResultStore,
+} from "./transport/pendingThreadResults";
+import type { WindowFocusSource } from "./transport/windowFocus";
 
 const SERVER_ID = "11111111-1111-4111-8111-111111111111" as ServerId;
 const SECOND_SERVER_ID = "33333333-3333-4333-8333-333333333333" as ServerId;
@@ -148,6 +153,30 @@ function createTestStore() {
   });
 }
 
+function createPendingThreadResultStore(
+  initial: readonly PendingThreadResult[] = [],
+): PendingThreadResultStore {
+  const pending = new Map(
+    initial.map(({ threadId, turnId }) => [threadId, turnId]),
+  );
+  return {
+    list: vi.fn(async () =>
+      [...pending].map(([threadId, turnId]) => ({ threadId, turnId }))
+    ),
+    record: vi.fn(async (_serverId, threadId, turnId) => {
+      pending.set(threadId, turnId);
+    }),
+    acknowledge: vi.fn(async (_serverId, threadId, turnId) => {
+      if (pending.get(threadId) === turnId) {
+        pending.delete(threadId);
+      }
+    }),
+    clear: vi.fn(async (_serverId, threadId) => {
+      pending.delete(threadId);
+    }),
+  };
+}
+
 function renderApp(
   snapshot: () => ConfigurationSnapshot | Promise<ConfigurationSnapshot>,
   options: {
@@ -162,6 +191,8 @@ function renderApp(
     readonly deepLinkSubscriber?: DeepLinkTargetSubscriber;
     readonly configuredServerStatusSubscriber?: ConfiguredServerStatusSubscriber;
     readonly draftStore?: DraftStore;
+    readonly pendingThreadResultStore?: PendingThreadResultStore;
+    readonly windowFocusSource?: WindowFocusSource;
     readonly protocolDebugAvailabilityLoader?: () => Promise<boolean>;
     readonly protocolDebugWindowOpener?: () => Promise<void>;
   } = {},
@@ -252,6 +283,12 @@ function renderApp(
         {...(options.draftStore === undefined
           ? {}
           : { draftStore: options.draftStore })}
+        pendingThreadResultStore={
+          options.pendingThreadResultStore ?? createPendingThreadResultStore()
+        }
+        {...(options.windowFocusSource === undefined
+          ? {}
+          : { windowFocusSource: options.windowFocusSource })}
         protocolDebugAvailabilityLoader={
           options.protocolDebugAvailabilityLoader ?? (async () => false)
         }
@@ -769,8 +806,10 @@ describe("App", () => {
       };
       return authoritative;
     });
+    const pendingThreadResultStore = createPendingThreadResultStore();
 
     renderApp(() => ({ servers: [localServer()], proxies: [] }), {
+      pendingThreadResultStore,
       sessionFactory,
       windowStateOptions: {
         loader: vi.fn(async () => authoritative),
@@ -823,9 +862,28 @@ describe("App", () => {
       await Promise.resolve();
     });
 
+    expect(
+      screen.getAllByRole("img", { name: "任务已完成，等待查看" }),
+    ).toHaveLength(2);
+    expect(pendingThreadResultStore.record).toHaveBeenCalledWith(
+      SERVER_ID,
+      "thread-b",
+      "turn-b",
+    );
+
     fireEvent.keyDown(window, { ctrlKey: true, key: "PageDown" });
     await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(1));
     expect(tabsUpdater.mock.calls.at(-1)?.[0].activeTabId).toBe("tab-b");
+    await waitFor(() =>
+      expect(
+        screen.queryAllByRole("img", { name: "任务已完成，等待查看" }),
+      ).toHaveLength(0)
+    );
+    expect(pendingThreadResultStore.acknowledge).toHaveBeenCalledWith(
+      SERVER_ID,
+      "thread-b",
+      "turn-b",
+    );
 
     fireEvent.keyDown(window, { ctrlKey: true, key: "PageUp" });
     await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(2));

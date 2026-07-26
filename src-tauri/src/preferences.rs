@@ -210,6 +210,7 @@ impl PreferencesRepository {
             .map_err(PreferencesError::Database)?;
         for statement in [
             "DELETE FROM drafts",
+            "DELETE FROM pending_thread_results",
             "DELETE FROM window_states",
             "DELETE FROM servers",
             "DELETE FROM proxies",
@@ -401,11 +402,26 @@ mod tests {
         .execute(&repository.pool)
         .await
         .unwrap();
+        sqlx::query(
+            "INSERT INTO pending_thread_results (
+                server_id, thread_id, turn_id, updated_at_ms
+             ) VALUES (?, 'thread-1', 'turn-1', 1)",
+        )
+        .bind(server_id.to_string())
+        .execute(&repository.pool)
+        .await
+        .unwrap();
 
         repository.clear_all_local_data().await.unwrap();
 
         assert_eq!(repository.load().await.unwrap(), json!({}));
-        for table in ["servers", "proxies", "window_states", "drafts"] {
+        for table in [
+            "servers",
+            "proxies",
+            "window_states",
+            "drafts",
+            "pending_thread_results",
+        ] {
             let count: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM {table}"))
                 .fetch_one(&repository.pool)
                 .await

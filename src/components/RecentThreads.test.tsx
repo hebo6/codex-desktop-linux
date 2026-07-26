@@ -176,6 +176,26 @@ describe("RecentThreads", () => {
     expect(screen.getByRole("img", { name: "会话失败" })).toHaveTextContent("失败");
   });
 
+  it("在空闲和状态同步中的会话展示待查看完成结果", () => {
+    const idleThread = {
+      ...THREAD_ONE,
+      status: { type: "idle" },
+    } satisfies ThreadSummary;
+    renderThreads({
+      pendingResultThreadIds: new Set([THREAD_ONE.id]),
+      threads: [idleThread],
+    });
+
+    expect(
+      screen.getByRole("img", { name: "任务已完成，等待查看" }),
+    ).toHaveAttribute("data-status", "resultReady");
+    expect(
+      screen.getByRole("button", {
+        name: "服务端标题 任务已完成，等待查看",
+      }),
+    ).toBeVisible();
+  });
+
   it("支持点击和方向键移动会话焦点", () => {
     const { onOpenThread } = renderThreads();
     const first = screen.getByRole("button", { name: "服务端标题 正在运行" });
