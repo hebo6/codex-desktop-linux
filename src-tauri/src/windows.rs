@@ -9,6 +9,7 @@ use std::{
     time::Duration,
 };
 
+use gtk::prelude::{GtkWindowExt as _, WidgetExt as _};
 use serde::{Deserialize, Serialize};
 use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Runtime, State, WebviewUrl,
@@ -756,18 +757,43 @@ pub(crate) fn activate_main_window<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-pub(crate) fn activate_application_window_by_label<R: Runtime>(
+pub(crate) async fn activate_application_window_from_notification<R: Runtime>(
     app: &AppHandle<R>,
     label: &str,
+    activation_token: Option<String>,
 ) -> Result<(), CommandError> {
     WindowId::from_window_label(label)?;
     let window = app
         .get_webview_window(label)
         .ok_or_else(CommandError::activation_failed)?;
-    activate_window(&window).map_err(|error| {
-        tracing::warn!(window_label = label, %error, "failed to focus application window");
-        CommandError::activation_failed()
-    })
+    let target_window = window.clone();
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    window
+        .run_on_main_thread(move || {
+            let result = target_window.gtk_window().map(|gtk_window| {
+                if let Some(activation_token) = activation_token {
+                    gtk_window.set_startup_id(&activation_token);
+                }
+                gtk_window.deiconify();
+                gtk_window.show_all();
+                gtk_window.present();
+            });
+            let _ = sender.send(result);
+        })
+        .map_err(|error| {
+            tracing::warn!(window_label = label, %error, "failed to schedule application window activation");
+            CommandError::activation_failed()
+        })?;
+    receiver
+        .await
+        .map_err(|error| {
+            tracing::warn!(window_label = label, %error, "application window activation was canceled");
+            CommandError::activation_failed()
+        })?
+        .map_err(|error| {
+            tracing::warn!(window_label = label, %error, "failed to focus application window");
+            CommandError::activation_failed()
+        })
 }
 
 fn activate_window<R: Runtime>(window: &WebviewWindow<R>) -> tauri::Result<()> {

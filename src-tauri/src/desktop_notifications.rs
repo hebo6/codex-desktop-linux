@@ -4,7 +4,7 @@ use futures_util::StreamExt as _;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager as _, Runtime, State, WebviewWindow};
 use tokio::sync::{OnceCell, mpsc, oneshot};
-use zbus::{Connection, Proxy, zvariant::Value};
+use zbus::{Connection, Message, Proxy, zvariant::Value};
 
 use crate::windows;
 
@@ -60,6 +60,76 @@ struct ShowCommand {
     notification: ValidatedNotification,
     target_window_label: String,
     response: oneshot::Sender<Result<(), CommandError>>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct NotificationActivation {
+    target_window_label: String,
+    activation_token: Option<String>,
+}
+
+#[derive(Debug)]
+struct TrackedNotification {
+    tag: String,
+    target_window_label: String,
+    activation_token: Option<String>,
+}
+
+#[derive(Default)]
+struct NotificationRegistry {
+    notification_ids_by_tag: HashMap<String, u32>,
+    notifications_by_id: HashMap<u32, TrackedNotification>,
+}
+
+impl NotificationRegistry {
+    fn replacement_id(&self, tag: &str) -> u32 {
+        self.notification_ids_by_tag.get(tag).copied().unwrap_or(0)
+    }
+
+    fn track(&mut self, notification_id: u32, tag: String, target_window_label: String) {
+        self.remove(notification_id);
+        if let Some(replaced_id) = self.notification_ids_by_tag.get(&tag).copied() {
+            self.remove(replaced_id);
+        }
+        self.notification_ids_by_tag
+            .insert(tag.clone(), notification_id);
+        self.notifications_by_id.insert(
+            notification_id,
+            TrackedNotification {
+                tag,
+                target_window_label,
+                activation_token: None,
+            },
+        );
+    }
+
+    fn set_activation_token(&mut self, notification_id: u32, activation_token: String) -> bool {
+        let Some(notification) = self.notifications_by_id.get_mut(&notification_id) else {
+            return false;
+        };
+        notification.activation_token = Some(activation_token);
+        true
+    }
+
+    fn take_activation(&mut self, notification_id: u32) -> Option<NotificationActivation> {
+        self.remove(notification_id)
+            .map(|notification| NotificationActivation {
+                target_window_label: notification.target_window_label,
+                activation_token: notification.activation_token,
+            })
+    }
+
+    fn forget(&mut self, notification_id: u32) {
+        self.remove(notification_id);
+    }
+
+    fn remove(&mut self, notification_id: u32) -> Option<TrackedNotification> {
+        let notification = self.notifications_by_id.remove(&notification_id)?;
+        if self.notification_ids_by_tag.get(&notification.tag) == Some(&notification_id) {
+            self.notification_ids_by_tag.remove(&notification.tag);
+        }
+        Some(notification)
+    }
 }
 
 #[derive(Default)]
@@ -152,34 +222,18 @@ async fn notification_worker<R: Runtime>(
                 continue;
             }
         };
-        let mut actions = match proxy.receive_signal("ActionInvoked").await {
-            Ok(actions) => actions,
+        let mut signals = match proxy.receive_all_signals().await {
+            Ok(signals) => signals,
             Err(error) => {
-                tracing::warn!(%error, "failed to subscribe to desktop notification actions");
+                tracing::warn!(%error, "failed to subscribe to desktop notification signals");
                 let _ = command.response.send(Err(CommandError::unavailable()));
                 continue;
             }
         };
-        let mut closures = match proxy.receive_signal("NotificationClosed").await {
-            Ok(closures) => closures,
-            Err(error) => {
-                tracing::warn!(%error, "failed to subscribe to desktop notification closures");
-                let _ = command.response.send(Err(CommandError::unavailable()));
-                continue;
-            }
-        };
-        let mut notification_ids_by_tag = HashMap::new();
-        let mut notification_tags_by_id = HashMap::new();
-        let mut target_windows_by_id = HashMap::new();
-        if send_notification(
-            &proxy,
-            &mut notification_ids_by_tag,
-            &mut notification_tags_by_id,
-            &mut target_windows_by_id,
-            command,
-        )
-        .await
-        .is_err()
+        let mut registry = NotificationRegistry::default();
+        if send_notification(&proxy, &mut registry, command)
+            .await
+            .is_err()
         {
             continue;
         }
@@ -190,84 +244,97 @@ async fn notification_worker<R: Runtime>(
                     let Some(command) = command else {
                         return;
                     };
-                    if send_notification(
-                        &proxy,
-                        &mut notification_ids_by_tag,
-                        &mut notification_tags_by_id,
-                        &mut target_windows_by_id,
-                        command,
-                    )
-                    .await
-                    .is_err()
-                    {
+                    if send_notification(&proxy, &mut registry, command).await.is_err() {
                         break;
                     }
                 }
-                action = actions.next() => {
-                    let Some(action) = action else {
-                        tracing::warn!("desktop notification action stream ended");
+                signal = signals.next() => {
+                    let Some(signal) = signal else {
+                        tracing::warn!("desktop notification signal stream ended");
                         break;
                     };
-                    let Ok((notification_id, action_key)) =
-                        action.body().deserialize::<(u32, String)>()
-                    else {
-                        tracing::warn!("desktop notification action payload is invalid");
-                        continue;
-                    };
-                    if action_key != NOTIFICATION_ACTION {
-                        continue;
-                    }
-                    let Some(target_window_label) =
-                        target_windows_by_id.remove(&notification_id)
-                    else {
-                        tracing::warn!(notification_id, "desktop notification action has no target window");
-                        continue;
-                    };
-                    forget_notification(
-                        notification_id,
-                        &mut notification_ids_by_tag,
-                        &mut notification_tags_by_id,
-                    );
-                    if let Err(error) =
-                        windows::activate_application_window_by_label(&app, &target_window_label)
-                    {
-                        tracing::warn!(%error, "failed to activate window from desktop notification");
-                    }
-                }
-                closure = closures.next() => {
-                    let Some(closure) = closure else {
-                        tracing::warn!("desktop notification closure stream ended");
-                        break;
-                    };
-                    let Ok((notification_id, _reason)) =
-                        closure.body().deserialize::<(u32, u32)>()
-                    else {
-                        tracing::warn!("desktop notification closure payload is invalid");
-                        continue;
-                    };
-                    target_windows_by_id.remove(&notification_id);
-                    forget_notification(
-                        notification_id,
-                        &mut notification_ids_by_tag,
-                        &mut notification_tags_by_id,
-                    );
+                    handle_notification_signal(&app, &mut registry, signal).await;
                 }
             }
         }
     }
 }
 
+async fn handle_notification_signal<R: Runtime>(
+    app: &AppHandle<R>,
+    registry: &mut NotificationRegistry,
+    signal: Message,
+) {
+    let header = signal.header();
+    let Some(signal_name) = header.member().map(|member| member.as_str()) else {
+        tracing::warn!("desktop notification signal has no member");
+        return;
+    };
+    match signal_name {
+        "ActivationToken" => {
+            let Ok((notification_id, activation_token)) =
+                signal.body().deserialize::<(u32, String)>()
+            else {
+                tracing::warn!("desktop notification activation token payload is invalid");
+                return;
+            };
+            if activation_token.is_empty() {
+                tracing::warn!(
+                    notification_id,
+                    "desktop notification activation token is empty"
+                );
+                return;
+            }
+            if !registry.set_activation_token(notification_id, activation_token) {
+                tracing::warn!(
+                    notification_id,
+                    "desktop notification activation token has no target window"
+                );
+            }
+        }
+        "ActionInvoked" => {
+            let Ok((notification_id, action_key)) = signal.body().deserialize::<(u32, String)>()
+            else {
+                tracing::warn!("desktop notification action payload is invalid");
+                return;
+            };
+            if action_key != NOTIFICATION_ACTION {
+                return;
+            }
+            let Some(activation) = registry.take_activation(notification_id) else {
+                tracing::warn!(
+                    notification_id,
+                    "desktop notification action has no target window"
+                );
+                return;
+            };
+            if let Err(error) = windows::activate_application_window_from_notification(
+                app,
+                &activation.target_window_label,
+                activation.activation_token,
+            )
+            .await
+            {
+                tracing::warn!(%error, "failed to activate window from desktop notification");
+            }
+        }
+        "NotificationClosed" => {
+            let Ok((notification_id, _reason)) = signal.body().deserialize::<(u32, u32)>() else {
+                tracing::warn!("desktop notification closure payload is invalid");
+                return;
+            };
+            registry.forget(notification_id);
+        }
+        _ => {}
+    }
+}
+
 async fn send_notification(
     proxy: &Proxy<'_>,
-    notification_ids_by_tag: &mut HashMap<String, u32>,
-    notification_tags_by_id: &mut HashMap<u32, String>,
-    target_windows_by_id: &mut HashMap<u32, String>,
+    registry: &mut NotificationRegistry,
     command: ShowCommand,
 ) -> Result<(), ()> {
-    let replaces_id = notification_ids_by_tag
-        .get(&command.notification.tag)
-        .copied()
-        .unwrap_or(0);
+    let replaces_id = registry.replacement_id(&command.notification.tag);
     let actions = vec![NOTIFICATION_ACTION, "打开"];
     let hints = HashMap::<&str, Value<'_>>::new();
     let result: zbus::Result<u32> = proxy
@@ -287,13 +354,11 @@ async fn send_notification(
         .await;
     match result {
         Ok(notification_id) => {
-            if replaces_id != 0 && replaces_id != notification_id {
-                notification_tags_by_id.remove(&replaces_id);
-                target_windows_by_id.remove(&replaces_id);
-            }
-            notification_ids_by_tag.insert(command.notification.tag.clone(), notification_id);
-            notification_tags_by_id.insert(notification_id, command.notification.tag);
-            target_windows_by_id.insert(notification_id, command.target_window_label);
+            registry.track(
+                notification_id,
+                command.notification.tag,
+                command.target_window_label,
+            );
             let _ = command.response.send(Ok(()));
             Ok(())
         }
@@ -313,19 +378,6 @@ async fn notification_proxy(connection: &Connection) -> zbus::Result<Proxy<'_>> 
         NOTIFICATION_INTERFACE,
     )
     .await
-}
-
-fn forget_notification(
-    notification_id: u32,
-    notification_ids_by_tag: &mut HashMap<String, u32>,
-    notification_tags_by_id: &mut HashMap<u32, String>,
-) {
-    let Some(tag) = notification_tags_by_id.remove(&notification_id) else {
-        return;
-    };
-    if notification_ids_by_tag.get(&tag) == Some(&notification_id) {
-        notification_ids_by_tag.remove(&tag);
-    }
 }
 
 fn validate_notification(
@@ -360,7 +412,70 @@ fn valid_tag(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{CommandError, ShowDesktopNotificationRequest, validate_notification};
+    use super::{
+        CommandError, NotificationActivation, NotificationRegistry, ShowDesktopNotificationRequest,
+        validate_notification,
+    };
+
+    #[test]
+    fn carries_activation_token_until_notification_action() {
+        let mut registry = NotificationRegistry::default();
+        registry.track(7, "task:main".to_owned(), "main".to_owned());
+
+        assert!(registry.set_activation_token(7, "activation-token".to_owned()));
+        assert_eq!(
+            registry.take_activation(7),
+            Some(NotificationActivation {
+                target_window_label: "main".to_owned(),
+                activation_token: Some("activation-token".to_owned()),
+            })
+        );
+        assert_eq!(registry.replacement_id("task:main"), 0);
+    }
+
+    #[test]
+    fn closed_notification_cannot_activate() {
+        let mut registry = NotificationRegistry::default();
+        registry.track(7, "task:main".to_owned(), "main".to_owned());
+        registry.forget(7);
+
+        assert!(!registry.set_activation_token(7, "activation-token".to_owned()));
+        assert_eq!(registry.take_activation(7), None);
+    }
+
+    #[test]
+    fn replacement_rebinds_notification_tag() {
+        let mut registry = NotificationRegistry::default();
+        registry.track(7, "task:main".to_owned(), "main".to_owned());
+        registry.track(9, "task:main".to_owned(), "app-window".to_owned());
+
+        assert_eq!(registry.replacement_id("task:main"), 9);
+        assert_eq!(registry.take_activation(7), None);
+        assert_eq!(
+            registry.take_activation(9),
+            Some(NotificationActivation {
+                target_window_label: "app-window".to_owned(),
+                activation_token: None,
+            })
+        );
+    }
+
+    #[test]
+    fn replacement_can_reuse_notification_id() {
+        let mut registry = NotificationRegistry::default();
+        registry.track(7, "task:main".to_owned(), "main".to_owned());
+        assert!(registry.set_activation_token(7, "stale-token".to_owned()));
+        registry.track(7, "task:main".to_owned(), "app-window".to_owned());
+
+        assert_eq!(registry.replacement_id("task:main"), 7);
+        assert_eq!(
+            registry.take_activation(7),
+            Some(NotificationActivation {
+                target_window_label: "app-window".to_owned(),
+                activation_token: None,
+            })
+        );
+    }
 
     #[test]
     fn accepts_bounded_plain_notification_content() {
