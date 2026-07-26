@@ -1,6 +1,6 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { tauriIpc, type TauriIpc } from "./tauriIpc";
 
-export type DesktopNotificationPermission = NotificationPermission | "unsupported";
+export type DesktopNotificationPermission = "default" | "granted" | "unsupported";
 
 export interface DesktopNotificationInput {
   readonly title: string;
@@ -9,39 +9,37 @@ export interface DesktopNotificationInput {
 }
 
 export interface DesktopNotificationService {
-  readonly permission: () => DesktopNotificationPermission;
+  readonly permission: () => Promise<DesktopNotificationPermission>;
   readonly requestPermission: () => Promise<DesktopNotificationPermission>;
-  readonly show: (input: DesktopNotificationInput) => boolean;
+  readonly show: (input: DesktopNotificationInput) => Promise<boolean>;
 }
 
 export function createDesktopNotificationService(
-  focusWindow: () => Promise<void> = async () => getCurrentWindow().setFocus(),
+  ipc: Pick<TauriIpc, "invoke"> = tauriIpc,
 ): DesktopNotificationService {
-  const permission = (): DesktopNotificationPermission =>
-    typeof Notification === "undefined" ? "unsupported" : Notification.permission;
+  const permission = async (): Promise<DesktopNotificationPermission> => {
+    try {
+      const available = await ipc.invoke<boolean>("desktop_notification_availability", {});
+      return available ? "granted" : "unsupported";
+    } catch {
+      return "unsupported";
+    }
+  };
   return {
     permission,
-    async requestPermission() {
-      if (typeof Notification === "undefined") return "unsupported";
-      return Notification.requestPermission();
-    },
-    show(input) {
-      if (
-        typeof Notification === "undefined" ||
-        Notification.permission !== "granted" ||
-        (document.visibilityState === "visible" && document.hasFocus())
-      ) {
+    requestPermission: permission,
+    async show(input) {
+      try {
+        return await ipc.invoke<boolean>("show_desktop_notification", {
+          request: {
+            title: boundedText(input.title, 96),
+            body: boundedText(input.body, 256),
+            tag: input.tag,
+          },
+        });
+      } catch {
         return false;
       }
-      const notification = new Notification(boundedText(input.title, 96), {
-        body: boundedText(input.body, 256),
-        tag: boundedText(input.tag, 128),
-      });
-      notification.onclick = () => {
-        notification.close();
-        void focusWindow().catch(() => undefined);
-      };
-      return true;
     },
   };
 }

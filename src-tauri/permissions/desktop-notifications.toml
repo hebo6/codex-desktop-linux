@@ -1,0 +1,7 @@
+[[permission]]
+identifier = "allow-desktop-notifications"
+description = "Allows application windows to check and send bounded native desktop notifications"
+commands.allow = [
+    "desktop_notification_availability",
+    "show_desktop_notification",
+]

@@ -256,7 +256,7 @@ function GeneralSection({ disabled, preferences, update }: PreferenceSectionProp
 }
 
 function NotificationsSection({ disabled, preferences, update, permission }: PreferenceSectionProps & { readonly permission: DesktopNotificationPermission }) {
-  const permissionText = permission === "granted" ? "系统通知权限已允许" : permission === "denied" ? "系统已拒绝通知权限，可在桌面环境设置中修改" : permission === "unsupported" ? "当前 WebView 不支持系统通知" : "首次启用时会请求系统通知权限";
+  const permissionText = permission === "granted" ? "系统通知服务可用" : permission === "unsupported" ? "当前桌面环境没有可用的通知服务" : "正在检查系统通知服务";
   return <Section title="桌面通知" description={`仅在相应窗口不活跃时发送，不包含用户消息或文件正文 · ${permissionText}`}><Toggle checked={preferences.notifyTaskComplete} disabled={disabled} label="任务完成" onChange={(notifyTaskComplete) => update({ notifyTaskComplete })} /><Toggle checked={preferences.notifyApproval} disabled={disabled} label="等待审批" onChange={(notifyApproval) => update({ notifyApproval })} /><Toggle checked={preferences.notifyConnectionFailure} disabled={disabled} label="连接失败" onChange={(notifyConnectionFailure) => update({ notifyConnectionFailure })} /></Section>;
 }
 

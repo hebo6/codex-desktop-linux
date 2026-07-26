@@ -756,6 +756,20 @@ pub(crate) fn activate_main_window<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
+pub(crate) fn activate_application_window_by_label<R: Runtime>(
+    app: &AppHandle<R>,
+    label: &str,
+) -> Result<(), CommandError> {
+    WindowId::from_window_label(label)?;
+    let window = app
+        .get_webview_window(label)
+        .ok_or_else(CommandError::activation_failed)?;
+    activate_window(&window).map_err(|error| {
+        tracing::warn!(window_label = label, %error, "failed to focus application window");
+        CommandError::activation_failed()
+    })
+}
+
 fn activate_window<R: Runtime>(window: &WebviewWindow<R>) -> tauri::Result<()> {
     if window.is_minimized()? {
         window.unminimize()?;

@@ -36,6 +36,7 @@ describe("usePreferences", () => {
       codeWrap: true,
       theme: "dark",
     })));
+    await waitFor(() => expect(result.current.saving).toBe(false));
   });
 
   it("保存失败保留当前选择并展示错误", async () => {

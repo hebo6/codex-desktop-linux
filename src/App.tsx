@@ -108,6 +108,7 @@ import {
 } from "./transport/preferences";
 import {
   desktopNotificationService,
+  type DesktopNotificationPermission,
   type DesktopNotificationService,
 } from "./transport/desktopNotifications";
 import type { ProxyConnectionTestInput } from "./transport/serverConnectionTest";
@@ -489,9 +490,8 @@ export function App({
   const [shortcutStatus, setShortcutStatus] = useState<string | null>(null);
   const [commandLocationRequest, setCommandLocationRequest] =
     useState<CommandLocationRequest | null>(null);
-  const [notificationPermission, setNotificationPermission] = useState(
-    () => notificationService.permission(),
-  );
+  const [notificationPermission, setNotificationPermission] =
+    useState<DesktopNotificationPermission>("default");
   const [openingExternalLink, setOpeningExternalLink] = useState(false);
   const trustedDomainsRef = useRef(new Set<string>());
   const [windowActionError, setWindowActionError] = useState<string | null>(
@@ -686,7 +686,13 @@ export function App({
   }, [configuredServerStatusSubscriber]);
 
   useEffect(() => {
-    setNotificationPermission(notificationService.permission());
+    let active = true;
+    void notificationService.permission().then((permission) => {
+      if (active) setNotificationPermission(permission);
+    });
+    return () => {
+      active = false;
+    };
   }, [notificationService]);
 
   useEffect(() => {
@@ -700,7 +706,7 @@ export function App({
       conversation.activeTurnId === null &&
       latestTurn?.status === "completed"
     ) {
-      notificationService.show({
+      void notificationService.show({
         title: "Codex 任务已完成",
         body: "返回对应窗口查看结果",
         tag: `task:${windowId ?? "main"}:${threadId ?? "draft"}`,
@@ -725,7 +731,7 @@ export function App({
       ({ key }) => !notifiedApprovalKeysRef.current.has(key),
     );
     if (hasNewRequest && preferences.preferences.notifyApproval) {
-      notificationService.show({
+      void notificationService.show({
         title: "Codex 正在等待审批",
         body: "返回对应窗口查看并处理请求",
         tag: `approval:${windowId ?? "main"}`,
@@ -746,7 +752,7 @@ export function App({
       previous !== "error" &&
       connection.view.phase === "error"
     ) {
-      notificationService.show({
+      void notificationService.show({
         title: "Codex 连接失败",
         body: "返回窗口查看连接诊断或重试",
         tag: `connection:${windowId ?? "main"}:${boundServerId ?? "unbound"}`,
@@ -1646,7 +1652,7 @@ export function App({
       preferences.update(patch);
       return;
     }
-    if (notificationPermission === "denied" || notificationPermission === "unsupported") {
+    if (notificationPermission === "unsupported") {
       preferences.update(disableRequestedNotifications(patch));
       return;
     }

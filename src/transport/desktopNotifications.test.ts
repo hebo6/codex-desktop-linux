@@ -1,45 +1,67 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createDesktopNotificationService } from "./desktopNotifications";
-
-const OriginalNotification = globalThis.Notification;
+import type { TauriIpc } from "./tauriIpc";
 
 afterEach(() => {
-  Object.defineProperty(globalThis, "Notification", { configurable: true, value: OriginalNotification });
   vi.restoreAllMocks();
 });
 
 describe("desktop notifications", () => {
-  it("窗口不活跃且已授权时发送，点击后聚焦当前窗口", async () => {
-    const instances: Array<{ close: ReturnType<typeof vi.fn>; onclick: (() => void) | null }> = [];
-    class FakeNotification {
-      static permission: NotificationPermission = "granted";
-      static requestPermission = vi.fn(async () => "granted" as NotificationPermission);
-      close = vi.fn();
-      onclick: (() => void) | null = null;
-      constructor(readonly title: string, readonly options?: NotificationOptions) {
-        instances.push(this);
-      }
-    }
-    Object.defineProperty(globalThis, "Notification", { configurable: true, value: FakeNotification });
-    vi.spyOn(document, "hasFocus").mockReturnValue(false);
-    const focus = vi.fn(async () => undefined);
-    const service = createDesktopNotificationService(focus);
+  it("通过原生 IPC 检查桌面通知服务", async () => {
+    const availableIpc = {
+      invoke: vi.fn(async () => true),
+    };
+    const unavailableIpc = {
+      invoke: vi.fn(async () => false),
+    };
 
-    expect(service.show({ title: "任务完成", body: "返回窗口查看结果", tag: "thread:1" })).toBe(true);
-    instances[0]?.onclick?.();
-    await Promise.resolve();
-    expect(instances[0]?.close).toHaveBeenCalledTimes(1);
-    expect(focus).toHaveBeenCalledTimes(1);
+    await expect(createDesktopNotificationService(
+      availableIpc as Pick<TauriIpc, "invoke">,
+    ).permission()).resolves.toBe("granted");
+    await expect(createDesktopNotificationService(
+      unavailableIpc as Pick<TauriIpc, "invoke">,
+    ).requestPermission()).resolves.toBe("unsupported");
+    expect(availableIpc.invoke).toHaveBeenCalledWith("desktop_notification_availability", {});
   });
 
-  it("窗口活跃或未授权时不发送", () => {
-    class FakeNotification {
-      static permission: NotificationPermission = "denied";
-      static requestPermission = vi.fn(async () => "denied" as NotificationPermission);
-    }
-    Object.defineProperty(globalThis, "Notification", { configurable: true, value: FakeNotification });
-    const service = createDesktopNotificationService();
-    expect(service.show({ title: "连接失败", body: "请检查设置", tag: "connection" })).toBe(false);
+  it("窗口不活跃时通过原生 IPC 发送有界通知", async () => {
+    const ipc = {
+      invoke: vi.fn(async () => true),
+    };
+    const service = createDesktopNotificationService(ipc as Pick<TauriIpc, "invoke">);
+
+    await expect(service.show({
+      title: `任务${"完".repeat(120)}`,
+      body: "返回窗口查看结果",
+      tag: "thread:1",
+    })).resolves.toBe(true);
+    expect(ipc.invoke).toHaveBeenCalledWith("show_desktop_notification", {
+      request: {
+        title: `任务${"完".repeat(93)}…`,
+        body: "返回窗口查看结果",
+        tag: "thread:1",
+      },
+    });
+  });
+
+  it("由原生窗口焦点判断决定是否发送", async () => {
+    const ipc = {
+      invoke: vi.fn(async () => false),
+    };
+    const service = createDesktopNotificationService(ipc as Pick<TauriIpc, "invoke">);
+
+    await expect(service.show({
+      title: "连接失败",
+      body: "请检查设置",
+      tag: "connection",
+    })).resolves.toBe(false);
+    expect(ipc.invoke).toHaveBeenCalledWith("show_desktop_notification", {
+      request: {
+        title: "连接失败",
+        body: "请检查设置",
+        tag: "connection",
+      },
+    });
   });
 });

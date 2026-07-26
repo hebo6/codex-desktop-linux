@@ -4,6 +4,7 @@ mod configuration;
 mod connection;
 mod credentials;
 mod deep_link;
+mod desktop_notifications;
 mod diagnostics;
 mod dialogs;
 mod drafts;
@@ -42,6 +43,7 @@ pub fn run() {
         .manage(connection::LocalStdioConnectionManager::default())
         .manage(connection::RemoteWebSocketConnectionManager::default())
         .manage(clipboard::ClipboardFileStore::default())
+        .manage(desktop_notifications::DesktopNotificationManager::default())
         .manage(connection::ConfiguredConnectionManager::new(
             protocol_trace.clone(),
         ))
@@ -273,6 +275,8 @@ pub fn run() {
             saved_prompts::delete_saved_prompt,
             saved_prompts::reorder_saved_prompts,
             diagnostics::read_system_diagnostics,
+            desktop_notifications::desktop_notification_availability,
+            desktop_notifications::show_desktop_notification,
             protocol_trace::protocol_debug_availability,
             protocol_trace::subscribe_protocol_trace,
             protocol_trace::unsubscribe_protocol_trace,

@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop-notifications",
+  "description": "Allows application windows to use native Linux desktop notifications",
+  "windows": ["main", "app-*"],
+  "permissions": [
+    "allow-desktop-notifications"
+  ]
+}

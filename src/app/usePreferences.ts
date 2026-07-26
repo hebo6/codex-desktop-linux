@@ -14,6 +14,7 @@ export function usePreferences(store: PreferencesStore = preferencesStore) {
   const [error, setError] = useState<string | null>(null);
   const currentRef = useRef<AppPreferences>(DEFAULT_APP_PREFERENCES);
   const saveTailRef = useRef(Promise.resolve());
+  const updateRevisionRef = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -41,6 +42,8 @@ export function usePreferences(store: PreferencesStore = preferencesStore) {
   }, [preferences.theme]);
 
   const update = useCallback((patch: Partial<AppPreferences>) => {
+    const revision = updateRevisionRef.current + 1;
+    updateRevisionRef.current = revision;
     const next = Object.freeze({ ...currentRef.current, ...patch });
     currentRef.current = next;
     setPreferences(next);
@@ -59,7 +62,7 @@ export function usePreferences(store: PreferencesStore = preferencesStore) {
         if (currentRef.current === next) setError("无法保存偏好设置");
       })
       .finally(() => {
-        if (currentRef.current === next) setSaving(false);
+        if (updateRevisionRef.current === revision) setSaving(false);
       });
   }, [store]);
 

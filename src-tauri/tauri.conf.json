@@ -34,6 +34,7 @@
         "window-controls",
         "app-events",
         "app-windows",
+        "desktop-notifications",
         "protocol-debug",
         "configuration",
         "configured-connection",
