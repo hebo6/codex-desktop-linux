@@ -54,17 +54,12 @@
   margin: 0 auto;
 }
 
-.messageColumn[data-running-turn-reserve="true"] {
+.messageColumn[data-running-turn-floor="true"] {
   padding-bottom: 0;
 }
 
 .conversationList {
   width: 100%;
-}
-
-.runningTurnReserve {
-  width: 100%;
-  pointer-events: none;
 }
 
 .conversationRow {

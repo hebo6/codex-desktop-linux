@@ -771,12 +771,13 @@ describe("ConversationView", () => {
         if (this.getAttribute("aria-label") !== "会话消息") {
           return originalScrollHeight?.call(this) ?? 0;
         }
-        const reserve = this.querySelector<HTMLElement>(
-          "[data-running-turn-reserve-space]",
+        const floor = this.querySelector<HTMLElement>(
+          '[data-running-turn-floor="true"]',
         );
-        return 28 + contentHeight + (
-          reserve === null ? 120 : Number.parseFloat(reserve.style.height)
-        );
+        const naturalHeight = 28 + contentHeight;
+        return floor === null
+          ? naturalHeight + 120
+          : Math.max(naturalHeight, Number.parseFloat(floor.style.minHeight));
       });
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function (this: HTMLElement) {
@@ -886,12 +887,12 @@ describe("ConversationView", () => {
       />,
     );
 
-    const reserve = scroller.querySelector<HTMLElement>(
-      "[data-running-turn-reserve-space]",
+    const floor = scroller.querySelector<HTMLElement>(
+      '[data-running-turn-floor="true"]',
     );
     const latestQuestion = screen.getByText("后续问题")
       .closest<HTMLElement>("[data-user-message]");
-    expect(reserve).toHaveStyle({ height: "470px" });
+    expect(floor).toHaveStyle({ minHeight: "1548px" });
     expect(scroller.scrollTop).toBe(948);
     expect(latestQuestion?.getBoundingClientRect().top).toBe(52);
     expect(scroller.scrollTop).toBe(
@@ -921,7 +922,7 @@ describe("ConversationView", () => {
       />,
     );
 
-    expect(reserve).toHaveStyle({ height: "270px" });
+    expect(floor).toHaveStyle({ minHeight: "1548px" });
     expect(scroller.scrollTop).toBe(948);
     expect(latestQuestion?.getBoundingClientRect().top).toBe(52);
     expect(scroller.scrollTop).toBe(
@@ -952,13 +953,15 @@ describe("ConversationView", () => {
         if (this.getAttribute("aria-label") !== "会话消息") {
           return originalScrollHeight?.call(this) ?? 0;
         }
-        const reserve = this.querySelector<HTMLElement>(
-          "[data-running-turn-reserve-space]",
+        const floor = this.querySelector<HTMLElement>(
+          '[data-running-turn-floor="true"]',
         );
-        const reserveHeight = reserve === null
-          ? 120
-          : Number.parseFloat(reserve.style.height);
-        return contentDocumentBottom + reserveHeight;
+        return floor === null
+          ? contentDocumentBottom + 120
+          : Math.max(
+            contentDocumentBottom,
+            Number.parseFloat(floor.style.minHeight),
+          );
       });
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function (this: HTMLElement) {
@@ -1047,7 +1050,7 @@ describe("ConversationView", () => {
     );
 
     expect(scroller.scrollTop).toBe(520);
-    expect(scroller.querySelector("[data-running-turn-reserve-space]"))
+    expect(scroller.querySelector('[data-running-turn-floor="true"]'))
       .not.toBeInTheDocument();
 
     const activityTurn = {
@@ -1068,10 +1071,10 @@ describe("ConversationView", () => {
       />,
     );
 
-    const reserve = scroller.querySelector<HTMLElement>(
-      "[data-running-turn-reserve-space]",
+    const floor = scroller.querySelector<HTMLElement>(
+      '[data-running-turn-floor="true"]',
     );
-    expect(reserve).toHaveStyle({ height: "400px" });
+    expect(floor).toHaveStyle({ minHeight: "1530px" });
     expect(scroller.scrollTop).toBe(930);
 
     const answeringTurn = {
@@ -1092,7 +1095,7 @@ describe("ConversationView", () => {
         restoredThread={{ ...RESTORED, turns: [completedTurn, answeringTurn] }}
       />,
     );
-    expect(reserve).toHaveStyle({ height: "130px" });
+    expect(floor).toHaveStyle({ minHeight: "1530px" });
     expect(scroller.scrollHeight).toBe(1_530);
     expect(scroller.scrollTop).toBe(930);
     expect(scroller.scrollTop).toBe(
@@ -1176,7 +1179,7 @@ describe("ConversationView", () => {
         }}
       />,
     );
-    expect(scroller.querySelector("[data-running-turn-reserve-space]"))
+    expect(scroller.querySelector('[data-running-turn-floor="true"]'))
       .not.toBeInTheDocument();
     expect(scroller.scrollTop).toBe(1_730);
   });

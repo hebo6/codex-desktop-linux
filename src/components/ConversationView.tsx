@@ -153,10 +153,9 @@ interface HistoryQuestion {
   readonly rowKey: string;
 }
 
-interface RunningTurnReserve {
-  readonly contentHeight: number;
-  readonly fullHeight: number;
-  readonly height: number;
+interface RunningTurnFloor {
+  readonly anchorBottom: number;
+  readonly floorHeight: number;
   readonly kind: "page" | "question";
   readonly turnId: string;
   readonly viewportHeight: number;
@@ -215,10 +214,10 @@ export function ConversationView({
   const runningTurnId =
     restoredThread.turns.findLast(({ status }) => status === "inProgress")?.id ??
     null;
-  const [runningTurnReserve, setRunningTurnReserve] =
-    useState<RunningTurnReserve | null>(null);
-  const runningTurnReserveVisible =
-    runningTurnId !== null && runningTurnReserve?.turnId === runningTurnId;
+  const [runningTurnFloor, setRunningTurnFloor] =
+    useState<RunningTurnFloor | null>(null);
+  const runningTurnFloorVisible =
+    runningTurnId !== null && runningTurnFloor?.turnId === runningTurnId;
   const previousQuestionCountRef = useRef(historyQuestions.length);
 
   const questionTop = useCallback(
@@ -310,79 +309,61 @@ export function ConversationView({
         return;
       }
       const contentRect = content.getBoundingClientRect();
-      const contentHeight = contentRect.height;
-      const activeReserve = runningTurnReserveVisible
-        ? runningTurnReserve
+      const scrollerRect = scroller.getBoundingClientRect();
+      const naturalBottom =
+        scroller.scrollTop + contentRect.bottom - scrollerRect.top;
+      const activeFloor = runningTurnFloorVisible
+        ? runningTurnFloor
         : null;
-      if (!followBottomRef.current) {
-        if (
-          activeReserve !== null &&
-          Math.abs(activeReserve.contentHeight - contentHeight) >
-            BOTTOM_THRESHOLD
-        ) {
-          setRunningTurnReserve({
-            ...activeReserve,
-            contentHeight,
-          });
-        }
-        return;
-      }
-      const contentBottom = contentRect.bottom;
-      const viewportBottom = scroller.getBoundingClientRect().bottom;
-      if (contentBottom < viewportBottom - BOTTOM_THRESHOLD) {
-        if (activeReserve === null) {
-          return;
-        }
-        const fullHeight = activeReserve.kind === "question"
-          ? activeReserve.fullHeight +
-            scroller.clientHeight -
-            activeReserve.viewportHeight
-          : scroller.clientHeight * RUNNING_TURN_RESERVE_RATIO;
-        const consumedHeight =
-          activeReserve.fullHeight -
-          activeReserve.height +
-          contentHeight -
-          activeReserve.contentHeight;
-        const height = Math.min(
-          fullHeight,
-          Math.max(0, fullHeight - consumedHeight),
+      if (
+        activeFloor !== null &&
+        Math.abs(activeFloor.viewportHeight - scroller.clientHeight) >
+          BOTTOM_THRESHOLD
+      ) {
+        const viewportDelta =
+          scroller.clientHeight - activeFloor.viewportHeight;
+        const floorHeight = Math.max(
+          0,
+          activeFloor.floorHeight + viewportDelta * (
+            activeFloor.kind === "question"
+              ? 1
+              : RUNNING_TURN_RESERVE_RATIO
+          ),
         );
-        if (
-          Math.abs(activeReserve.contentHeight - contentHeight) <=
-            BOTTOM_THRESHOLD &&
-          Math.abs(activeReserve.fullHeight - fullHeight) <= BOTTOM_THRESHOLD &&
-          Math.abs(activeReserve.height - height) <= BOTTOM_THRESHOLD
-        ) {
-          return;
-        }
-        setRunningTurnReserve({
-          contentHeight,
-          fullHeight,
-          height,
-          kind: activeReserve.kind,
-          turnId: runningTurnId,
+        setRunningTurnFloor({
+          ...activeFloor,
+          floorHeight,
           viewportHeight: scroller.clientHeight,
         });
         return;
       }
-      const fullHeight = scroller.clientHeight * RUNNING_TURN_RESERVE_RATIO;
+      if (!followBottomRef.current) {
+        return;
+      }
+      const contentBottom = contentRect.bottom;
+      const viewportBottom = scrollerRect.bottom;
+      if (contentBottom < viewportBottom - BOTTOM_THRESHOLD) {
+        return;
+      }
+      const floorHeight =
+        naturalBottom +
+        scroller.clientHeight * RUNNING_TURN_RESERVE_RATIO;
       if (
-        activeReserve?.kind === "question" &&
-        Math.abs(activeReserve.contentHeight - contentHeight) <= BOTTOM_THRESHOLD
+        activeFloor?.kind === "question" &&
+        Math.abs(activeFloor.anchorBottom - naturalBottom) <= BOTTOM_THRESHOLD
       ) {
         return;
       }
       if (
-        activeReserve === null ||
-        Math.abs(activeReserve.contentHeight - contentHeight) >
+        activeFloor === null ||
+        activeFloor.kind !== "page" ||
+        Math.abs(activeFloor.anchorBottom - naturalBottom) >
           BOTTOM_THRESHOLD ||
-        Math.abs(activeReserve.fullHeight - fullHeight) > BOTTOM_THRESHOLD ||
-        Math.abs(activeReserve.height - fullHeight) > BOTTOM_THRESHOLD
+        Math.abs(activeFloor.floorHeight - floorHeight) > BOTTOM_THRESHOLD
       ) {
-        setRunningTurnReserve({
-          contentHeight,
-          fullHeight,
-          height: fullHeight,
+        setRunningTurnFloor({
+          anchorBottom: naturalBottom,
+          floorHeight,
           kind: "page",
           turnId: runningTurnId,
           viewportHeight: scroller.clientHeight,
@@ -393,8 +374,8 @@ export function ConversationView({
     },
     [
       runningTurnId,
-      runningTurnReserve,
-      runningTurnReserveVisible,
+      runningTurnFloor,
+      runningTurnFloorVisible,
       scrollToBottom,
     ],
   );
@@ -430,14 +411,16 @@ export function ConversationView({
       }
       return;
     }
-    const height = scroller.clientHeight;
+    const contentRect = content.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    const naturalBottom =
+      scroller.scrollTop + contentRect.bottom - scrollerRect.top;
     pendingQuestionPositionRef.current = latestQuestion.itemId;
     followBottomRef.current = true;
     setShowJumpToBottom(false);
-    setRunningTurnReserve({
-      contentHeight: content.getBoundingClientRect().height,
-      fullHeight: height,
-      height,
+    setRunningTurnFloor({
+      anchorBottom: naturalBottom,
+      floorHeight: naturalBottom + scroller.clientHeight,
       kind: "question",
       turnId: runningTurnId,
       viewportHeight: scroller.clientHeight,
@@ -456,8 +439,8 @@ export function ConversationView({
     if (
       pendingQuestionId === null ||
       scroller === null ||
-      !runningTurnReserveVisible ||
-      runningTurnReserve?.kind !== "question"
+      !runningTurnFloorVisible ||
+      runningTurnFloor?.kind !== "question"
     ) {
       return;
     }
@@ -476,20 +459,15 @@ export function ConversationView({
       0,
       top - initialQuestionTop(scroller),
     );
-    const scrollHeightWithoutReserve =
-      scroller.scrollHeight - runningTurnReserve.height;
-    const height = Math.max(
-      0,
-      targetTop + scroller.clientHeight - scrollHeightWithoutReserve,
-    );
+    const floorHeight = targetTop + scroller.clientHeight;
     if (
-      Math.abs(runningTurnReserve.height - height) > BOTTOM_THRESHOLD ||
-      Math.abs(runningTurnReserve.fullHeight - height) > BOTTOM_THRESHOLD
+      Math.abs(runningTurnFloor.floorHeight - floorHeight) > BOTTOM_THRESHOLD ||
+      Math.abs(runningTurnFloor.viewportHeight - scroller.clientHeight) >
+        BOTTOM_THRESHOLD
     ) {
-      setRunningTurnReserve({
-        ...runningTurnReserve,
-        fullHeight: height,
-        height,
+      setRunningTurnFloor({
+        ...runningTurnFloor,
+        floorHeight,
         viewportHeight: scroller.clientHeight,
       });
       return;
@@ -499,8 +477,8 @@ export function ConversationView({
   }, [
     historyQuestions,
     questionTop,
-    runningTurnReserve,
-    runningTurnReserveVisible,
+    runningTurnFloor,
+    runningTurnFloorVisible,
     scrollerHeight,
   ]);
 
@@ -550,14 +528,14 @@ export function ConversationView({
     followContent,
     itemCount,
     restoredThread.turns,
-    runningTurnReserveVisible,
+    runningTurnFloorVisible,
     scrollerHeight,
   ]);
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     pendingQuestionPositionRef.current = null;
-    setRunningTurnReserve(null);
+    setRunningTurnFloor(null);
     followBottomRef.current = true;
     setShowJumpToBottom(false);
     if (scroller === null) {
@@ -733,7 +711,12 @@ export function ConversationView({
               ? ` ${styles.messageColumnWithQuestionNavigation}`
               : ""
           }`}
-          data-running-turn-reserve={runningTurnReserveVisible}
+          data-running-turn-floor={runningTurnFloorVisible}
+          style={
+            runningTurnFloorVisible && runningTurnFloor !== null
+              ? { minHeight: runningTurnFloor.floorHeight }
+              : undefined
+          }
         >
           <div
             aria-label="会话内容列表"
@@ -774,14 +757,6 @@ export function ConversationView({
               </div>
             ))}
           </div>
-          {runningTurnReserveVisible ? (
-            <div
-              aria-hidden="true"
-              className={styles.runningTurnReserve}
-              data-running-turn-reserve-space
-              style={{ height: runningTurnReserve?.height ?? 0 }}
-            />
-          ) : null}
         </div>
       </div>
       {historyQuestions.length >= 4 ? (
