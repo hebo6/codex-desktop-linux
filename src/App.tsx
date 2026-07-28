@@ -499,6 +499,7 @@ export function App({
   const [recentConnectionError, setRecentConnectionError] = useState<string | null>(null);
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
+  const [composerFocusTabId, setComposerFocusTabId] = useState<string | null>(null);
   const [draftThreadPresence, setDraftThreadPresence] =
     useState<DraftThreadPresence>({ keyPrefix: null, threadIds: new Set() });
   const [shortcutStatus, setShortcutStatus] = useState<string | null>(null);
@@ -633,6 +634,32 @@ export function App({
   useEffect(() => {
     setCommandLocationRequest(null);
   }, [currentThreadId]);
+
+  useEffect(() => {
+    if (
+      composerFocusTabId === null ||
+      activeTabId !== composerFocusTabId ||
+      restoredThread === null ||
+      connection.view.phase !== "ready" ||
+      conversation.submitting
+    ) {
+      return;
+    }
+    const composer = document.querySelector<HTMLTextAreaElement>(
+      "[data-composer-input]",
+    );
+    if (composer === null || composer.disabled) {
+      return;
+    }
+    composer.focus();
+    setComposerFocusTabId(null);
+  }, [
+    activeTabId,
+    composerFocusTabId,
+    connection.view.phase,
+    conversation.submitting,
+    restoredThread,
+  ]);
 
   useEffect(() => {
     let disposed = false;
@@ -1382,13 +1409,19 @@ export function App({
     }
   };
 
-  const openThreadInNewTab = async (threadId: string): Promise<void> => {
+  const openThreadInNewTab = async (
+    threadId: string,
+    focusComposer = false,
+  ): Promise<void> => {
     if (windowState.status !== "ready") {
       return;
     }
     setWindowActionError(null);
     try {
-      await windowState.openTab(threadId);
+      const state = await windowState.openTab(threadId);
+      if (focusComposer && state.activeTabId !== undefined) {
+        setComposerFocusTabId(state.activeTabId);
+      }
     } catch {
       setWindowActionError("无法在新标签打开会话，请重试");
     }
@@ -2070,8 +2103,9 @@ export function App({
         onNewTaskInProject={(cwd) => void openNewTab(cwd)}
         onRefreshThreads={() => void serverThreads.refreshThreads()}
         onSearchThreads={() => setQuickSwitcherOpen(true)}
-        onOpenThread={(threadId) => void openThreadInNewTab(threadId)}
-        onOpenThreadInNewTab={(threadId) => void openThreadInNewTab(threadId)}
+        onOpenThread={(threadId) => void openThreadInNewTab(threadId, true)}
+        onOpenThreadInNewTab={(threadId) =>
+          void openThreadInNewTab(threadId, true)}
         onUndoArchive={() => void serverThreads.undoArchive()}
         pendingThreadIds={serverThreads.pendingThreadIds}
         pendingResultThreadIds={pendingThreadResults.pendingThreadIds}

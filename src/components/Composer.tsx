@@ -1231,6 +1231,7 @@ export function Composer({
       const value = await onPickCwd();
       if (value !== null) {
         onCwdChange?.(value);
+        textareaRef.current?.focus();
       }
     } catch {
       setCwdError("无法打开系统目录选择器");
@@ -1263,7 +1264,10 @@ export function Composer({
                     setCwdError(null);
                     setEditingCwd(true);
                   }}
-                  onSelect={(directory) => onCwdChange?.(directory)}
+                  onSelect={(directory) => {
+                    onCwdChange?.(directory);
+                    textareaRef.current?.focus();
+                  }}
                   picking={pickingCwd}
                 />
                 {editingCwd ? (
