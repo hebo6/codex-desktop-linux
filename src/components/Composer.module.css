@@ -194,6 +194,16 @@
   pointer-events: none;
 }
 
+.clipboardStatus {
+  padding: 0 var(--space-5) var(--space-2);
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.clipboardStatus[data-error="true"] {
+  color: var(--color-status-danger);
+}
+
 .attachments {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));

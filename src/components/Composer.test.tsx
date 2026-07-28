@@ -51,9 +51,9 @@ function savedPromptStore(initial: readonly SavedPrompt[] = [SAVED_PROMPT]): Sav
   };
 }
 
-function deferred() {
-  let resolve!: () => void;
-  const promise = new Promise<void>((resolvePromise) => {
+function deferred<Value = void>() {
+  let resolve!: (value: Value | PromiseLike<Value>) => void;
+  const promise = new Promise<Value>((resolvePromise) => {
     resolve = resolvePromise;
   });
   return { promise, resolve };
@@ -213,7 +213,7 @@ describe("Composer", () => {
     });
   });
 
-  it("统一撤销和重做结构化令牌与附件变更", async () => {
+  it("撤销和重做结构化令牌时不改变附件", async () => {
     const user = userEvent.setup();
     renderComposer({
       onLoadSkills: vi.fn(async () => undefined),
@@ -237,18 +237,20 @@ describe("Composer", () => {
 
     editor.focus();
     fireEvent.keyDown(editor, { ctrlKey: true, key: "z" });
-    expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("结构化输入")).toHaveTextContent("$deploy");
+    expect(screen.getByLabelText("附件")).toHaveTextContent("history.png");
+    expect(screen.queryByLabelText("结构化输入")).not.toBeInTheDocument();
 
     fireEvent.keyDown(editor, { ctrlKey: true, key: "y" });
     expect(screen.getByLabelText("附件")).toHaveTextContent("history.png");
-    expect(screen.getByLabelText("附件")).not.toHaveTextContent("正在读取图片");
+    expect(screen.getByLabelText("结构化输入")).toHaveTextContent("$deploy");
 
     await user.click(screen.getByRole("button", { name: "移除 history.png" }));
     editor.focus();
     fireEvent.keyDown(editor, { ctrlKey: true, key: "z" });
-    expect(screen.getByLabelText("附件")).toHaveTextContent("history.png");
+    expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("结构化输入")).not.toBeInTheDocument();
 
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "y" });
     await user.click(screen.getByRole("button", { name: "移除 deploy" }));
     editor.focus();
     fireEvent.keyDown(editor, { ctrlKey: true, key: "z" });
@@ -959,7 +961,7 @@ describe("Composer", () => {
       clipboardData: {
         getData: () => "普通文本",
         items: [{ getAsFile: () => null, kind: "string", type: "text/plain" }],
-        types: ["text/plain"],
+        types: ["text/plain", "image/png"],
       },
     });
 
@@ -970,7 +972,7 @@ describe("Composer", () => {
     expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
   });
 
-  it("本地路径没有对应文件剪贴板时仍作为文本粘贴", async () => {
+  it("本地路径文字不读取原生剪贴板", () => {
     const clipboardFilesReader = vi.fn(async () => []);
     renderComposer({ clipboardFilesReader, initialText: "查看 " });
     const editor = screen.getByRole("textbox", { name: "任务输入" }) as HTMLTextAreaElement;
@@ -985,13 +987,9 @@ describe("Composer", () => {
 
     fireEvent(editor, event);
 
-    expect(event.defaultPrevented).toBe(true);
-    expect(clipboardFilesReader).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(editor).toHaveValue("查看 /tmp/screen.png"));
+    expect(event.defaultPrevented).toBe(false);
+    expect(clipboardFilesReader).not.toHaveBeenCalled();
     expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
-
-    fireEvent.keyDown(editor, { ctrlKey: true, key: "z" });
-    expect(editor).toHaveValue("查看 ");
   });
 
   it("将 Linux 文件 URI 剪贴板读取为图片而不是粘贴路径", async () => {
@@ -1026,12 +1024,19 @@ describe("Composer", () => {
 
   it("WebKit 未暴露文件项目时从原生剪贴板读取截图", async () => {
     const screenshot = imageFile("粘贴图片.png");
-    const clipboardFilesReader = vi.fn(async () => [{
+    const clipboardRead = deferred<readonly [{
+      readonly name: string;
+      readonly size: number;
+      readonly file: File;
+      readonly error: null;
+    }]>();
+    const clipboardFilesReader = vi.fn(() => clipboardRead.promise);
+    const result = [{
       name: screenshot.name,
       size: screenshot.size,
       file: screenshot,
       error: null,
-    }]);
+    }] as const;
     renderComposer({ clipboardFilesReader });
     const editor = screen.getByRole("textbox", { name: "任务输入" });
     const event = createEvent.paste(editor, {
@@ -1044,14 +1049,16 @@ describe("Composer", () => {
 
     fireEvent(editor, event);
 
-    expect(event.defaultPrevented).toBe(true);
+    expect(event.defaultPrevented).toBe(false);
     expect(clipboardFilesReader).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("status")).toHaveTextContent("正在读取剪贴板图片");
+    clipboardRead.resolve(result);
     await waitFor(() =>
       expect(screen.getByLabelText("附件")).toHaveTextContent("粘贴图片.png"),
     );
   });
 
-  it("URI 剪贴板中的网页链接探测后仍按普通文本粘贴", async () => {
+  it("URI 剪贴板中的网页链接不读取原生剪贴板", () => {
     const clipboardFilesReader = vi.fn(async () => []);
     renderComposer({ clipboardFilesReader });
     const editor = screen.getByRole("textbox", { name: "任务输入" });
@@ -1065,9 +1072,8 @@ describe("Composer", () => {
 
     fireEvent(editor, event);
 
-    expect(event.defaultPrevented).toBe(true);
-    expect(clipboardFilesReader).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(editor).toHaveValue("https://example.com/image.png"));
+    expect(event.defaultPrevented).toBe(false);
+    expect(clipboardFilesReader).not.toHaveBeenCalled();
     expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
   });
 

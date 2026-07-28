@@ -105,12 +105,6 @@ interface DraftAttachment {
 interface ComposerContent {
   readonly text: string;
   readonly tokens: readonly StructuredInput[];
-  readonly attachments: readonly DraftAttachment[];
-}
-
-interface ClipboardTextFallback {
-  readonly pastedText: string;
-  readonly selection: ComposerSelection;
 }
 
 const MAX_IMAGE_SIZE = 16 * 1024 * 1024;
@@ -227,16 +221,16 @@ export function Composer({
     getSelection: getComposerSelection,
     redo: redoComposerContent,
     rememberSelection: rememberComposerHistorySelection,
-    replace: replaceComposerContent,
     reset: resetComposerContent,
     undo: undoComposerContent,
     value: composerContent,
   } = useComposerHistory<ComposerContent>(
-    { text: initialText, tokens: [], attachments: [] },
+    { text: initialText, tokens: [] },
     collapsedSelection(initialText.length),
     composerContentsEqual,
   );
-  const { attachments, text, tokens } = composerContent;
+  const { text, tokens } = composerContent;
+  const [attachments, setAttachments] = useState<readonly DraftAttachment[]>([]);
   const [selectedTokenIndex, setSelectedTokenIndex] = useState<number | null>(null);
   const [editingCwd, setEditingCwd] = useState(false);
   const [cwdInput, setCwdInput] = useState(cwd ?? "");
@@ -257,6 +251,7 @@ export function Composer({
   const [selectedPermission, setSelectedPermission] = useState<string | null>(null);
   const [preparingAttachments, setPreparingAttachments] = useState(false);
   const [readingClipboardFiles, setReadingClipboardFiles] = useState(false);
+  const [clipboardReadError, setClipboardReadError] = useState<string | null>(null);
   const [markdownPreview, setMarkdownPreview] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const markdownPreviewHeightRef = useRef<number | null>(null);
@@ -274,8 +269,8 @@ export function Composer({
   const savedPromptSearchRef = useRef<HTMLInputElement>(null);
   const copiedPromptTimeoutRef = useRef<number | null>(null);
   const fileSearchRef = useRef(0);
-  const preparedAttachmentsRef = useRef(new Map<string, DraftAttachment>());
   const composingRef = useRef(false);
+  const clipboardReadRequestRef = useRef(0);
   const readingClipboardFilesRef = useRef(false);
   const sendingRef = useRef(false);
   const draftKeyRef = useRef(draftKey);
@@ -441,7 +436,11 @@ export function Composer({
       }
       return () => { disposed = true; };
     }
-    preparedAttachmentsRef.current.clear();
+    clipboardReadRequestRef.current += 1;
+    readingClipboardFilesRef.current = false;
+    setReadingClipboardFiles(false);
+    setAttachments([]);
+    setClipboardReadError(null);
     if (
       previousDraftKey !== null &&
       previousDraftKey !== draftKey &&
@@ -464,13 +463,13 @@ export function Composer({
     setSelectedPermission(null);
     if (draftKey === null) {
       resetComposerContent(
-        { text: initialText, tokens: [], attachments: [] },
+        { text: initialText, tokens: [] },
         collapsedSelection(initialText.length),
       );
       return () => { disposed = true; };
     }
     resetComposerContent(
-      { text: "", tokens: [], attachments: [] },
+      { text: "", tokens: [] },
       collapsedSelection(0),
     );
     void draftStore.load(draftKey).then(
@@ -479,7 +478,7 @@ export function Composer({
         const restored = stored ?? { text: "", tokens: [] };
         setDraftPersistenceError(null);
         resetComposerContent(
-          { ...restored, attachments: [] },
+          restored,
           collapsedSelection(restored.text.length),
         );
         loadedDraftKeyRef.current = draftKey;
@@ -489,7 +488,7 @@ export function Composer({
         if (disposed) return;
         setDraftPersistenceError("草稿读取失败，请切换会话后重试");
         resetComposerContent(
-          { text: "", tokens: [], attachments: [] },
+          { text: "", tokens: [] },
           collapsedSelection(0),
         );
         loadedDraftKeyRef.current = draftKey;
@@ -681,9 +680,8 @@ export function Composer({
         prepared.filter(({ url }) => url === null).map(({ id }) => id),
       );
       if (failed.size > 0) {
-        replaceComposerContent((current) => ({
-          ...current,
-          attachments: current.attachments.map((attachment) =>
+        setAttachments((current) =>
+          current.map((attachment) =>
             failed.has(attachment.id)
               ? {
                   ...attachment,
@@ -691,8 +689,8 @@ export function Composer({
                   error: "无法读取此图片",
                   status: "error",
                 }
-              : attachment),
-        }));
+              : attachment)
+        );
         return;
       }
       const input: TurnStartParams["input"] = [
@@ -718,10 +716,10 @@ export function Composer({
           }
         }
         resetComposerContent(
-          { text: "", tokens: [], attachments: [] },
+          { text: "", tokens: [] },
           collapsedSelection(0),
         );
-        preparedAttachmentsRef.current.clear();
+        setAttachments([]);
         setSelectedTokenIndex(null);
         setTrigger(null);
         setMarkdownPreview(false);
@@ -751,17 +749,6 @@ export function Composer({
     snapshot: ComposerHistorySnapshot<ComposerContent> | null,
   ) => {
     if (snapshot === null) return;
-    const hydratedAttachments = snapshot.value.attachments.map((attachment) =>
-      preparedAttachmentsRef.current.get(attachment.id) ?? attachment
-    );
-    if (hydratedAttachments.some((attachment, index) =>
-      attachment !== snapshot.value.attachments[index]
-    )) {
-      replaceComposerContent(
-        () => ({ ...snapshot.value, attachments: hydratedAttachments }),
-        snapshot.selection,
-      );
-    }
     setSelectedTokenIndex(null);
     updateTrigger(snapshot.value.text, snapshot.selection.start);
     focusComposerSelection(snapshot.selection);
@@ -1027,124 +1014,69 @@ export function Composer({
     const prepared = await Promise.all(queued.map(({ attachment, file }) =>
       readAttachment(file, attachment, imageValidator)
     ));
-    for (const attachment of prepared) {
-      preparedAttachmentsRef.current.set(attachment.id, attachment);
-    }
     const preparedById = new Map(prepared.map((attachment) => [attachment.id, attachment]));
-    replaceComposerContent((current) => ({
-      ...current,
-      attachments: current.attachments.map((attachment) =>
-        preparedById.get(attachment.id) ?? attachment),
-    }));
+    setAttachments((current) =>
+      current.map((attachment) => preparedById.get(attachment.id) ?? attachment)
+    );
   };
 
   const addFiles = async (
     files: FileList | readonly File[],
     source: AttachmentSource,
   ) => {
+    setClipboardReadError(null);
     const queued = [...files].map((file, index) => ({
       file,
       attachment: pendingAttachment(file, source, index),
     }));
     if (queued.length === 0) return;
-    changeComposerContent(
-      (current) => ({
-        ...current,
-        attachments: [
-          ...current.attachments,
-          ...queued.map(({ attachment }) => attachment),
-        ],
-      }),
-      getComposerSelection(),
-    );
+    setAttachments((current) => [
+      ...current,
+      ...queued.map(({ attachment }) => attachment),
+    ]);
     await prepareQueuedFiles(queued);
   };
 
-  const finishClipboardFileRead = (cursor: number) => {
+  const finishClipboardFileRead = (request: number) => {
+    if (request !== clipboardReadRequestRef.current) return;
     readingClipboardFilesRef.current = false;
     setReadingClipboardFiles(false);
-    focusAt(textareaRef.current, cursor);
   };
 
-  const restoreClipboardTextOrShowError = (
-    placeholder: DraftAttachment,
-    fallback: ClipboardTextFallback,
-    error: string,
-  ) => {
-    const cursor = fallback.selection.start + fallback.pastedText.length;
-    let restoredText: string | null = null;
-    const restored = replaceComposerContent(
-      (current) => {
-        if (!current.attachments.some(({ id }) => id === placeholder.id)) {
-          return current;
-        }
-        if (fallback.pastedText.length === 0) {
-          return {
-            ...current,
-            attachments: current.attachments.map((attachment) =>
-              attachment.id === placeholder.id
-                ? attachmentError(attachment, error)
-                : attachment),
-          };
-        }
-        restoredText = insertTextAtSelection(
-          current.text,
-          fallback.pastedText,
-          fallback.selection,
-        );
-        return {
-          ...current,
-          text: restoredText,
-          attachments: current.attachments.filter(({ id }) => id !== placeholder.id),
-        };
-      },
-      collapsedSelection(cursor),
-    );
-    if (restored && restoredText !== null) {
-      updateTrigger(restoredText, cursor);
-    }
-    finishClipboardFileRead(cursor);
-  };
-
-  const addClipboardFiles = async (fallback: ClipboardTextFallback) => {
+  const addClipboardFiles = async (reportEmpty: boolean) => {
+    if (readingClipboardFilesRef.current) return;
     readingClipboardFilesRef.current = true;
+    const request = ++clipboardReadRequestRef.current;
     setReadingClipboardFiles(true);
-    const placeholder = pendingClipboardAttachment();
-    changeComposerContent(
-      (current) => ({
-        ...current,
-        attachments: [...current.attachments, placeholder],
-      }),
-      getComposerSelection(),
-    );
+    setClipboardReadError(null);
 
     let results: readonly ClipboardFileResult[];
     try {
       results = await clipboardFilesReader();
     } catch {
-      restoreClipboardTextOrShowError(placeholder, fallback, "无法读取系统剪贴板");
+      if (request !== clipboardReadRequestRef.current) return;
+      setClipboardReadError("无法读取系统剪贴板");
+      finishClipboardFileRead(request);
       return;
     }
+    if (request !== clipboardReadRequestRef.current) return;
     if (results.length === 0) {
-      restoreClipboardTextOrShowError(
-        placeholder,
-        fallback,
-        "剪贴板中没有可读取的本地文件",
-      );
+      if (reportEmpty) {
+        setClipboardReadError("剪贴板中没有可读取的图片");
+      }
+      finishClipboardFileRead(request);
       return;
     }
 
-    const queued = results.flatMap((result, index) => {
-      if (result.file === null) {
-        return [];
-      }
-      return [{
-        file: result.file,
-        attachment: pendingAttachment(result.file, "paste", index),
-      }];
-    });
+    const queued = results.flatMap((result, index) => result.file === null
+      ? []
+      : [{
+          file: result.file,
+          attachment: pendingAttachment(result.file, "paste", index),
+        }]
+    );
     const queuedByResult = new Map(queued.map((item) => [item.file, item.attachment]));
-    const replacements = results.map((result) => {
+    const additions = results.map((result) => {
       if (result.file !== null) {
         return queuedByResult.get(result.file)!;
       }
@@ -1157,48 +1089,35 @@ export function Composer({
         status: "error" as const,
       };
     });
-    const replaced = replaceComposerContent((current) => {
-      if (!current.attachments.some(({ id }) => id === placeholder.id)) {
-        return current;
-      }
-      return {
-        ...current,
-        attachments: current.attachments.flatMap((attachment) =>
-          attachment.id === placeholder.id ? replacements : [attachment]),
-      };
-    });
-    if (replaced) {
-      finishClipboardFileRead(fallback.selection.start);
-      await prepareQueuedFiles(queued);
-      return;
-    }
-    finishClipboardFileRead(fallback.selection.start);
+    setAttachments((current) => [...current, ...additions]);
+    finishClipboardFileRead(request);
+    await prepareQueuedFiles(queued);
   };
 
   const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
-    if (readingClipboardFilesRef.current) {
+    setClipboardReadError(null);
+    const files = clipboardFiles(event.clipboardData);
+    if (files.length > 0) {
       event.preventDefault();
+      void addFiles(files, "paste");
       return;
     }
-    const files = Array.from(event.clipboardData.items)
-      .filter(({ kind }) => kind === "file")
-      .map((item) => item.getAsFile())
-      .filter((file): file is File => file !== null);
-    if (files.length === 0) {
-      const pastedText = clipboardFileProbeText(event.clipboardData);
-      if (pastedText === null) {
-        return;
-      }
-      const fallback = {
-        pastedText,
-        selection: selectionFromTextarea(event.currentTarget),
-      };
+    if (clipboardContainsLocalFileUris(event.clipboardData)) {
       event.preventDefault();
-      void addClipboardFiles(fallback);
+      void addClipboardFiles(true);
       return;
     }
-    event.preventDefault();
-    void addFiles(files, "paste");
+    if (event.clipboardData.getData("text/plain").length > 0) {
+      return;
+    }
+    const types = Array.from(event.clipboardData.types ?? []);
+    const items = Array.from(event.clipboardData.items ?? []);
+    if (
+      types.some((type) => type.startsWith("image/"))
+      || (types.length === 0 && items.length === 0)
+    ) {
+      void addClipboardFiles(types.some((type) => type.startsWith("image/")));
+    }
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -1344,7 +1263,7 @@ export function Composer({
           <textarea
             aria-label="任务输入"
             data-composer-input
-            disabled={submitting || preparingAttachments || readingClipboardFiles}
+            disabled={submitting || preparingAttachments}
             onBeforeInput={handleBeforeInput}
             onChange={handleChange}
             onClick={(event) => updateTrigger(text, event.currentTarget.selectionStart)}
@@ -1380,7 +1299,7 @@ export function Composer({
           accept={IMAGE_ACCEPT}
           aria-label="选择图片附件"
           className={styles.fileInput}
-          disabled={submitting || preparingAttachments || readingClipboardFiles}
+          disabled={submitting || preparingAttachments}
           multiple
           onChange={(event) => {
             if (event.target.files !== null) {
@@ -1391,6 +1310,15 @@ export function Composer({
           ref={attachmentInputRef}
           type="file"
         />
+        {readingClipboardFiles || clipboardReadError !== null ? (
+          <div
+            className={styles.clipboardStatus}
+            data-error={clipboardReadError !== null}
+            role="status"
+          >
+            {clipboardReadError ?? "正在读取剪贴板图片"}
+          </div>
+        ) : null}
         {attachments.length === 0 ? null : (
           <div aria-label="附件" className={styles.attachments}>
             {attachments.map((attachment) => (
@@ -1409,13 +1337,9 @@ export function Composer({
                 </span>
                 <button
                   aria-label={`移除 ${attachment.name}`}
-                  disabled={preparingAttachments || readingClipboardFiles || submitting}
-                  onClick={() => changeComposerContent(
-                    (current) => ({
-                      ...current,
-                      attachments: current.attachments.filter(({ id }) => id !== attachment.id),
-                    }),
-                    getComposerSelection(),
+                  disabled={preparingAttachments || submitting}
+                  onClick={() => setAttachments((current) =>
+                    current.filter(({ id }) => id !== attachment.id)
                   )}
                   type="button"
                 >
@@ -2488,8 +2412,7 @@ function nextSelectableIndex(items: readonly Suggestion[], current: number, dire
 
 function composerContentsEqual(left: ComposerContent, right: ComposerContent): boolean {
   return left.text === right.text
-    && left.tokens === right.tokens
-    && left.attachments === right.attachments;
+    && left.tokens === right.tokens;
 }
 
 function collapsedSelection(position: number): ComposerSelection {
@@ -2578,57 +2501,38 @@ function pendingAttachment(
   };
 }
 
-function pendingClipboardAttachment(): DraftAttachment {
-  return {
-    id: crypto.randomUUID(),
-    name: "粘贴图片",
-    size: 0,
-    blob: null,
-    error: null,
-    status: "preparing",
-  };
-}
-
-function clipboardFileProbeText(clipboardData: DataTransfer): string | null {
-  const types = Array.from(clipboardData.types ?? []);
-  if (typeof clipboardData.getData !== "function") {
-    return types.some((type) => type.startsWith("image/")) ? "" : null;
+function clipboardFiles(clipboardData: DataTransfer): readonly File[] {
+  const directFiles = Array.from(clipboardData.files ?? []);
+  if (directFiles.length > 0) {
+    return directFiles;
   }
-  const pastedText = clipboardData.getData("text/plain");
-  const hasFileReferenceType = types.includes("text/uri-list")
-    || types.includes("x-special/gnome-copied-files");
-  const hasImageType = types.some((type) => type.startsWith("image/"));
-  return hasFileReferenceType
-      || hasImageType
-      || pastedText.length === 0
-      || looksLikeLocalPathList(pastedText)
-    ? pastedText
-    : null;
+  return Array.from(clipboardData.items ?? [])
+    .filter(({ kind }) => kind === "file")
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => file !== null);
 }
 
-function looksLikeLocalPathList(value: string): boolean {
-  const lines = value
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  return lines.length > 0 && lines.every((line) => {
-    if (line.startsWith("/")) {
-      return true;
-    }
-    try {
-      return new URL(line).protocol === "file:";
-    } catch {
-      return false;
-    }
-  });
-}
-
-function insertTextAtSelection(
-  text: string,
-  insertedText: string,
-  selection: ComposerSelection,
-): string {
-  return `${text.slice(0, selection.start)}${insertedText}${text.slice(selection.end)}`;
+function clipboardContainsLocalFileUris(clipboardData: DataTransfer): boolean {
+  if (typeof clipboardData.getData !== "function") return false;
+  const types = new Set(clipboardData.types ?? []);
+  return ["text/uri-list", "x-special/gnome-copied-files"]
+    .filter((type) => types.has(type))
+    .some((type) => clipboardData.getData(type)
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .filter((line) =>
+        line.length > 0
+        && !line.startsWith("#")
+        && line !== "copy"
+        && line !== "cut"
+      )
+      .some((line) => {
+        try {
+          return new URL(line).protocol === "file:";
+        } catch {
+          return false;
+        }
+      }));
 }
 
 async function readAttachment(
