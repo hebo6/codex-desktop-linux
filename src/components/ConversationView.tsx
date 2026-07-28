@@ -154,7 +154,7 @@ interface HistoryQuestion {
 }
 
 interface RunningTurnFloor {
-  readonly anchorBottom: number;
+  readonly contentHeight: number;
   readonly floorHeight: number;
   readonly kind: "page" | "question";
   readonly turnId: string;
@@ -350,19 +350,20 @@ export function ConversationView({
         scroller.clientHeight * RUNNING_TURN_RESERVE_RATIO;
       if (
         activeFloor?.kind === "question" &&
-        Math.abs(activeFloor.anchorBottom - naturalBottom) <= BOTTOM_THRESHOLD
+        Math.abs(activeFloor.contentHeight - contentRect.height) <=
+          BOTTOM_THRESHOLD
       ) {
         return;
       }
       if (
         activeFloor === null ||
         activeFloor.kind !== "page" ||
-        Math.abs(activeFloor.anchorBottom - naturalBottom) >
+        Math.abs(activeFloor.contentHeight - contentRect.height) >
           BOTTOM_THRESHOLD ||
         Math.abs(activeFloor.floorHeight - floorHeight) > BOTTOM_THRESHOLD
       ) {
         setRunningTurnFloor({
-          anchorBottom: naturalBottom,
+          contentHeight: contentRect.height,
           floorHeight,
           kind: "page",
           turnId: runningTurnId,
@@ -419,7 +420,7 @@ export function ConversationView({
     followBottomRef.current = true;
     setShowJumpToBottom(false);
     setRunningTurnFloor({
-      anchorBottom: naturalBottom,
+      contentHeight: contentRect.height,
       floorHeight: naturalBottom + scroller.clientHeight,
       kind: "question",
       turnId: runningTurnId,
