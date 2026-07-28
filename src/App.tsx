@@ -1382,34 +1382,6 @@ export function App({
     }
   };
 
-  const openThread = async (threadId: string): Promise<void> => {
-    if (windowState.status !== "ready") {
-      return;
-    }
-    setWindowActionError(null);
-    const sourceTabId = activeTabId;
-    const sourceWasBlank = currentThreadId === null;
-    try {
-      const state = await windowState.replaceActiveThread(threadId);
-      if (
-        sourceWasBlank &&
-        sourceTabId !== null &&
-        state.tabs.find(({ id }) => id === sourceTabId)?.threadId !== null
-      ) {
-        const key = transientDraftKey(
-          state.windowId,
-          state.serverId ?? null,
-          sourceTabId,
-        );
-        if (key !== null) {
-          tabDraftStore.discardTransient(key);
-        }
-      }
-    } catch {
-      setWindowActionError("无法打开会话，请重试");
-    }
-  };
-
   const openThreadInNewTab = async (threadId: string): Promise<void> => {
     if (windowState.status !== "ready") {
       return;
@@ -2290,7 +2262,7 @@ export function App({
       <ThreadQuickSwitcher
         currentThreadId={currentThreadId}
         onClose={() => setQuickSwitcherOpen(false)}
-        onOpenThread={(threadId) => void openThread(threadId)}
+        onOpenThread={(threadId) => void openThreadInNewTab(threadId)}
         open={quickSwitcherOpen}
         threads={serverThreads.threads}
       />

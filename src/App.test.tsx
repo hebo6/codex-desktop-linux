@@ -397,7 +397,7 @@ describe("App", () => {
     ])).toEqual(["/workspace/alpha", "/workspace/beta"]);
   });
 
-  it("最近会话和新建入口在末尾追加标签并保留各自草稿", async () => {
+  it("快速切换和新建入口在末尾追加标签并保留各自草稿", async () => {
     const user = userEvent.setup();
     const thread = {
       cliVersion: "1.0.0",
@@ -493,20 +493,18 @@ describe("App", () => {
     await screen.findByText("这个会话还没有回合");
     expect(screen.getByRole("img", { name: "存在未发送草稿" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "项目" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "最近会话操作" }));
-    await user.click(screen.getByRole("menuitem", { name: /搜索会话/u }));
+    fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
     expect(screen.getByRole("dialog", { name: "快速切换会话" })).toBeVisible();
-    await user.keyboard("{Escape}");
-    await user.click(screen.getByRole("button", { name: "其他项目会话" }));
+    await user.click(screen.getByRole("option", { name: /其他项目会话/u }));
 
     await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(1));
-    const recentThreadRequest = tabsUpdater.mock.calls[0]?.[0];
-    expect(recentThreadRequest?.tabs.map(({ threadId }) => threadId)).toEqual([
+    const quickSwitchRequest = tabsUpdater.mock.calls[0]?.[0];
+    expect(quickSwitchRequest?.tabs.map(({ threadId }) => threadId)).toEqual([
       thread.id,
       otherThread.id,
     ]);
-    expect(recentThreadRequest?.activeTabId).toBe(
-      recentThreadRequest?.tabs.at(-1)?.id,
+    expect(quickSwitchRequest?.activeTabId).toBe(
+      quickSwitchRequest?.tabs.at(-1)?.id,
     );
 
     await user.click(screen.getByRole("button", { name: "新建任务" }));

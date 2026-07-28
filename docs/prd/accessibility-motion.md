@@ -19,6 +19,7 @@
 | 功能 | 快捷键 |
 | --- | --- |
 | 新建会话标签 | `Ctrl+N`、`Ctrl+T` |
+| 快速切换会话 | `Ctrl+K` |
 | 归档会话 | `Ctrl+Shift+A` |
 | 新建独立会话 | `Ctrl+Alt+O` |
 | 切换固定状态 | `Ctrl+Alt+P` |
@@ -69,7 +70,6 @@
 | 复制工作目录 | `Ctrl+Shift+C` |
 | 强制重新加载浏览器页面 | `Ctrl+Shift+R` |
 | 新建窗口 | `Ctrl+Shift+N` |
-| 打开命令菜单 | `Ctrl+K`、`Ctrl+Shift+P` |
 | 重新加载浏览器页面 | `Ctrl+R` |
 | 重命名会话 | `Ctrl+Alt+R` |
 | 搜索文件… | `Ctrl+P` |
