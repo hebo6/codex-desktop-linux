@@ -24,18 +24,19 @@ The screenshot is generated from the project's deterministic visual-regression f
 - Safe Markdown rendering and previews for common local and remote file references
 - Native multi-window behavior, single-instance deep links, desktop notifications, and rate-limit visibility
 
-## Differences from the official desktop app
+## Why Codex Desktop Linux
 
-This project uses the same Codex app-server protocol but has a different deployment focus from the [official desktop app](https://learn.chatgpt.com/docs/app)
+The [official desktop app](https://learn.chatgpt.com/docs/app) supports macOS and Windows and can use [remote projects over SSH](https://learn.chatgpt.com/docs/remote-connections). This project does not aim to reproduce every official capability. It focuses on native Linux desktop workflows and self-managed Codex infrastructure
 
-| Area | Codex Desktop Linux | Official desktop app |
-| --- | --- | --- |
-| Platform | Native Linux client with planned AppImage, deb, and rpm packages | First-party desktop app documented for macOS and Windows |
-| Self-managed remote Codex | Manages multiple local or self-hosted remote app-server profiles and connects through direct WebSocket, HTTP CONNECT, SOCKS5, or SSH | Published desktop workflows focus on local projects, worktrees, and OpenAI-hosted cloud tasks; the [Codex CLI](https://learn.chatgpt.com/docs/developer-commands.md?surface=cli) separately provides experimental remote app-server support |
-| Closing the client | A turn on an independently managed remote app-server can continue after the desktop client closes, provided the server remains running and the turn does not require approval or user input | Local desktop workflows follow the desktop application's lifecycle, while cloud tasks run in an OpenAI-hosted environment |
-| Network boundary | The desktop host only needs a route to the configured app-server and does not need direct OpenAI connectivity; the app-server host still needs authentication and access to OpenAI or its configured model provider | Connectivity depends on whether the selected official workflow runs locally or in OpenAI's cloud |
+| User pain point | What this project provides |
+| --- | --- |
+| There is no official Linux desktop app | A native Linux client delivered as AppImage, deb, and rpm packages |
+| Code and toolchains live on a development host, in a container, or inside a private network | Connections to local or independently managed remote app-server processes without moving the working environment to the desktop host |
+| Remote environments require a proxy or bastion host | Direct TLS, HTTP CONNECT, SOCKS5, and SSH direct-tcpip paths with reusable server and proxy profiles |
+| The desktop client lifecycle should not determine the task lifecycle | A turn can continue after the client closes when the independently managed app-server remains running and the turn does not require approval or user input |
+| The desktop host cannot reach the model service directly | The client only needs a route to the app-server; the app-server host handles authentication and access to OpenAI or its configured model provider |
 
-This is a comparison of deployment models, not a complete feature comparison. The project does not replace first-party cloud, ChatGPT, or platform-integration capabilities
+This project is best suited to developers who need a native Linux interface, self-managed app-server processes, or flexible remote network paths. Use the official desktop app for first-party cloud tasks, ChatGPT, browser, plugin, and platform-integration capabilities
 
 ## Project status
 
