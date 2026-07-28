@@ -13,6 +13,11 @@ import {
   contentProcessor as sharedContentProcessor,
   type ContentProcessor,
 } from "../content/contentProcessing";
+import {
+  decodeBase64Bytes,
+  decodedBase64Size,
+  parseDataImageUrl,
+} from "../content/dataImage";
 import { sanitizeSvg } from "../content/sanitizeSvg";
 import {
   syntaxHighlighter as sharedSyntaxHighlighter,
@@ -436,7 +441,7 @@ export function FilePreviewDialog({
   };
   const save = async () => {
     if (loaded === null || saving) return;
-    const size = decodedSize(loaded.dataBase64);
+    const size = decodedBase64Size(loaded.dataBase64);
     const allowLarge = size > 256 * 1024 * 1024
       ? window.confirm(`此文件大小为 ${formatBytes(size)}，超过 256 MiB 默认限制，仍要继续保存吗？`)
       : false;
@@ -469,7 +474,7 @@ export function FilePreviewDialog({
         {saveStatus === null ? null : <div className={styles.status} role="status">{saveStatus}</div>}
         <div className={styles.meta}>
           <span>{decoded === null ? "正在识别" : kindLabel(decoded.type)}</span>
-          <span>{loaded === null ? "大小未知" : formatBytes(decodedSize(loaded.dataBase64))}</span>
+          <span>{loaded === null ? "大小未知" : formatBytes(decodedBase64Size(loaded.dataBase64))}</span>
           {decoded?.type === "text" ? <><span>{language}</span><span>UTF-8</span><span>{lineEnding(decoded.text)}</span></> : null}
           {loaded !== null && loaded.modifiedAtMs > 0 ? <span>{new Date(loaded.modifiedAtMs).toLocaleString()}</span> : null}
         </div>
@@ -533,31 +538,8 @@ type DecodedPreview =
   | { readonly type: "image"; readonly blob: Blob }
   | { readonly type: "binary" | "tooLarge" };
 
-function parseDataImageUrl(
-  dataUrl: string,
-): { readonly dataBase64: string } | null {
-  const separator = dataUrl.indexOf(",");
-  if (separator < 0) return null;
-  const metadata = dataUrl.slice(0, separator).toLocaleLowerCase();
-  if (
-    !metadata.endsWith(";base64")
-    || ![
-      "data:image/gif;base64",
-      "data:image/jpeg;base64",
-      "data:image/png;base64",
-      "data:image/webp;base64",
-    ].includes(metadata)
-  ) {
-    return null;
-  }
-  const dataBase64 = dataUrl.slice(separator + 1);
-  return /^[a-z\d+/]*={0,2}$/iu.test(dataBase64)
-    ? { dataBase64 }
-    : null;
-}
-
 function decodePreview(path: string, dataBase64: string): DecodedPreview {
-  const size = decodedSize(dataBase64);
+  const size = decodedBase64Size(dataBase64);
   if (size > MAX_PREVIEW_BYTES) return { type: "tooLarge" };
   const extension = path.split(".").at(-1)?.toLocaleLowerCase() ?? "";
   const imageMediaType: Readonly<Record<string, string | undefined>> = {
@@ -574,7 +556,7 @@ function decodePreview(path: string, dataBase64: string): DecodedPreview {
     }
     const mediaType = imageMediaType[extension];
     if (mediaType !== undefined) {
-      return { type: "image", blob: new Blob([decodeBytes(dataBase64)], { type: mediaType }) };
+      return { type: "image", blob: new Blob([decodeBase64Bytes(dataBase64)], { type: mediaType }) };
     }
     const text = decodeUtf8(dataBase64);
     return text.includes("\0") ? { type: "binary" } : { type: "text", text };
@@ -679,21 +661,9 @@ function highlightTokenQuery(
 }
 
 function decodeUtf8(dataBase64: string): string {
-  return new TextDecoder("utf-8", { fatal: true }).decode(decodeBytes(dataBase64));
-}
-
-function decodeBytes(dataBase64: string): Uint8Array<ArrayBuffer> {
-  const binary = atob(dataBase64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-}
-
-function decodedSize(dataBase64: string): number {
-  const padding = dataBase64.endsWith("==") ? 2 : dataBase64.endsWith("=") ? 1 : 0;
-  return Math.max(0, Math.floor(dataBase64.length * 3 / 4) - padding);
+  return new TextDecoder("utf-8", { fatal: true }).decode(
+    decodeBase64Bytes(dataBase64),
+  );
 }
 
 function fileName(path: string): string { return path.split(/[\\/]/u).at(-1) || "远程文件"; }

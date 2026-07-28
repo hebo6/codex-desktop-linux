@@ -15,6 +15,12 @@ import {
 } from "react";
 
 import type { RestoredThread, ThreadTurn } from "../app/useServerThreads";
+import { decodeDataImageUrl } from "../content/dataImage";
+import {
+  browserBlobUrls,
+  useBlobUrl,
+  type BlobUrlFactory,
+} from "../content/useBlobUrl";
 import { recordConversationFirstCommit } from "../diagnostics/conversationLoadDiagnostics";
 import { markdownToPlainText, SafeMarkdown } from "./SafeMarkdown";
 import styles from "./ConversationView.module.css";
@@ -26,6 +32,7 @@ export interface CommandLocationRequest {
 
 export interface ConversationViewProps {
   readonly restoredThread: RestoredThread;
+  readonly blobUrlFactory?: BlobUrlFactory;
   readonly commandLocationRequest?: CommandLocationRequest | null;
   readonly onForkTurn?: (turnId: string, isLatest: boolean) => void;
   readonly actionError?: string | null;
@@ -168,6 +175,7 @@ type ConversationRow =
     };
 
 export function ConversationView({
+  blobUrlFactory = browserBlobUrls,
   commandLocationRequest = null,
   onForkTurn,
   actionError = null,
@@ -755,6 +763,7 @@ export function ConversationView({
               >
                 <ConversationRowView
                   actionError={actionError}
+                  blobUrlFactory={blobUrlFactory}
                   commandLocationRequest={commandLocationRequest}
                   {...(onForkTurn === undefined ? {} : { onForkTurn })}
                   {...(onOpenLink === undefined ? {} : { onOpenLink })}
@@ -821,6 +830,7 @@ export function ConversationView({
 
 function ConversationRowView({
   actionError,
+  blobUrlFactory,
   commandLocationRequest,
   onForkTurn,
   onOpenLink,
@@ -829,6 +839,7 @@ function ConversationRowView({
   row,
 }: {
   readonly actionError: string | null;
+  readonly blobUrlFactory: BlobUrlFactory;
   readonly commandLocationRequest: CommandLocationRequest | null;
   readonly onForkTurn?: (turnId: string, isLatest: boolean) => void;
   readonly onOpenLink?: (link: string) => void;
@@ -844,6 +855,7 @@ function ConversationRowView({
   }
   return row.segment.type === "item" ? (
     <ItemView
+      blobUrlFactory={blobUrlFactory}
       item={row.segment.item}
       isLatestTurn={row.isLatestTurn}
       {...(row.turn.completedAt === undefined
@@ -903,6 +915,7 @@ function HistoryQuestionNavigation({
 }
 
 function ItemView({
+  blobUrlFactory = browserBlobUrls,
   item,
   isLatestTurn = false,
   onFork,
@@ -912,6 +925,7 @@ function ItemView({
   turnCompletedAt,
   turnStartedAt,
 }: {
+  readonly blobUrlFactory?: BlobUrlFactory;
   readonly item: ThreadItem;
   readonly isLatestTurn?: boolean;
   readonly onFork?: () => void;
@@ -925,6 +939,7 @@ function ItemView({
     case "userMessage":
       return (
         <UserMessage
+          blobUrlFactory={blobUrlFactory}
           item={item}
           {...(onOpenLink === undefined ? {} : { onOpenLink })}
           {...(onOpenImage === undefined ? {} : { onOpenImage })}
@@ -1068,11 +1083,13 @@ function ItemView({
 }
 
 function UserMessage({
+  blobUrlFactory,
   item,
   onOpenLink,
   onOpenImage,
   turnStartedAt,
 }: {
+  readonly blobUrlFactory: BlobUrlFactory;
   readonly item: Extract<ThreadItem, { type: "userMessage" }>;
   readonly onOpenLink?: (link: string) => void;
   readonly onOpenImage?: (url: string, name: string) => void;
@@ -1092,6 +1109,7 @@ function UserMessage({
       onMouseEnter={() => setNow(Date.now())}
     >
       <UserMessageBody
+        blobUrlFactory={blobUrlFactory}
         item={item}
         {...(onOpenLink === undefined ? {} : { onOpenLink })}
         {...(onOpenImage === undefined ? {} : { onOpenImage })}
@@ -1118,11 +1136,13 @@ function UserMessage({
 }
 
 function UserMessageBody({
+  blobUrlFactory,
   item,
   onOpenLink,
   onOpenImage,
   variant = "document",
 }: {
+  readonly blobUrlFactory: BlobUrlFactory;
   readonly item: UserMessageItem;
   readonly onOpenLink?: (link: string) => void;
   readonly onOpenImage?: (url: string, name: string) => void;
@@ -1148,6 +1168,7 @@ function UserMessageBody({
           case "image":
             return (
               <UserImageAttachment
+                blobUrlFactory={blobUrlFactory}
                 key={index}
                 url={input.url}
                 {...(onOpenImage === undefined ? {} : { onOpen: onOpenImage })}
@@ -1166,22 +1187,30 @@ function UserMessageBody({
 }
 
 function UserImageAttachment({
+  blobUrlFactory,
   onOpen,
   url,
 }: {
+  readonly blobUrlFactory: BlobUrlFactory;
   readonly onOpen?: (url: string, name: string) => void;
   readonly url: string;
 }) {
   const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
-  const image = userMessageImage(url);
+  const image = useMemo(
+    () => decodeDataImageUrl(url),
+    [attempt, url],
+  );
+  const imageUrl = useBlobUrl(image?.blob ?? null, blobUrlFactory);
   useEffect(() => {
-    setAttempt(0);
     setFailed(false);
   }, [url]);
 
   if (image === null) {
     return <span className={styles.attachment}>图片附件不可预览</span>;
+  }
+  if (imageUrl === null) {
+    return <span aria-label={image.name} className={styles.imageAttachment} />;
   }
   if (failed) {
     return (
@@ -1205,7 +1234,7 @@ function UserImageAttachment({
       decoding="async"
       key={attempt}
       onError={() => setFailed(true)}
-      src={url}
+      src={imageUrl}
     />
   );
   return onOpen === undefined ? (
@@ -1220,22 +1249,6 @@ function UserImageAttachment({
       {thumbnail}
     </button>
   );
-}
-
-function userMessageImage(
-  url: string,
-): { readonly name: string } | null {
-  const prefix = url.slice(0, url.indexOf(",") + 1).toLocaleLowerCase();
-  const extension = prefix === "data:image/png;base64,"
-    ? "png"
-    : prefix === "data:image/jpeg;base64,"
-      ? "jpg"
-      : prefix === "data:image/gif;base64,"
-        ? "gif"
-        : prefix === "data:image/webp;base64,"
-          ? "webp"
-          : null;
-  return extension === null ? null : { name: `粘贴图片.${extension}` };
 }
 
 function AgentMessage({

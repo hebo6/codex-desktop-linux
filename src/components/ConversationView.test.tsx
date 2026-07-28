@@ -205,9 +205,11 @@ describe("ConversationView", () => {
     expect(onOpenLink).toHaveBeenCalledWith("src/App.tsx");
   });
 
-  it("用户消息图片显示缩略图并打开统一预览", () => {
+  it("用户消息图片通过 Blob URL 显示缩略图并打开统一预览", async () => {
+    const create = vi.fn(() => "blob:user-message-image");
+    const revoke = vi.fn();
     const onOpenImage = vi.fn();
-    const imageUrl = "data:image/png;base64,QUJDRA==";
+    const imageUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==";
     const imageTurn = {
       ...TURN,
       items: [
@@ -226,15 +228,17 @@ describe("ConversationView", () => {
       ],
     } satisfies ThreadTurn;
 
-    render(
+    const { unmount } = render(
       <ConversationView
+        blobUrlFactory={{ create, revoke }}
         onOpenImage={onOpenImage}
         restoredThread={{ ...RESTORED, turns: [imageTurn] }}
       />,
     );
 
-    const image = screen.getByRole("img", { name: "粘贴图片.png" });
-    expect(image).toHaveAttribute("src", imageUrl);
+    const image = await screen.findByRole("img", { name: "粘贴图片.png" });
+    expect(image).toHaveAttribute("src", "blob:user-message-image");
+    expect(create).toHaveBeenCalledWith(expect.any(Blob));
     fireEvent.click(screen.getByRole("button", { name: "预览粘贴图片.png" }));
     expect(onOpenImage).toHaveBeenCalledWith(imageUrl, "粘贴图片.png");
     expect(screen.getByText("图片附件不可预览")).toBeVisible();
@@ -242,7 +246,15 @@ describe("ConversationView", () => {
     fireEvent.error(image);
     expect(screen.getByText("粘贴图片.png加载失败")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
-    expect(screen.getByRole("img", { name: "粘贴图片.png" })).toBeVisible();
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("img", { name: "粘贴图片.png" })).toHaveAttribute(
+      "src",
+      "blob:user-message-image",
+    );
+    expect(revoke).toHaveBeenCalledWith("blob:user-message-image");
+
+    unmount();
+    expect(revoke).toHaveBeenCalledTimes(2);
   });
 
   it("覆盖全部持久化 ThreadItem 的稳定展示", async () => {
