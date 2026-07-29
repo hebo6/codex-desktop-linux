@@ -199,7 +199,7 @@ export async function prepareHtmlPreview({
   }
 
   await Promise.all(
-    [...documentNode.querySelectorAll("link[href]")].map(async (link) => {
+    [...documentNode.querySelectorAll<HTMLLinkElement>("link[href]")].map(async (link) => {
       const relations = link.rel.toLocaleLowerCase().split(/\s+/u);
       if (!relations.includes("stylesheet")) {
         link.remove();

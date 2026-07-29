@@ -605,7 +605,11 @@ export function FilePreviewDialog({
           ) : activeView === "preview" && fileRequest !== null && isHtml(fileRequest.path) && htmlPreview.phase === "error" ? (
             <div className={styles.placeholder} role="alert"><strong>无法安全处理此 HTML 文件</strong><span>仍可切换到源码视图查看原始内容</span></div>
           ) : activeView === "preview" && fileRequest !== null && isHtml(fileRequest.path) && htmlPreview.phase === "ready" ? (
-            <HtmlPreviewFrame name={name} onOpenLink={onOpenLink} url={htmlPreview.url} />
+            <HtmlPreviewFrame
+              name={name}
+              {...(onOpenLink === undefined ? {} : { onOpenLink })}
+              url={htmlPreview.url}
+            />
           ) : activeView === "preview" && displayedText !== null && fileRequest !== null && isMarkdown(fileRequest.path) ? (
             <article className={styles.markdownPreview}><SafeMarkdown {...(onOpenLink === undefined ? {} : { onOpenLink })} source={displayedText} /></article>
           ) : activeView === "preview" && displayedText !== null && fileRequest !== null && isJson(fileRequest.path) ? (
