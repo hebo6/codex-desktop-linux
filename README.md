@@ -153,6 +153,15 @@ Build the current architecture without creating an installer
 pnpm tauri build --debug --no-bundle
 ```
 
+Build an AppImage for the current architecture in the development container
+
+```bash
+devcontainer up --workspace-folder .
+devcontainer exec --workspace-folder . pnpm build:appimage
+```
+
+The artifact is written to `src-tauri/target/<Rust target>/release/bundle/appimage`
+
 Protocol generation and visual-regression workflows are documented in [protocol baseline](docs/protocol-baseline.md) and [visual regression](docs/visual-regression.md)
 
 ## Documentation

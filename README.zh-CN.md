@@ -153,6 +153,15 @@ pnpm build
 pnpm tauri build --debug --no-bundle
 ```
 
+使用 Dev Container 构建当前架构的 AppImage
+
+```bash
+devcontainer up --workspace-folder .
+devcontainer exec --workspace-folder . pnpm build:appimage
+```
+
+产物位于 `src-tauri/target/<Rust 目标>/release/bundle/appimage`
+
 协议生成和视觉回归流程见[协议基线](docs/protocol-baseline.md)与[视觉回归](docs/visual-regression.md)
 
 ## 文档

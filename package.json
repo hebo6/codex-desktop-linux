@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "vite",
     "build": "pnpm protocol:check && tsc -b && vite build",
+    "build:appimage": "bash scripts/build-appimage.sh",
     "protocol:generate": "node scripts/generate-protocol-code.mjs",
     "protocol:check": "node scripts/generate-protocol-code.mjs --check",
     "release:assemble": "node scripts/assemble-release.mjs",

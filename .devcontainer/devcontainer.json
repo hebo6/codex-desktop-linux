@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
+  "name": "Codex Desktop Linux AppImage",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/node:2.1.0": {
+      "version": "24",
+      "pnpmVersion": "11.3.0"
+    },
+    "ghcr.io/devcontainers/features/rust:1.5.1": {
+      "version": "1.85",
+      "profile": "minimal",
+      "components": "rustfmt,clippy"
+    }
+  },
+  "postCreateCommand": "pnpm install --frozen-lockfile",
+  "remoteUser": "vscode"
+}

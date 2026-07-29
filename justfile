@@ -4,4 +4,4 @@ default:
 
 # 构建当前架构的 AppImage
 build-appimage:
-    env NO_STRIP=true pnpm tauri build --bundles appimage
+    pnpm build:appimage
