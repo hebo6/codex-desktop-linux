@@ -89,14 +89,6 @@
   scrollbar-gutter: stable;
 }
 
-.stickyGroupHeading {
-  position: sticky;
-  z-index: 2;
-  top: 0;
-  height: 32px;
-  margin-bottom: -32px;
-}
-
 .virtualCanvas {
   position: relative;
   width: 100%;
@@ -128,10 +120,6 @@
   overflow: hidden;
   margin: 0;
   font-size: 11px;
-}
-
-.stickyGroupHeading .groupHeading {
-  background: var(--color-sidebar-bg);
 }
 
 .groupToggle,

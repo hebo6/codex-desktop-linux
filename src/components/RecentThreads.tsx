@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -100,11 +99,6 @@ type RecentThreadEntry =
 
 type RecentThreadGroupEntry = Extract<RecentThreadEntry, { type: "group" }>;
 
-interface StickyGroupHeadingState {
-  readonly key: string;
-  readonly translateY: number;
-}
-
 const GROUP_HEADING_HEIGHT = 32;
 const INITIAL_GROUP_THREAD_COUNT = 3;
 const GROUP_THREAD_PAGE_SIZE = 3;
@@ -153,8 +147,6 @@ export function RecentThreads({
     ReadonlySet<string>
   >(() => new Set());
   const [contextMenu, setContextMenu] = useState<ThreadContextMenuState | null>(null);
-  const [stickyGroupHeading, setStickyGroupHeading] =
-    useState<StickyGroupHeadingState | null>(null);
   const groups = useMemo(() => groupThreads(threads, grouped), [grouped, threads]);
   const entries = useMemo(
     () => recentThreadEntries({
@@ -214,7 +206,6 @@ export function RecentThreads({
   });
 
   const toggleGroup = useCallback((key: string) => {
-    setStickyGroupHeading(null);
     setCollapsedGroupKeys((current) => {
       const next = new Set(current);
       if (next.has(key)) {
@@ -304,54 +295,6 @@ export function RecentThreads({
     visibleGroupThreadCounts,
   ]);
 
-  const updateStickyGroupHeading = useCallback((element: HTMLDivElement | null) => {
-    if (!grouped || element === null) {
-      setStickyGroupHeading(null);
-      return;
-    }
-    const entryIndex = virtual.indexAtOffset(element.scrollTop);
-    if (entryIndex === null) {
-      setStickyGroupHeading(null);
-      return;
-    }
-    let groupIndex = entryIndex;
-    while (groupIndex >= 0 && entries[groupIndex]?.type !== "group") {
-      groupIndex -= 1;
-    }
-    const group = entries[groupIndex];
-    const groupOffset = virtual.offsetForIndex(groupIndex);
-    if (
-      group?.type !== "group" ||
-      group.collapsed ||
-      groupOffset === null ||
-      element.scrollTop <= groupOffset
-    ) {
-      setStickyGroupHeading(null);
-      return;
-    }
-    const nextGroupIndex = entries.findIndex(
-      (entry, index) => index > groupIndex && entry.type === "group",
-    );
-    const nextGroupOffset = nextGroupIndex < 0
-      ? null
-      : virtual.offsetForIndex(nextGroupIndex);
-    const translateY = nextGroupOffset === null
-      ? 0
-      : Math.min(
-          0,
-          nextGroupOffset - element.scrollTop - GROUP_HEADING_HEIGHT,
-        );
-    setStickyGroupHeading((current) =>
-      current?.key === group.key && current.translateY === translateY
-        ? current
-        : { key: group.key, translateY },
-    );
-  }, [entries, grouped, virtual.indexAtOffset, virtual.offsetForIndex]);
-
-  useLayoutEffect(() => {
-    updateStickyGroupHeading(listRef.current);
-  }, [updateStickyGroupHeading, virtual.totalSize]);
-
   useEffect(() => {
     if (contextMenu === null) {
       return;
@@ -419,7 +362,6 @@ export function RecentThreads({
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     setContextMenu(null);
     const element = event.currentTarget;
-    updateStickyGroupHeading(element);
     if (
       hasMore &&
       !loadingMore &&
@@ -428,14 +370,6 @@ export function RecentThreads({
       onLoadMore();
     }
   };
-  const stickyGroupEntry = stickyGroupHeading === null
-    ? null
-    : entries.find(
-        (entry): entry is RecentThreadGroupEntry =>
-          entry.type === "group" &&
-          entry.key === stickyGroupHeading.key &&
-          !entry.collapsed,
-      ) ?? null;
 
   return (
     <section aria-labelledby="recent-threads-title" className={styles.section}>
@@ -471,23 +405,6 @@ export function RecentThreads({
           ref={listRef}
           role="list"
         >
-          {stickyGroupEntry === null || stickyGroupHeading === null ? null : (
-            <div
-              className={styles.stickyGroupHeading}
-              data-sticky-group-heading
-              style={{
-                transform: `translateY(${stickyGroupHeading.translateY}px)`,
-              }}
-            >
-              <GroupHeading
-                entry={stickyGroupEntry}
-                {...(onNewTaskInProject === undefined
-                  ? {}
-                  : { onNewTaskInProject })}
-                onToggle={() => toggleGroup(stickyGroupEntry.key)}
-              />
-            </div>
-          )}
           <div
             className={styles.virtualCanvas}
             style={{ height: virtual.totalSize } as CSSProperties}
@@ -520,7 +437,6 @@ export function RecentThreads({
                         ? {}
                         : { onNewTaskInProject })}
                       onToggle={() => toggleGroup(entry.key)}
-                      suppressed={stickyGroupHeading?.key === entry.key}
                     />
                   ) : entry.type === "thread" ? (
                     <ThreadRow
@@ -640,20 +556,16 @@ function GroupHeading({
   entry,
   onNewTaskInProject,
   onToggle,
-  suppressed = false,
 }: {
   readonly entry: RecentThreadGroupEntry;
   readonly onNewTaskInProject?: (cwd: string) => void;
   readonly onToggle: () => void;
-  readonly suppressed?: boolean;
 }) {
   const projectPath = entry.path;
   return (
     <h3
       aria-label={entry.label}
-      aria-hidden={suppressed || undefined}
       className={styles.groupHeading}
-      inert={suppressed || undefined}
     >
       <button
         aria-expanded={!entry.collapsed}

@@ -3,7 +3,6 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -403,39 +402,13 @@ describe("RecentThreads", () => {
     })).not.toBeInTheDocument());
   });
 
-  it("滚动时仅置顶已展开的当前分组并由下一分组顶替", () => {
+  it("滚动时不粘性置顶项目名称", () => {
     renderThreads({ grouped: true });
     const scroller = screen.getByRole("list", { name: "最近会话" });
 
     scroller.scrollTop = 40;
     fireEvent.scroll(scroller);
-    let stickyHeading = scroller.querySelector<HTMLElement>(
-      "[data-sticky-group-heading]",
-    );
-    expect(stickyHeading).not.toBeNull();
-    expect(within(stickyHeading!).getByRole("button", { name: "alpha" }))
-      .toHaveAttribute("aria-expanded", "true");
-    expect(stickyHeading?.style.transform).toBe("translateY(0px)");
-
-    scroller.scrollTop = 50;
-    fireEvent.scroll(scroller);
-    stickyHeading = scroller.querySelector<HTMLElement>(
-      "[data-sticky-group-heading]",
-    );
-    expect(stickyHeading?.style.transform).toBe("translateY(-10px)");
-
-    scroller.scrollTop = 73;
-    fireEvent.scroll(scroller);
-    stickyHeading = scroller.querySelector<HTMLElement>(
-      "[data-sticky-group-heading]",
-    );
-    const stickyBeta = within(stickyHeading!).getByRole("button", { name: "beta" });
-    fireEvent.click(stickyBeta);
     expect(scroller.querySelector("[data-sticky-group-heading]")).toBeNull();
-    expect(screen.getByRole("button", { name: "beta" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
   });
 
   it("标记服务端已确认移除的会话行", () => {
@@ -500,6 +473,6 @@ describe("RecentThreads", () => {
     expect(screen.getAllByRole("listitem").length).toBeLessThan(100);
     scroller.scrollTop = 5_000;
     fireEvent.scroll(scroller);
-    expect(scroller.querySelector("[data-sticky-group-heading]")).not.toBeNull();
+    expect(screen.getAllByRole("listitem").length).toBeLessThan(100);
   });
 });

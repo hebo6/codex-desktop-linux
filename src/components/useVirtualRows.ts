@@ -33,8 +33,6 @@ interface VirtualRowsResult {
   readonly scrollToBottom: () => void;
   readonly scrollToIndex: (index: number) => void;
   readonly keyAtOffset: (offset: number) => string | null;
-  readonly indexAtOffset: (offset: number) => number | null;
-  readonly offsetForIndex: (index: number) => number | null;
 }
 
 interface ObservedElement {
@@ -210,17 +208,6 @@ export function useVirtualRows({
     [layout.rows],
   );
 
-  const indexAtOffset = useCallback(
-    (offset: number) =>
-      layout.rows.find((row) => row.start + row.size > offset)?.index ?? null,
-    [layout.rows],
-  );
-
-  const offsetForIndex = useCallback(
-    (index: number) => layout.rows[index]?.start ?? null,
-    [layout.rows],
-  );
-
   return {
     rows,
     totalSize: layout.totalSize,
@@ -230,8 +217,6 @@ export function useVirtualRows({
     scrollToBottom,
     scrollToIndex,
     keyAtOffset,
-    indexAtOffset,
-    offsetForIndex,
   };
 }
 
