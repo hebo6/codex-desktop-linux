@@ -22,12 +22,18 @@
 .command {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   padding: var(--space-2);
   border-radius: var(--radius-sm);
   background: var(--color-fill-subtle);
+}
+
+.commandHeader {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
 }
 
 .commandCopy {
@@ -55,10 +61,17 @@
   font-size: 11px;
 }
 
-.commandCopy samp {
+.output {
+  position: relative;
+  min-width: 0;
+}
+
+.output samp {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
   max-height: 240px;
   padding: var(--space-2);
-  margin-top: var(--space-1);
   overflow: auto;
   border-radius: var(--radius-sm);
   color: var(--color-text-secondary);
@@ -71,6 +84,7 @@
 
 .actions {
   display: flex;
+  align-items: center;
   gap: var(--space-1);
 }
 
@@ -95,10 +109,46 @@
   background: var(--color-fill-hover);
 }
 
+.actions .terminateAction:hover:not(:disabled),
+.actions .terminateAction:focus-visible:not(:disabled),
+.bulkActions .terminateAction:hover:not(:disabled),
+.bulkActions .terminateAction:focus-visible:not(:disabled) {
+  border-color:
+    color-mix(in srgb, var(--color-status-danger) 34%, var(--color-divider-strong));
+  color: var(--color-status-danger);
+  background:
+    color-mix(in srgb, var(--color-status-danger) 8%, var(--color-content-bg));
+}
+
 .actions button:disabled,
 .bulkActions button:disabled {
   cursor: default;
   opacity: 0.5;
+}
+
+.returnToLatest {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  display: flex;
+  min-height: 26px;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: var(--color-content-bg);
+  box-shadow: var(--shadow-composer);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.returnToLatest:hover,
+.returnToLatest:focus-visible {
+  color: var(--color-text-primary);
+  background: var(--color-fill-hover);
 }
 
 .error {
@@ -114,11 +164,8 @@
 }
 
 @media (max-width: 560px) {
-  .command {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .actions {
-    justify-content: flex-end;
+  .actions button {
+    padding-right: var(--space-1);
+    padding-left: var(--space-1);
   }
 }

@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type { ObservedBackgroundTerminal } from "../app/useBackgroundTerminals";
 import type { ThreadTurn } from "../app/useServerThreads";
@@ -19,6 +25,7 @@ interface RunningCommand {
 }
 
 const COMMAND_PANEL_DELAY_MS = 3_000;
+const OUTPUT_BOTTOM_THRESHOLD_PX = 8;
 
 export interface BackgroundCommandPanelProps {
   readonly error: string | null;
@@ -97,6 +104,7 @@ export function BackgroundCommandPanel({
         {visibleProcessIds.length < 2 ? null : (
           <div className={styles.bulkActions}>
             <button
+              className={styles.terminateAction}
               disabled={terminatingAll || anyCommandTerminating}
               onClick={() => {
                 setTerminatingAll(true);
@@ -116,35 +124,38 @@ export function BackgroundCommandPanel({
             terminatingProcessIds.has(command.processId);
           return (
             <article className={styles.command} key={command.itemId}>
-              <div className={styles.commandCopy}>
-                <code>{command.command}</code>
-                <small title={command.cwd}>
-                  {command.cwd} · {formatDuration(command.durationMs)}
-                </small>
-                {command.output === null ? null : (
-                  <samp aria-label="命令输出">{command.output}</samp>
-                )}
+              <div className={styles.commandHeader}>
+                <div className={styles.commandCopy}>
+                  <code>{command.command}</code>
+                  <small title={command.cwd}>
+                    {command.cwd} · {formatDuration(command.durationMs)}
+                  </small>
+                </div>
+                <div className={styles.actions}>
+                  <button
+                    disabled={!command.locatable}
+                    onClick={() => onLocate(command.itemId)}
+                    type="button"
+                  >
+                    定位
+                  </button>
+                  <button
+                    className={styles.terminateAction}
+                    disabled={command.processId === null || terminating}
+                    onClick={() => {
+                      if (command.processId !== null) {
+                        onTerminate(command.processId);
+                      }
+                    }}
+                    type="button"
+                  >
+                    {terminating ? "正在终止" : "终止"}
+                  </button>
+                </div>
               </div>
-              <div className={styles.actions}>
-                <button
-                  disabled={!command.locatable}
-                  onClick={() => onLocate(command.itemId)}
-                  type="button"
-                >
-                  定位
-                </button>
-                <button
-                  disabled={command.processId === null || terminating}
-                  onClick={() => {
-                    if (command.processId !== null) {
-                      onTerminate(command.processId);
-                    }
-                  }}
-                  type="button"
-                >
-                  {terminating ? "正在终止" : "终止"}
-                </button>
-              </div>
+              {command.output === null ? null : (
+                <CommandOutput expanded={expanded} output={command.output} />
+              )}
             </article>
           );
         })}
@@ -153,6 +164,96 @@ export function BackgroundCommandPanel({
         )}
       </div>
     </ComposerAccessoryDisclosure>
+  );
+}
+
+function CommandOutput({
+  expanded,
+  output,
+}: {
+  readonly expanded: boolean;
+  readonly output: string;
+}) {
+  const outputRef = useRef<HTMLElement>(null);
+  const followingRef = useRef(true);
+  const previousOutputRef = useRef(output);
+  const [following, setFollowing] = useState(true);
+  const [hasNewOutput, setHasNewOutput] = useState(false);
+
+  useLayoutEffect(() => {
+    const element = outputRef.current;
+    const outputChanged = previousOutputRef.current !== output;
+    previousOutputRef.current = output;
+    if (element === null) {
+      return;
+    }
+    if (!expanded) {
+      if (outputChanged && !followingRef.current) {
+        setHasNewOutput(true);
+      }
+      return;
+    }
+    if (followingRef.current) {
+      element.scrollTop = Math.max(
+        0,
+        element.scrollHeight - element.clientHeight,
+      );
+      setHasNewOutput(false);
+      return;
+    }
+    if (outputChanged) {
+      setHasNewOutput(true);
+    }
+  }, [expanded, output]);
+
+  const updateFollowing = (nextFollowing: boolean) => {
+    followingRef.current = nextFollowing;
+    setFollowing(nextFollowing);
+    if (nextFollowing) {
+      setHasNewOutput(false);
+    }
+  };
+
+  const scrollToLatest = () => {
+    const element = outputRef.current;
+    if (element === null) {
+      return;
+    }
+    updateFollowing(true);
+    element.scrollTop = Math.max(
+      0,
+      element.scrollHeight - element.clientHeight,
+    );
+  };
+
+  return (
+    <div className={styles.output}>
+      <samp
+        aria-label="命令输出"
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          const distanceToBottom = element.scrollHeight -
+            element.scrollTop -
+            element.clientHeight;
+          updateFollowing(distanceToBottom <= OUTPUT_BOTTOM_THRESHOLD_PX);
+        }}
+        ref={outputRef}
+      >
+        {output}
+      </samp>
+      {following ? null : (
+        <button
+          aria-label={hasNewOutput ? "有新输出，回到最新" : "回到最新输出"}
+          aria-live="polite"
+          className={styles.returnToLatest}
+          onClick={scrollToLatest}
+          type="button"
+        >
+          {hasNewOutput ? "有新输出" : "回到最新"}
+          <span aria-hidden="true">↓</span>
+        </button>
+      )}
+    </div>
   );
 }
 
