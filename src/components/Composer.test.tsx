@@ -525,6 +525,7 @@ describe("Composer", () => {
     const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
     await user.type(editor, "稍后发送的普通消息");
 
+    expect(editor).toHaveValue("稍后发送的普通消息");
     expect(screen.getByText("Shell 命令执行完成后可发送普通消息")).toBeVisible();
     expect(screen.queryByRole("button", { name: "追加" })).not.toBeInTheDocument();
     expect(onSend).not.toHaveBeenCalled();

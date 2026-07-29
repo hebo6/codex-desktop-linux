@@ -39,6 +39,8 @@ export interface ConversationViewProps {
   readonly onOpenLink?: (link: string) => void;
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenImage?: (url: string, name: string) => void;
+  readonly onRunShellCommand?: (command: string) => Promise<boolean>;
+  readonly shellCommandDisabled?: boolean;
 }
 
 export function ConversationPlaceholder({
@@ -181,7 +183,9 @@ export function ConversationView({
   onOpenLink,
   onOpenDiff,
   onOpenImage,
+  onRunShellCommand,
   restoredThread,
+  shellCommandDisabled = false,
 }: ConversationViewProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -753,7 +757,11 @@ export function ConversationView({
                   {...(onOpenLink === undefined ? {} : { onOpenLink })}
                   {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
                   {...(onOpenImage === undefined ? {} : { onOpenImage })}
+                  {...(onRunShellCommand === undefined
+                    ? {}
+                    : { onRunShellCommand })}
                   row={row}
+                  shellCommandDisabled={shellCommandDisabled}
                 />
               </div>
             ))}
@@ -812,7 +820,9 @@ function ConversationRowView({
   onOpenLink,
   onOpenDiff,
   onOpenImage,
+  onRunShellCommand,
   row,
+  shellCommandDisabled,
 }: {
   readonly actionError: string | null;
   readonly blobUrlFactory: BlobUrlFactory;
@@ -821,7 +831,9 @@ function ConversationRowView({
   readonly onOpenLink?: (link: string) => void;
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenImage?: (url: string, name: string) => void;
+  readonly onRunShellCommand?: (command: string) => Promise<boolean>;
   readonly row: ConversationRow;
+  readonly shellCommandDisabled: boolean;
 }) {
   if (row.type === "actionError") {
     return <div className={styles.actionError} role="alert">{actionError}</div>;
@@ -846,6 +858,12 @@ function ConversationRowView({
       {...(onOpenLink === undefined ? {} : { onOpenLink })}
       {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
       {...(onOpenImage === undefined ? {} : { onOpenImage })}
+      {...(
+        onRunShellCommand === undefined || row.turn.status !== "completed"
+          ? {}
+          : { onRunShellCommand }
+      )}
+      shellCommandDisabled={shellCommandDisabled}
     />
   ) : (
     <ActivityGroup
@@ -898,6 +916,8 @@ function ItemView({
   onOpenLink,
   onOpenDiff,
   onOpenImage,
+  onRunShellCommand,
+  shellCommandDisabled = false,
   turnCompletedAt,
   turnStartedAt,
 }: {
@@ -908,6 +928,8 @@ function ItemView({
   readonly onOpenLink?: (link: string) => void;
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenImage?: (url: string, name: string) => void;
+  readonly onRunShellCommand?: (command: string) => Promise<boolean>;
+  readonly shellCommandDisabled?: boolean;
   readonly turnCompletedAt?: number | null;
   readonly turnStartedAt?: number | null;
 }) {
@@ -941,6 +963,8 @@ function ItemView({
           {...(turnCompletedAt === undefined ? {} : { turnCompletedAt })}
           {...(onFork === undefined ? {} : { onFork })}
           {...(onOpenLink === undefined ? {} : { onOpenLink })}
+          {...(onRunShellCommand === undefined ? {} : { onRunShellCommand })}
+          shellCommandDisabled={shellCommandDisabled}
         />
       );
     case "plan":
@@ -1232,12 +1256,16 @@ function AgentMessage({
   item,
   onFork,
   onOpenLink,
+  onRunShellCommand,
+  shellCommandDisabled,
   turnCompletedAt,
 }: {
   readonly isLatestTurn: boolean;
   readonly item: Extract<ThreadItem, { type: "agentMessage" }>;
   readonly onFork?: () => void;
   readonly onOpenLink?: (link: string) => void;
+  readonly onRunShellCommand?: (command: string) => Promise<boolean>;
+  readonly shellCommandDisabled: boolean;
   readonly turnCompletedAt?: number | null;
 }) {
   const [now, setNow] = useState(() => Date.now());
@@ -1256,7 +1284,18 @@ function AgentMessage({
       tabIndex={0}
       onMouseEnter={() => setNow(Date.now())}
     >
-      <div className={styles.agentText}><SafeMarkdown {...(onOpenLink === undefined ? {} : { onOpenLink })} source={item.text} /></div>
+      <div className={styles.agentText}>
+        <SafeMarkdown
+          shellCommandDisabled={shellCommandDisabled}
+          source={item.text}
+          {...(onOpenLink === undefined ? {} : { onOpenLink })}
+          {...(
+            !isFinalAnswer || onRunShellCommand === undefined
+              ? {}
+              : { onRunShellCommand }
+          )}
+        />
+      </div>
       {isFinalAnswer ? (
         <div className={styles.agentActions}>
           <CopyButton

@@ -205,6 +205,89 @@ describe("ConversationView", () => {
     expect(onOpenLink).toHaveBeenCalledWith("src/App.tsx");
   });
 
+  it("仅允许从已完成的最终回答执行 Shell 代码块", async () => {
+    const onRunShellCommand = vi.fn(async () => true);
+    const shellTurn = {
+      ...TURN,
+      items: [
+        {
+          id: "commentary-shell",
+          phase: "commentary" as const,
+          text: "```bash\necho commentary\n```",
+          type: "agentMessage" as const,
+        },
+        {
+          id: "answer-shell",
+          phase: "final_answer" as const,
+          text: [
+            "```bash",
+            "echo answer",
+            "```",
+            "",
+            "```ts",
+            "console.log('not shell')",
+            "```",
+          ].join("\n"),
+          type: "agentMessage" as const,
+        },
+      ],
+      status: "completed" as const,
+    } satisfies ThreadTurn;
+    const { rerender } = render(
+      <ConversationView
+        onRunShellCommand={onRunShellCommand}
+        restoredThread={{ ...RESTORED, turns: [shellTurn] }}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "执行 Shell 命令" });
+    expect(screen.getAllByRole("button", { name: "执行 Shell 命令" }))
+      .toHaveLength(1);
+    fireEvent.click(trigger);
+    fireEvent.click(
+      within(screen.getByRole("alertdialog"))
+        .getByRole("button", { name: "执行" }),
+    );
+    await waitFor(() =>
+      expect(onRunShellCommand).toHaveBeenCalledWith("echo answer")
+    );
+
+    rerender(
+      <ConversationView
+        onRunShellCommand={onRunShellCommand}
+        restoredThread={{
+          ...RESTORED,
+          turns: [{ ...shellTurn, status: "inProgress" }],
+        }}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "执行 Shell 命令" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("存在活动回合或 Shell 命令时禁用回答中的执行入口", () => {
+    const shellTurn = {
+      ...TURN,
+      items: [{
+        id: "answer-disabled-shell",
+        phase: "final_answer" as const,
+        text: "```zsh\npwd\n```",
+        type: "agentMessage" as const,
+      }],
+      status: "completed" as const,
+    } satisfies ThreadTurn;
+    render(
+      <ConversationView
+        onRunShellCommand={vi.fn(async () => true)}
+        restoredThread={{ ...RESTORED, turns: [shellTurn] }}
+        shellCommandDisabled
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "执行 Shell 命令" }))
+      .toBeDisabled();
+  });
+
   it("用户消息图片通过 Blob URL 显示缩略图并打开统一预览", async () => {
     const create = vi.fn(() => "blob:user-message-image");
     const revoke = vi.fn();

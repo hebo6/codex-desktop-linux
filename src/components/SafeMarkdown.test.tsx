@@ -1,4 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { resolveLink } from "../content/linkResolver";
@@ -53,5 +59,93 @@ describe("SafeMarkdown", () => {
       endLine: null,
       column: null,
     });
+  });
+
+  it("仅为非空 Shell 代码块提供确认后执行", async () => {
+    let completeExecution: (accepted: boolean) => void = (_accepted) => {
+      throw new Error("Shell 执行尚未开始");
+    };
+    const onRunShellCommand = vi.fn(() => new Promise<boolean>((resolve) => {
+      completeExecution = resolve;
+    }));
+    render(
+      <SafeMarkdown
+        onRunShellCommand={onRunShellCommand}
+        source={[
+          "```bash",
+          "echo first",
+          "echo second",
+          "```",
+          "",
+          "```console",
+          "$ echo output",
+          "```",
+          "",
+          "```sh",
+          "```",
+        ].join("\n")}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "执行 Shell 命令" });
+    expect(screen.getAllByRole("button", { name: "执行 Shell 命令" }))
+      .toHaveLength(1);
+    fireEvent.click(trigger);
+    const confirmation = screen.getByRole("alertdialog", {
+      name: "确认执行这段 Shell 命令？",
+    });
+    const cancel = within(confirmation).getByRole("button", { name: "取消" });
+    expect(cancel).toHaveFocus();
+
+    fireEvent.click(within(confirmation).getByRole("button", { name: "执行" }));
+    expect(onRunShellCommand).toHaveBeenCalledWith("echo first\necho second");
+    expect(trigger).toBeDisabled();
+    expect(trigger).toHaveTextContent("执行中");
+    completeExecution(true);
+    await waitFor(() => expect(trigger).toBeEnabled());
+    expect(trigger).toHaveTextContent("执行");
+  });
+
+  it("支持取消 Shell 执行确认", () => {
+    render(
+      <SafeMarkdown
+        onRunShellCommand={vi.fn(async () => true)}
+        source={"```zsh\npwd\n```"}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "执行 Shell 命令" });
+
+    fireEvent.click(trigger);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+
+    fireEvent.click(trigger);
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("Shell 执行不可用时禁用入口并关闭确认", () => {
+    const onRunShellCommand = vi.fn(async () => true);
+    const { rerender } = render(
+      <SafeMarkdown
+        onRunShellCommand={onRunShellCommand}
+        source={"```sh\npwd\n```"}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "执行 Shell 命令" });
+    fireEvent.click(trigger);
+    expect(screen.getByRole("alertdialog")).toBeVisible();
+
+    rerender(
+      <SafeMarkdown
+        onRunShellCommand={onRunShellCommand}
+        shellCommandDisabled
+        source={"```sh\npwd\n```"}
+      />,
+    );
+    expect(trigger).toBeDisabled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(onRunShellCommand).not.toHaveBeenCalled();
   });
 });

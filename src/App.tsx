@@ -2069,6 +2069,20 @@ export function App({
                   setContentError(null);
                   setPreviewRequest({ dataUrl: url, name, type: "dataImage" });
                 }}
+                {...(
+                  connection.view.phase !== "ready" ||
+                  serverThreads.offline ||
+                  activeThreadSession?.offline
+                    ? {}
+                    : {
+                        onRunShellCommand: conversation.runShellCommand,
+                        shellCommandDisabled:
+                          conversation.activeTurnId !== null ||
+                          conversation.shellCommandActive ||
+                          conversation.stopping ||
+                          conversation.submitting,
+                      }
+                )}
                 {...(serverThreads.offline || activeThreadSession?.offline
                   ? {}
                   : { onForkTurn: (turnId: string, isLatest: boolean) => {

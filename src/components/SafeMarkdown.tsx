@@ -1,13 +1,23 @@
-import { useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import styles from "./SafeMarkdown.module.css";
 
 export function SafeMarkdown({
   onOpenLink,
+  onRunShellCommand,
+  shellCommandDisabled = false,
   source,
   variant = "document",
 }: {
   readonly onOpenLink?: (link: string) => void;
+  readonly onRunShellCommand?: (command: string) => Promise<boolean>;
+  readonly shellCommandDisabled?: boolean;
   readonly source: string;
   readonly variant?: "compact" | "document";
 }) {
@@ -27,7 +37,13 @@ export function SafeMarkdown({
   return (
     <div className={styles.markdown}>
       {parseBlocks(source).map((block, index) => (
-        <MarkdownBlock block={block} key={`${block.type}:${index}`} {...(onOpenLink === undefined ? {} : { onOpenLink })} />
+        <MarkdownBlock
+          block={block}
+          key={`${block.type}:${index}`}
+          shellCommandDisabled={shellCommandDisabled}
+          {...(onOpenLink === undefined ? {} : { onOpenLink })}
+          {...(onRunShellCommand === undefined ? {} : { onRunShellCommand })}
+        />
       ))}
     </div>
   );
@@ -139,9 +155,13 @@ interface ListItem {
 function MarkdownBlock({
   block,
   onOpenLink,
+  onRunShellCommand,
+  shellCommandDisabled,
 }: {
   readonly block: Block;
   readonly onOpenLink?: (link: string) => void;
+  readonly onRunShellCommand?: (command: string) => Promise<boolean>;
+  readonly shellCommandDisabled: boolean;
 }) {
   const inline = (text: string) => renderInline(text, onOpenLink, onOpenLink !== undefined);
   switch (block.type) {
@@ -160,7 +180,14 @@ function MarkdownBlock({
       return <h6 id={id}>{content}</h6>;
     }
     case "code":
-      return <CodeBlock language={block.language} source={block.text} />;
+      return (
+        <CodeBlock
+          language={block.language}
+          shellCommandDisabled={shellCommandDisabled}
+          source={block.text}
+          {...(onRunShellCommand === undefined ? {} : { onRunShellCommand })}
+        />
+      );
     case "list": {
       const items = block.items.map((item, index) => (
         <li key={index}>
@@ -184,9 +211,100 @@ function MarkdownBlock({
   }
 }
 
-function CodeBlock({ language, source }: { readonly language: string; readonly source: string }) {
+const EXECUTABLE_SHELL_LANGUAGES = new Set(["bash", "sh", "zsh"]);
+
+function CodeBlock({
+  language,
+  onRunShellCommand,
+  shellCommandDisabled,
+  source,
+}: {
+  readonly language: string;
+  readonly onRunShellCommand?: (command: string) => Promise<boolean>;
+  readonly shellCommandDisabled: boolean;
+  readonly source: string;
+}) {
   const [wrapped, setWrapped] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const confirmationRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const confirmationId = useId();
+  const confirmationTitleId = useId();
+  const executable =
+    onRunShellCommand !== undefined &&
+    source.trim().length > 0 &&
+    EXECUTABLE_SHELL_LANGUAGES.has(language.trim().toLowerCase());
+
+  useEffect(() => {
+    if (!confirmationOpen) {
+      return;
+    }
+    cancelButtonRef.current?.focus();
+    const closeFromOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (
+        !(target instanceof Node) ||
+        confirmationRef.current?.contains(target) ||
+        triggerRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setConfirmationOpen(false);
+    };
+    const closeFromFocusOutside = (event: FocusEvent) => {
+      const target = event.target;
+      if (
+        !(target instanceof Node) ||
+        confirmationRef.current?.contains(target) ||
+        triggerRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setConfirmationOpen(false);
+    };
+    const closeFromEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+      event.preventDefault();
+      setConfirmationOpen(false);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener("focusin", closeFromFocusOutside);
+    document.addEventListener("pointerdown", closeFromOutside);
+    document.addEventListener("keydown", closeFromEscape);
+    return () => {
+      document.removeEventListener("focusin", closeFromFocusOutside);
+      document.removeEventListener("pointerdown", closeFromOutside);
+      document.removeEventListener("keydown", closeFromEscape);
+    };
+  }, [confirmationOpen]);
+
+  useEffect(() => {
+    if (shellCommandDisabled) {
+      setConfirmationOpen(false);
+    }
+  }, [shellCommandDisabled]);
+
+  const execute = async () => {
+    if (onRunShellCommand === undefined || shellCommandDisabled || submitting) {
+      return;
+    }
+    setConfirmationOpen(false);
+    setSubmitting(true);
+    triggerRef.current?.focus();
+    try {
+      await onRunShellCommand(source);
+    } catch {
+      // Execution errors are presented by the conversation layer.
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <section className={styles.codeBlock}>
       <header>
@@ -198,7 +316,54 @@ function CodeBlock({ language, source }: { readonly language: string; readonly s
             window.setTimeout(() => setCopied(false), 1_500);
           }, () => undefined);
         }} type="button">{copied ? "已复制" : "复制"}</button>
+        {executable ? (
+          <button
+            aria-controls={confirmationId}
+            aria-expanded={confirmationOpen}
+            aria-haspopup="dialog"
+            aria-label="执行 Shell 命令"
+            className={styles.shellRunButton}
+            disabled={shellCommandDisabled || submitting}
+            onClick={() => setConfirmationOpen((value) => !value)}
+            ref={triggerRef}
+            type="button"
+          >
+            {submitting ? "执行中" : "执行"}
+          </button>
+        ) : null}
       </header>
+      {confirmationOpen ? (
+        <div
+          aria-labelledby={confirmationTitleId}
+          aria-modal={false}
+          className={styles.shellConfirmation}
+          id={confirmationId}
+          ref={confirmationRef}
+          role="alertdialog"
+        >
+          <strong id={confirmationTitleId}>确认执行这段 Shell 命令？</strong>
+          <p>当前项目 · 不受沙箱限制</p>
+          <div className={styles.shellConfirmationActions}>
+            <button
+              onClick={() => {
+                setConfirmationOpen(false);
+                triggerRef.current?.focus();
+              }}
+              ref={cancelButtonRef}
+              type="button"
+            >
+              取消
+            </button>
+            <button
+              className={styles.shellConfirmButton}
+              onClick={() => void execute()}
+              type="button"
+            >
+              执行
+            </button>
+          </div>
+        </div>
+      ) : null}
       <pre data-wrapped={wrapped}><code>{source}</code></pre>
     </section>
   );
