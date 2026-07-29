@@ -34,6 +34,10 @@ export interface ConversationViewProps {
   readonly restoredThread: RestoredThread;
   readonly blobUrlFactory?: BlobUrlFactory;
   readonly commandLocationRequest?: CommandLocationRequest | null;
+  readonly hasOlderTurns?: boolean;
+  readonly loadingOlderTurns?: boolean;
+  readonly olderTurnsError?: string | null;
+  readonly onLoadOlderTurns?: () => Promise<boolean>;
   readonly onForkTurn?: (turnId: string, isLatest: boolean) => void;
   readonly actionError?: string | null;
   readonly onOpenLink?: (link: string) => void;
@@ -44,9 +48,11 @@ export interface ConversationViewProps {
 }
 
 export function ConversationPlaceholder({
+  detail = null,
   kind,
   onNewTask,
 }: {
+  readonly detail?: string | null;
   readonly kind: "blank" | "loading" | "error" | "deleted";
   readonly onNewTask?: () => void;
 }) {
@@ -54,10 +60,13 @@ export function ConversationPlaceholder({
     kind === "blank"
       ? ["开始一个新任务", "发送第一条消息时才会创建服务端会话"]
       : kind === "loading"
-        ? ["正在恢复会话", "正在读取全部回合和服务端状态"]
+        ? ["正在恢复会话", "正在读取最近回合、完整项目和服务端状态"]
         : kind === "deleted"
           ? ["会话已被删除", "服务端已删除此会话，不能继续提交输入"]
-          : ["无法恢复会话", "可从左侧重新选择会话或重试连接"];
+          : [
+              "无法恢复会话",
+              detail ?? "可从左侧重新选择会话或重试连接",
+            ];
   return (
     <section
       className={styles.placeholder}
@@ -84,6 +93,7 @@ type ReasoningItem = Extract<ThreadItem, { type: "reasoning" }>;
 const PANEL_TRANSITION_MS = 210;
 const FIRST_TURN_ROW_PADDING = 24;
 const BOTTOM_THRESHOLD = 1;
+const HISTORY_LOAD_THRESHOLD = 96;
 const RUNNING_TURN_RESERVE_RATIO = 2 / 3;
 
 function useCollapsibleContent(initiallyExpanded: boolean) {
@@ -178,6 +188,10 @@ type ConversationRow =
 export function ConversationView({
   blobUrlFactory = browserBlobUrls,
   commandLocationRequest = null,
+  hasOlderTurns = false,
+  loadingOlderTurns = false,
+  olderTurnsError = null,
+  onLoadOlderTurns,
   onForkTurn,
   actionError = null,
   onOpenLink,
@@ -190,6 +204,12 @@ export function ConversationView({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pendingQuestionPositionRef = useRef<string | null>(null);
+  const pendingHistoryAnchorRef = useRef<{
+    readonly firstTurnId: string | null;
+    readonly scrollHeight: number;
+    readonly scrollTop: number;
+  } | null>(null);
+  const historyLoadRef = useRef<Promise<boolean> | null>(null);
   const followBottomRef = useRef(true);
   const scrollbarDragRef = useRef(false);
   const touchPositionRef = useRef<{ x: number; y: number } | null>(null);
@@ -299,6 +319,47 @@ export function ConversationView({
     setShowJumpToBottom(false);
   }, []);
 
+  const requestOlderTurns = useCallback(() => {
+    const scroller = scrollerRef.current;
+    if (
+      scroller === null ||
+      onLoadOlderTurns === undefined ||
+      !hasOlderTurns ||
+      loadingOlderTurns ||
+      historyLoadRef.current !== null
+    ) {
+      return;
+    }
+    pendingHistoryAnchorRef.current = {
+      firstTurnId: restoredThread.turns[0]?.id ?? null,
+      scrollHeight: scroller.scrollHeight,
+      scrollTop: scroller.scrollTop,
+    };
+    followBottomRef.current = false;
+    setShowJumpToBottom(true);
+    const request = onLoadOlderTurns();
+    historyLoadRef.current = request;
+    void request.then(
+      (loaded) => {
+        if (!loaded) {
+          pendingHistoryAnchorRef.current = null;
+        }
+      },
+      () => {
+        pendingHistoryAnchorRef.current = null;
+      },
+    ).finally(() => {
+      if (historyLoadRef.current === request) {
+        historyLoadRef.current = null;
+      }
+    });
+  }, [
+    hasOlderTurns,
+    loadingOlderTurns,
+    onLoadOlderTurns,
+    restoredThread.turns,
+  ]);
+
   const followContent = useCallback(
     (scroller: HTMLDivElement) => {
       if (pendingQuestionPositionRef.current !== null) {
@@ -394,6 +455,9 @@ export function ConversationView({
     }
     const previousQuestionCount = previousQuestionCountRef.current;
     previousQuestionCountRef.current = historyQuestions.length;
+    if (pendingHistoryAnchorRef.current !== null) {
+      return;
+    }
     if (historyQuestions.length <= previousQuestionCount) {
       return;
     }
@@ -437,6 +501,22 @@ export function ConversationView({
     runningTurnId,
     scrollToBottom,
   ]);
+
+  useLayoutEffect(() => {
+    const anchor = pendingHistoryAnchorRef.current;
+    const scroller = scrollerRef.current;
+    if (
+      anchor === null ||
+      scroller === null ||
+      (restoredThread.turns[0]?.id ?? null) === anchor.firstTurnId
+    ) {
+      return;
+    }
+    scroller.scrollTop =
+      anchor.scrollTop + scroller.scrollHeight - anchor.scrollHeight;
+    pendingHistoryAnchorRef.current = null;
+    updateBottomState(scroller);
+  }, [restoredThread.turns, updateBottomState]);
 
   useLayoutEffect(() => {
     const pendingQuestionId = pendingQuestionPositionRef.current;
@@ -613,7 +693,15 @@ export function ConversationView({
   }, [commandLocationRequest, updateBottomState]);
 
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
-    updateBottomState(event.currentTarget, scrollbarDragRef.current);
+    const scroller = event.currentTarget;
+    const atBottom = updateBottomState(scroller, scrollbarDragRef.current);
+    if (
+      !atBottom &&
+      scroller.scrollTop <= HISTORY_LOAD_THRESHOLD &&
+      olderTurnsError === null
+    ) {
+      requestOlderTurns();
+    }
   };
 
   const handleWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
@@ -723,6 +811,29 @@ export function ConversationView({
               : undefined
           }
         >
+          {hasOlderTurns || loadingOlderTurns || olderTurnsError !== null ? (
+            <div className={styles.historyLoader}>
+              {loadingOlderTurns ? (
+                <span aria-live="polite" role="status">
+                  正在加载更早内容
+                </span>
+              ) : (
+                <button onClick={requestOlderTurns} type="button">
+                  {olderTurnsError === null
+                    ? "加载更早内容"
+                    : "重试加载更早内容"}
+                </button>
+              )}
+              {olderTurnsError === null ? null : (
+                <span
+                  className={styles.historyLoadError}
+                  role="alert"
+                >
+                  {olderTurnsError}
+                </span>
+              )}
+            </div>
+          ) : null}
           <div
             aria-label="会话内容列表"
             className={styles.conversationList}

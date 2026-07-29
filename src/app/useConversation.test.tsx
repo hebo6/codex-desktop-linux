@@ -259,6 +259,7 @@ describe("useConversation", () => {
 
     expect(client.startThreadCalls).toEqual([{
       cwd: "/workspace",
+      historyMode: "paginated",
       permissions: ":read-only",
     }]);
     expect(onThreadCreated).toHaveBeenCalledWith(client.threadStartResponse);

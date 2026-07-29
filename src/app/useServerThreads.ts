@@ -5,6 +5,8 @@ import type {
   ThreadListResponse,
   ThreadReadResponse,
   ThreadResumeResponse,
+  ThreadTurnsListResponse,
+  ThreadItemsListResponse,
   ThreadStartResponse,
   ThreadUnsubscribeResponse,
   ThreadArchiveResponse,
@@ -84,6 +86,15 @@ export interface ServerThreadsClient {
   ): ThreadRequest<ThreadListResponse>;
   readThread(threadId: string): ThreadRequest<ThreadReadResponse>;
   resumeThread(threadId: string): ThreadRequest<ThreadResumeResponse>;
+  listThreadTurns(
+    threadId: string,
+    cursor: string,
+  ): ThreadRequest<ThreadTurnsListResponse>;
+  listThreadItems(
+    threadId: string,
+    turnId: string,
+    cursor?: string | null,
+  ): ThreadRequest<ThreadItemsListResponse>;
   unsubscribeThread(threadId: string): ThreadRequest<ThreadUnsubscribeResponse>;
   archiveThread(threadId: string): ThreadRequest<ThreadArchiveResponse>;
   unarchiveThread(threadId: string): ThreadRequest<ThreadUnarchiveResponse>;

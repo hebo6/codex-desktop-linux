@@ -27,6 +27,7 @@ import type {
   ThreadCompactStartResponse,
   ThreadDeleteResponse,
   ThreadForkResponse,
+  ThreadItemsListResponse,
   ThreadListResponse,
   ThreadReadResponse,
   ThreadResumeResponse,
@@ -54,6 +55,7 @@ export const validateThreadListResponse: StandaloneValidateFunction<ThreadListRe
 export const validateThreadReadResponse: StandaloneValidateFunction<ThreadReadResponse>;
 export const validateThreadResumeResponse: StandaloneValidateFunction<ThreadResumeResponse>;
 export const validateThreadTurnsListResponse: StandaloneValidateFunction<ThreadTurnsListResponse>;
+export const validateThreadItemsListResponse: StandaloneValidateFunction<ThreadItemsListResponse>;
 export const validateThreadUnsubscribeResponse: StandaloneValidateFunction<ThreadUnsubscribeResponse>;
 export const validateThreadArchiveResponse: StandaloneValidateFunction<ThreadArchiveResponse>;
 export const validateThreadUnarchiveResponse: StandaloneValidateFunction<ThreadUnarchiveResponse>;

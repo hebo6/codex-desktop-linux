@@ -40,9 +40,22 @@
         "method": "thread/turns/list",
         "params": {
           "threadId": "thread-redacted",
-          "itemsView": "full",
-          "limit": 30,
+          "itemsView": "notLoaded",
+          "limit": 25,
           "sortDirection": "desc"
+        }
+      }
+    },
+    {
+      "area": "thread",
+      "message": {
+        "id": "client-items",
+        "method": "thread/items/list",
+        "params": {
+          "threadId": "thread-redacted",
+          "turnId": "turn-redacted",
+          "limit": 100,
+          "sortDirection": "asc"
         }
       }
     },
@@ -134,15 +147,31 @@
         "data": [
           {
             "id": "turn-redacted",
-            "items": [
-              {
-                "id": "item-redacted",
-                "text": "脱敏回答",
-                "type": "agentMessage"
-              }
-            ],
-            "itemsView": "full",
+            "items": [],
+            "itemsView": "notLoaded",
             "status": "completed"
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "area": "thread",
+      "method": "thread/items/list",
+      "result": {
+        "data": [
+          {
+            "item": {
+              "aggregatedOutput": "脱敏输出",
+              "command": "git status --short",
+              "commandActions": [],
+              "cwd": "/workspace",
+              "exitCode": 0,
+              "id": "item-redacted",
+              "status": "completed",
+              "type": "commandExecution"
+            },
+            "turnId": "turn-redacted"
           }
         ],
         "nextCursor": null

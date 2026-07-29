@@ -29,6 +29,7 @@ import {
 } from "./app/useServerThreads";
 import {
   useThreadSession,
+  type ThreadSessionControls,
   type ThreadSessionState,
 } from "./app/useThreadSession";
 import { useServerInteractions } from "./app/useServerInteractions";
@@ -329,6 +330,7 @@ export function App({
         next.set(tabId, {
           threadId: response.thread.id,
           state: preparedState,
+          loadOlderTurns: null,
           preparedClient: connection.threadClient,
         });
         return next;
@@ -403,11 +405,11 @@ export function App({
   const updateTabSession = useCallback((
     tabId: string,
     threadId: string,
-    state: ThreadSessionState | null,
+    session: ThreadSessionControls | null,
   ) => {
     setTabSessions((current) => {
       const existing = current.get(tabId);
-      if (state === null) {
+      if (session === null) {
         if (existing?.threadId !== threadId) {
           return current;
         }
@@ -415,11 +417,20 @@ export function App({
         next.delete(tabId);
         return next;
       }
-      if (existing?.threadId === threadId && existing.state === state) {
+      if (
+        existing?.threadId === threadId &&
+        existing.state === session.state &&
+        existing.loadOlderTurns === session.loadOlderTurns
+      ) {
         return current;
       }
       const next = new Map(current);
-      next.set(tabId, { threadId, state, preparedClient: null });
+      next.set(tabId, {
+        threadId,
+        state: session.state,
+        loadOlderTurns: session.loadOlderTurns,
+        preparedClient: null,
+      });
       return next;
     });
   }, []);
@@ -2063,6 +2074,20 @@ export function App({
                   forkError ?? contentError ?? threadRestoreError
                 }
                 commandLocationRequest={commandLocationRequest}
+                hasOlderTurns={
+                  !activeThreadSession?.offline &&
+                  typeof activeThreadSession?.olderTurnsCursor === "string"
+                }
+                loadingOlderTurns={
+                  activeThreadSession?.loadingOlderTurns ?? false
+                }
+                olderTurnsError={
+                  activeThreadSession?.olderTurnsError ?? null
+                }
+                {...(activeTabSession?.loadOlderTurns === null ||
+                    activeTabSession?.loadOlderTurns === undefined
+                  ? {}
+                  : { onLoadOlderTurns: activeTabSession.loadOlderTurns })}
                 onOpenDiff={openDiff}
                 onOpenLink={openContentLink}
                 onOpenImage={(url, name) => {
@@ -2097,6 +2122,7 @@ export function App({
               />
             ) : (
               <ConversationPlaceholder
+                detail={threadRestoreError}
                 kind={
                   currentThreadDeleted
                     ? "deleted"
@@ -2525,6 +2551,7 @@ function getBasename(path: string): string {
 interface TabThreadSession {
   readonly threadId: string;
   readonly state: ThreadSessionState;
+  readonly loadOlderTurns: (() => Promise<boolean>) | null;
   readonly preparedClient: ServerThreadsClient | null;
 }
 
@@ -2539,7 +2566,7 @@ function ThreadSubscription({
   readonly onChange: (
     tabId: string,
     threadId: string,
-    state: ThreadSessionState | null,
+    session: ThreadSessionControls | null,
   ) => void;
   readonly preparedState: ThreadSessionState | null;
   readonly tabId: string;
@@ -2573,6 +2600,9 @@ function startedThreadSession(
       turns: Object.freeze([]),
     }),
     resumedThreadId: response.thread.id,
+    olderTurnsCursor: null,
+    loadingOlderTurns: false,
+    olderTurnsError: null,
     deleted: false,
     offline: false,
     error: null,

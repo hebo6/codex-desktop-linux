@@ -6,6 +6,10 @@ import type {
   ThreadReadResponse,
   ThreadResumeParams,
   ThreadResumeResponse,
+  ThreadTurnsListParams,
+  ThreadTurnsListResponse,
+  ThreadItemsListParams,
+  ThreadItemsListResponse,
   ThreadUnsubscribeParams,
   ThreadUnsubscribeResponse,
   ThreadArchiveParams,
@@ -26,6 +30,8 @@ import {
   validateThreadListResponse,
   validateThreadReadResponse,
   validateThreadResumeResponse,
+  validateThreadTurnsListResponse,
+  validateThreadItemsListResponse,
   validateThreadUnsubscribeResponse,
   validateThreadArchiveResponse,
   validateThreadUnarchiveResponse,
@@ -36,6 +42,8 @@ import type { AppServerSession } from "./session";
 import { beginConversationLoadMeasurement } from "../diagnostics/conversationLoadDiagnostics";
 
 export const RECENT_THREAD_PAGE_SIZE = 50;
+export const THREAD_TURN_PAGE_SIZE = 25;
+export const THREAD_ITEM_PAGE_SIZE = 100;
 
 export interface RecentThreadPageOptions {
   readonly archived?: boolean;
@@ -90,7 +98,15 @@ export class AppServerThreadClient {
   }
 
   resumeThread(threadId: string): RequestHandle<ThreadResumeResponse> {
-    const params: ThreadResumeParams = { threadId };
+    const params: ThreadResumeParams = {
+      threadId,
+      excludeTurns: true,
+      initialTurnsPage: {
+        itemsView: "notLoaded",
+        limit: THREAD_TURN_PAGE_SIZE,
+        sortDirection: "desc",
+      },
+    };
     const measurement = beginConversationLoadMeasurement();
     try {
       const request = this.session.sendRequest({
@@ -108,6 +124,43 @@ export class AppServerThreadClient {
       measurement.recordFailure();
       throw error;
     }
+  }
+
+  listThreadTurns(
+    threadId: string,
+    cursor: string,
+  ): RequestHandle<ThreadTurnsListResponse> {
+    const params: ThreadTurnsListParams = {
+      threadId,
+      cursor,
+      itemsView: "notLoaded",
+      limit: THREAD_TURN_PAGE_SIZE,
+      sortDirection: "desc",
+    };
+    return this.session.sendRequest({
+      method: "thread/turns/list",
+      params,
+      validateResult: threadTurnsListResponseValidator,
+    });
+  }
+
+  listThreadItems(
+    threadId: string,
+    turnId: string,
+    cursor: string | null = null,
+  ): RequestHandle<ThreadItemsListResponse> {
+    const params: ThreadItemsListParams = {
+      threadId,
+      turnId,
+      limit: THREAD_ITEM_PAGE_SIZE,
+      sortDirection: "asc",
+      ...(cursor === null ? {} : { cursor }),
+    };
+    return this.session.sendRequest({
+      method: "thread/items/list",
+      params,
+      validateResult: threadItemsListResponseValidator,
+    });
   }
 
   unsubscribeThread(threadId: string): RequestHandle<ThreadUnsubscribeResponse> {
@@ -166,6 +219,10 @@ const threadReadResponseValidator: ResultValidator<ThreadReadResponse> =
   validateThreadReadResponse;
 const threadResumeResponseValidator: ResultValidator<ThreadResumeResponse> =
   validateThreadResumeResponse;
+const threadTurnsListResponseValidator: ResultValidator<ThreadTurnsListResponse> =
+  validateThreadTurnsListResponse;
+const threadItemsListResponseValidator: ResultValidator<ThreadItemsListResponse> =
+  validateThreadItemsListResponse;
 const threadUnsubscribeResponseValidator: ResultValidator<ThreadUnsubscribeResponse> =
   validateThreadUnsubscribeResponse;
 const threadArchiveResponseValidator: ResultValidator<ThreadArchiveResponse> =

@@ -404,6 +404,7 @@ describe("App", () => {
       createdAt: 100,
       cwd: "/workspace/current",
       ephemeral: false,
+      historyMode: "paginated",
       id: "thread-current",
       modelProvider: "openai",
       name: "当前会话",
@@ -431,6 +432,7 @@ describe("App", () => {
           ? { data: [thread, otherThread], nextCursor: null }
           : request.method === "thread/resume"
             ? {
+                initialTurnsPage: { data: [], nextCursor: null },
                 thread: request.params?.threadId === otherThread.id
                   ? otherThread
                   : thread,
@@ -563,6 +565,7 @@ describe("App", () => {
       createdAt: 100,
       cwd: "/workspace/new",
       ephemeral: false,
+      historyMode: "paginated",
       id: "thread-new",
       modelProvider: "openai",
       preview: "新任务",
@@ -705,6 +708,7 @@ describe("App", () => {
         createdAt: 100,
         cwd: "/workspace/a",
         ephemeral: false,
+        historyMode: "paginated",
         id: "thread-a",
         modelProvider: "openai",
         name: "会话 A",
@@ -720,6 +724,7 @@ describe("App", () => {
         createdAt: 90,
         cwd: "/workspace/b",
         ephemeral: false,
+        historyMode: "paginated",
         id: "thread-b",
         modelProvider: "openai",
         name: "会话 B",
@@ -854,6 +859,7 @@ describe("App", () => {
           reasoningEffort: null,
           sandbox: { type: "readOnly" },
           serviceTier: null,
+          initialTurnsPage: { data: [], nextCursor: null },
           thread,
         });
       }
@@ -961,6 +967,7 @@ describe("App", () => {
       createdAt: 100,
       cwd: "/workspace/project",
       ephemeral: false,
+      historyMode: "paginated",
       id: "thread-completed-with-background-command",
       modelProvider: "openai",
       name: "后台命令会话",
@@ -1008,8 +1015,20 @@ describe("App", () => {
                 model: "gpt-5",
                 modelProvider: "openai",
                 sandbox: { type: "readOnly" },
+                initialTurnsPage: {
+                  data: thread.turns,
+                  nextCursor: null,
+                },
                 thread,
               })
+            : request.method === "thread/items/list"
+              ? Promise.resolve({
+                  data: [{
+                    item: commandItem,
+                    turnId: thread.turns[0].id,
+                  }],
+                  nextCursor: null,
+                })
             : request.method === "thread/backgroundTerminals/list"
               ? Promise.resolve({
                   data: [{

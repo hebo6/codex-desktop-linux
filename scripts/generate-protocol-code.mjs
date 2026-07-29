@@ -70,6 +70,15 @@ const schemaDeclarations = [
     validatorName: "validateThreadTurnsListResponse",
   },
   {
+    typeName: "ThreadItemsListParams",
+    schemaPath: "v2/ThreadItemsListParams.json",
+  },
+  {
+    typeName: "ThreadItemsListResponse",
+    schemaPath: "v2/ThreadItemsListResponse.json",
+    validatorName: "validateThreadItemsListResponse",
+  },
+  {
     typeName: "ThreadUnsubscribeParams",
     schemaPath: "v2/ThreadUnsubscribeParams.json",
   },

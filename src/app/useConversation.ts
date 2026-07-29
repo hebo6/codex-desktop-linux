@@ -221,6 +221,7 @@ export function useConversation({
       return threadId;
     }
     const response = await activeClient.startThread({
+      historyMode: "paginated",
       ...(configuration.cwd === undefined ? {} : { cwd: configuration.cwd }),
       ...(configuration.model === undefined ? {} : { model: configuration.model }),
       ...(configuration.permissions === undefined

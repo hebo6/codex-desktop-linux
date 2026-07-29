@@ -108,6 +108,18 @@ class FakeThreadClient implements ServerThreadsClient {
     return { result: nextResult(this.resumeResults) };
   }
 
+  listThreadTurns(_threadId: string, _cursor: string): never {
+    throw new Error("此测试客户端不加载回合分页");
+  }
+
+  listThreadItems(
+    _threadId: string,
+    _turnId: string,
+    _cursor?: string | null,
+  ): never {
+    throw new Error("此测试客户端不加载项目分页");
+  }
+
   unsubscribeThread(threadId: string) {
     this.unsubscribeCalls.push(threadId);
     return {

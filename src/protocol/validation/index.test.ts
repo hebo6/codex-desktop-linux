@@ -13,6 +13,7 @@ import {
   validateThreadListResponse,
   validateThreadReadResponse,
   validateThreadResumeResponse,
+  validateThreadItemsListResponse,
   validateThreadTurnsListResponse,
 } from ".";
 
@@ -32,14 +33,20 @@ describe("协议运行时边界", () => {
     });
   });
 
-  it("生成的 ClientRequest 联合包含实验方法 thread/turns/list", () => {
-    const request: Extract<ClientRequest, { method: "thread/turns/list" }> = {
+  it("生成的 ClientRequest 联合包含两级历史分页方法", () => {
+    const turnsRequest: Extract<ClientRequest, { method: "thread/turns/list" }> = {
       id: 1,
       method: "thread/turns/list",
       params: { threadId: "thread-1" },
     };
+    const itemsRequest: Extract<ClientRequest, { method: "thread/items/list" }> = {
+      id: 2,
+      method: "thread/items/list",
+      params: { threadId: "thread-1", turnId: "turn-1" },
+    };
 
-    expect(request.method).toBe("thread/turns/list");
+    expect(turnsRequest.method).toBe("thread/turns/list");
+    expect(itemsRequest.method).toBe("thread/items/list");
   });
 
   it("不把 raw response 独立负载当作合法服务端通知", () => {
@@ -158,7 +165,7 @@ describe("协议运行时边界", () => {
     ).toBe(true);
   });
 
-  it("校验会话列表、读取、恢复和 turn 分页响应", () => {
+  it("校验会话列表、读取、恢复及 turn 和 item 分页响应", () => {
     const turn = {
       id: "turn-1",
       items: [],
@@ -196,6 +203,23 @@ describe("协议运行时边界", () => {
     ).toBe(true);
     expect(
       validateThreadTurnsListResponse({ data: [turn], nextCursor: null }).ok,
+    ).toBe(true);
+    expect(
+      validateThreadItemsListResponse({
+        data: [{
+          item: {
+            aggregatedOutput: "完成",
+            command: "git status --short",
+            commandActions: [],
+            cwd: "/workspace",
+            id: "command-1",
+            status: "completed",
+            type: "commandExecution",
+          },
+          turnId: "turn-1",
+        }],
+        nextCursor: null,
+      }).ok,
     ).toBe(true);
 
     const invalid = validateThreadListResponse({ data: "secret-value" });

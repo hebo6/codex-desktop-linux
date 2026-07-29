@@ -226,7 +226,15 @@ P0 不支持 ProxyJump、多级堡垒机、端口转发命令模板或用户自�
 
 客户端使用 v2 thread 接口完成新建、恢复、列表、读取、归档、取消归档和删除
 
-首次发送任务时才创建 thread，恢复时使用 `thread/resume` 的默认语义一次取得 `thread.turns` 中的全部完整回合
+首次发送任务时才创建 thread，并在 `thread/start` 中指定 `historyMode: "paginated"`
+
+恢复时使用 `thread/resume` 的 `excludeTurns: true` 和 `initialTurnsPage` 取得最新一页 `itemsView: "notLoaded"` 回合骨架，不依赖默认恢复和 `itemsView: "full"` 的兼容性全量物化路径
+
+客户端使用 `thread/items/list` 按升序完整水合当前页中的每个回合，使用 `thread/turns/list` 按降序继续读取更早回合；服务端返回的每页回合在写入标签会话状态前反转为正文使用的升序
+
+分页游标、加载状态和已水合正文保存在对应标签的进程内会话状态中，更早页完成水合后原子前插
+
+`legacy` 会话不具备完整项目投影且不能原地转换，客户端不回退到会丢失工具记录的旧恢复路径；这类会话恢复为明确错误，新创建会话统一使用 `paginated`
 
 发送任务创建 turn，运行中输入通过 steer 追加，显式停止通过中断请求完成
 

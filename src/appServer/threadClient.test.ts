@@ -9,6 +9,8 @@ import type { ServerNotification } from "../protocol/generated";
 import {
   AppServerThreadClient,
   RECENT_THREAD_PAGE_SIZE,
+  THREAD_ITEM_PAGE_SIZE,
+  THREAD_TURN_PAGE_SIZE,
 } from "./threadClient";
 
 class RecordingSession {
@@ -125,7 +127,7 @@ describe("AppServerThreadClient", () => {
     ]);
   });
 
-  it("恢复时请求完整 turn 历史", () => {
+  it("恢复时请求最近一页 turn 骨架且不走兼容性全量路径", () => {
     const session = new RecordingSession();
     const client = new AppServerThreadClient(session);
 
@@ -133,8 +135,59 @@ describe("AppServerThreadClient", () => {
 
     expect(session.requests.map(({ method, params }) => ({ method, params }))).toEqual([{
       method: "thread/resume",
-      params: { threadId: "thread-1" },
+      params: {
+        excludeTurns: true,
+        initialTurnsPage: {
+          itemsView: "notLoaded",
+          limit: THREAD_TURN_PAGE_SIZE,
+          sortDirection: "desc",
+        },
+        threadId: "thread-1",
+      },
     }]);
+  });
+
+  it("分页读取更早 turn 骨架和单个 turn 的完整项目", () => {
+    const session = new RecordingSession();
+    const client = new AppServerThreadClient(session);
+
+    client.listThreadTurns("thread-1", "older-turns");
+    client.listThreadItems("thread-1", "turn-1");
+    client.listThreadItems("thread-1", "turn-1", "more-items");
+
+    expect(
+      session.requests.map(({ method, params }) => ({ method, params })),
+    ).toEqual([
+      {
+        method: "thread/turns/list",
+        params: {
+          cursor: "older-turns",
+          itemsView: "notLoaded",
+          limit: THREAD_TURN_PAGE_SIZE,
+          sortDirection: "desc",
+          threadId: "thread-1",
+        },
+      },
+      {
+        method: "thread/items/list",
+        params: {
+          limit: THREAD_ITEM_PAGE_SIZE,
+          sortDirection: "asc",
+          threadId: "thread-1",
+          turnId: "turn-1",
+        },
+      },
+      {
+        method: "thread/items/list",
+        params: {
+          cursor: "more-items",
+          limit: THREAD_ITEM_PAGE_SIZE,
+          sortDirection: "asc",
+          threadId: "thread-1",
+          turnId: "turn-1",
+        },
+      },
+    ]);
   });
 
   it("取消当前会话的服务端订阅", () => {
@@ -172,6 +225,8 @@ describe("AppServerThreadClient", () => {
     client.listRecentThreads();
     client.readThread("thread-1");
     client.resumeThread("thread-1");
+    client.listThreadTurns("thread-1", "older-turns");
+    client.listThreadItems("thread-1", "turn-1");
     client.unsubscribeThread("thread-1");
     client.archiveThread("thread-1");
     client.unarchiveThread("thread-1");

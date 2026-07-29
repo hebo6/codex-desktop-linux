@@ -17,6 +17,8 @@ export type { ThreadResumeParams } from "./types/ThreadResumeParams";
 export type { ThreadResumeResponse } from "./types/ThreadResumeResponse";
 export type { ThreadTurnsListParams } from "./types/ThreadTurnsListParams";
 export type { ThreadTurnsListResponse } from "./types/ThreadTurnsListResponse";
+export type { ThreadItemsListParams } from "./types/ThreadItemsListParams";
+export type { ThreadItemsListResponse } from "./types/ThreadItemsListResponse";
 export type { ThreadUnsubscribeParams } from "./types/ThreadUnsubscribeParams";
 export type { ThreadUnsubscribeResponse } from "./types/ThreadUnsubscribeResponse";
 export type { ThreadArchiveParams } from "./types/ThreadArchiveParams";

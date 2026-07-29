@@ -11,6 +11,7 @@ import type {
   ThreadReadResponse,
   ThreadResumeResponse,
   ThreadTurnsListResponse,
+  ThreadItemsListResponse,
   ThreadUnsubscribeResponse,
   ThreadArchiveResponse,
   ThreadUnarchiveResponse,
@@ -49,6 +50,7 @@ import {
   validateThreadReadResponse as validateThreadReadResponseSchema,
   validateThreadResumeResponse as validateThreadResumeResponseSchema,
   validateThreadTurnsListResponse as validateThreadTurnsListResponseSchema,
+  validateThreadItemsListResponse as validateThreadItemsListResponseSchema,
   validateThreadUnsubscribeResponse as validateThreadUnsubscribeResponseSchema,
   validateThreadArchiveResponse as validateThreadArchiveResponseSchema,
   validateThreadUnarchiveResponse as validateThreadUnarchiveResponseSchema,
@@ -234,6 +236,18 @@ export function validateThreadTurnsListResponse(
     "invalid_params",
     "params",
     "thread/turns/list 响应校验失败",
+  );
+}
+
+export function validateThreadItemsListResponse(
+  value: unknown,
+): ProtocolValidationResult<ThreadItemsListResponse> {
+  return validateWithSchema(
+    value,
+    validateThreadItemsListResponseSchema,
+    "invalid_params",
+    "params",
+    "thread/items/list 响应校验失败",
   );
 }
 

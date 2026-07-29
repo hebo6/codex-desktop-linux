@@ -52,7 +52,12 @@ describe("conversation load diagnostics", () => {
     monotonicMs = 30;
     measurement.recordResponse(response);
     monotonicMs = 35;
-    recordConversationProjection(thread, 5);
+    recordConversationProjection(thread, 5, [{
+      id: "turn-1",
+      items: [{ id: "compact-1", type: "contextCompaction" }],
+      itemsView: "full",
+      status: "completed",
+    }]);
     monotonicMs = 42;
     recordConversationFirstCommit(thread);
 
@@ -67,7 +72,7 @@ describe("conversation load diagnostics", () => {
       totalMs: 32,
       responseCharacters: 4_096,
       turnCount: 1,
-      itemCount: 0,
+      itemCount: 1,
     }]);
     expect(JSON.stringify(readConversationLoadDiagnostics())).not.toContain("private");
   });

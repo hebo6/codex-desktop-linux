@@ -1863,6 +1863,47 @@ describe("ConversationView", () => {
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });
 
+  it("加载更早回合后保持当前滚动锚点", async () => {
+    const currentTurn = {
+      ...TURN,
+      id: "turn-current",
+    } satisfies ThreadTurn;
+    const olderTurn = {
+      ...TURN,
+      id: "turn-older",
+      items: TURN.items.map((item) => ({ ...item, id: `older-${item.id}` })),
+    } satisfies ThreadTurn;
+    const onLoadOlderTurns = vi.fn(async () => true);
+    const { rerender } = render(
+      <ConversationView
+        hasOlderTurns
+        onLoadOlderTurns={onLoadOlderTurns}
+        restoredThread={{ ...RESTORED, turns: [currentTurn] }}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    let scrollHeight = 1_000;
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 500 },
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+    });
+    userScroll(scroller, 120);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载更早内容" }));
+    expect(onLoadOlderTurns).toHaveBeenCalledOnce();
+
+    scrollHeight = 1_360;
+    rerender(
+      <ConversationView
+        hasOlderTurns={false}
+        onLoadOlderTurns={onLoadOlderTurns}
+        restoredThread={{ ...RESTORED, turns: [olderTurn, currentTurn] }}
+      />,
+    );
+
+    await waitFor(() => expect(scroller.scrollTop).toBe(480));
+  });
+
   it("从回答所在 turn 发起分叉并标记最新回合", () => {
     const onForkTurn = vi.fn();
     render(
@@ -2192,6 +2233,15 @@ describe("ConversationView", () => {
     expect(screen.getByRole("status")).toHaveTextContent("正在恢复会话");
     rerender(<ConversationPlaceholder kind="error" />);
     expect(screen.getByRole("alert")).toHaveTextContent("无法恢复会话");
+    rerender(
+      <ConversationPlaceholder
+        detail="当前会话使用 legacy 历史格式，无法加载完整历史"
+        kind="error"
+      />,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "当前会话使用 legacy 历史格式，无法加载完整历史",
+    );
     const onNewTask = vi.fn();
     rerender(
       <ConversationPlaceholder kind="deleted" onNewTask={onNewTask} />,

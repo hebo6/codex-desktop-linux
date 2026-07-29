@@ -21,6 +21,7 @@ import {
   validateServerRequest,
   validateSkillsListResponse,
   validateThreadListResponse,
+  validateThreadItemsListResponse,
   validateThreadTurnsListResponse,
   validateTurnStartResponse,
 } from "../validation";
@@ -63,6 +64,7 @@ const clientRequestValidator = new Ajv({
 const resultValidators = {
   initialize: validateInitializeResponse,
   "thread/list": validateThreadListResponse,
+  "thread/items/list": validateThreadItemsListResponse,
   "thread/turns/list": validateThreadTurnsListResponse,
   "turn/start": validateTurnStartResponse,
   "skills/list": validateSkillsListResponse,
@@ -125,11 +127,11 @@ describe("脱敏 app-server 协议契约", () => {
     expect(recordOf(recordOf(initialize.params).capabilities).experimentalApi).toBe(
       true,
     );
-    expect(
-      recording.clientRequests.some(
-        ({ message }) => recordOf(message).method === "thread/turns/list",
-      ),
-    ).toBe(true);
+    const clientMethods = new Set(
+      recording.clientRequests.map(({ message }) => recordOf(message).method),
+    );
+    expect(clientMethods).toContain("thread/turns/list");
+    expect(clientMethods).toContain("thread/items/list");
   });
 
   it("回放初始化、thread、turn、技能、文件搜索和限额结果与通知", () => {

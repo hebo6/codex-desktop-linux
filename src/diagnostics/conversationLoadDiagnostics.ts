@@ -1,4 +1,5 @@
 import type { ThreadResumeResponse } from "../protocol/generated";
+import type { ThreadTurn } from "../app/useServerThreads";
 import type { RpcResponseTiming } from "../protocol/rpc";
 
 const MAX_SAMPLES = 20;
@@ -95,11 +96,19 @@ export function beginConversationLoadMeasurement(): ConversationLoadMeasurement 
 export function recordConversationProjection(
   threadMetadata: object,
   projectionMs: number,
+  turns?: readonly ThreadTurn[],
 ): void {
   const sample = samplesByThreadMetadata.get(threadMetadata);
   if (sample === undefined) return;
   sample.projectionMs = projectionMs;
   sample.projectionCompletedAtMonotonicMs = performance.now();
+  if (turns !== undefined) {
+    sample.turnCount = turns.length;
+    sample.itemCount = turns.reduce(
+      (count, turn) => count + turn.items.length,
+      0,
+    );
+  }
 }
 
 export function recordConversationFirstCommit(threadMetadata: object): void {

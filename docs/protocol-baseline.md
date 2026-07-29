@@ -108,7 +108,7 @@ Schema 必须使用 `--experimental` 生成，保留固定提交中标记为实�
 }
 ```
 
-`thread/turns/list` 保留在固定实验 Schema 和契约测试中，产品会话恢复流程不调用该方法
+产品会话恢复使用 `thread/resume.initialTurnsPage`、`thread/turns/list` 和 `thread/items/list` 的两级分页契约，运行时边界必须分别校验回合页与项目页响应
 
 客户端应在 `initialize` 成功后发送 `initialized`，初始化完成前不得发送业务请求
 
