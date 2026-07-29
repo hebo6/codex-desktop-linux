@@ -412,9 +412,8 @@ export function FilePreviewDialog({
       if (viewport === null || imageSize.width === 0 || imageSize.height === 0) return;
       const fitScale = imageFit
         ? Math.min(
-            1,
-            viewport.clientWidth * 0.9 / imageSize.width,
-            viewport.clientHeight * 0.9 / imageSize.height,
+            viewport.clientWidth / imageSize.width,
+            viewport.clientHeight / imageSize.height,
           )
         : 1;
       const rotated = rotation % 180 !== 0;

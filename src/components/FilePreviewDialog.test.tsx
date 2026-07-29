@@ -381,6 +381,31 @@ describe("FilePreviewDialog", () => {
     expect(image.style.transform).not.toContain("translate(0px, 0px)");
   });
 
+  it("适应窗口使用可见内容区并保持图片比例", async () => {
+    render(
+      <FilePreviewDialog
+        blobUrlFactory={{ create: () => "blob:image", revoke: vi.fn() }}
+        client={clientFor("image-bytes")}
+        onClose={vi.fn()}
+        request={{ path: "/remote/image.png" }}
+        serverName="服务器"
+      />,
+    );
+
+    const image = await screen.findByRole("img", { name: "image.png" });
+    const viewport = image.parentElement as HTMLDivElement;
+    const content = viewport.parentElement as HTMLElement;
+    const imageStyle = getComputedStyle(image);
+    const viewportStyle = getComputedStyle(viewport);
+
+    expect(getComputedStyle(content).position).toBe("relative");
+    expect(viewportStyle.position).toBe("absolute");
+    expect(viewportStyle.inset).toBe("0px");
+    expect(imageStyle.width).toBe("100%");
+    expect(imageStyle.height).toBe("100%");
+    expect(imageStyle.objectFit).toBe("contain");
+  });
+
   it("文件变更支持统一差异和左右对照", async () => {
     render(
       <FilePreviewDialog
