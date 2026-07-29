@@ -68,6 +68,7 @@ const LANGUAGES_BY_EXTENSION: Readonly<Record<string, SourceLanguage | undefined
   rs: { id: "rust", label: "Rust" },
   sh: { id: "bash", label: "Shell" },
   sql: { id: "sql", label: "SQL" },
+  svg: { id: "xml", label: "SVG" },
   swift: { id: "swift", label: "Swift" },
   toml: { id: "toml", label: "TOML" },
   ts: { id: "typescript", label: "TypeScript" },

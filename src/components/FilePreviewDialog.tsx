@@ -35,6 +35,10 @@ import {
   type BlobUrlFactory,
 } from "../content/useBlobUrl";
 import { saveRemoteFile } from "../transport/systemDialog";
+import {
+  HtmlPreviewFrame,
+  useHtmlPreview,
+} from "./HtmlPreviewFrame";
 import { useModalLayer } from "./modalStack";
 import { SafeMarkdown } from "./SafeMarkdown";
 import styles from "./FilePreviewDialog.module.css";
@@ -64,6 +68,8 @@ interface LoadedFile {
   readonly dataBase64: string;
   readonly modifiedAtMs: number;
 }
+
+type FileViewMode = "preview" | "source";
 
 export function FilePreviewDialog({
   client,
@@ -96,7 +102,13 @@ export function FilePreviewDialog({
   const [attempt, setAttempt] = useState(0);
   const [wrap, setWrap] = useState(defaultWrap);
   const [search, setSearch] = useState("");
-  const [markdownView, setMarkdownView] = useState(true);
+  const [viewSelection, setViewSelection] = useState<{
+    readonly mode: FileViewMode;
+    readonly request: FilePreviewRequest | null;
+  }>(() => ({
+    mode: defaultFileView(request?.type === "dataImage" ? null : request),
+    request,
+  }));
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [imageFit, setImageFit] = useState(true);
@@ -245,11 +257,26 @@ export function FilePreviewDialog({
       : decodePreview(previewPath, loaded.dataBase64),
     [loaded, previewPath],
   );
+  const sourceText = decoded?.type === "text"
+    ? decoded.text
+    : decoded?.type === "image"
+      ? decoded.sourceText ?? null
+      : null;
+  const availableViews = fileRequest === null
+    ? (["preview"] as const)
+    : fileViewsForPath(fileRequest.path);
+  const selectedView = viewSelection.request === request
+    ? viewSelection.mode
+    : defaultFileView(fileRequest);
+  const activeView = availableViews.includes(selectedView)
+    ? selectedView
+    : availableViews[0] ?? "source";
   const imageUrl = useBlobUrl(
-    decoded?.type === "image" ? decoded.blob : null,
+    activeView === "preview" && decoded?.type === "image"
+      ? decoded.blob
+      : null,
     blobUrlFactory,
   );
-  const sourceText = decoded?.type === "text" ? decoded.text : null;
 
   useEffect(() => {
     setFormattedText(null);
@@ -280,15 +307,33 @@ export function FilePreviewDialog({
     };
   }, [contentProcessor, fileRequest, sourceText]);
 
-  const displayedText = formattedText ?? sourceText;
+  const displayedText = activeView === "preview" &&
+    fileRequest !== null &&
+    isJson(fileRequest.path)
+      ? formattedText ?? sourceText
+      : sourceText;
   const sourceLanguage =
     previewPath === null ? null : sourceLanguageForPath(previewPath);
+  const htmlPreview = useHtmlPreview({
+    active: activeView === "preview" &&
+      fileRequest !== null &&
+      isHtml(fileRequest.path),
+    blobUrlFactory,
+    client,
+    documentPath: fileRequest?.path ?? null,
+    source: sourceText,
+    workspacePath: workspacePath ?? null,
+  });
 
   useEffect(() => {
     setHighlightedSource(null);
     if (
       displayedText === null ||
       sourceLanguage === null ||
+      (
+        activeView === "preview" &&
+        (fileRequest === null || !isJson(fileRequest.path))
+      ) ||
       (fileRequest?.diff !== undefined && fileRequest.diff !== null)
     ) {
       return;
@@ -312,12 +357,24 @@ export function FilePreviewDialog({
     return () => {
       disposed = true;
     };
-  }, [displayedText, fileRequest?.diff, sourceLanguage, syntaxHighlighter]);
+  }, [
+    activeView,
+    displayedText,
+    fileRequest,
+    sourceLanguage,
+    syntaxHighlighter,
+  ]);
 
   useEffect(() => {
     setMatchingLines(new Set());
     setSearchingText(false);
-    if (displayedText === null || search.length === 0) return;
+    if (
+      activeView !== "source" ||
+      displayedText === null ||
+      search.length === 0
+    ) {
+      return;
+    }
     let disposed = false;
     const timeout = window.setTimeout(() => {
       setSearchingText(true);
@@ -337,18 +394,24 @@ export function FilePreviewDialog({
       disposed = true;
       window.clearTimeout(timeout);
     };
-  }, [contentProcessor, displayedText, search]);
+  }, [activeView, contentProcessor, displayedText, search]);
 
   useEffect(() => {
-    if (activeLine === null || decoded?.type !== "text") return;
+    if (
+      activeView !== "source" ||
+      activeLine === null ||
+      sourceText === null
+    ) {
+      return;
+    }
     const target = document.getElementById(`preview-line-${activeLine}`);
     if (target !== null && typeof target.scrollIntoView === "function") {
       target.scrollIntoView({ block: "center" });
     }
-  }, [activeLine, displayedText, decoded?.type]);
+  }, [activeLine, activeView, displayedText, sourceText]);
 
   useEffect(() => {
-    if (decoded?.type !== "image") return;
+    if (activeView !== "preview" || decoded?.type !== "image") return;
     const update = () => {
       const viewport = imageViewportRef.current;
       if (viewport === null || imageSize.width === 0 || imageSize.height === 0) return;
@@ -369,7 +432,7 @@ export function FilePreviewDialog({
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, [decoded?.type, imageFit, imageSize, rotation, zoom]);
+  }, [activeView, decoded?.type, imageFit, imageSize, rotation, zoom]);
 
   if (request === null) {
     return null;
@@ -475,7 +538,7 @@ export function FilePreviewDialog({
         <div className={styles.meta}>
           <span>{decoded === null ? "正在识别" : kindLabel(decoded.type)}</span>
           <span>{loaded === null ? "大小未知" : formatBytes(decodedBase64Size(loaded.dataBase64))}</span>
-          {decoded?.type === "text" ? <><span>{language}</span><span>UTF-8</span><span>{lineEnding(decoded.text)}</span></> : null}
+          {sourceText === null ? null : <><span>{language}</span><span>UTF-8</span><span>{lineEnding(sourceText)}</span></>}
           {loaded !== null && loaded.modifiedAtMs > 0 ? <span>{new Date(loaded.modifiedAtMs).toLocaleString()}</span> : null}
         </div>
         <div className={styles.toolbar}>
@@ -484,27 +547,46 @@ export function FilePreviewDialog({
               <button aria-pressed={diffMode === "unified"} onClick={() => setDiffMode("unified")} type="button">统一差异</button>
               <button aria-pressed={diffMode === "split"} onClick={() => setDiffMode("split")} type="button">左右对照</button>
             </>
-          ) : decoded?.type === "text" ? (
+          ) : (
             <>
-              <input aria-label="在文件中查找" onChange={(event) => setSearch(event.target.value)} placeholder="查找" type="search" value={search} />
-              {search.length === 0 ? null : <span role="status">{searchingText ? "正在搜索" : `${matchingLines.size} 行匹配`}</span>}
-              {formattingJson ? <span role="status">正在格式化 JSON</span> : null}
-              <label className={styles.jumpLine}><span className={styles.srOnly}>跳转到行</span><input aria-label="跳转到行" min={1} onChange={(event) => setJumpLine(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") jumpToLine(); }} placeholder="行号" type="number" value={jumpLine} /><button onClick={jumpToLine} type="button">跳转</button></label>
-              {jumpError === null ? null : <span className={styles.inlineError} role="alert">{jumpError}</span>}
-              <button onClick={() => void navigator.clipboard.writeText(window.getSelection()?.toString() ?? "")} type="button">复制选区</button>
-              <button aria-pressed={wrap} onClick={() => setWrap((value) => !value)} type="button">{wrap ? "不折行" : "折行"}</button>
-              {fileRequest !== null && isMarkdown(fileRequest.path) ? <button aria-pressed={markdownView} onClick={() => setMarkdownView((value) => !value)} type="button">{markdownView ? "查看源码" : "渲染预览"}</button> : null}
+              {availableViews.length > 1 ? (
+                <div aria-label="文件视图" className={styles.viewSwitch} role="group">
+                  {availableViews.map((mode) => (
+                    <button
+                      aria-pressed={activeView === mode}
+                      key={mode}
+                      onClick={() => setViewSelection({ mode, request })}
+                      type="button"
+                    >
+                      {mode === "preview" ? "预览" : "源码"}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {activeView === "source" && sourceText !== null ? (
+                <>
+                  <input aria-label="在文件中查找" onChange={(event) => setSearch(event.target.value)} placeholder="查找" type="search" value={search} />
+                  {search.length === 0 ? null : <span role="status">{searchingText ? "正在搜索" : `${matchingLines.size} 行匹配`}</span>}
+                  <label className={styles.jumpLine}><span className={styles.srOnly}>跳转到行</span><input aria-label="跳转到行" min={1} onChange={(event) => setJumpLine(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") jumpToLine(); }} placeholder="行号" type="number" value={jumpLine} /><button onClick={jumpToLine} type="button">跳转</button></label>
+                  {jumpError === null ? null : <span className={styles.inlineError} role="alert">{jumpError}</span>}
+                  <button onClick={() => void navigator.clipboard.writeText(window.getSelection()?.toString() ?? "")} type="button">复制选区</button>
+                  <button aria-pressed={wrap} onClick={() => setWrap((value) => !value)} type="button">{wrap ? "不折行" : "折行"}</button>
+                </>
+              ) : null}
+              {activeView === "preview" && fileRequest !== null && isJson(fileRequest.path) && formattingJson ? <span role="status">正在格式化 JSON</span> : null}
+              {activeView === "preview" && htmlPreview.phase === "ready" && htmlPreview.blockedResourceCount > 0 ? <span role="status">{htmlPreview.blockedResourceCount} 个外部或不支持的资源未加载</span> : null}
+              {activeView === "preview" && decoded?.type === "image" ? (
+                <>
+                  <button onClick={() => updateZoom(zoom - 0.2)} type="button">缩小</button>
+                  <button onClick={() => updateZoom(zoom + 0.2)} type="button">放大</button>
+                  <button aria-pressed={imageFit} onClick={() => { setImageFit(true); setZoom(1); setRotation(0); setImagePan({ x: 0, y: 0 }); }} type="button">适应窗口</button>
+                  <button aria-pressed={!imageFit} onClick={() => { setImageFit(false); setZoom(1); setImagePan({ x: 0, y: 0 }); }} type="button">原始尺寸</button>
+                  <button onClick={() => { setRotation((value) => (value + 90) % 360); setImagePan({ x: 0, y: 0 }); }} type="button">旋转</button>
+                  <span>{Math.round(zoom * 100)}%</span>
+                </>
+              ) : null}
             </>
-          ) : decoded?.type === "image" ? (
-            <>
-              <button onClick={() => updateZoom(zoom - 0.2)} type="button">缩小</button>
-              <button onClick={() => updateZoom(zoom + 0.2)} type="button">放大</button>
-              <button aria-pressed={imageFit} onClick={() => { setImageFit(true); setZoom(1); setRotation(0); setImagePan({ x: 0, y: 0 }); }} type="button">适应窗口</button>
-              <button aria-pressed={!imageFit} onClick={() => { setImageFit(false); setZoom(1); setImagePan({ x: 0, y: 0 }); }} type="button">原始尺寸</button>
-              <button onClick={() => { setRotation((value) => (value + 90) % 360); setImagePan({ x: 0, y: 0 }); }} type="button">旋转</button>
-              <span>{Math.round(zoom * 100)}%</span>
-            </>
-          ) : null}
+          )}
           {fileRequest === null
             ? null
             : <button onClick={() => void navigator.clipboard.writeText(fileRequest.path)} type="button">复制路径</button>}
@@ -518,13 +600,21 @@ export function FilePreviewDialog({
             <div className={styles.placeholder}><strong>文件超过 16 MiB 预览上限</strong><span>仍可使用另存为保存完整内容</span></div>
           ) : decoded?.type === "binary" ? (
             <div className={styles.placeholder}><strong>此文件不是有效的 UTF-8 文本或支持的图片</strong><span>为避免在 WebView 中执行未知内容，仅提供另存为</span></div>
-          ) : decoded?.type === "image" && imageUrl !== null ? (
-            <div className={styles.imageViewport} data-pannable={canPanImage} onPointerCancel={endPan} onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={endPan} onWheel={zoomAtPointer} ref={imageViewportRef}><img alt={name} data-fit={imageFit} decoding="async" draggable={false} onLoad={(event) => setImageSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} src={imageUrl} style={{ transform: `translate(${imagePan.x}px, ${imagePan.y}px) scale(${zoom}) rotate(${rotation}deg)` }} /></div>
-          ) : decoded?.type === "image" ? (
-            <div className={styles.placeholder} role="status">正在解码图片</div>
-          ) : displayedText !== null && fileRequest !== null && isMarkdown(fileRequest.path) && markdownView ? (
+          ) : activeView === "preview" && fileRequest !== null && isHtml(fileRequest.path) && htmlPreview.phase === "loading" ? (
+            <div className={styles.placeholder} role="status">正在准备隔离的 HTML 预览</div>
+          ) : activeView === "preview" && fileRequest !== null && isHtml(fileRequest.path) && htmlPreview.phase === "error" ? (
+            <div className={styles.placeholder} role="alert"><strong>无法安全处理此 HTML 文件</strong><span>仍可切换到源码视图查看原始内容</span></div>
+          ) : activeView === "preview" && fileRequest !== null && isHtml(fileRequest.path) && htmlPreview.phase === "ready" ? (
+            <HtmlPreviewFrame name={name} onOpenLink={onOpenLink} url={htmlPreview.url} />
+          ) : activeView === "preview" && displayedText !== null && fileRequest !== null && isMarkdown(fileRequest.path) ? (
             <article className={styles.markdownPreview}><SafeMarkdown {...(onOpenLink === undefined ? {} : { onOpenLink })} source={displayedText} /></article>
-          ) : displayedText !== null ? (
+          ) : activeView === "preview" && displayedText !== null && fileRequest !== null && isJson(fileRequest.path) ? (
+            <StructuredTextPreview highlightedLines={highlightedLines} text={displayedText} />
+          ) : activeView === "preview" && decoded?.type === "image" && imageUrl !== null ? (
+            <div className={styles.imageViewport} data-pannable={canPanImage} onPointerCancel={endPan} onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={endPan} onWheel={zoomAtPointer} ref={imageViewportRef}><img alt={name} data-fit={imageFit} decoding="async" draggable={false} onLoad={(event) => setImageSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} src={imageUrl} style={{ transform: `translate(${imagePan.x}px, ${imagePan.y}px) scale(${zoom}) rotate(${rotation}deg)` }} /></div>
+          ) : activeView === "preview" && decoded?.type === "image" ? (
+            <div className={styles.placeholder} role="status">正在解码图片</div>
+          ) : activeView === "source" && displayedText !== null ? (
             <TextSource column={activeLine === fileRequest?.line ? fileRequest?.column ?? null : null} endLine={activeEndLine} highlightedLines={highlightedLines} line={activeLine} matchingLines={matchingLines} query={search} text={displayedText} wrap={wrap} />
           ) : null}
         </main>
@@ -535,7 +625,11 @@ export function FilePreviewDialog({
 
 type DecodedPreview =
   | { readonly type: "text"; readonly text: string }
-  | { readonly type: "image"; readonly blob: Blob }
+  | {
+      readonly type: "image";
+      readonly blob: Blob;
+      readonly sourceText?: string;
+    }
   | { readonly type: "binary" | "tooLarge" };
 
 function decodePreview(path: string, dataBase64: string): DecodedPreview {
@@ -547,11 +641,13 @@ function decodePreview(path: string, dataBase64: string): DecodedPreview {
   };
   try {
     if (extension === "svg") {
+      const sourceText = decodeUtf8(dataBase64);
       return {
         type: "image",
-        blob: new Blob([sanitizeSvg(decodeUtf8(dataBase64))], {
+        blob: new Blob([sanitizeSvg(sourceText)], {
           type: "image/svg+xml;charset=utf-8",
         }),
+        sourceText,
       };
     }
     const mediaType = imageMediaType[extension];
@@ -563,6 +659,28 @@ function decodePreview(path: string, dataBase64: string): DecodedPreview {
   } catch {
     return { type: "binary" };
   }
+}
+
+function StructuredTextPreview({
+  highlightedLines,
+  text,
+}: {
+  readonly highlightedLines: HighlightedLines | null;
+  readonly text: string;
+}) {
+  const lines = text.split(/\r?\n/u);
+  return (
+    <pre className={styles.structuredPreview}>
+      <code>
+        {lines.map((line, index) => (
+          <span key={index}>
+            {highlightLine(line, highlightedLines?.[index], "")}
+            {index === lines.length - 1 ? null : "\n"}
+          </span>
+        ))}
+      </code>
+    </pre>
+  );
 }
 
 function TextSource({ column, endLine, highlightedLines, line, matchingLines, query, text, wrap }: { readonly column: number | null; readonly endLine: number | null; readonly highlightedLines: HighlightedLines | null; readonly line: number | null; readonly matchingLines: ReadonlySet<number>; readonly query: string; readonly text: string; readonly wrap: boolean }) {
@@ -681,7 +799,31 @@ function languageForPath(path: string): string {
     : extension.toLocaleUpperCase();
 }
 function isMarkdown(path: string): boolean { return /\.(?:md|markdown|mdx)$/iu.test(path); }
+function isHtml(path: string): boolean { return /\.(?:htm|html)$/iu.test(path); }
 function isJson(path: string): boolean { return /\.(?:json|jsonc)$/iu.test(path); }
+function isSvg(path: string): boolean { return /\.svg$/iu.test(path); }
+function fileViewsForPath(path: string): readonly FileViewMode[] {
+  if (isMarkdown(path) || isHtml(path) || isJson(path) || isSvg(path)) {
+    return ["preview", "source"];
+  }
+  return /\.(?:gif|jpe?g|png|webp|pdf)$/iu.test(path)
+    ? ["preview"]
+    : ["source"];
+}
+function defaultFileView(
+  request: RemoteFilePreviewRequest | null,
+): FileViewMode {
+  if (
+    (request?.line !== undefined && request.line !== null) ||
+    (request?.endLine !== undefined && request.endLine !== null) ||
+    (request?.column !== undefined && request.column !== null)
+  ) {
+    return "source";
+  }
+  return request === null
+    ? "preview"
+    : fileViewsForPath(request.path)[0] ?? "source";
+}
 function kindLabel(type: DecodedPreview["type"]): string { return type === "text" ? "文本" : type === "image" ? "图片" : type === "tooLarge" ? "大文件" : "二进制"; }
 function lineEnding(text: string): string { return text.includes("\r\n") ? "CRLF" : "LF"; }
 function formatBytes(size: number): string { return size < 1024 ? `${size} B` : size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KiB` : `${(size / (1024 * 1024)).toFixed(1)} MiB`; }

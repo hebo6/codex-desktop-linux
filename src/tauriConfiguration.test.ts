@@ -38,6 +38,15 @@ describe("Tauri 发布配置", () => {
     expect(windowPermission).toContain('"read_clipboard_file_chunk"');
   });
 
+  it("仅允许 Blob 子框架和 HTML 预览需要的 Blob 资源", () => {
+    const csp = tauriConfiguration.app.security.csp;
+    expect(csp).toContain("frame-src blob:");
+    expect(csp).toContain("font-src 'self' blob:");
+    expect(csp).toContain("style-src 'self' blob:");
+    expect(csp).not.toMatch(/frame-src[^;]*https?:/u);
+    expect(csp).not.toContain("'unsafe-inline'");
+  });
+
   it("允许应用窗口订阅和退订应用事件", () => {
     expect(tauriConfiguration.app.security.capabilities).toContain("app-events");
     expect(eventCapability.windows).toEqual(["main", "app-*"]);

@@ -21,9 +21,13 @@ function clientFor(text: string): FileClient {
       modifiedAtMs: 1_700_000_000_000,
     })),
     readFile: vi.fn(() => handle({
-      dataBase64: btoa(String.fromCharCode(...new TextEncoder().encode(text))),
+      dataBase64: base64For(text),
     })),
   };
+}
+
+function base64For(text: string): string {
+  return btoa(String.fromCharCode(...new TextEncoder().encode(text)));
 }
 
 describe("FilePreviewDialog", () => {
@@ -89,6 +93,13 @@ describe("FilePreviewDialog", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "文档" })).toBeVisible());
     expect(document.querySelector("script")).toBeNull();
     expect(screen.getByText("bad()内容")).toBeVisible();
+    expect(screen.getByRole("button", { name: "预览" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "源码" }));
+    expect(screen.getByText("<script>bad()</script>内容")).toBeVisible();
+    expect(screen.getByRole("searchbox", { name: "在文件中查找" })).toBeVisible();
   });
 
   it("在内容 Worker 中格式化 JSON 并执行全文搜索", async () => {
@@ -97,7 +108,7 @@ describe("FilePreviewDialog", () => {
         formatted: true,
         text: '{\n  "query": "matched"\n}',
       })),
-      findMatchingLines: vi.fn(async () => Uint32Array.from([2])),
+      findMatchingLines: vi.fn(async () => Uint32Array.from([1])),
     };
     render(
       <FilePreviewDialog
@@ -111,17 +122,148 @@ describe("FilePreviewDialog", () => {
     await waitFor(() =>
       expect(screen.getByText('"query": "matched"', { exact: false })).toBeVisible(),
     );
+    expect(
+      screen.queryByRole("searchbox", { name: "在文件中查找" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "源码" }));
+    expect(screen.getByText('{"query":"matched"}')).toBeVisible();
     fireEvent.change(screen.getByRole("searchbox", { name: "在文件中查找" }), {
       target: { value: "matched" },
     });
     await waitFor(() =>
       expect(processor.findMatchingLines).toHaveBeenCalledWith(
-        '{\n  "query": "matched"\n}',
+        '{"query":"matched"}',
         "matched",
       ),
     );
     await waitFor(() => expect(screen.getByText("1 行匹配")).toBeVisible());
     expect(screen.getByText("matched").closest("mark")).not.toBeNull();
+  });
+
+  it("HTML 默认使用隔离预览并可以切换到原始源码", async () => {
+    const create = vi.fn(() => "blob:html-preview");
+    const source =
+      '<h1>预览</h1><img src="asset.png"><script>alert(1)</script>';
+    const client = clientFor(source);
+    render(
+      <FilePreviewDialog
+        blobUrlFactory={{ create, revoke: vi.fn() }}
+        client={client}
+        onClose={vi.fn()}
+        request={{ path: "/remote/index.html" }}
+        serverName="服务器"
+        workspacePath="/remote"
+      />,
+    );
+
+    const frame = await screen.findByTitle("index.html HTML 预览");
+    expect(frame).toHaveAttribute("sandbox", "allow-same-origin");
+    expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
+    expect(frame).toHaveAttribute("src", "blob:html-preview");
+    expect(client.getMetadata).toHaveBeenCalledWith("/remote/asset.png");
+    expect(client.readFile).toHaveBeenCalledWith("/remote/asset.png");
+    expect(screen.getByRole("button", { name: "预览" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "源码" }));
+    expect(screen.queryByTitle("index.html HTML 预览")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        source,
+        { exact: true },
+      ),
+    ).toBeVisible();
+  });
+
+  it("带源码位置的 HTML 默认进入源码视图", async () => {
+    render(
+      <FilePreviewDialog
+        client={clientFor("<h1>first</h1>\n<p>second</p>")}
+        onClose={vi.fn()}
+        request={{ path: "/remote/index.html", line: 2 }}
+        serverName="服务器"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(document.getElementById("preview-line-2")).toHaveAttribute(
+        "data-highlighted",
+        "true",
+      ),
+    );
+    expect(screen.getByRole("button", { name: "源码" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.queryByTitle("index.html HTML 预览")).not.toBeInTheDocument();
+  });
+
+  it("打开新文件时重新使用该文件的默认视图", async () => {
+    const firstRequest = { path: "/remote/first.md" };
+    const { rerender } = render(
+      <FilePreviewDialog
+        client={clientFor("# 第一份")}
+        onClose={vi.fn()}
+        request={firstRequest}
+        serverName="服务器"
+      />,
+    );
+    await screen.findByRole("heading", { name: "第一份" });
+    fireEvent.click(screen.getByRole("button", { name: "源码" }));
+    expect(screen.getByRole("button", { name: "源码" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    rerender(
+      <FilePreviewDialog
+        client={clientFor("# 第二份")}
+        onClose={vi.fn()}
+        request={{ path: "/remote/second.md" }}
+        serverName="服务器"
+      />,
+    );
+
+    await screen.findByRole("heading", { name: "第二份" });
+    expect(screen.getByRole("button", { name: "预览" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(
+      screen.queryByRole("searchbox", { name: "在文件中查找" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("SVG 默认安全预览并在源码定位时延迟创建图片 URL", async () => {
+    const create = vi.fn(() => "blob:svg-preview");
+    render(
+      <FilePreviewDialog
+        blobUrlFactory={{ create, revoke: vi.fn() }}
+        client={clientFor(
+          '<svg xmlns="http://www.w3.org/2000/svg"><script>bad()</script><path d="M0 0"/></svg>',
+        )}
+        onClose={vi.fn()}
+        request={{ path: "/remote/icon.svg", line: 1 }}
+        serverName="服务器"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(document.getElementById("preview-line-1")).toBeVisible(),
+    );
+    expect(screen.getByText("SVG")).toBeVisible();
+    expect(create).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "预览" }));
+    await waitFor(() =>
+      expect(screen.getByRole("img", { name: "icon.svg" })).toHaveAttribute(
+        "src",
+        "blob:svg-preview",
+      ),
+    );
+    expect(create).toHaveBeenCalledOnce();
   });
 
   it("使用语法 Worker 的浅色和深色 token 渲染源码", async () => {
