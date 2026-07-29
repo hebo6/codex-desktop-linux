@@ -75,7 +75,7 @@
 .imageViewport[data-pannable="true"] { cursor: grab; }
 .imageViewport[data-pannable="true"]:active { cursor: grabbing; }
 .imageViewport img { max-width: none; max-height: none; transform-origin: center; transition: transform 140ms ease; pointer-events: none; }
-.imageViewport img[data-fit="true"] { max-width: 90%; max-height: 90%; }
+.imageViewport img[data-fit="true"] { max-width: 100%; max-height: 100%; }
 
 @media (prefers-reduced-motion: reduce) {
   .imageViewport img { transition: none; }
