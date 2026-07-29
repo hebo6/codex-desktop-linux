@@ -113,7 +113,7 @@ codex app-server \
 
 - Node.js 24 或更高版本
 - 通过 Corepack 使用 pnpm 11.3.0
-- Rust 1.85 或更高版本
+- Rust 1.88 或更高版本
 - [Tauri 2 Linux 系统依赖](https://v2.tauri.app/start/prerequisites/#linux)
 
 安装锁定的 JavaScript 依赖

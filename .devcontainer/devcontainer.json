@@ -2,7 +2,17 @@
   "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
   "name": "Codex Desktop Linux AppImage",
   "build": {
-    "dockerfile": "Dockerfile"
+    "dockerfile": "Dockerfile",
+    "options": [
+      "--build-arg",
+      "http_proxy",
+      "--build-arg",
+      "https_proxy",
+      "--build-arg",
+      "all_proxy",
+      "--build-arg",
+      "no_proxy"
+    ]
   },
   "features": {
     "ghcr.io/devcontainers/features/node:2.1.0": {
@@ -10,11 +20,21 @@
       "pnpmVersion": "11.3.0"
     },
     "ghcr.io/devcontainers/features/rust:1.5.1": {
-      "version": "1.85",
+      "version": "1.97.1",
       "profile": "minimal",
       "components": "rustfmt,clippy"
     }
   },
   "postCreateCommand": "pnpm install --frozen-lockfile",
+  "remoteEnv": {
+    "http_proxy": "${localEnv:http_proxy}",
+    "https_proxy": "${localEnv:https_proxy}",
+    "all_proxy": "${localEnv:all_proxy}",
+    "no_proxy": "${localEnv:no_proxy}",
+    "HTTP_PROXY": "${localEnv:http_proxy}",
+    "HTTPS_PROXY": "${localEnv:https_proxy}",
+    "ALL_PROXY": "${localEnv:all_proxy}",
+    "NO_PROXY": "${localEnv:no_proxy}"
+  },
   "remoteUser": "vscode"
 }

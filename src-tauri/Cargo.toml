@@ -4,7 +4,7 @@ version = "0.1.19"
 description = "Codex Desktop client for Linux"
 license = "Apache-2.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 
 [lib]
 name = "codex_desktop_lib"

@@ -113,7 +113,7 @@ Compatibility with older or newer Codex builds is not implied. See the [protocol
 
 - Node.js 24 or newer
 - pnpm 11.3.0 through Corepack
-- Rust 1.85 or newer
+- Rust 1.88 or newer
 - The [Tauri 2 Linux system dependencies](https://v2.tauri.app/start/prerequisites/#linux)
 
 Install the locked JavaScript dependencies
