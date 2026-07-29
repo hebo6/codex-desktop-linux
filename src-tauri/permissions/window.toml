@@ -10,6 +10,7 @@ commands.allow = [
     "protocol_debug_availability",
     "pick_local_directory",
     "open_external_url",
+    "open_html_in_browser",
     "save_remote_file",
     "read_clipboard_files",
     "read_clipboard_file_chunk",

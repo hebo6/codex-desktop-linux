@@ -6,6 +6,7 @@ use base64::engine::general_purpose::STANDARD;
 use base64::read::DecoderReader;
 
 const MAX_SAVE_BYTES: u64 = 256 * 1024 * 1024;
+const MAX_BROWSER_HTML_BYTES: u64 = 256 * 1024 * 1024;
 
 #[tauri::command]
 pub async fn pick_local_directory() -> Option<String> {
@@ -34,6 +35,31 @@ pub fn open_external_url(url: String) -> Result<(), String> {
         .spawn()
         .map(|_| ())
         .map_err(|_| "无法调用系统默认浏览器".to_owned())
+}
+
+#[tauri::command]
+pub fn open_html_in_browser(data_base64: String) -> Result<(), String> {
+    let estimated_size = (data_base64.len() as u64 / 4).saturating_mul(3);
+    if estimated_size > MAX_BROWSER_HTML_BYTES {
+        return Err("HTML 文件超过 256 MiB 浏览器打开上限".to_owned());
+    }
+    let temporary_path = crate::local_data::temporary_directory()
+        .map_err(|_| "无法创建受控临时目录".to_owned())?
+        .join(format!("{}.html", uuid::Uuid::new_v4()));
+    let result = write_browser_html(&data_base64, &temporary_path).and_then(|()| {
+        std::process::Command::new("xdg-open")
+            .arg(&temporary_path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map(|_| ())
+            .map_err(|_| "无法调用系统默认浏览器".to_owned())
+    });
+    if result.is_err() {
+        let _ = std::fs::remove_file(temporary_path);
+    }
+    result
 }
 
 #[tauri::command]
@@ -69,6 +95,23 @@ pub async fn save_remote_file(
     );
     let _ = std::fs::remove_file(&temporary_path);
     result.map(|()| Some(target.path().to_string_lossy().into_owned()))
+}
+
+fn write_browser_html(data_base64: &str, temporary_path: &std::path::Path) -> Result<(), String> {
+    let mut temporary = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(temporary_path)
+        .map_err(|_| "无法创建受控 HTML 临时文件".to_owned())?;
+    let mut decoder = DecoderReader::new(data_base64.as_bytes(), &STANDARD);
+    let decoded_bytes = io::copy(&mut decoder, &mut temporary)
+        .map_err(|_| "HTML 文件内容不是有效 Base64 数据".to_owned())?;
+    if decoded_bytes > MAX_BROWSER_HTML_BYTES {
+        return Err("HTML 文件超过 256 MiB 浏览器打开上限".to_owned());
+    }
+    temporary
+        .sync_all()
+        .map_err(|_| "无法写入受控 HTML 临时文件".to_owned())
 }
 
 fn write_saved_file(
@@ -137,12 +180,25 @@ fn sanitize_file_name(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::sanitize_file_name;
+    use super::{sanitize_file_name, write_browser_html};
 
     #[test]
     fn sanitizes_suggested_file_names() {
         assert_eq!(sanitize_file_name("../../secret.txt"), "_.._secret.txt");
         assert_eq!(sanitize_file_name("..."), "remote-file");
         assert_eq!(sanitize_file_name("image.png"), "image.png");
+    }
+
+    #[test]
+    fn writes_browser_html_to_a_new_temporary_file() {
+        let path = std::env::temp_dir().join(format!(
+            "codex-desktop-browser-html-test-{}.html",
+            uuid::Uuid::new_v4()
+        ));
+
+        write_browser_html("PGgxPuS9oOWlvTwvaDE+", &path).unwrap();
+
+        assert_eq!(std::fs::read(&path).unwrap(), "<h1>你好</h1>".as_bytes());
+        std::fs::remove_file(path).unwrap();
     }
 }

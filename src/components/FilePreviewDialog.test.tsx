@@ -140,15 +140,15 @@ describe("FilePreviewDialog", () => {
     expect(screen.getByText("matched").closest("mark")).not.toBeNull();
   });
 
-  it("HTML 默认使用隔离预览并可以切换到原始源码", async () => {
-    const create = vi.fn(() => "blob:html-preview");
+  it("HTML 仅显示原始源码并可以交给系统浏览器打开", async () => {
     const source =
       '<h1>预览</h1><img src="asset.png"><script>alert(1)</script>';
     const client = clientFor(source);
+    const htmlBrowserOpener = vi.fn(async () => {});
     render(
       <FilePreviewDialog
-        blobUrlFactory={{ create, revoke: vi.fn() }}
         client={client}
+        htmlBrowserOpener={htmlBrowserOpener}
         onClose={vi.fn()}
         request={{ path: "/remote/index.html" }}
         serverName="服务器"
@@ -156,28 +156,22 @@ describe("FilePreviewDialog", () => {
       />,
     );
 
-    const frame = await screen.findByTitle("index.html HTML 预览");
-    expect(frame).toHaveAttribute("sandbox", "allow-same-origin");
-    expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
-    expect(frame).toHaveAttribute("src", "blob:html-preview");
-    expect(client.getMetadata).toHaveBeenCalledWith("/remote/asset.png");
-    expect(client.readFile).toHaveBeenCalledWith("/remote/asset.png");
-    expect(screen.getByRole("button", { name: "预览" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
+    await waitFor(() =>
+      expect(document.getElementById("preview-line-1")).toHaveTextContent(source),
     );
+    expect(screen.queryByRole("button", { name: "预览" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "源码" })).not.toBeInTheDocument();
+    expect(client.getMetadata).toHaveBeenCalledTimes(1);
+    expect(client.readFile).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "源码" }));
-    expect(screen.queryByTitle("index.html HTML 预览")).not.toBeInTheDocument();
-    expect(
-      screen.getByText(
-        source,
-        { exact: true },
-      ),
-    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "在浏览器中打开" }));
+    await waitFor(() =>
+      expect(htmlBrowserOpener).toHaveBeenCalledWith(base64For(source)),
+    );
+    expect(screen.getByText("已在系统浏览器中打开")).toBeVisible();
   });
 
-  it("带源码位置的 HTML 默认进入源码视图", async () => {
+  it("带源码位置的 HTML 在源码视图中定位", async () => {
     render(
       <FilePreviewDialog
         client={clientFor("<h1>first</h1>\n<p>second</p>")}
@@ -193,11 +187,8 @@ describe("FilePreviewDialog", () => {
         "true",
       ),
     );
-    expect(screen.getByRole("button", { name: "源码" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.queryByTitle("index.html HTML 预览")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "预览" })).not.toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "在文件中查找" })).toBeVisible();
   });
 
   it("打开新文件时重新使用该文件的默认视图", async () => {

@@ -41,8 +41,8 @@
         "local-stdio",
         "remote-websocket"
       ],
-      "csp": "default-src 'self'; base-uri 'none'; connect-src ipc: http://ipc.localhost; font-src 'self' blob:; form-action 'none'; frame-ancestors 'none'; frame-src blob:; img-src 'self' blob:; manifest-src 'self'; media-src 'none'; object-src 'none'; script-src 'self'; style-src 'self' blob:; worker-src 'self' blob:",
-      "devCsp": "default-src 'self'; base-uri 'none'; connect-src ipc: http://ipc.localhost ws://localhost:1421; font-src 'self' blob:; form-action 'none'; frame-ancestors 'none'; frame-src blob:; img-src 'self' blob:; manifest-src 'self'; media-src 'none'; object-src 'none'; script-src 'self'; style-src 'self' blob: 'unsafe-inline'; worker-src 'self' blob:",
+      "csp": "default-src 'self'; base-uri 'none'; connect-src ipc: http://ipc.localhost; font-src 'self'; form-action 'none'; frame-ancestors 'none'; img-src 'self' blob:; manifest-src 'self'; media-src 'none'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self' blob:",
+      "devCsp": "default-src 'self'; base-uri 'none'; connect-src ipc: http://ipc.localhost ws://localhost:1421; font-src 'self'; form-action 'none'; frame-ancestors 'none'; img-src 'self' blob:; manifest-src 'self'; media-src 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:",
       "freezePrototype": true,
       "headers": {
         "Cross-Origin-Opener-Policy": "same-origin",

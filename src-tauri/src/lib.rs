@@ -266,6 +266,7 @@ pub fn run() {
             windows::open_protocol_debug_window,
             dialogs::pick_local_directory,
             dialogs::open_external_url,
+            dialogs::open_html_in_browser,
             dialogs::save_remote_file,
             deep_link::take_pending_deep_link,
             drafts::list_draft_keys,

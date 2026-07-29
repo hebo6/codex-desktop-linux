@@ -38,12 +38,16 @@ describe("Tauri 发布配置", () => {
     expect(windowPermission).toContain('"read_clipboard_file_chunk"');
   });
 
-  it("仅允许 Blob 子框架和 HTML 预览需要的 Blob 资源", () => {
+  it("允许应用窗口将 HTML 交给系统浏览器", () => {
+    expect(windowPermission).toContain('"open_html_in_browser"');
+  });
+
+  it("不允许应用内 HTML 子框架和 Blob 样式资源", () => {
     const csp = tauriConfiguration.app.security.csp;
-    expect(csp).toContain("frame-src blob:");
-    expect(csp).toContain("font-src 'self' blob:");
-    expect(csp).toContain("style-src 'self' blob:");
-    expect(csp).not.toMatch(/frame-src[^;]*https?:/u);
+    expect(csp).not.toContain("frame-src");
+    expect(csp).toContain("font-src 'self'");
+    expect(csp).toContain("style-src 'self'");
+    expect(csp).not.toMatch(/(?:font|style)-src[^;]*blob:/u);
     expect(csp).not.toContain("'unsafe-inline'");
   });
 

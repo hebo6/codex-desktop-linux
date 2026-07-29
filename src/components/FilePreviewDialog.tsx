@@ -34,11 +34,10 @@ import {
   useBlobUrl,
   type BlobUrlFactory,
 } from "../content/useBlobUrl";
-import { saveRemoteFile } from "../transport/systemDialog";
 import {
-  HtmlPreviewFrame,
-  useHtmlPreview,
-} from "./HtmlPreviewFrame";
+  openHtmlInBrowser as openHtmlInSystemBrowser,
+  saveRemoteFile,
+} from "../transport/systemDialog";
 import { useModalLayer } from "./modalStack";
 import { SafeMarkdown } from "./SafeMarkdown";
 import styles from "./FilePreviewDialog.module.css";
@@ -81,6 +80,7 @@ export function FilePreviewDialog({
   defaultWrap = false,
   blobUrlFactory = browserBlobUrls,
   contentProcessor = sharedContentProcessor,
+  htmlBrowserOpener = openHtmlInSystemBrowser,
   syntaxHighlighter = sharedSyntaxHighlighter,
 }: {
   readonly client: FileClient | null;
@@ -92,6 +92,7 @@ export function FilePreviewDialog({
   readonly defaultWrap?: boolean;
   readonly blobUrlFactory?: BlobUrlFactory;
   readonly contentProcessor?: ContentProcessor;
+  readonly htmlBrowserOpener?: (dataBase64: string) => Promise<void>;
   readonly syntaxHighlighter?: SyntaxHighlighter;
 }) {
   const titleId = useId();
@@ -122,6 +123,8 @@ export function FilePreviewDialog({
   const [jumpLine, setJumpLine] = useState("");
   const [jumpError, setJumpError] = useState<string | null>(null);
   const [diffMode, setDiffMode] = useState<"unified" | "split">("unified");
+  const [openingHtml, setOpeningHtml] = useState(false);
+  const [browserStatus, setBrowserStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [formattedText, setFormattedText] = useState<string | null>(null);
@@ -158,6 +161,8 @@ export function FilePreviewDialog({
       : String(fileRequest.line));
     setJumpError(null);
     setDiffMode("unified");
+    setOpeningHtml(false);
+    setBrowserStatus(null);
     setSaveStatus(null);
     if (request === null) {
       setLoading(false);
@@ -314,16 +319,6 @@ export function FilePreviewDialog({
       : sourceText;
   const sourceLanguage =
     previewPath === null ? null : sourceLanguageForPath(previewPath);
-  const htmlPreview = useHtmlPreview({
-    active: activeView === "preview" &&
-      fileRequest !== null &&
-      isHtml(fileRequest.path),
-    blobUrlFactory,
-    client,
-    documentPath: fileRequest?.path ?? null,
-    source: sourceText,
-    workspacePath: workspacePath ?? null,
-  });
 
   useEffect(() => {
     setHighlightedSource(null);
@@ -520,6 +515,26 @@ export function FilePreviewDialog({
       setSaving(false);
     }
   };
+  const openHtml = async () => {
+    if (
+      loaded === null ||
+      openingHtml ||
+      fileRequest === null ||
+      !isHtml(fileRequest.path)
+    ) {
+      return;
+    }
+    setOpeningHtml(true);
+    setBrowserStatus(null);
+    try {
+      await htmlBrowserOpener(loaded.dataBase64);
+      setBrowserStatus("已在系统浏览器中打开");
+    } catch {
+      setBrowserStatus("无法在系统浏览器中打开此 HTML 文件");
+    } finally {
+      setOpeningHtml(false);
+    }
+  };
 
   return (
     <div className={styles.backdrop}>
@@ -530,10 +545,16 @@ export function FilePreviewDialog({
             <p>{dataImageRequest === null ? `${serverName} · ${relativePath}` : relativePath}</p>
           </div>
           <div className={styles.headerActions}>
+            {fileRequest !== null && isHtml(fileRequest.path) ? (
+              <button disabled={loaded === null || openingHtml} onClick={() => void openHtml()} type="button">
+                {openingHtml ? "正在打开" : "在浏览器中打开"}
+              </button>
+            ) : null}
             <button disabled={loaded === null || saving} onClick={() => void save()} type="button">{saving ? "正在保存" : "另存为"}</button>
             <button aria-label="关闭文件预览" onClick={onClose} type="button">×</button>
           </div>
         </header>
+        {browserStatus === null ? null : <div className={styles.status} role="status">{browserStatus}</div>}
         {saveStatus === null ? null : <div className={styles.status} role="status">{saveStatus}</div>}
         <div className={styles.meta}>
           <span>{decoded === null ? "正在识别" : kindLabel(decoded.type)}</span>
@@ -574,7 +595,6 @@ export function FilePreviewDialog({
                 </>
               ) : null}
               {activeView === "preview" && fileRequest !== null && isJson(fileRequest.path) && formattingJson ? <span role="status">正在格式化 JSON</span> : null}
-              {activeView === "preview" && htmlPreview.phase === "ready" && htmlPreview.blockedResourceCount > 0 ? <span role="status">{htmlPreview.blockedResourceCount} 个外部或不支持的资源未加载</span> : null}
               {activeView === "preview" && decoded?.type === "image" ? (
                 <>
                   <button onClick={() => updateZoom(zoom - 0.2)} type="button">缩小</button>
@@ -600,16 +620,6 @@ export function FilePreviewDialog({
             <div className={styles.placeholder}><strong>文件超过 16 MiB 预览上限</strong><span>仍可使用另存为保存完整内容</span></div>
           ) : decoded?.type === "binary" ? (
             <div className={styles.placeholder}><strong>此文件不是有效的 UTF-8 文本或支持的图片</strong><span>为避免在 WebView 中执行未知内容，仅提供另存为</span></div>
-          ) : activeView === "preview" && fileRequest !== null && isHtml(fileRequest.path) && htmlPreview.phase === "loading" ? (
-            <div className={styles.placeholder} role="status">正在准备隔离的 HTML 预览</div>
-          ) : activeView === "preview" && fileRequest !== null && isHtml(fileRequest.path) && htmlPreview.phase === "error" ? (
-            <div className={styles.placeholder} role="alert"><strong>无法安全处理此 HTML 文件</strong><span>仍可切换到源码视图查看原始内容</span></div>
-          ) : activeView === "preview" && fileRequest !== null && isHtml(fileRequest.path) && htmlPreview.phase === "ready" ? (
-            <HtmlPreviewFrame
-              name={name}
-              {...(onOpenLink === undefined ? {} : { onOpenLink })}
-              url={htmlPreview.url}
-            />
           ) : activeView === "preview" && displayedText !== null && fileRequest !== null && isMarkdown(fileRequest.path) ? (
             <article className={styles.markdownPreview}><SafeMarkdown {...(onOpenLink === undefined ? {} : { onOpenLink })} source={displayedText} /></article>
           ) : activeView === "preview" && displayedText !== null && fileRequest !== null && isJson(fileRequest.path) ? (
@@ -807,7 +817,7 @@ function isHtml(path: string): boolean { return /\.(?:htm|html)$/iu.test(path); 
 function isJson(path: string): boolean { return /\.(?:json|jsonc)$/iu.test(path); }
 function isSvg(path: string): boolean { return /\.svg$/iu.test(path); }
 function fileViewsForPath(path: string): readonly FileViewMode[] {
-  if (isMarkdown(path) || isHtml(path) || isJson(path) || isSvg(path)) {
+  if (isMarkdown(path) || isJson(path) || isSvg(path)) {
     return ["preview", "source"];
   }
   return /\.(?:gif|jpe?g|png|webp|pdf)$/iu.test(path)

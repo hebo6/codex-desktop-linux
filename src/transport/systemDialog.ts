@@ -17,6 +17,13 @@ export function openExternalUrl(url: string, ipc: TauriIpc = tauriIpc): Promise<
   return ipc.invoke<void>("open_external_url", { url });
 }
 
+export function openHtmlInBrowser(
+  dataBase64: string,
+  ipc: TauriIpc = tauriIpc,
+): Promise<void> {
+  return ipc.invoke<void>("open_html_in_browser", { dataBase64 });
+}
+
 export function saveRemoteFile(
   dataBase64: string,
   suggestedName: string,
