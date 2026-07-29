@@ -75,6 +75,8 @@ export type { ThreadBackgroundTerminalsListParams } from "./types/ThreadBackgrou
 export type { ThreadBackgroundTerminalsListResponse } from "./types/ThreadBackgroundTerminalsListResponse";
 export type { ThreadBackgroundTerminalsTerminateParams } from "./types/ThreadBackgroundTerminalsTerminateParams";
 export type { ThreadBackgroundTerminalsTerminateResponse } from "./types/ThreadBackgroundTerminalsTerminateResponse";
+export type { ThreadShellCommandParams } from "./types/ThreadShellCommandParams";
+export type { ThreadShellCommandResponse } from "./types/ThreadShellCommandResponse";
 
 export {
   KNOWN_SERVER_NOTIFICATION_METHODS,

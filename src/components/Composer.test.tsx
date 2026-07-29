@@ -74,6 +74,7 @@ function imageFile(
 }
 
 function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}) {
+  const onRunShellCommand = vi.fn(async () => true);
   const onSend = vi.fn(async () => true);
   const onStop = vi.fn(async () => true);
   let blobUrlIndex = 0;
@@ -88,6 +89,7 @@ function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}
       cwd="/workspace/project"
       error={null}
       imageValidator={async () => undefined}
+      onRunShellCommand={onRunShellCommand}
       onSend={onSend}
       onStop={onStop}
       showProjectPicker={true}
@@ -96,7 +98,13 @@ function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}
       {...overrides}
     />,
   );
-  return { blobUrlFactory, onSend, onStop, unmount: result.unmount };
+  return {
+    blobUrlFactory,
+    onRunShellCommand,
+    onSend,
+    onStop,
+    unmount: result.unmount,
+  };
 }
 
 describe("Composer", () => {
@@ -277,6 +285,7 @@ describe("Composer", () => {
           draftKey={draftKey}
           draftStore={draftStore}
           error={null}
+          onRunShellCommand={async () => true}
           onSend={async () => {
             setDraftKey("window:server:thread");
             return false;
@@ -374,6 +383,7 @@ describe("Composer", () => {
             draftKey={draftKey}
             draftStore={draftStore}
             error={null}
+            onRunShellCommand={async () => true}
             onSend={async () => {
               setDraftKey("window:server:thread");
               await releaseTurn.promise;
@@ -414,6 +424,117 @@ describe("Composer", () => {
     await user.click(screen.getByRole("menuitem", { name: /添加图片/ }));
 
     expect(openPicker).toHaveBeenCalledTimes(1);
+  });
+
+  it("从添加菜单进入 Shell 模式并直接执行命令", async () => {
+    const user = userEvent.setup();
+    const { onRunShellCommand, onSend } = renderComposer();
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+
+    await user.click(screen.getByRole("button", { name: "添加内容" }));
+    await user.click(screen.getByRole("menuitem", { name: /执行 Shell 命令/u }));
+
+    expect(editor).toHaveValue("!");
+    await waitFor(() => expect(editor).toHaveFocus());
+    expect(screen.getByText("将在当前服务器直接执行，不受会话权限限制")).toBeVisible();
+    expect(screen.getByRole("button", { name: "执行 Shell 命令" })).toBeDisabled();
+
+    await user.type(editor, "git status --short");
+    await user.click(screen.getByRole("button", { name: "执行 Shell 命令" }));
+
+    await waitFor(() => expect(onRunShellCommand).toHaveBeenCalledWith(
+      "git status --short",
+      { cwd: "/workspace/project" },
+    ));
+    expect(onSend).not.toHaveBeenCalled();
+    await waitFor(() => expect(editor).toHaveValue(""));
+  });
+
+  it("已有草稿时不允许菜单将普通输入转换为 Shell 命令", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+    await user.type(editor, "解释当前修改");
+    await user.click(screen.getByRole("button", { name: "添加内容" }));
+
+    const shellMenuItem = screen.getByRole("menuitem", { name: /执行 Shell 命令/u });
+    expect(shellMenuItem).toBeDisabled();
+    expect(shellMenuItem).toHaveTextContent("请先清空当前输入");
+    await user.click(shellMenuItem);
+    expect(editor).toHaveValue("解释当前修改");
+  });
+
+  it("只有原始文本首字符为感叹号时才执行 Shell 命令", async () => {
+    const user = userEvent.setup();
+    const { onRunShellCommand, onSend } = renderComposer();
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+
+    fireEvent.change(editor, { target: { value: " !这是一条普通消息" } });
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith(
+      [{ type: "text", text: "!这是一条普通消息" }],
+      { cwd: "/workspace/project" },
+    ));
+    expect(onRunShellCommand).not.toHaveBeenCalled();
+  });
+
+  it("Shell 模式拒绝携带附件直到用户移除", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+    await user.type(editor, "!pwd");
+    const image = imageFile("shell.png");
+    fireEvent.change(screen.getByLabelText("选择图片附件"), {
+      target: { files: [image] },
+    });
+
+    await waitFor(() => expect(screen.getByLabelText("附件")).toHaveTextContent("shell.png"));
+    expect(
+      screen.getByText("Shell 命令不能包含附件或结构化引用，请先移除"),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "执行 Shell 命令" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "移除 shell.png" }));
+    expect(screen.getByRole("button", { name: "执行 Shell 命令" })).toBeEnabled();
+  });
+
+  it("Shell 命令提交失败时保留完整草稿", async () => {
+    const user = userEvent.setup();
+    const onRunShellCommand = vi.fn(async () => false);
+    renderComposer({ onRunShellCommand });
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+    await user.type(editor, "!printf 'hello world'");
+
+    await user.click(screen.getByRole("button", { name: "执行 Shell 命令" }));
+
+    await waitFor(() => expect(onRunShellCommand).toHaveBeenCalledWith(
+      "printf 'hello world'",
+      { cwd: "/workspace/project" },
+    ));
+    expect(editor).toHaveValue("!printf 'hello world'");
+  });
+
+  it("独立 Shell 回合保留普通草稿但只允许继续执行 Shell 命令", async () => {
+    const user = userEvent.setup();
+    const { onRunShellCommand, onSend } = renderComposer({
+      activeTurn: true,
+      shellCommandActive: true,
+      showProjectPicker: false,
+    });
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+    await user.type(editor, "稍后发送的普通消息");
+
+    expect(screen.getByText("Shell 命令执行完成后可发送普通消息")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "追加" })).not.toBeInTheDocument();
+    expect(onSend).not.toHaveBeenCalled();
+
+    fireEvent.change(editor, { target: { value: "!pwd" } });
+    await user.click(screen.getByRole("button", { name: "执行 Shell 命令" }));
+    await waitFor(() => expect(onRunShellCommand).toHaveBeenCalledWith(
+      "pwd",
+      { cwd: "/workspace/project" },
+    ));
   });
 
   it("常用提示词独立发送并完整保留输入框草稿", async () => {
@@ -486,6 +607,7 @@ describe("Composer", () => {
           draftKey={draftKey}
           draftStore={draftStore}
           error={null}
+          onRunShellCommand={async () => true}
           onSend={async (...arguments_) => {
             setDraftKey("window:server:thread");
             return onSend(...arguments_);

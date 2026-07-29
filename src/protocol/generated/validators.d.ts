@@ -31,6 +31,7 @@ import type {
   ThreadReadResponse,
   ThreadResumeResponse,
   ThreadSettingsUpdateResponse,
+  ThreadShellCommandResponse,
   ThreadStartResponse,
   ThreadTurnsListResponse,
   ThreadUnarchiveResponse,
@@ -80,3 +81,4 @@ export const validateConsumeAccountRateLimitResetCreditResponse: StandaloneValid
 export const validateGetAccountTokenUsageResponse: StandaloneValidateFunction<GetAccountTokenUsageResponse>;
 export const validateThreadBackgroundTerminalsListResponse: StandaloneValidateFunction<ThreadBackgroundTerminalsListResponse>;
 export const validateThreadBackgroundTerminalsTerminateResponse: StandaloneValidateFunction<ThreadBackgroundTerminalsTerminateResponse>;
+export const validateThreadShellCommandResponse: StandaloneValidateFunction<ThreadShellCommandResponse>;

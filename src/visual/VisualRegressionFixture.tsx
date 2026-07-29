@@ -277,6 +277,7 @@ function FixtureComposer({ state }: Pick<VisualRegressionQuery, "state">) {
       initialText={state === "slash" ? "/" : ""}
       models={MODELS}
       onCwdChange={() => undefined}
+      onRunShellCommand={NOOP_BOOLEAN}
       onSend={NOOP_BOOLEAN}
       onStop={NOOP_BOOLEAN}
       permissions={[

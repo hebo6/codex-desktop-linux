@@ -277,6 +277,15 @@ const schemaDeclarations = [
     schemaPath: "v2/ThreadBackgroundTerminalsTerminateResponse.json",
     validatorName: "validateThreadBackgroundTerminalsTerminateResponse",
   },
+  {
+    typeName: "ThreadShellCommandParams",
+    schemaPath: "v2/ThreadShellCommandParams.json",
+  },
+  {
+    typeName: "ThreadShellCommandResponse",
+    schemaPath: "v2/ThreadShellCommandResponse.json",
+    validatorName: "validateThreadShellCommandResponse",
+  },
 ];
 
 const validatorDeclarations = schemaDeclarations.filter(

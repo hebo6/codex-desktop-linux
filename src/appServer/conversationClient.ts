@@ -1,5 +1,7 @@
 import type {
   ServerNotification,
+  ThreadShellCommandParams,
+  ThreadShellCommandResponse,
   ThreadStartParams,
   ThreadStartResponse,
   ThreadSettingsUpdateParams,
@@ -23,6 +25,7 @@ import type {
   ServerNotificationHandler,
 } from "../protocol/rpc";
 import {
+  validateThreadShellCommandResponse,
   validateThreadStartResponse,
   validateThreadSettingsUpdateResponse,
   validateThreadBackgroundTerminalsListResponse,
@@ -52,6 +55,10 @@ export interface StartTurnOptions {
 
 export interface ConversationClient {
   startThread(params?: ThreadStartParams): RequestHandle<ThreadStartResponse>;
+  runShellCommand(
+    threadId: string,
+    command: string,
+  ): RequestHandle<ThreadShellCommandResponse>;
   startTurn(threadId: string, options: StartTurnOptions): RequestHandle<TurnStartResponse>;
   setServiceTier(
     threadId: string,
@@ -89,6 +96,18 @@ export class AppServerConversationClient
       method: "thread/start",
       params,
       validateResult: threadStartResponseValidator,
+    });
+  }
+
+  runShellCommand(
+    threadId: string,
+    command: string,
+  ): RequestHandle<ThreadShellCommandResponse> {
+    const params: ThreadShellCommandParams = { threadId, command };
+    return this.session.sendRequest({
+      method: "thread/shellCommand",
+      params,
+      validateResult: threadShellCommandResponseValidator,
     });
   }
 
@@ -204,6 +223,8 @@ export class AppServerConversationClient
 
 const threadStartResponseValidator: ResultValidator<ThreadStartResponse> =
   validateThreadStartResponse;
+const threadShellCommandResponseValidator: ResultValidator<ThreadShellCommandResponse> =
+  validateThreadShellCommandResponse;
 const threadSettingsUpdateResponseValidator: ResultValidator<ThreadSettingsUpdateResponse> =
   validateThreadSettingsUpdateResponse;
 const threadBackgroundTerminalsListResponseValidator: ResultValidator<ThreadBackgroundTerminalsListResponse> =

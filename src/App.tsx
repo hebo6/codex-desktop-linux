@@ -2038,6 +2038,7 @@ export function App({
                     ? { onPickCwd: pickLocalDirectory }
                     : {})}
                   onRunImmediateCommand={conversation.runImmediateCommand}
+                  onRunShellCommand={conversation.runShellCommand}
                   onOpenSettings={() => setSettingsSection("appearance")}
                   onSearchFiles={composerCapabilities.searchFiles}
                   onServiceTierChange={conversation.setServiceTier}
@@ -2048,6 +2049,7 @@ export function App({
                   recentCwds={recentCwds}
                   skills={composerCapabilities.skills}
                   skillsLoading={composerCapabilities.skillsLoading}
+                  shellCommandActive={conversation.shellCommandActive}
                   showProjectPicker={currentThreadId === null}
                   stopping={conversation.stopping}
                   submitting={conversation.submitting}

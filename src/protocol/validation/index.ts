@@ -31,6 +31,7 @@ import type {
   AppsListResponse,
   PluginListResponse,
   ThreadCompactStartResponse,
+  ThreadShellCommandResponse,
   ReviewStartResponse,
   ThreadForkResponse,
   FsReadFileResponse,
@@ -68,6 +69,7 @@ import {
   validateAppsListResponse as validateAppsListResponseSchema,
   validatePluginListResponse as validatePluginListResponseSchema,
   validateThreadCompactStartResponse as validateThreadCompactStartResponseSchema,
+  validateThreadShellCommandResponse as validateThreadShellCommandResponseSchema,
   validateReviewStartResponse as validateReviewStartResponseSchema,
   validateThreadForkResponse as validateThreadForkResponseSchema,
   validateFsReadFileResponse as validateFsReadFileResponseSchema,
@@ -395,6 +397,18 @@ export function validateThreadCompactStartResponse(
   value: unknown,
 ): ProtocolValidationResult<ThreadCompactStartResponse> {
   return validateWithSchema(value, validateThreadCompactStartResponseSchema, "invalid_params", "params", "thread/compact/start 响应校验失败");
+}
+
+export function validateThreadShellCommandResponse(
+  value: unknown,
+): ProtocolValidationResult<ThreadShellCommandResponse> {
+  return validateWithSchema(
+    value,
+    validateThreadShellCommandResponseSchema,
+    "invalid_params",
+    "params",
+    "thread/shellCommand 响应校验失败",
+  );
 }
 
 export function validateReviewStartResponse(

@@ -148,6 +148,7 @@ export interface ComposerProps {
   readonly interactionPanel?: ReactNode;
   readonly skills?: readonly SkillMetadata[];
   readonly skillsLoading?: boolean;
+  readonly shellCommandActive?: boolean;
   readonly capabilitiesError?: string | null;
   readonly canRunImmediateCommands?: boolean;
   readonly onLoadSkills?: (forceReload?: boolean) => Promise<void>;
@@ -156,6 +157,10 @@ export interface ComposerProps {
   readonly onDraftPresenceChange?: (draftKey: string, present: boolean) => void;
   readonly onPickCwd?: () => Promise<string | null>;
   readonly onRunImmediateCommand?: (command: "compact" | "review") => Promise<boolean>;
+  readonly onRunShellCommand: (
+    command: string,
+    configuration?: ConversationTurnConfiguration,
+  ) => Promise<boolean>;
   readonly onOpenSettings?: () => void;
   readonly onSearchFiles?: (query: string) => Promise<readonly FuzzyFileSearchResult[]>;
   readonly onServiceTierChange?: (serviceTier: string) => Promise<boolean>;
@@ -198,6 +203,7 @@ export function Composer({
   interactionPanel,
   skills = [],
   skillsLoading = false,
+  shellCommandActive = false,
   capabilitiesError = null,
   canRunImmediateCommands = false,
   onLoadSkills,
@@ -206,6 +212,7 @@ export function Composer({
   onDraftPresenceChange,
   onPickCwd,
   onRunImmediateCommand,
+  onRunShellCommand,
   onOpenSettings,
   onSearchFiles,
   onServiceTierChange,
@@ -237,7 +244,9 @@ export function Composer({
   const [cwdError, setCwdError] = useState<string | null>(null);
   const [pickingCwd, setPickingCwd] = useState(false);
   const [trigger, setTrigger] = useState<Trigger | null>(() =>
-    findTrigger(initialText, initialText.length),
+    initialText.startsWith("!")
+      ? null
+      : findTrigger(initialText, initialText.length),
   );
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [fileResults, setFileResults] = useState<readonly FuzzyFileSearchResult[]>([]);
@@ -286,6 +295,8 @@ export function Composer({
   draftKeyRef.current = draftKey;
   currentDraftRef.current = { text, tokens };
   const normalized = text.trim();
+  const shellMode = text.startsWith("!");
+  const shellCommand = shellMode ? text.slice(1).trim() : "";
   const catalogDefaultModel = models.find(({ isDefault }) => isDefault) ?? null;
   const defaultModel = defaultModelId === null
     ? catalogDefaultModel
@@ -323,12 +334,23 @@ export function Composer({
   const hasPreparingAttachment = attachments.some(({ status }) => status === "preparing");
   const hasInvalidAttachment = (selectedModelRejectsImages && attachments.length > 0)
     || attachments.some(({ error }) => error !== null);
-  const canSend = (
-    normalized.length > 0 ||
-    tokens.length > 0 ||
-    attachments.some(({ blob }) => blob !== null)
-  ) && !hasInvalidAttachment && !hasPreparingAttachment && !preparingAttachments && !serviceTierUpdating &&
-    !readingClipboardFiles && !submitting && !stopping;
+  const hasShellIncompatibleContent =
+    shellMode && (tokens.length > 0 || attachments.length > 0);
+  const hasSubmittableContent = shellMode
+    ? shellCommand.length > 0 && !hasShellIncompatibleContent
+    : (
+        normalized.length > 0 ||
+        tokens.length > 0 ||
+        attachments.some(({ blob }) => blob !== null)
+      ) && !shellCommandActive;
+  const canSend = hasSubmittableContent &&
+    !hasInvalidAttachment &&
+    !hasPreparingAttachment &&
+    !preparingAttachments &&
+    !serviceTierUpdating &&
+    !readingClipboardFiles &&
+    !submitting &&
+    !stopping;
   const normalizedSavedPromptQuery = savedPromptQuery.trim().toLocaleLowerCase();
   const filteredSavedPrompts = useMemo(() => normalizedSavedPromptQuery.length === 0
     ? savedPrompts.prompts
@@ -657,6 +679,33 @@ export function Composer({
     }, 0);
   };
 
+  const clearSubmittedDraft = async (
+    sourceDraftKey: string | null,
+    cleanupError: string,
+  ) => {
+    preserveDraftForNextKeyRef.current = false;
+    if (sourceDraftKey !== null) {
+      try {
+        await draftStore.transition(
+          sourceDraftKey,
+          draftKeyRef.current ?? sourceDraftKey,
+          null,
+        );
+        setDraftPersistenceError(null);
+      } catch {
+        setDraftPersistenceError(cleanupError);
+      }
+    }
+    resetComposerContent(
+      { text: "", tokens: [] },
+      collapsedSelection(0),
+    );
+    setAttachments([]);
+    setSelectedTokenIndex(null);
+    setTrigger(null);
+    setMarkdownPreview(false);
+  };
+
   const send = async () => {
     if (!canSend || sendingRef.current) {
       return;
@@ -664,6 +713,22 @@ export function Composer({
     const sourceDraftKey = draftKey;
     preserveDraftForNextKeyRef.current = false;
     sendingRef.current = true;
+    if (shellMode) {
+      if (showProjectPicker) preserveDraftForNextKeyRef.current = true;
+      try {
+        if (await onRunShellCommand(shellCommand, turnConfiguration())) {
+          await clearSubmittedDraft(
+            sourceDraftKey,
+            "Shell 命令已提交，但草稿清理失败",
+          );
+        } else if (showProjectPicker) {
+          releaseDraftPreservationIfUnchanged();
+        }
+      } finally {
+        sendingRef.current = false;
+      }
+      return;
+    }
     setPreparingAttachments(true);
     try {
       const prepared = await Promise.all(attachments.map(async (attachment) => {
@@ -702,27 +767,10 @@ export function Composer({
       ];
       if (showProjectPicker) preserveDraftForNextKeyRef.current = true;
       if (await onSend(input, turnConfiguration())) {
-        preserveDraftForNextKeyRef.current = false;
-        if (sourceDraftKey !== null) {
-          try {
-            await draftStore.transition(
-              sourceDraftKey,
-              draftKeyRef.current ?? sourceDraftKey,
-              null,
-            );
-            setDraftPersistenceError(null);
-          } catch {
-            setDraftPersistenceError("消息已发送，但草稿清理失败");
-          }
-        }
-        resetComposerContent(
-          { text: "", tokens: [] },
-          collapsedSelection(0),
+        await clearSubmittedDraft(
+          sourceDraftKey,
+          "消息已发送，但草稿清理失败",
         );
-        setAttachments([]);
-        setSelectedTokenIndex(null);
-        setTrigger(null);
-        setMarkdownPreview(false);
       } else if (showProjectPicker) {
         releaseDraftPreservationIfUnchanged();
       }
@@ -733,7 +781,11 @@ export function Composer({
   };
 
   const updateTrigger = (value: string, cursor: number, composing = false) => {
-    setTrigger(composing ? null : findTrigger(value, cursor));
+    setTrigger(
+      composing || value.startsWith("!")
+        ? null
+        : findTrigger(value, cursor),
+    );
   };
 
   const focusComposerSelection = (selection: ComposerSelection) => {
@@ -962,7 +1014,13 @@ export function Composer({
   };
 
   const sendSavedPrompt = async (prompt: SavedPrompt) => {
-    if (sendingRef.current || submitting || stopping || preparingAttachments) return;
+    if (
+      sendingRef.current ||
+      submitting ||
+      stopping ||
+      preparingAttachments ||
+      shellCommandActive
+    ) return;
     sendingRef.current = true;
     setSendingPromptId(prompt.promptId);
     setSavedPromptActionError(null);
@@ -983,6 +1041,20 @@ export function Composer({
       setSendingPromptId(null);
       restoreComposerSelection();
     }
+  };
+
+  const triggerShellCommand = () => {
+    if (text.length > 0 || tokens.length > 0 || attachments.length > 0) {
+      return;
+    }
+    setMenuOpen(false);
+    setMarkdownPreview(false);
+    setTrigger(null);
+    changeComposerContent(
+      (current) => ({ ...current, text: "!" }),
+      collapsedSelection(1),
+    );
+    focusAt(textareaRef.current, 1);
   };
 
   const triggerMention = () => {
@@ -1221,7 +1293,7 @@ export function Composer({
           aria-label={markdownPreview ? "编辑 Markdown" : "预览 Markdown"}
           aria-pressed={markdownPreview}
           className={styles.markdownModeButton}
-          disabled={!markdownPreview && normalized.length === 0}
+          disabled={shellMode || (!markdownPreview && normalized.length === 0)}
           onClick={() => {
             if (markdownPreview) {
               setMarkdownPreview(false);
@@ -1287,7 +1359,13 @@ export function Composer({
                 updateTrigger(text, event.currentTarget.selectionStart);
               }
             }}
-            placeholder={activeTurn ? "输入要追加的内容" : "向 Codex 描述任务"}
+            placeholder={
+              shellCommandActive
+                ? "Shell 命令执行完成后可发送消息"
+                : activeTurn
+                  ? "输入要追加的内容"
+                  : "向 Codex 描述任务"
+            }
             onPaste={handlePaste}
             onSelect={rememberComposerSelection}
             ref={textareaRef}
@@ -1310,6 +1388,21 @@ export function Composer({
           ref={attachmentInputRef}
           type="file"
         />
+        {shellMode ? (
+          <div
+            className={styles.shellCommandStatus}
+            data-error={hasShellIncompatibleContent}
+            role={hasShellIncompatibleContent ? "alert" : "status"}
+          >
+            {hasShellIncompatibleContent
+              ? "Shell 命令不能包含附件或结构化引用，请先移除"
+              : "将在当前服务器直接执行，不受会话权限限制"}
+          </div>
+        ) : shellCommandActive && normalized.length > 0 ? (
+          <div className={styles.shellCommandStatus} role="status">
+            Shell 命令执行完成后可发送普通消息
+          </div>
+        ) : null}
         {readingClipboardFiles || clipboardReadError !== null ? (
           <div
             className={styles.clipboardStatus}
@@ -1411,6 +1504,30 @@ export function Composer({
               {menuOpen && (
                 <div className={styles.plusMenu} role="menu">
                   <button
+                    disabled={
+                      text.length > 0 ||
+                      tokens.length > 0 ||
+                      attachments.length > 0
+                    }
+                    onClick={triggerShellCommand}
+                    role="menuitem"
+                    type="button"
+                  >
+                    <svg aria-hidden="true" className={styles.menuIcon} viewBox="0 0 24 24">
+                      <path d="m5 7 5 5-5 5" />
+                      <path d="M12 17h7" />
+                    </svg>
+                    <div className={styles.menuText}>
+                      <strong>执行 Shell 命令</strong>
+                      <small>
+                        {text.length > 0 || tokens.length > 0 || attachments.length > 0
+                          ? "请先清空当前输入"
+                          : "在当前服务器无沙箱执行 (!)"}
+                      </small>
+                    </div>
+                  </button>
+                  <button
+                    disabled={shellMode}
                     onClick={handleUploadClick}
                     role="menuitem"
                     type="button"
@@ -1426,6 +1543,7 @@ export function Composer({
                     </div>
                   </button>
                   <button
+                    disabled={shellMode}
                     onClick={triggerMention}
                     role="menuitem"
                     type="button"
@@ -1443,6 +1561,7 @@ export function Composer({
                     </div>
                   </button>
                   <button
+                    disabled={shellCommandActive}
                     onClick={openSavedPromptPicker}
                     role="menuitem"
                     type="button"
@@ -1538,7 +1657,12 @@ export function Composer({
                             <button
                               aria-label={`发送 ${prompt.name}`}
                               className={styles.savedPromptAction}
-                              disabled={sendingPromptId !== null || submitting || stopping}
+                              disabled={
+                                sendingPromptId !== null ||
+                                submitting ||
+                                stopping ||
+                                shellCommandActive
+                              }
                               onClick={() => void sendSavedPrompt(prompt)}
                               type="button"
                             >
@@ -1610,7 +1734,7 @@ export function Composer({
             </button>
           )}
           <div className={styles.actions}>
-            {activeTurn && canSend ? (
+            {activeTurn && (canSend || shellMode) ? (
               <button
                 aria-label="停止当前回合"
                 className={styles.stopSecondary}
@@ -1624,7 +1748,7 @@ export function Composer({
                 </svg>
               </button>
             ) : null}
-            {activeTurn && !canSend ? (
+            {activeTurn && !canSend && !shellMode ? (
               <button
                 aria-label={stopping ? "正在停止" : "停止"}
                 className={styles.stopButton}
@@ -1639,16 +1763,33 @@ export function Composer({
               </button>
             ) : (
               <button
-                aria-label={preparingAttachments || readingClipboardFiles ? "正在准备" : submitting ? "正在提交" : activeTurn ? "追加" : "发送"}
+                aria-label={
+                  preparingAttachments || readingClipboardFiles
+                    ? "正在准备"
+                    : submitting
+                      ? "正在提交"
+                      : shellMode
+                        ? "执行 Shell 命令"
+                        : activeTurn
+                          ? "追加"
+                          : "发送"
+                }
                 className={styles.sendButton}
                 disabled={!canSend}
                 onClick={() => void send()}
-                title={activeTurn ? "追加" : "发送"}
+                title={shellMode ? "执行 Shell 命令" : activeTurn ? "追加" : "发送"}
                 type="button"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24">
-                  <path d="M12 19V5M6.5 10.5 12 5l5.5 5.5" />
-                </svg>
+                {shellMode ? (
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="m5 7 5 5-5 5" />
+                    <path d="M12 17h7" />
+                  </svg>
+                ) : (
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="M12 19V5M6.5 10.5 12 5l5.5 5.5" />
+                  </svg>
+                )}
               </button>
             )}
           </div>

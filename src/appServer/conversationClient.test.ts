@@ -31,6 +31,7 @@ describe("AppServerConversationClient", () => {
     const input = [{ type: "text" as const, text: "继续" }];
 
     client.startThread({ cwd: "/workspace" });
+    client.runShellCommand("thread-1", "git status --short");
     client.startTurn("thread-1", {
       clientUserMessageId: "message-1",
       input,
@@ -45,6 +46,10 @@ describe("AppServerConversationClient", () => {
 
     expect(session.requests.map(({ method, params }) => ({ method, params }))).toEqual([
       { method: "thread/start", params: { cwd: "/workspace" } },
+      {
+        method: "thread/shellCommand",
+        params: { threadId: "thread-1", command: "git status --short" },
+      },
       {
         method: "turn/start",
         params: {

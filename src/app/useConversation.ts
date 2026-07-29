@@ -17,11 +17,16 @@ export interface ConversationState {
 }
 
 export interface ConversationControls extends ConversationState {
+  readonly shellCommandActive: boolean;
   readonly sendInput: (
     input: TurnStartParams["input"],
     configuration?: ConversationTurnConfiguration,
   ) => Promise<boolean>;
   readonly sendText: (text: string) => Promise<boolean>;
+  readonly runShellCommand: (
+    command: string,
+    configuration?: ConversationTurnConfiguration,
+  ) => Promise<boolean>;
   readonly setServiceTier: (serviceTier: string) => Promise<boolean>;
   readonly stop: () => Promise<boolean>;
   readonly runImmediateCommand: (command: "compact" | "review") => Promise<boolean>;
@@ -45,6 +50,13 @@ export interface UseConversationOptions {
 interface ConversationSource {
   readonly client: ConversationClient | null;
   readonly threadId: string | null;
+}
+
+interface StandaloneShellExecution {
+  readonly client: ConversationClient;
+  readonly operation: symbol;
+  readonly threadId: string;
+  readonly turnId: string | null;
 }
 
 const EMPTY_STATE = Object.freeze({
@@ -71,8 +83,19 @@ export function useConversation({
   const submissionRef = useRef<symbol | null>(null);
   const stopRef = useRef<symbol | null>(null);
   const serviceTierRef = useRef<symbol | null>(null);
+  const standaloneShellExecutionRef = useRef<StandaloneShellExecution | null>(null);
+  const [standaloneShellExecution, setStandaloneShellExecution] =
+    useState<StandaloneShellExecution | null>(null);
   currentThreadIdRef.current = currentThreadId;
   clientRef.current = client;
+
+  const updateStandaloneShellExecution = useCallback(
+    (execution: StandaloneShellExecution | null) => {
+      standaloneShellExecutionRef.current = execution;
+      setStandaloneShellExecution(execution);
+    },
+    [],
+  );
 
   useEffect(() => {
     const previousSource = stateSourceRef.current;
@@ -129,6 +152,30 @@ export function useConversation({
       if (threadId === null || threadId !== currentThreadIdRef.current) {
         return;
       }
+      const standaloneShell = standaloneShellExecutionRef.current;
+      if (
+        standaloneShell !== null &&
+        standaloneShell.client === client &&
+        standaloneShell.threadId === threadId
+      ) {
+        if (
+          notification.method === "turn/started" &&
+          standaloneShell.turnId === null
+        ) {
+          updateStandaloneShellExecution({
+            ...standaloneShell,
+            turnId: notification.params.turn.id,
+          });
+        } else if (
+          notification.method === "turn/completed" &&
+          (
+            standaloneShell.turnId === null ||
+            standaloneShell.turnId === notification.params.turn.id
+          )
+        ) {
+          updateStandaloneShellExecution(null);
+        }
+      }
       if (isTextDeltaNotification(notification)) {
         queued.push(notification);
         frame ??= window.requestAnimationFrame(flush);
@@ -149,42 +196,81 @@ export function useConversation({
       }
       queued = [];
     };
-  }, [client, currentThreadId]);
+  }, [client, currentThreadId, updateStandaloneShellExecution]);
+
+  useEffect(() => {
+    const standaloneShell = standaloneShellExecutionRef.current;
+    if (
+      standaloneShell !== null &&
+      (
+        standaloneShell.client !== client ||
+        standaloneShell.threadId !== currentThreadId
+      )
+    ) {
+      updateStandaloneShellExecution(null);
+    }
+  }, [client, currentThreadId, updateStandaloneShellExecution]);
+
+  const ensureThread = useCallback(async (
+    activeClient: ConversationClient,
+    configuration: ConversationTurnConfiguration,
+    operation: symbol,
+  ): Promise<string | null> => {
+    let threadId = currentThreadIdRef.current;
+    if (threadId !== null) {
+      return threadId;
+    }
+    const response = await activeClient.startThread({
+      ...(configuration.cwd === undefined ? {} : { cwd: configuration.cwd }),
+      ...(configuration.model === undefined ? {} : { model: configuration.model }),
+      ...(configuration.permissions === undefined
+        ? {}
+        : { permissions: configuration.permissions }),
+      ...(configuration.serviceTier === undefined
+        ? {}
+        : { serviceTier: configuration.serviceTier }),
+    }).result;
+    if (
+      submissionRef.current !== operation ||
+      clientRef.current !== activeClient ||
+      currentThreadIdRef.current !== null
+    ) {
+      return null;
+    }
+    threadId = response.thread.id;
+    currentThreadIdRef.current = threadId;
+    await onThreadCreated(response);
+    return (
+      submissionRef.current === operation &&
+      clientRef.current === activeClient &&
+      currentThreadIdRef.current === threadId
+    )
+      ? threadId
+      : null;
+  }, [onThreadCreated]);
+
+  const shellCommandActive = standaloneShellExecution !== null;
 
   const sendInput = useCallback(
     async (
       input: TurnStartParams["input"],
       configuration: ConversationTurnConfiguration = {},
     ): Promise<boolean> => {
-      if (client === null || input.length === 0 || state.submitting) {
+      if (
+        client === null ||
+        input.length === 0 ||
+        state.submitting ||
+        shellCommandActive
+      ) {
         return false;
       }
       const operation = Symbol("conversation-submit");
       submissionRef.current = operation;
       setState((current) => ({ ...current, submitting: true, error: null }));
       try {
-        let threadId = currentThreadIdRef.current;
+        const threadId = await ensureThread(client, configuration, operation);
         if (threadId === null) {
-          const response = await client.startThread({
-            ...(configuration.cwd === undefined ? {} : { cwd: configuration.cwd }),
-            ...(configuration.model === undefined ? {} : { model: configuration.model }),
-            ...(configuration.permissions === undefined
-              ? {}
-              : { permissions: configuration.permissions }),
-            ...(configuration.serviceTier === undefined
-              ? {}
-              : { serviceTier: configuration.serviceTier }),
-          }).result;
-          if (
-            submissionRef.current !== operation ||
-            clientRef.current !== client ||
-            currentThreadIdRef.current !== null
-          ) {
-            return false;
-          }
-          threadId = response.thread.id;
-          currentThreadIdRef.current = threadId;
-          await onThreadCreated(response);
+          return false;
         }
         const options = {
           clientUserMessageId: crypto.randomUUID(),
@@ -239,7 +325,13 @@ export function useConversation({
           submissionRef.current = null;
         }
       }
-    }, [client, onThreadCreated, state.activeTurnId, state.submitting],
+    }, [
+      client,
+      ensureThread,
+      shellCommandActive,
+      state.activeTurnId,
+      state.submitting,
+    ],
   );
 
   const sendText = useCallback(
@@ -251,6 +343,77 @@ export function useConversation({
     },
     [sendInput],
   );
+
+  const runShellCommand = useCallback(async (
+    command: string,
+    configuration: ConversationTurnConfiguration = {},
+  ): Promise<boolean> => {
+    const normalized = command.trim();
+    if (
+      client === null ||
+      normalized.length === 0 ||
+      state.submitting ||
+      state.stopping
+    ) {
+      return false;
+    }
+    const operation = Symbol("conversation-shell-command");
+    submissionRef.current = operation;
+    setState((current) => ({ ...current, submitting: true, error: null }));
+    let accepted = false;
+    try {
+      const threadId = await ensureThread(client, configuration, operation);
+      if (threadId === null) {
+        return false;
+      }
+      stateSourceRef.current = { client, threadId };
+      if (state.activeTurnId === null) {
+        updateStandaloneShellExecution({
+          client,
+          operation,
+          threadId,
+          turnId: null,
+        });
+      }
+      await client.runShellCommand(threadId, normalized).result;
+      if (
+        submissionRef.current !== operation ||
+        clientRef.current !== client ||
+        currentThreadIdRef.current !== threadId
+      ) {
+        return false;
+      }
+      accepted = true;
+      setState((current) => ({ ...current, submitting: false, error: null }));
+      return true;
+    } catch {
+      if (submissionRef.current === operation) {
+        setState((current) => ({
+          ...current,
+          submitting: false,
+          error: "无法执行 Shell 命令，当前草稿未受影响",
+        }));
+      }
+      return false;
+    } finally {
+      if (
+        !accepted &&
+        standaloneShellExecutionRef.current?.operation === operation
+      ) {
+        updateStandaloneShellExecution(null);
+      }
+      if (submissionRef.current === operation) {
+        submissionRef.current = null;
+      }
+    }
+  }, [
+    client,
+    ensureThread,
+    state.activeTurnId,
+    state.stopping,
+    state.submitting,
+    updateStandaloneShellExecution,
+  ]);
 
   const setServiceTier = useCallback(async (serviceTier: string): Promise<boolean> => {
     const threadId = currentThreadIdRef.current;
@@ -368,7 +531,16 @@ export function useConversation({
     }
   }, [client, state.activeTurnId, state.submitting]);
 
-  return { ...state, sendInput, sendText, setServiceTier, stop, runImmediateCommand };
+  return {
+    ...state,
+    shellCommandActive,
+    sendInput,
+    sendText,
+    runShellCommand,
+    setServiceTier,
+    stop,
+    runImmediateCommand,
+  };
 }
 
 export function reduceConversationNotification(

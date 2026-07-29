@@ -6,6 +6,7 @@ import type {
   ServerNotification,
   ThreadStartParams,
   ThreadStartResponse,
+  ThreadShellCommandResponse,
   ThreadSettingsUpdateResponse,
   TurnInterruptResponse,
   TurnStartResponse,
@@ -26,6 +27,7 @@ const RUNNING_TURN = {
 
 class FakeConversationClient implements ConversationClient {
   readonly startThreadCalls: ThreadStartParams[] = [];
+  readonly shellCommandCalls: Array<{ threadId: string; command: string }> = [];
   readonly startTurnCalls: Array<{ threadId: string; options: StartTurnOptions }> = [];
   readonly steerCalls: Array<{
     threadId: string;
@@ -46,6 +48,11 @@ class FakeConversationClient implements ConversationClient {
   startTurn(threadId: string, options: StartTurnOptions) {
     this.startTurnCalls.push({ threadId, options });
     return handle(Promise.resolve(this.turnStartResponse));
+  }
+
+  runShellCommand(threadId: string, command: string) {
+    this.shellCommandCalls.push({ threadId, command });
+    return handle(Promise.resolve({} satisfies ThreadShellCommandResponse));
   }
 
   setServiceTier(threadId: string, serviceTier: string) {
@@ -228,6 +235,40 @@ describe("useConversation", () => {
     expect(client.startTurnCalls[0]?.options).toMatchObject({ serviceTier: "priority" });
   });
 
+  it("空白页先创建 thread 再直接执行 Shell 命令", async () => {
+    const client = new FakeConversationClient();
+    client.threadStartResponse = {
+      thread: restored([]).metadata,
+    } as ThreadStartResponse;
+    const onThreadCreated = vi.fn(async () => undefined);
+    const { result } = renderHook(() =>
+      useConversation({
+        client,
+        currentThreadId: null,
+        restoredThread: null,
+        onThreadCreated,
+      }),
+    );
+
+    await act(async () => {
+      expect(await result.current.runShellCommand(
+        "  git status --short  ",
+        { cwd: "/workspace", permissions: ":read-only" },
+      )).toBe(true);
+    });
+
+    expect(client.startThreadCalls).toEqual([{
+      cwd: "/workspace",
+      permissions: ":read-only",
+    }]);
+    expect(onThreadCreated).toHaveBeenCalledWith(client.threadStartResponse);
+    expect(client.shellCommandCalls).toEqual([{
+      threadId: "thread-1",
+      command: "git status --short",
+    }]);
+    expect(client.startTurnCalls).toHaveLength(0);
+  });
+
   it("已有会话只通过线程设置更新 Fast 速率", async () => {
     const client = new FakeConversationClient();
     const snapshot = restored([]);
@@ -248,6 +289,57 @@ describe("useConversation", () => {
     expect(client.serviceTierCalls).toEqual([
       { threadId: "thread-1", serviceTier: "priority" },
     ]);
+  });
+
+  it("Shell 请求受理后立即阻止普通消息直到独立回合完成", async () => {
+    const client = new FakeConversationClient();
+    const snapshot = restored([]);
+    const { result } = renderHook(() =>
+      useConversation({
+        client,
+        currentThreadId: "thread-1",
+        restoredThread: snapshot,
+        onThreadCreated: vi.fn(async () => undefined),
+      }),
+    );
+    await waitFor(() => expect(result.current.activeTurnId).toBeNull());
+
+    await act(async () => {
+      expect(await result.current.runShellCommand("sleep 1")).toBe(true);
+    });
+    expect(result.current.shellCommandActive).toBe(true);
+    await act(async () => {
+      expect(await result.current.sendText("等待执行完成")).toBe(false);
+    });
+
+    act(() => {
+      client.notificationHandler?.({
+        method: "turn/started",
+        params: {
+          threadId: "thread-1",
+          turn: {
+            id: "turn-shell",
+            items: [],
+            itemsView: "full",
+            status: "inProgress",
+          },
+        },
+      } as ServerNotification);
+      client.notificationHandler?.({
+        method: "turn/completed",
+        params: {
+          threadId: "thread-1",
+          turn: {
+            id: "turn-shell",
+            items: [],
+            itemsView: "notLoaded",
+            status: "completed",
+          },
+        },
+      } as ServerNotification);
+    });
+
+    await waitFor(() => expect(result.current.shellCommandActive).toBe(false));
   });
 
   it("新建线程的空恢复快照不会覆盖首个回合", async () => {
@@ -355,6 +447,48 @@ describe("useConversation", () => {
     expect(client.steerCalls).toHaveLength(1);
     expect(client.interruptCalls).toEqual([
       { threadId: "thread-1", turnId: RUNNING_TURN.id },
+    ]);
+  });
+
+  it("独立 Shell 回合阻止普通消息但允许继续执行 Shell 命令", async () => {
+    const client = new FakeConversationClient();
+    const snapshot = restored([]);
+    const { result } = renderHook(() =>
+      useConversation({
+        client,
+        currentThreadId: "thread-1",
+        restoredThread: snapshot,
+        onThreadCreated: vi.fn(async () => undefined),
+      }),
+    );
+    await act(async () => {
+      expect(await result.current.runShellCommand("sleep 10")).toBe(true);
+    });
+    act(() => {
+      client.notificationHandler?.({
+        method: "turn/started",
+        params: {
+          threadId: "thread-1",
+          turn: {
+            id: "turn-shell",
+            items: [],
+            itemsView: "full",
+            status: "inProgress",
+          },
+        },
+      } as ServerNotification);
+    });
+    await waitFor(() => expect(result.current.activeTurnId).toBe("turn-shell"));
+
+    await act(async () => {
+      expect(await result.current.sendText("不要追加到 Shell 回合")).toBe(false);
+      expect(await result.current.runShellCommand("pwd")).toBe(true);
+    });
+
+    expect(client.steerCalls).toHaveLength(0);
+    expect(client.shellCommandCalls).toEqual([
+      { threadId: "thread-1", command: "sleep 10" },
+      { threadId: "thread-1", command: "pwd" },
     ]);
   });
 });
