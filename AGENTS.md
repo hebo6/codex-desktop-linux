@@ -4,6 +4,13 @@
 - 需要了解 Codex 或 `app-server` 的协议与实现细节时，优先参考该仓库源码
 - Codex 源码仓库仅供只读参考，禁止修改
 
+# Just 命令
+
+- `just`：显示所有可用命令
+- `just build-appimage`：在当前环境构建当前架构的 AppImage
+- `just devcontainer-up`：启动或复用项目 Dev Container
+- `just build-appimage-devcontainer`：启动或复用项目 Dev Container，并在容器内构建当前架构的 AppImage
+
 # 开发原则
 
 - 修改时不考虑向后兼容或添加兜底机制，应从长期可维护性和演进方向出发

@@ -22,7 +22,7 @@
 .jumpLine button { min-width: 48px; }
 .inlineError { flex: 0 0 auto; color: var(--color-status-danger); }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.content { min-height: 0; overflow: auto; background: color-mix(in srgb, var(--color-content-bg) 94%, var(--color-sidebar-bg)); }
+.content { grid-row: 5; min-height: 0; overflow: auto; background: color-mix(in srgb, var(--color-content-bg) 94%, var(--color-sidebar-bg)); }
 .placeholder { display: grid; height: 100%; min-height: 260px; align-content: center; justify-items: center; gap: var(--space-3); padding: var(--space-6); color: var(--color-text-tertiary); text-align: center; }
 .placeholder strong { color: var(--color-text-primary); }
 .source { min-width: max-content; padding: var(--space-4) var(--space-4) var(--space-6) 64px; margin: 0; color: var(--color-text-tertiary); font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; }
