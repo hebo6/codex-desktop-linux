@@ -89,10 +89,39 @@ const LANGUAGES_BY_FILE_NAME: Readonly<Record<string, SourceLanguage | undefined
   "makefile": { id: "makefile", label: "Makefile" },
 };
 
+const LANGUAGES_BY_ID = new Map<string, SourceLanguage>();
+for (const language of Object.values(LANGUAGES_BY_EXTENSION)) {
+  if (language !== undefined && !LANGUAGES_BY_ID.has(language.id)) {
+    LANGUAGES_BY_ID.set(language.id, language);
+  }
+}
+
+const MARKDOWN_FENCE_ALIASES: Readonly<Record<string, SyntaxLanguage | undefined>> = {
+  "c++": "cpp",
+  shell: "bash",
+  zsh: "bash",
+};
+
 export function sourceLanguageForPath(path: string): SourceLanguage | null {
   const name = path.split(/[\\/]/u).at(-1)?.toLocaleLowerCase() ?? "";
   const namedLanguage = LANGUAGES_BY_FILE_NAME[name];
   if (namedLanguage !== undefined) return namedLanguage;
   const extension = name.split(".").at(-1) ?? "";
   return LANGUAGES_BY_EXTENSION[extension] ?? null;
+}
+
+export function markdownFenceLanguageName(infoString: string): string {
+  return infoString.trim().split(/\s+/u, 1)[0]?.toLocaleLowerCase() ?? "";
+}
+
+export function sourceLanguageForMarkdownFence(
+  infoString: string,
+): SourceLanguage | null {
+  const name = markdownFenceLanguageName(infoString);
+  if (name.length === 0) return null;
+  const alias = MARKDOWN_FENCE_ALIASES[name];
+  if (alias !== undefined) return LANGUAGES_BY_ID.get(alias) ?? null;
+  return LANGUAGES_BY_EXTENSION[name] ??
+    LANGUAGES_BY_ID.get(name) ??
+    null;
 }

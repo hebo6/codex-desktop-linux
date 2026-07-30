@@ -40,6 +40,7 @@ import {
 } from "../transport/systemDialog";
 import { useModalLayer } from "./modalStack";
 import { SafeMarkdown } from "./SafeMarkdown";
+import syntaxTokenStyles from "./SyntaxToken.module.css";
 import styles from "./FilePreviewDialog.module.css";
 
 const MAX_PREVIEW_BYTES = 16 * 1024 * 1024;
@@ -776,7 +777,7 @@ function highlightLine(
       matchEndsAfterTokenStart
       ? highlightTokenQuery(token.content, tokenStart, matchStart, matchEnd)
       : token.content;
-    return <span key={`${tokenStart}-${index}`} style={token.style}>{content}</span>;
+    return <span className={syntaxTokenStyles.token} key={`${tokenStart}-${index}`} style={token.style}>{content}</span>;
   });
 }
 

@@ -29,48 +29,14 @@
 .source li { min-height: 20px; padding: 0 var(--space-4); }
 .source li::marker { user-select: none; }
 .source code { color: var(--color-text-primary); white-space: pre; }
-.source code > span {
-  color: var(--shiki-light);
-  background-color: var(--shiki-light-bg);
-  font-style: var(--shiki-light-font-style);
-  font-weight: var(--shiki-light-font-weight);
-  text-decoration: var(--shiki-light-text-decoration);
-}
 .source[data-wrapped="true"] { min-width: 0; }
 .source[data-wrapped="true"] code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .source li[data-highlighted="true"] { background: var(--color-code-highlight-surface); }
 .source mark { color: inherit; background: #f2cf57; }
 .columnHint { color: var(--color-text-tertiary); }
-
-@media (prefers-color-scheme: dark) {
-  :global(:root:not([data-theme="light"])) .source code > span,
-  :global(:root:not([data-theme="light"])) .structuredPreview code > span > span {
-    color: var(--shiki-dark);
-    background-color: var(--shiki-dark-bg);
-    font-style: var(--shiki-dark-font-style);
-    font-weight: var(--shiki-dark-font-weight);
-    text-decoration: var(--shiki-dark-text-decoration);
-  }
-}
-
-:global(:root[data-theme="dark"]) .source code > span,
-:global(:root[data-theme="dark"]) .structuredPreview code > span > span {
-  color: var(--shiki-dark);
-  background-color: var(--shiki-dark-bg);
-  font-style: var(--shiki-dark-font-style);
-  font-weight: var(--shiki-dark-font-weight);
-  text-decoration: var(--shiki-dark-text-decoration);
-}
 .markdownPreview { width: min(820px, 100%); padding: var(--space-6); margin: 0 auto; }
 .structuredPreview { width: min(920px, 100%); min-height: 100%; padding: var(--space-5); margin: 0 auto; color: var(--color-text-primary); font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; line-height: 20px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .structuredPreview code > span { display: block; min-height: 20px; }
-.structuredPreview code > span > span {
-  color: var(--shiki-light);
-  background-color: var(--shiki-light-bg);
-  font-style: var(--shiki-light-font-style);
-  font-weight: var(--shiki-light-font-weight);
-  text-decoration: var(--shiki-light-text-decoration);
-}
 .imageViewport { display: grid; position: absolute; inset: 0; grid-template: minmax(0, 1fr) / minmax(0, 1fr); overflow: hidden; place-items: center; touch-action: none; user-select: none; background-image: linear-gradient(45deg, var(--color-fill-subtle) 25%, transparent 25%), linear-gradient(-45deg, var(--color-fill-subtle) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--color-fill-subtle) 75%), linear-gradient(-45deg, transparent 75%, var(--color-fill-subtle) 75%); background-position: 0 0, 0 8px, 8px -8px, -8px 0; background-size: 16px 16px; }
 .imageViewport[data-pannable="true"] { cursor: grab; }
 .imageViewport[data-pannable="true"]:active { cursor: grabbing; }

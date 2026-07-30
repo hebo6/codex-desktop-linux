@@ -5,9 +5,14 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import type { CSSProperties } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { resolveLink } from "../content/linkResolver";
+import type {
+  HighlightedLines,
+  SyntaxHighlighter,
+} from "../content/syntaxHighlighting";
 import { markdownToPlainText, SafeMarkdown } from "./SafeMarkdown";
 
 describe("SafeMarkdown", () => {
@@ -59,6 +64,127 @@ describe("SafeMarkdown", () => {
       endLine: null,
       column: null,
     });
+  });
+
+  it("使用代码围栏语言和明暗主题 token 高亮代码", async () => {
+    const highlighter: SyntaxHighlighter = {
+      highlight: vi.fn(async () => [
+        [
+          {
+            content: "const",
+            style: {
+              "--shiki-dark": "#ff7b72",
+              "--shiki-light": "#cf222e",
+            } as CSSProperties,
+          },
+          {
+            content: " value = 1;",
+            style: {
+              "--shiki-dark": "#c9d1d9",
+              "--shiki-light": "#24292f",
+            } as CSSProperties,
+          },
+        ],
+        [
+          {
+            content: "return value;",
+            style: {
+              "--shiki-dark": "#c9d1d9",
+              "--shiki-light": "#24292f",
+            } as CSSProperties,
+          },
+        ],
+      ]),
+    };
+    render(
+      <SafeMarkdown
+        source={'```ts title="example.ts"\nconst value = 1;\nreturn value;\n```'}
+        syntaxHighlighter={highlighter}
+      />,
+    );
+
+    const token = await screen.findByText("const", { exact: true });
+    expect(highlighter.highlight).toHaveBeenCalledWith(
+      "const value = 1;\nreturn value;",
+      "typescript",
+    );
+    expect(screen.getByText("TypeScript")).toBeVisible();
+    expect(token.style.getPropertyValue("--shiki-light")).toBe("#cf222e");
+    expect(token.style.getPropertyValue("--shiki-dark")).toBe("#ff7b72");
+    expect(token.closest("code")).toHaveTextContent(
+      "const value = 1; return value;",
+    );
+  });
+
+  it("不高亮未知语言和流式输出中尚未闭合的围栏", () => {
+    const highlighter: SyntaxHighlighter = {
+      highlight: vi.fn(async () => []),
+    };
+    render(
+      <SafeMarkdown
+        source={"```unknown\nvalue\n```\n\n```ts\nconst streaming = true;"}
+        syntaxHighlighter={highlighter}
+      />,
+    );
+
+    expect(highlighter.highlight).not.toHaveBeenCalled();
+    expect(screen.getByText("unknown")).toBeVisible();
+    expect(screen.getByText("value")).toBeVisible();
+    expect(screen.getByText("const streaming = true;")).toBeVisible();
+  });
+
+  it("忽略过期或内容不一致的异步高亮结果", async () => {
+    const pending = new Map<
+      string,
+      (lines: HighlightedLines) => void
+    >();
+    const highlighter: SyntaxHighlighter = {
+      highlight: vi.fn((source) => new Promise<HighlightedLines>((resolve) => {
+        pending.set(source, resolve);
+      })),
+    };
+    const { rerender } = render(
+      <SafeMarkdown
+        source={"```ts\nold value\n```"}
+        syntaxHighlighter={highlighter}
+      />,
+    );
+    await waitFor(() => expect(pending.has("old value")).toBe(true));
+
+    rerender(
+      <SafeMarkdown
+        source={"```ts\nnew value\n```"}
+        syntaxHighlighter={highlighter}
+      />,
+    );
+    await waitFor(() => expect(pending.has("new value")).toBe(true));
+    pending.get("new value")?.([[
+      { content: "new value", style: {} },
+    ]]);
+    expect(await screen.findByText("new value", { selector: "span" }))
+      .toBeVisible();
+
+    pending.get("old value")?.([[
+      { content: "stale result", style: {} },
+    ]]);
+    await waitFor(() =>
+      expect(screen.queryByText("stale result")).not.toBeInTheDocument(),
+    );
+
+    rerender(
+      <SafeMarkdown
+        source={"```ts\ntrusted source\n```"}
+        syntaxHighlighter={highlighter}
+      />,
+    );
+    await waitFor(() => expect(pending.has("trusted source")).toBe(true));
+    pending.get("trusted source")?.([[
+      { content: "different source", style: {} },
+    ]]);
+    await waitFor(() =>
+      expect(screen.queryByText("different source")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("trusted source")).toBeVisible();
   });
 
   it("仅为非空 Shell 代码块提供确认后执行", async () => {

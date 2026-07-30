@@ -6,6 +6,16 @@ import {
   type ReactNode,
 } from "react";
 
+import {
+  syntaxHighlighter as sharedSyntaxHighlighter,
+  type HighlightedLines,
+  type SyntaxHighlighter,
+} from "../content/syntaxHighlighting";
+import {
+  markdownFenceLanguageName,
+  sourceLanguageForMarkdownFence,
+} from "../content/syntaxLanguages";
+import syntaxTokenStyles from "./SyntaxToken.module.css";
 import styles from "./SafeMarkdown.module.css";
 
 export function SafeMarkdown({
@@ -13,12 +23,14 @@ export function SafeMarkdown({
   onRunShellCommand,
   shellCommandDisabled = false,
   source,
+  syntaxHighlighter = sharedSyntaxHighlighter,
   variant = "document",
 }: {
   readonly onOpenLink?: (link: string) => void;
   readonly onRunShellCommand?: (command: string) => Promise<boolean>;
   readonly shellCommandDisabled?: boolean;
   readonly source: string;
+  readonly syntaxHighlighter?: SyntaxHighlighter;
   readonly variant?: "compact" | "document";
 }) {
   if (variant === "compact") {
@@ -41,6 +53,7 @@ export function SafeMarkdown({
           block={block}
           key={`${block.type}:${index}`}
           shellCommandDisabled={shellCommandDisabled}
+          syntaxHighlighter={syntaxHighlighter}
           {...(onOpenLink === undefined ? {} : { onOpenLink })}
           {...(onRunShellCommand === undefined ? {} : { onRunShellCommand })}
         />
@@ -142,7 +155,7 @@ function CompactMarkdownBlock({
 type Block =
   | { readonly type: "paragraph" | "quote"; readonly text: string }
   | { readonly type: "heading"; readonly level: number; readonly text: string }
-  | { readonly type: "code"; readonly language: string; readonly text: string }
+  | { readonly type: "code"; readonly closed: boolean; readonly language: string; readonly text: string }
   | { readonly type: "list"; readonly ordered: boolean; readonly items: readonly ListItem[] }
   | { readonly type: "table"; readonly header: readonly string[]; readonly rows: readonly (readonly string[])[] }
   | { readonly type: "rule" };
@@ -157,11 +170,13 @@ function MarkdownBlock({
   onOpenLink,
   onRunShellCommand,
   shellCommandDisabled,
+  syntaxHighlighter,
 }: {
   readonly block: Block;
   readonly onOpenLink?: (link: string) => void;
   readonly onRunShellCommand?: (command: string) => Promise<boolean>;
   readonly shellCommandDisabled: boolean;
+  readonly syntaxHighlighter: SyntaxHighlighter;
 }) {
   const inline = (text: string) => renderInline(text, onOpenLink, onOpenLink !== undefined);
   switch (block.type) {
@@ -182,9 +197,11 @@ function MarkdownBlock({
     case "code":
       return (
         <CodeBlock
+          closed={block.closed}
           language={block.language}
           shellCommandDisabled={shellCommandDisabled}
           source={block.text}
+          syntaxHighlighter={syntaxHighlighter}
           {...(onRunShellCommand === undefined ? {} : { onRunShellCommand })}
         />
       );
@@ -214,29 +231,63 @@ function MarkdownBlock({
 const EXECUTABLE_SHELL_LANGUAGES = new Set(["bash", "sh", "zsh"]);
 
 function CodeBlock({
+  closed,
   language,
   onRunShellCommand,
   shellCommandDisabled,
   source,
+  syntaxHighlighter,
 }: {
+  readonly closed: boolean;
   readonly language: string;
   readonly onRunShellCommand?: (command: string) => Promise<boolean>;
   readonly shellCommandDisabled: boolean;
   readonly source: string;
+  readonly syntaxHighlighter: SyntaxHighlighter;
 }) {
   const [wrapped, setWrapped] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [highlightedSource, setHighlightedSource] = useState<{
+    readonly language: string;
+    readonly lines: HighlightedLines;
+    readonly source: string;
+  } | null>(null);
   const confirmationRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const confirmationId = useId();
   const confirmationTitleId = useId();
+  const fenceLanguageName = markdownFenceLanguageName(language);
+  const sourceLanguage = sourceLanguageForMarkdownFence(language);
   const executable =
     onRunShellCommand !== undefined &&
     source.trim().length > 0 &&
-    EXECUTABLE_SHELL_LANGUAGES.has(language.trim().toLowerCase());
+    EXECUTABLE_SHELL_LANGUAGES.has(fenceLanguageName);
+
+  useEffect(() => {
+    setHighlightedSource(null);
+    if (!closed || source.length === 0 || sourceLanguage === null) {
+      return;
+    }
+    let disposed = false;
+    void syntaxHighlighter.highlight(source, sourceLanguage.id).then(
+      (lines) => {
+        if (!disposed && highlightedText(lines) === source) {
+          setHighlightedSource({
+            language: sourceLanguage.id,
+            lines,
+            source,
+          });
+        }
+      },
+      () => {},
+    );
+    return () => {
+      disposed = true;
+    };
+  }, [closed, source, sourceLanguage, syntaxHighlighter]);
 
   useEffect(() => {
     if (!confirmationOpen) {
@@ -308,7 +359,7 @@ function CodeBlock({
   return (
     <section className={styles.codeBlock}>
       <header>
-        <span>{language || "文本"}</span>
+        <span>{sourceLanguage?.label ?? (fenceLanguageName || "文本")}</span>
         <button aria-pressed={wrapped} onClick={() => setWrapped((value) => !value)} type="button">{wrapped ? "不折行" : "折行"}</button>
         <button onClick={() => {
           void navigator.clipboard.writeText(source).then(() => {
@@ -364,9 +415,45 @@ function CodeBlock({
           </div>
         </div>
       ) : null}
-      <pre data-wrapped={wrapped}><code>{source}</code></pre>
+      <pre data-wrapped={wrapped}>
+        <code>
+          {
+            highlightedSource?.source === source &&
+            highlightedSource.language === sourceLanguage?.id
+              ? renderHighlightedLines(highlightedSource.lines)
+              : source
+          }
+        </code>
+      </pre>
     </section>
   );
+}
+
+function highlightedText(lines: HighlightedLines): string {
+  return lines
+    .map((line) => line.map((token) => token.content).join(""))
+    .join("\n");
+}
+
+function renderHighlightedLines(lines: HighlightedLines): readonly ReactNode[] {
+  const nodes: ReactNode[] = [];
+  for (const [lineIndex, line] of lines.entries()) {
+    for (const [tokenIndex, token] of line.entries()) {
+      nodes.push(
+        <span
+          className={syntaxTokenStyles.token}
+          key={`${lineIndex}:${tokenIndex}`}
+          style={token.style}
+        >
+          {token.content}
+        </span>,
+      );
+    }
+    if (lineIndex < lines.length - 1) {
+      nodes.push("\n");
+    }
+  }
+  return nodes;
 }
 
 function parseBlocks(source: string): readonly Block[] {
@@ -382,13 +469,22 @@ function parseBlocks(source: string): readonly Block[] {
     const fence = /^\s*```([^`]*)$/u.exec(line);
     if (fence !== null) {
       const content: string[] = [];
+      let closed = false;
       index += 1;
       while (index < lines.length && !/^\s*```\s*$/u.test(lines[index] ?? "")) {
         content.push(lines[index] ?? "");
         index += 1;
       }
-      if (index < lines.length) index += 1;
-      blocks.push({ type: "code", language: (fence[1] ?? "").trim(), text: content.join("\n") });
+      if (index < lines.length) {
+        closed = true;
+        index += 1;
+      }
+      blocks.push({
+        type: "code",
+        closed,
+        language: (fence[1] ?? "").trim(),
+        text: content.join("\n"),
+      });
       continue;
     }
     const heading = /^(#{1,6})\s+(.+)$/u.exec(line);
