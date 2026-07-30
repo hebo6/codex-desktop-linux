@@ -1,3 +1,5 @@
+import Anser from "anser";
+
 export type AnsiColor =
   | { readonly kind: "basic"; readonly index: number }
   | { readonly kind: "indexed"; readonly index: number }
@@ -19,406 +21,198 @@ export interface AnsiTextToken {
   readonly text: string;
 }
 
-interface MutableAnsiTextToken {
-  style: AnsiTextStyle;
-  text: string;
-}
+const BASIC_COLOR_INDEX = new Map([
+  ["ansi-black", 0],
+  ["ansi-red", 1],
+  ["ansi-green", 2],
+  ["ansi-yellow", 3],
+  ["ansi-blue", 4],
+  ["ansi-magenta", 5],
+  ["ansi-cyan", 6],
+  ["ansi-white", 7],
+  ["ansi-bright-black", 8],
+  ["ansi-bright-red", 9],
+  ["ansi-bright-green", 10],
+  ["ansi-bright-yellow", 11],
+  ["ansi-bright-blue", 12],
+  ["ansi-bright-magenta", 13],
+  ["ansi-bright-cyan", 14],
+  ["ansi-bright-white", 15],
+]);
 
-type ParserMode =
-  | "controlString"
-  | "controlStringEscape"
-  | "csi"
-  | "escape"
-  | "escapeSequence"
-  | "text";
-
-const DEFAULT_STYLE: AnsiTextStyle = Object.freeze({
-  background: null,
-  bold: false,
-  dim: false,
-  foreground: null,
-  inverse: false,
-  italic: false,
-  strikethrough: false,
-  underline: false,
-});
-
-const ESCAPE = 0x1b;
-const DELETE = 0x7f;
-const C1_CONTROL_START = 0x80;
-const C1_CONTROL_END = 0x9f;
-const C1_DEVICE_CONTROL_STRING = 0x90;
-const C1_START_OF_STRING = 0x98;
-const C1_CONTROL_SEQUENCE_INTRODUCER = 0x9b;
-const C1_STRING_TERMINATOR = 0x9c;
-const C1_OPERATING_SYSTEM_COMMAND = 0x9d;
-const C1_PRIVACY_MESSAGE = 0x9e;
-const C1_APPLICATION_PROGRAM_COMMAND = 0x9f;
-const BELL = 0x07;
-const MAX_CSI_PARAMETER_LENGTH = 256;
+const CONTROL_STRING_SEQUENCE =
+  /(?:\u001b(?:\]|P|X|\^|_)|[\u0090\u0098\u009d-\u009f])[\s\S]*?(?:\u0007|\u009c|\u001b\\)/gu;
+const UNTERMINATED_CONTROL_STRING =
+  /(?:\u001b(?:\]|P|X|\^|_)|[\u0090\u0098\u009d-\u009f])[\s\S]*$/gu;
+const OTHER_ESCAPE_SEQUENCE =
+  /\u001b(?!\[)(?:[\u0020-\u002f]*[\u0030-\u007e]|.)?/gu;
+const INCOMPLETE_CSI = /\u001b\[[\u0020-\u003f]*$/gu;
+const C0_CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001a\u001c-\u001f\u007f]/gu;
+const C1_CONTROL = /[\u0080-\u009f]/gu;
+const COLON_SGR = /\u001b\[([\d:;]*)m/gu;
 
 export function parseAnsiOutput(source: string): readonly AnsiTextToken[] {
-  return new AnsiParser().parse(source);
+  const entries = Anser.ansiToJson(sanitizeAnsiOutput(source), {
+    remove_empty: true,
+    use_classes: true,
+  });
+  const tokens: AnsiTextToken[] = [];
+  for (const entry of entries) {
+    const token = tokenFrom(entry);
+    const previous = tokens[tokens.length - 1];
+    if (previous !== undefined && sameStyle(previous.style, token.style)) {
+      tokens[tokens.length - 1] = {
+        style: previous.style,
+        text: previous.text + token.text,
+      };
+    } else {
+      tokens.push(token);
+    }
+  }
+  return tokens;
 }
 
-class AnsiParser {
-  readonly #tokens: MutableAnsiTextToken[] = [];
-  #csiParameters = "";
-  #mode: ParserMode = "text";
-  #skipLineFeed = false;
-  #style: AnsiTextStyle = DEFAULT_STYLE;
+function sanitizeAnsiOutput(source: string): string {
+  return source
+    .replaceAll("\u009b", "\u001b[")
+    .replace(CONTROL_STRING_SEQUENCE, "")
+    .replace(UNTERMINATED_CONTROL_STRING, "")
+    .replace(COLON_SGR, (_sequence, parameters: string) =>
+      `\u001b[${normalizeColonSgr(parameters)}m`
+    )
+    .replace(OTHER_ESCAPE_SEQUENCE, "")
+    .replace(INCOMPLETE_CSI, "")
+    .replace(C0_CONTROL, "")
+    .replace(C1_CONTROL, "")
+    .replaceAll("\r\n", "\n")
+    .replaceAll("\r", "\n");
+}
 
-  parse(source: string): readonly AnsiTextToken[] {
-    for (let index = 0; index < source.length; index += 1) {
-      const character = source[index] ?? "";
-      const code = source.charCodeAt(index);
-
-      switch (this.#mode) {
-        case "text":
-          this.#consumeText(character, code);
-          break;
-        case "escape":
-          if (character === "[") {
-            this.#startCsi();
-          } else if (
-            character === "]" ||
-            character === "P" ||
-            character === "X" ||
-            character === "^" ||
-            character === "_"
-          ) {
-            this.#mode = "controlString";
-          } else if (isEscapeIntermediate(code)) {
-            this.#mode = "escapeSequence";
-          } else if (isEscapeFinal(code)) {
-            this.#mode = "text";
-          } else if (code !== ESCAPE) {
-            this.#mode = "text";
-            index -= 1;
-          }
-          break;
-        case "escapeSequence":
-          if (isEscapeFinal(code)) {
-            this.#mode = "text";
-          } else if (!isEscapeIntermediate(code)) {
-            this.#mode = "text";
-            index -= 1;
-          }
-          break;
-        case "csi":
-          if (isCsiFinal(code)) {
-            if (character === "m") {
-              this.#applySgr(this.#csiParameters);
-            }
-            this.#csiParameters = "";
-            this.#mode = "text";
-          } else if (isCsiParameterOrIntermediate(code)) {
-            if (this.#csiParameters.length < MAX_CSI_PARAMETER_LENGTH) {
-              this.#csiParameters += character;
-            }
-          } else if (code === ESCAPE) {
-            this.#csiParameters = "";
-            this.#mode = "escape";
-          } else {
-            this.#csiParameters = "";
-            this.#mode = "text";
-            index -= 1;
-          }
-          break;
-        case "controlString":
-          if (code === BELL || code === C1_STRING_TERMINATOR) {
-            this.#mode = "text";
-          } else if (code === ESCAPE) {
-            this.#mode = "controlStringEscape";
-          }
-          break;
-        case "controlStringEscape":
-          if (character === "\\" || code === C1_STRING_TERMINATOR || code === BELL) {
-            this.#mode = "text";
-          } else if (code !== ESCAPE) {
-            this.#mode = "controlString";
-          }
-          break;
-      }
+function normalizeColonSgr(parameters: string): string {
+  return parameters.split(";").map((field) => {
+    if (!field.includes(":")) {
+      return field;
     }
-
-    return this.#tokens;
-  }
-
-  #consumeText(character: string, code: number) {
-    if (this.#skipLineFeed) {
-      this.#skipLineFeed = false;
-      if (character === "\n") {
-        return;
-      }
-    }
-
-    if (code === ESCAPE) {
-      this.#mode = "escape";
-      return;
-    }
-    if (code === C1_CONTROL_SEQUENCE_INTRODUCER) {
-      this.#startCsi();
-      return;
-    }
-    if (
-      code === C1_DEVICE_CONTROL_STRING ||
-      code === C1_START_OF_STRING ||
-      code === C1_OPERATING_SYSTEM_COMMAND ||
-      code === C1_PRIVACY_MESSAGE ||
-      code === C1_APPLICATION_PROGRAM_COMMAND
-    ) {
-      this.#mode = "controlString";
-      return;
-    }
-    if (character === "\r") {
-      this.#appendText("\n");
-      this.#skipLineFeed = true;
-      return;
-    }
-    if (character === "\n" || character === "\t") {
-      this.#appendText(character);
-      return;
-    }
-    if (
-      code < 0x20 ||
-      code === DELETE ||
-      (code >= C1_CONTROL_START && code <= C1_CONTROL_END)
-    ) {
-      return;
-    }
-    this.#appendText(character);
-  }
-
-  #startCsi() {
-    this.#csiParameters = "";
-    this.#mode = "csi";
-  }
-
-  #appendText(text: string) {
-    const previous = this.#tokens[this.#tokens.length - 1];
-    if (previous !== undefined && sameStyle(previous.style, this.#style)) {
-      previous.text += text;
-      return;
-    }
-    this.#tokens.push({
-      style: this.#style,
-      text,
-    });
-  }
-
-  #applySgr(parameters: string) {
-    if (parameters.length === 0) {
-      this.#style = DEFAULT_STYLE;
-      return;
-    }
-
-    const fields = parameters.split(";");
-    for (let index = 0; index < fields.length; index += 1) {
-      const field = fields[index] ?? "";
-      if (field.includes(":")) {
-        this.#applyColonSgr(field);
-        continue;
-      }
-
-      const code = sgrNumber(field, 0);
-      if (code === null) {
-        continue;
-      }
-      if (code === 38 || code === 48) {
-        const parsed = extendedSemicolonColor(fields, index);
-        if (parsed !== null) {
-          this.#setColor(code, parsed.color);
-          index = parsed.lastIndex;
-        }
-        continue;
-      }
-      this.#applySimpleSgr(code);
-    }
-  }
-
-  #applyColonSgr(field: string) {
-    const values = field.split(":").map((value) => sgrNumber(value, null));
+    const values = field.split(":");
     const code = values[0];
-    if (code === 4) {
-      this.#style = {
-        ...this.#style,
-        underline: values[1] !== 0,
-      };
-      return;
-    }
-    if (code !== 38 && code !== 48) {
-      if (code !== null && code !== undefined) {
-        this.#applySimpleSgr(code);
-      }
-      return;
-    }
-
     const mode = values[1];
-    if (mode === 5) {
-      const index = byte(values[values.length - 1]);
-      if (index !== null) {
-        this.#setColor(code, indexedColor(index));
-      }
-      return;
+    if ((code === "38" || code === "48") && mode === "5") {
+      return `${code};5;${values[values.length - 1] ?? ""}`;
     }
-    if (mode === 2) {
-      const red = byte(values[values.length - 3]);
-      const green = byte(values[values.length - 2]);
-      const blue = byte(values[values.length - 1]);
-      if (red !== null && green !== null && blue !== null) {
-        this.#setColor(code, { blue, green, kind: "rgb", red });
-      }
+    if ((code === "38" || code === "48") && mode === "2") {
+      return `${code};2;${values.slice(-3).join(";")}`;
     }
-  }
-
-  #applySimpleSgr(code: number) {
-    if (code >= 30 && code <= 37) {
-      this.#setColor(38, { index: code - 30, kind: "basic" });
-      return;
+    if (code === "4") {
+      return mode === "0" ? "24" : "4";
     }
-    if (code >= 40 && code <= 47) {
-      this.#setColor(48, { index: code - 40, kind: "basic" });
-      return;
-    }
-    if (code >= 90 && code <= 97) {
-      this.#setColor(38, { index: code - 90 + 8, kind: "basic" });
-      return;
-    }
-    if (code >= 100 && code <= 107) {
-      this.#setColor(48, { index: code - 100 + 8, kind: "basic" });
-      return;
-    }
-
-    switch (code) {
-      case 0:
-        this.#style = DEFAULT_STYLE;
-        break;
-      case 1:
-        this.#style = { ...this.#style, bold: true };
-        break;
-      case 2:
-        this.#style = { ...this.#style, dim: true };
-        break;
-      case 3:
-        this.#style = { ...this.#style, italic: true };
-        break;
-      case 4:
-      case 21:
-        this.#style = { ...this.#style, underline: true };
-        break;
-      case 7:
-        this.#style = { ...this.#style, inverse: true };
-        break;
-      case 9:
-        this.#style = { ...this.#style, strikethrough: true };
-        break;
-      case 22:
-        this.#style = { ...this.#style, bold: false, dim: false };
-        break;
-      case 23:
-        this.#style = { ...this.#style, italic: false };
-        break;
-      case 24:
-        this.#style = { ...this.#style, underline: false };
-        break;
-      case 27:
-        this.#style = { ...this.#style, inverse: false };
-        break;
-      case 29:
-        this.#style = { ...this.#style, strikethrough: false };
-        break;
-      case 39:
-        this.#style = { ...this.#style, foreground: null };
-        break;
-      case 49:
-        this.#style = { ...this.#style, background: null };
-        break;
-    }
-  }
-
-  #setColor(code: 38 | 48, color: AnsiColor) {
-    this.#style = code === 38
-      ? { ...this.#style, foreground: color }
-      : { ...this.#style, background: color };
-  }
+    return values.join(";");
+  }).join(";");
 }
 
-function extendedSemicolonColor(
-  fields: readonly string[],
-  codeIndex: number,
-): { readonly color: AnsiColor; readonly lastIndex: number } | null {
-  const mode = sgrNumber(fields[codeIndex + 1] ?? "", null);
-  if (mode === 5) {
-    const index = byte(sgrNumber(fields[codeIndex + 2] ?? "", null));
-    return index === null
-      ? null
-      : { color: indexedColor(index), lastIndex: codeIndex + 2 };
+function tokenFrom(entry: AnserEntry): AnsiTextToken {
+  const decorations = new Set(entry.decorations);
+  let foreground = ansiColor(entry.fg, entry.fg_truecolor);
+  let background = ansiColor(entry.bg, entry.bg_truecolor);
+  const inverse = entry.isInverted === true;
+  if (inverse) {
+    [foreground, background] = [background, foreground];
+    foreground = isBasicColor(foreground, 7) ? null : foreground;
+    background = isBasicColor(background, 0) ? null : background;
   }
-  if (mode !== 2) {
+  return {
+    style: {
+      background,
+      bold: decorations.has("bold"),
+      dim: decorations.has("dim"),
+      foreground,
+      inverse,
+      italic: decorations.has("italic"),
+      strikethrough: decorations.has("strikethrough"),
+      underline: decorations.has("underline"),
+    },
+    text: entry.content,
+  };
+}
+
+type AnserEntry = Anser.AnserJsonEntry & {
+  readonly isInverted?: boolean;
+};
+
+function ansiColor(
+  className: string | null,
+  trueColor: string | null,
+): AnsiColor | null {
+  if (className === null) {
     return null;
   }
-
-  const red = byte(sgrNumber(fields[codeIndex + 2] ?? "", null));
-  const green = byte(sgrNumber(fields[codeIndex + 3] ?? "", null));
-  const blue = byte(sgrNumber(fields[codeIndex + 4] ?? "", null));
-  return red === null || green === null || blue === null
-    ? null
-    : {
-        color: { blue, green, kind: "rgb", red },
-        lastIndex: codeIndex + 4,
-      };
-}
-
-function indexedColor(index: number): AnsiColor {
-  return index < 16
-    ? { index, kind: "basic" }
-    : { index, kind: "indexed" };
-}
-
-function sgrNumber(value: string, empty: number | null): number | null {
-  if (value.length === 0) {
-    return empty;
+  const basicIndex = BASIC_COLOR_INDEX.get(className);
+  if (basicIndex !== undefined) {
+    return { index: basicIndex, kind: "basic" };
   }
-  if (!/^\d+$/u.test(value)) {
+  if (className === "ansi-truecolor") {
+    return rgbColor(trueColor);
+  }
+  const palette = /^ansi-palette-(\d{1,3})$/u.exec(className);
+  if (palette === null) {
     return null;
   }
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) ? parsed : null;
-}
-
-function byte(value: number | null | undefined): number | null {
-  return value !== null && value !== undefined && value >= 0 && value <= 255
-    ? value
+  const index = Number(palette[1]);
+  return index >= 16 && index <= 255
+    ? { index, kind: "indexed" }
     : null;
 }
 
+function rgbColor(value: string | null): AnsiColor | null {
+  if (value === null) {
+    return null;
+  }
+  const components = value.split(",").map((component) => Number(component.trim()));
+  const red = components[0];
+  const green = components[1];
+  const blue = components[2];
+  return components.length === 3 &&
+      byte(red) &&
+      byte(green) &&
+      byte(blue)
+    ? { blue, green, kind: "rgb", red }
+    : null;
+}
+
+function isBasicColor(color: AnsiColor | null, index: number): boolean {
+  return color?.kind === "basic" && color.index === index;
+}
+
+function byte(value: number | undefined): value is number {
+  return value !== undefined &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value <= 255;
+}
+
 function sameStyle(left: AnsiTextStyle, right: AnsiTextStyle): boolean {
-  return left === right ||
-    (
-      left.background === right.background &&
-      left.bold === right.bold &&
-      left.dim === right.dim &&
-      left.foreground === right.foreground &&
-      left.inverse === right.inverse &&
-      left.italic === right.italic &&
-      left.strikethrough === right.strikethrough &&
-      left.underline === right.underline
-    );
+  return left.bold === right.bold &&
+    left.dim === right.dim &&
+    left.inverse === right.inverse &&
+    left.italic === right.italic &&
+    left.strikethrough === right.strikethrough &&
+    left.underline === right.underline &&
+    sameColor(left.background, right.background) &&
+    sameColor(left.foreground, right.foreground);
 }
 
-function isEscapeIntermediate(code: number): boolean {
-  return code >= 0x20 && code <= 0x2f;
-}
-
-function isEscapeFinal(code: number): boolean {
-  return code >= 0x30 && code <= 0x7e;
-}
-
-function isCsiParameterOrIntermediate(code: number): boolean {
-  return code >= 0x20 && code <= 0x3f;
-}
-
-function isCsiFinal(code: number): boolean {
-  return code >= 0x40 && code <= 0x7e;
+function sameColor(left: AnsiColor | null, right: AnsiColor | null): boolean {
+  if (left === null || right === null) {
+    return left === right;
+  }
+  if (left.kind !== right.kind) {
+    return false;
+  }
+  if (left.kind === "rgb" && right.kind === "rgb") {
+    return left.red === right.red &&
+      left.green === right.green &&
+      left.blue === right.blue;
+  }
+  return left.kind !== "rgb" &&
+    right.kind !== "rgb" &&
+    left.index === right.index;
 }
