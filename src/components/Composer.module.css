@@ -694,6 +694,7 @@
 .projectOptions {
   display: grid;
   min-height: 0;
+  grid-auto-rows: max-content;
   gap: 2px;
   overflow: auto;
 }
