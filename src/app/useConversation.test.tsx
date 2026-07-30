@@ -181,6 +181,114 @@ describe("useConversation", () => {
     expect(completed.activeTurnId).toBeNull();
   });
 
+  it("完成摘要按项目 ID 校正内容并保留完整回合", () => {
+    const runningTurn = {
+      id: "turn-summary",
+      items: [
+        {
+          id: "user-summary",
+          type: "userMessage",
+          content: [{ type: "text", text: "为什么用户问题消失了" }],
+        },
+        {
+          id: "reasoning-summary",
+          type: "reasoning",
+          summary: ["排查合并逻辑"],
+        },
+        {
+          id: "agent-summary",
+          type: "agentMessage",
+          text: "初始回答",
+        },
+      ],
+      itemsView: "full",
+      status: "inProgress",
+    } satisfies ThreadTurn;
+    const initial: ConversationState = {
+      turns: [runningTurn],
+      activeTurnId: runningTurn.id,
+      submitting: false,
+      stopping: false,
+      error: null,
+    };
+    const notification = {
+      method: "turn/completed",
+      params: {
+        threadId: "thread-1",
+        turn: {
+          id: runningTurn.id,
+          items: [{
+            id: "agent-summary",
+            type: "agentMessage",
+            text: "最终回答",
+            phase: "final_answer",
+          }],
+          itemsView: "summary",
+          status: "completed",
+        },
+      },
+    } as ServerNotification;
+
+    const completed = reduceConversationNotification(initial, notification);
+    const duplicate = reduceConversationNotification(completed, notification);
+
+    expect(duplicate.turns[0]).toMatchObject({
+      status: "completed",
+      itemsView: "full",
+    });
+    expect(duplicate.turns[0]?.items.map(({ id }) => id)).toEqual([
+      "user-summary",
+      "reasoning-summary",
+      "agent-summary",
+    ]);
+    expect(duplicate.turns[0]?.items[2]).toMatchObject({
+      text: "最终回答",
+      phase: "final_answer",
+    });
+    expect(duplicate.activeTurnId).toBeNull();
+  });
+
+  it("缺省项目视图按完整回合替换", () => {
+    const initial: ConversationState = {
+      turns: [{
+        id: "turn-full",
+        items: [{
+          id: "user-full",
+          type: "userMessage",
+          content: [{ type: "text", text: "旧内容" }],
+        }],
+        itemsView: "full",
+        status: "inProgress",
+      }],
+      activeTurnId: "turn-full",
+      submitting: false,
+      stopping: false,
+      error: null,
+    };
+    const notification = {
+      method: "turn/completed",
+      params: {
+        threadId: "thread-1",
+        turn: {
+          id: "turn-full",
+          items: [{
+            id: "agent-full",
+            type: "agentMessage",
+            text: "完整快照",
+          }],
+          status: "completed",
+        },
+      },
+    } as ServerNotification;
+
+    const completed = reduceConversationNotification(initial, notification);
+
+    expect(completed.turns[0]?.items.map(({ id }) => id)).toEqual([
+      "agent-full",
+    ]);
+    expect(completed.activeTurnId).toBeNull();
+  });
+
   it("空白页先创建 thread 再创建 turn", async () => {
     const client = new FakeConversationClient();
     client.threadStartResponse = {

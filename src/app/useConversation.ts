@@ -622,20 +622,41 @@ function withTurn(state: ConversationState, turn: ThreadTurn): ConversationState
   const index = state.turns.findIndex(({ id }) => id === turn.id);
   const turns = [...state.turns];
   const existing = index < 0 ? undefined : turns[index];
-  const nextTurn =
-    existing !== undefined && turn.itemsView === "notLoaded"
-      ? {
-          ...turn,
-          items: existing.items,
-          itemsView: existing.itemsView ?? "full",
-        }
-      : turn;
+  const nextTurn = existing === undefined
+    ? turn
+    : mergeTurnProjection(existing, turn);
   if (index < 0) {
     turns.push(nextTurn);
   } else {
     turns[index] = nextTurn;
   }
   return { ...state, turns: Object.freeze(turns), activeTurnId: activeTurnId(turns) };
+}
+
+function mergeTurnProjection(
+  existing: ThreadTurn,
+  incoming: ThreadTurn,
+): ThreadTurn {
+  if (incoming.itemsView === undefined || incoming.itemsView === "full") {
+    return incoming;
+  }
+  if (incoming.itemsView === "notLoaded") {
+    return {
+      ...incoming,
+      items: existing.items,
+      itemsView: existing.itemsView ?? "full",
+    };
+  }
+  const existingIds = new Set(existing.items.map(({ id }) => id));
+  const incomingById = new Map(incoming.items.map((item) => [item.id, item]));
+  return {
+    ...incoming,
+    items: [
+      ...existing.items.map((item) => incomingById.get(item.id) ?? item),
+      ...incoming.items.filter(({ id }) => !existingIds.has(id)),
+    ],
+    itemsView: existing.itemsView === "full" ? "full" : "summary",
+  };
 }
 
 function withItem(
