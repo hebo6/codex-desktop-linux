@@ -169,9 +169,14 @@ interface HistoryQuestion {
 interface RunningTurnFloor {
   readonly contentHeight: number;
   readonly floorHeight: number;
-  readonly kind: "page" | "question";
+  readonly kind: "answer" | "page" | "question";
   readonly turnId: string;
   readonly viewportHeight: number;
+}
+
+interface PendingFinalAnswerPosition {
+  readonly itemId: string;
+  readonly turnId: string;
 }
 
 type ConversationRow =
@@ -205,6 +210,8 @@ export function ConversationView({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pendingQuestionPositionRef = useRef<string | null>(null);
+  const pendingFinalAnswerPositionRef =
+    useRef<PendingFinalAnswerPosition | null>(null);
   const pendingHistoryAnchorRef = useRef<{
     readonly firstTurnId: string | null;
     readonly scrollHeight: number;
@@ -236,9 +243,16 @@ export function ConversationView({
     () => new Map(historyQuestions.map((question, index) => [question.rowIndex, index])),
     [historyQuestions],
   );
-  const runningTurnId =
-    restoredThread.turns.findLast(({ status }) => status === "inProgress")?.id ??
+  const runningTurn =
+    restoredThread.turns.findLast(({ status }) => status === "inProgress") ??
     null;
+  const runningTurnId = runningTurn?.id ?? null;
+  const runningFinalAnswer =
+    runningTurn?.items.find(isFinalAnswer) ?? null;
+  const observedRunningFinalAnswerRef = useRef({
+    itemId: runningFinalAnswer?.id ?? null,
+    threadId: restoredThread.metadata.id,
+  });
   const [runningTurnFloor, setRunningTurnFloor] =
     useState<RunningTurnFloor | null>(null);
   const runningTurnFloorVisible =
@@ -320,6 +334,81 @@ export function ConversationView({
     setShowJumpToBottom(false);
   }, []);
 
+  const positionPendingFinalAnswer = useCallback(
+    (scroller: HTMLDivElement) => {
+      const pending = pendingFinalAnswerPositionRef.current;
+      if (pending === null) {
+        return false;
+      }
+      if (
+        !runningTurnFloorVisible ||
+        runningTurnFloor?.kind !== "answer" ||
+        runningTurnFloor.turnId !== pending.turnId
+      ) {
+        return true;
+      }
+      const source = conversationItemElement(scroller, pending.itemId);
+      if (source === null) {
+        pendingFinalAnswerPositionRef.current = null;
+        return false;
+      }
+      const content = contentRef.current;
+      if (content === null) {
+        return true;
+      }
+      const contentRect = content.getBoundingClientRect();
+      const sourceRect = source.getBoundingClientRect();
+      const scrollerRect = scroller.getBoundingClientRect();
+      const sourceTop =
+        scroller.scrollTop + sourceRect.top - scrollerRect.top;
+      const targetTop = Math.max(
+        0,
+        sourceTop - initialQuestionTop(scroller),
+      );
+      const floorHeight = targetTop + scroller.clientHeight;
+      if (
+        Math.abs(runningTurnFloor.floorHeight - floorHeight) >
+          BOTTOM_THRESHOLD ||
+        Math.abs(
+          runningTurnFloor.viewportHeight - scroller.clientHeight,
+        ) > BOTTOM_THRESHOLD ||
+        Math.abs(
+          runningTurnFloor.contentHeight -
+            contentRect.height,
+        ) > BOTTOM_THRESHOLD
+      ) {
+        setRunningTurnFloor({
+          ...runningTurnFloor,
+          contentHeight: contentRect.height,
+          floorHeight,
+          viewportHeight: scroller.clientHeight,
+        });
+        return true;
+      }
+      scroller.scrollTop = targetTop;
+      followBottomRef.current = true;
+      setShowJumpToBottom(false);
+      if (!turnHasMountedActivityContent(scroller, pending.turnId)) {
+        pendingFinalAnswerPositionRef.current = null;
+        if (contentRect.bottom >= scrollerRect.bottom - BOTTOM_THRESHOLD) {
+          const naturalBottom =
+            scroller.scrollTop + contentRect.bottom - scrollerRect.top;
+          setRunningTurnFloor({
+            contentHeight: contentRect.height,
+            floorHeight:
+              naturalBottom +
+              scroller.clientHeight * RUNNING_TURN_RESERVE_RATIO,
+            kind: "page",
+            turnId: pending.turnId,
+            viewportHeight: scroller.clientHeight,
+          });
+        }
+      }
+      return true;
+    },
+    [runningTurnFloor, runningTurnFloorVisible],
+  );
+
   const requestOlderTurns = useCallback(() => {
     const scroller = scrollerRef.current;
     if (
@@ -363,6 +452,9 @@ export function ConversationView({
 
   const followContent = useCallback(
     (scroller: HTMLDivElement) => {
+      if (positionPendingFinalAnswer(scroller)) {
+        return;
+      }
       if (pendingQuestionPositionRef.current !== null) {
         return;
       }
@@ -391,9 +483,9 @@ export function ConversationView({
         const floorHeight = Math.max(
           0,
           activeFloor.floorHeight + viewportDelta * (
-            activeFloor.kind === "question"
-              ? 1
-              : RUNNING_TURN_RESERVE_RATIO
+            activeFloor.kind === "page"
+              ? RUNNING_TURN_RESERVE_RATIO
+              : 1
           ),
         );
         setRunningTurnFloor({
@@ -415,7 +507,8 @@ export function ConversationView({
         naturalBottom +
         scroller.clientHeight * RUNNING_TURN_RESERVE_RATIO;
       if (
-        activeFloor?.kind === "question" &&
+        activeFloor !== null &&
+        activeFloor.kind !== "page" &&
         Math.abs(activeFloor.contentHeight - contentRect.height) <=
           BOTTOM_THRESHOLD
       ) {
@@ -443,6 +536,7 @@ export function ConversationView({
       runningTurnId,
       runningTurnFloor,
       runningTurnFloorVisible,
+      positionPendingFinalAnswer,
       scrollToBottom,
     ],
   );
@@ -569,6 +663,65 @@ export function ConversationView({
   ]);
 
   useLayoutEffect(() => {
+    const current = {
+      itemId: runningFinalAnswer?.id ?? null,
+      threadId: restoredThread.metadata.id,
+    };
+    const observed = observedRunningFinalAnswerRef.current;
+    observedRunningFinalAnswerRef.current = current;
+    if (
+      observed.threadId !== current.threadId ||
+      current.itemId === null ||
+      observed.itemId === current.itemId ||
+      runningTurnId === null
+    ) {
+      return;
+    }
+    const scroller = scrollerRef.current;
+    const content = contentRef.current;
+    const source = scroller === null
+      ? null
+      : conversationItemElement(scroller, current.itemId);
+    if (
+      scroller === null ||
+      content === null ||
+      source === null ||
+      (
+        !followBottomRef.current &&
+        !turnActivityHeaderIsAboveViewport(scroller, runningTurnId)
+      )
+    ) {
+      return;
+    }
+    const sourceRect = source.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    const sourceTop =
+      scroller.scrollTop + sourceRect.top - scrollerRect.top;
+    const targetTop = Math.max(
+      0,
+      sourceTop - initialQuestionTop(scroller),
+    );
+    pendingQuestionPositionRef.current = null;
+    pendingFinalAnswerPositionRef.current = {
+      itemId: current.itemId,
+      turnId: runningTurnId,
+    };
+    followBottomRef.current = true;
+    setShowJumpToBottom(false);
+    setRunningTurnFloor({
+      contentHeight: content.getBoundingClientRect().height,
+      floorHeight: targetTop + scroller.clientHeight,
+      kind: "answer",
+      turnId: runningTurnId,
+      viewportHeight: scroller.clientHeight,
+    });
+  }, [
+    restoredThread.metadata.id,
+    runningFinalAnswer?.id,
+    runningTurnId,
+  ]);
+
+  useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     if (scroller === null) {
       return;
@@ -621,6 +774,7 @@ export function ConversationView({
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     pendingQuestionPositionRef.current = null;
+    pendingFinalAnswerPositionRef.current = null;
     setRunningTurnFloor(null);
     followBottomRef.current = true;
     setShowJumpToBottom(false);
@@ -1392,6 +1546,7 @@ function AgentMessage({
     <article
       className={styles.agentMessage}
       data-final-answer={isFinalAnswer}
+      data-item-id={item.id}
       data-latest-turn={isLatestTurn}
       tabIndex={0}
       onMouseEnter={() => setNow(Date.now())}
@@ -1458,10 +1613,10 @@ function ActivityGroup({
   ).length;
   const turnWorkRunning =
     turn.status === "inProgress" && !finalAnswerStarted;
-  const running = turnWorkRunning || runningCommandCount > 0;
-  const initiallyExpanded = running;
+  const automaticallyExpanded = turnWorkRunning;
+  const initiallyExpanded = automaticallyExpanded;
   const transition = useCollapsibleContent(initiallyExpanded);
-  const previousRunningRef = useRef(running);
+  const previousAutomaticallyExpandedRef = useRef(automaticallyExpanded);
   const duration = useTurnDuration(turn, turnWorkRunning);
   const visibleItems = items;
   const setGroupOpen = transition.setOpen;
@@ -1472,13 +1627,14 @@ function ActivityGroup({
   );
 
   useEffect(() => {
-    const wasRunning = previousRunningRef.current;
-    previousRunningRef.current = running;
-    if (wasRunning === running) {
+    const wasAutomaticallyExpanded =
+      previousAutomaticallyExpandedRef.current;
+    previousAutomaticallyExpandedRef.current = automaticallyExpanded;
+    if (wasAutomaticallyExpanded === automaticallyExpanded) {
       return;
     }
-    setGroupOpen(running);
-  }, [running, setGroupOpen]);
+    setGroupOpen(automaticallyExpanded);
+  }, [automaticallyExpanded, setGroupOpen]);
 
   useEffect(() => {
     if (
@@ -1497,10 +1653,18 @@ function ActivityGroup({
   return (
     <section
       className={styles.activityGroup}
+      data-activity-group
+      data-content-mounted={transition.contentMounted}
       data-expanded={transition.expanded}
       data-status={runningCommandCount > 0 ? "inProgress" : turn.status}
     >
-      <button aria-expanded={transition.targetExpanded} className={styles.activityGroupHeader} onClick={toggle} type="button">
+      <button
+        aria-expanded={transition.targetExpanded}
+        className={styles.activityGroupHeader}
+        data-activity-group-header
+        onClick={toggle}
+        type="button"
+      >
         <span>{activityGroupLabel(
           turn.status,
           duration,
@@ -2064,6 +2228,50 @@ function conversationListTop(scroller: HTMLElement): number {
     return scroller.scrollTop + listRect.top - scroller.getBoundingClientRect().top;
   }
   return list.offsetTop;
+}
+
+function conversationItemElement(
+  scroller: HTMLElement,
+  itemId: string,
+): HTMLElement | null {
+  return Array.from(
+    scroller.querySelectorAll<HTMLElement>("[data-item-id]"),
+  ).find((element) => element.dataset.itemId === itemId) ?? null;
+}
+
+function turnActivityGroups(
+  scroller: HTMLElement,
+  turnId: string,
+): readonly HTMLElement[] {
+  return Array.from(
+    scroller.querySelectorAll<HTMLElement>("[data-turn-id]"),
+  ).filter((row) => row.dataset.turnId === turnId).flatMap((row) =>
+    Array.from(row.querySelectorAll<HTMLElement>("[data-activity-group]"))
+  );
+}
+
+function turnActivityHeaderIsAboveViewport(
+  scroller: HTMLElement,
+  turnId: string,
+): boolean {
+  const header = turnActivityGroups(scroller, turnId).at(-1)?.querySelector<
+    HTMLElement
+  >("[data-activity-group-header]");
+  if (header === null || header === undefined) {
+    return false;
+  }
+  const headerRect = header.getBoundingClientRect();
+  return headerRect.height > 0 &&
+    headerRect.bottom <= scroller.getBoundingClientRect().top;
+}
+
+function turnHasMountedActivityContent(
+  scroller: HTMLElement,
+  turnId: string,
+): boolean {
+  return turnActivityGroups(scroller, turnId).some(
+    (group) => group.dataset.contentMounted === "true",
+  );
 }
 
 function initialQuestionTop(scroller: HTMLElement): number {
