@@ -47,6 +47,8 @@ export type { PermissionProfileListParams } from "./types/PermissionProfileListP
 export type { PermissionProfileListResponse } from "./types/PermissionProfileListResponse";
 export type { ConfigReadParams } from "./types/ConfigReadParams";
 export type { ConfigReadResponse } from "./types/ConfigReadResponse";
+export type { ConfigValueWriteParams } from "./types/ConfigValueWriteParams";
+export type { ConfigWriteResponse } from "./types/ConfigWriteResponse";
 export type { ConfigRequirementsReadResponse } from "./types/ConfigRequirementsReadResponse";
 export type { AppsListParams } from "./types/AppsListParams";
 export type { AppsListResponse } from "./types/AppsListResponse";

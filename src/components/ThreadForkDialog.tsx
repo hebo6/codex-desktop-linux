@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef } from "react";
 
 import { useModalLayer } from "./modalStack";
-import styles from "./ThreadDeleteDialog.module.css";
+import styles from "./DeleteDialog.module.css";
 
 export function ThreadForkDialog({
   error,

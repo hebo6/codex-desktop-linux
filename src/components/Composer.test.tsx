@@ -712,6 +712,63 @@ describe("Composer", () => {
     expect(screen.queryByRole("dialog", { name: "项目设置" })).not.toBeInTheDocument();
   });
 
+  it("在项目选择器右侧删除当前受信任项目", async () => {
+    const user = userEvent.setup();
+    const onDeleteProject = vi.fn(async () => undefined);
+    renderComposer({
+      cwd: "/workspace/project",
+      onCwdChange: vi.fn(),
+      onDeleteProject,
+      projectCwds: ["/workspace/project", "/workspace/other"],
+    });
+
+    const projectPicker = screen.getByRole("button", { name: "项目" });
+    const deleteButton = screen.getByRole("button", {
+      name: "删除项目 project",
+    });
+    expect(
+      projectPicker.compareDocumentPosition(deleteButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+
+    await user.click(deleteButton);
+    const dialog = screen.getByRole("dialog", { name: "删除受信任项目？" });
+    expect(dialog).toHaveTextContent("/workspace/project");
+    expect(dialog).toHaveTextContent("不会删除项目文件");
+    await user.click(within(dialog).getByRole("button", { name: "删除项目" }));
+
+    expect(onDeleteProject).toHaveBeenCalledWith("/workspace/project");
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "删除受信任项目？" }),
+      ).not.toBeInTheDocument()
+    );
+  });
+
+  it("删除受信任项目失败时保留确认框并展示错误", async () => {
+    const user = userEvent.setup();
+    renderComposer({
+      cwd: "/workspace/project",
+      onCwdChange: vi.fn(),
+      onDeleteProject: vi.fn(async () => {
+        throw new Error("write failed");
+      }),
+      projectCwds: ["/workspace/project"],
+    });
+
+    await user.click(screen.getByRole("button", {
+      name: "删除项目 project",
+    }));
+    await user.click(screen.getByRole("button", { name: "删除项目" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "无法删除受信任项目，请重试",
+    );
+    expect(
+      screen.getByRole("dialog", { name: "删除受信任项目？" }),
+    ).toBeVisible();
+  });
+
   it("设置命令直接打开客户端设置", async () => {
     const user = userEvent.setup();
     const onOpenSettings = vi.fn();

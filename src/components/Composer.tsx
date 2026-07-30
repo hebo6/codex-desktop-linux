@@ -40,6 +40,7 @@ import {
   ComposerAccessoryPanel,
   ComposerAccessoryRow,
 } from "./ComposerAccessoryPanel";
+import { ProjectDeleteDialog } from "./ProjectDeleteDialog";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { SavedPromptManagerDialog } from "./SavedPromptManagerDialog";
 import {
@@ -154,6 +155,7 @@ export interface ComposerProps {
   readonly onLoadSkills?: (forceReload?: boolean) => Promise<void>;
   readonly onLoadMentions?: (forceReload?: boolean) => Promise<void>;
   readonly onCwdChange?: (cwd: string) => void;
+  readonly onDeleteProject?: (directory: string) => Promise<void>;
   readonly onDraftPresenceChange?: (draftKey: string, present: boolean) => void;
   readonly onPickCwd?: () => Promise<string | null>;
   readonly onRunImmediateCommand?: (command: "compact" | "review") => Promise<boolean>;
@@ -209,6 +211,7 @@ export function Composer({
   onLoadSkills,
   onLoadMentions,
   onCwdChange,
+  onDeleteProject,
   onDraftPresenceChange,
   onPickCwd,
   onRunImmediateCommand,
@@ -243,6 +246,11 @@ export function Composer({
   const [cwdInput, setCwdInput] = useState(cwd ?? "");
   const [cwdError, setCwdError] = useState<string | null>(null);
   const [pickingCwd, setPickingCwd] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [deletingProject, setDeletingProject] = useState(false);
+  const [projectDeleteError, setProjectDeleteError] = useState<string | null>(
+    null,
+  );
   const [trigger, setTrigger] = useState<Trigger | null>(() =>
     initialText.startsWith("!")
       ? null
@@ -1241,7 +1249,12 @@ export function Composer({
                 <ProjectPicker
                   cwd={cwd}
                   directories={cwdOptions}
-                  disabled={onCwdChange === undefined || activeTurn || submitting}
+                  disabled={
+                    onCwdChange === undefined ||
+                    activeTurn ||
+                    submitting ||
+                    deletingProject
+                  }
                   onBrowse={onPickCwd === undefined ? undefined : () => void chooseCwd()}
                   onCustom={() => {
                     setCwdInput(cwd ?? "");
@@ -1254,6 +1267,25 @@ export function Composer({
                   }}
                   picking={pickingCwd}
                 />
+                {cwd === null ||
+                !cwdOptions.includes(cwd) ||
+                onDeleteProject === undefined ? null : (
+                  <button
+                    aria-label={`删除项目 ${projectName(cwd)}`}
+                    className={styles.projectDeleteButton}
+                    disabled={activeTurn || submitting || deletingProject}
+                    onClick={() => {
+                      setProjectDeleteError(null);
+                      setProjectToDelete(cwd);
+                    }}
+                    title="删除受信任项目"
+                    type="button"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="M4.5 7h15M9.5 3.5h5L16 7H8zM7 7l.8 13h8.4L17 7M10 10.5v6M14 10.5v6" />
+                    </svg>
+                  </button>
+                )}
                 {editingCwd ? (
                   <div className={styles.cwdEditor}>
                     <label>
@@ -1788,6 +1820,32 @@ export function Composer({
           </div>
         </footer>
       </div>
+      <ProjectDeleteDialog
+        deleting={deletingProject}
+        directory={projectToDelete}
+        error={projectDeleteError}
+        onCancel={() => {
+          setProjectDeleteError(null);
+          setProjectToDelete(null);
+        }}
+        onConfirm={(directory) => {
+          if (onDeleteProject === undefined || deletingProject) {
+            return;
+          }
+          setDeletingProject(true);
+          setProjectDeleteError(null);
+          void onDeleteProject(directory).then(
+            () => {
+              setProjectToDelete(null);
+            },
+            () => {
+              setProjectDeleteError("无法删除受信任项目，请重试");
+            },
+          ).finally(() => {
+            setDeletingProject(false);
+          });
+        }}
+      />
       <SavedPromptManagerDialog
         error={savedPrompts.error}
         loading={savedPrompts.loading}

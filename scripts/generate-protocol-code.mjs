@@ -172,6 +172,15 @@ const schemaDeclarations = [
     validatorName: "validateConfigReadResponse",
   },
   {
+    typeName: "ConfigValueWriteParams",
+    schemaPath: "v2/ConfigValueWriteParams.json",
+  },
+  {
+    typeName: "ConfigWriteResponse",
+    schemaPath: "v2/ConfigWriteResponse.json",
+    validatorName: "validateConfigWriteResponse",
+  },
+  {
     typeName: "ConfigRequirementsReadResponse",
     schemaPath: "v2/ConfigRequirementsReadResponse.json",
     validatorName: "validateConfigRequirementsReadResponse",

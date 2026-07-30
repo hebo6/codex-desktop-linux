@@ -451,6 +451,12 @@ export function App({
     ?? draftCwd
     ?? projectCwds[0]
     ?? configuredCwd;
+  const removeConfiguredProject = useCallback(async (directory: string) => {
+    await configuredProjects.remove(directory);
+    if (draftCwd === directory) {
+      setDraftCwd(null);
+    }
+  }, [configuredProjects.remove, draftCwd, setDraftCwd]);
   const composerCapabilities = useComposerCapabilities(
     connection.capabilityClient,
     composerCwd,
@@ -2050,6 +2056,7 @@ export function App({
                   onLoadMentions={composerCapabilities.loadMentions}
                   onLoadSkills={composerCapabilities.loadSkills}
                   onCwdChange={setDraftCwd}
+                  onDeleteProject={removeConfiguredProject}
                   onDraftPresenceChange={updateDraftPresence}
                   {...(boundServer?.configuration.type === "localStdio"
                     ? { onPickCwd: pickLocalDirectory }

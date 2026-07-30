@@ -6,6 +6,7 @@ import type {
   AppsListResponse,
   ConfigReadResponse,
   ConfigRequirementsReadResponse,
+  ConfigWriteResponse,
   ConsumeAccountRateLimitResetCreditResponse,
   FsGetMetadataResponse,
   FsReadFileResponse,
@@ -70,6 +71,7 @@ export const validateSkillsListResponse: StandaloneValidateFunction<SkillsListRe
 export const validateFuzzyFileSearchResponse: StandaloneValidateFunction<FuzzyFileSearchResponse>;
 export const validatePermissionProfileListResponse: StandaloneValidateFunction<PermissionProfileListResponse>;
 export const validateConfigReadResponse: StandaloneValidateFunction<ConfigReadResponse>;
+export const validateConfigWriteResponse: StandaloneValidateFunction<ConfigWriteResponse>;
 export const validateConfigRequirementsReadResponse: StandaloneValidateFunction<ConfigRequirementsReadResponse>;
 export const validateAppsListResponse: StandaloneValidateFunction<AppsListResponse>;
 export const validatePluginListResponse: StandaloneValidateFunction<PluginListResponse>;

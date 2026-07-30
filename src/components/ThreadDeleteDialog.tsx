@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef } from "react";
 
 import type { ThreadSummary } from "../app/useServerThreads";
 import { useModalLayer } from "./modalStack";
-import styles from "./ThreadDeleteDialog.module.css";
+import styles from "./DeleteDialog.module.css";
 
 export interface ThreadDeleteDialogProps {
   readonly deleting: boolean;

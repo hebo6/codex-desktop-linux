@@ -19,6 +19,12 @@ function completed<T>(value: T): RequestHandle<T> {
 
 function capabilityClient(
   readConfig: CapabilityClient["readConfig"],
+  writeConfigValue: CapabilityClient["writeConfigValue"] = () => completed({
+    filePath: "/config.toml",
+    overriddenMetadata: null,
+    status: "ok",
+    version: "sha256:updated",
+  }),
 ): CapabilityClient {
   return {
     listApps: () => completed({ data: [], nextCursor: null }),
@@ -29,6 +35,7 @@ function capabilityClient(
     readConfig,
     readConfigRequirements: () => completed({ requirements: null }),
     searchFiles: () => completed({ files: [] }),
+    writeConfigValue,
   };
 }
 
@@ -62,6 +69,40 @@ describe("useConfiguredProjects", () => {
     expect(() => configuredProjectDirectories({
       projects: ["/workspace/project"],
     })).toThrow("config.projects must be an object");
+  });
+
+  it("删除项目配置并立即从列表移除", async () => {
+    const writeConfigValue = vi.fn(() => completed({
+      filePath: "/config.toml",
+      overriddenMetadata: null,
+      status: "ok" as const,
+      version: "sha256:updated",
+    }));
+    const client = capabilityClient(
+      () => completed({
+        config: {
+          projects: {
+            "/workspace/team.alpha": { trust_level: "trusted" },
+            "/workspace/other": { trust_level: "trusted" },
+          },
+        },
+        origins: {},
+      }),
+      writeConfigValue,
+    );
+    const { result } = renderHook(() => useConfiguredProjects(client));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await result.current.remove("/workspace/team.alpha");
+
+    expect(writeConfigValue).toHaveBeenCalledWith({
+      keyPath: "projects.\"/workspace/team.alpha\"",
+      mergeStrategy: "replace",
+      value: null,
+    });
+    await waitFor(() =>
+      expect(result.current.directories).toEqual(["/workspace/other"])
+    );
   });
 
   it("配置读取失败时不提供项目目录", async () => {

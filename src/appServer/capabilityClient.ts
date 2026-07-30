@@ -4,6 +4,8 @@ import type {
   ConfigReadParams,
   ConfigReadResponse,
   ConfigRequirementsReadResponse,
+  ConfigValueWriteParams,
+  ConfigWriteResponse,
   FuzzyFileSearchParams,
   FuzzyFileSearchResponse,
   ModelListParams,
@@ -20,6 +22,7 @@ import {
   validateAppsListResponse,
   validateConfigReadResponse,
   validateConfigRequirementsReadResponse,
+  validateConfigWriteResponse,
   validateFuzzyFileSearchResponse,
   validateModelListResponse,
   validatePermissionProfileListResponse,
@@ -33,6 +36,7 @@ type CapabilitySession = Pick<AppServerSession, "sendRequest">;
 export interface CapabilityClient {
   listApps(params?: AppsListParams): RequestHandle<AppsListResponse>;
   readConfig(params?: ConfigReadParams): RequestHandle<ConfigReadResponse>;
+  writeConfigValue(params: ConfigValueWriteParams): RequestHandle<ConfigWriteResponse>;
   readConfigRequirements(): RequestHandle<ConfigRequirementsReadResponse>;
   listModels(params?: ModelListParams): RequestHandle<ModelListResponse>;
   listSkills(params?: SkillsListParams): RequestHandle<SkillsListResponse>;
@@ -59,6 +63,16 @@ export class AppServerCapabilityClient implements CapabilityClient {
       method: "config/read",
       params,
       validateResult: configReadResponseValidator,
+    });
+  }
+
+  writeConfigValue(
+    params: ConfigValueWriteParams,
+  ): RequestHandle<ConfigWriteResponse> {
+    return this.session.sendRequest({
+      method: "config/value/write",
+      params,
+      validateResult: configWriteResponseValidator,
     });
   }
 
@@ -116,6 +130,8 @@ const appsListResponseValidator: ResultValidator<AppsListResponse> =
   validateAppsListResponse;
 const configReadResponseValidator: ResultValidator<ConfigReadResponse> =
   validateConfigReadResponse;
+const configWriteResponseValidator: ResultValidator<ConfigWriteResponse> =
+  validateConfigWriteResponse;
 const configRequirementsReadResponseValidator: ResultValidator<ConfigRequirementsReadResponse> =
   validateConfigRequirementsReadResponse;
 

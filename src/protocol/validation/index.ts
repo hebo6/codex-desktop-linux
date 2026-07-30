@@ -28,6 +28,7 @@ import type {
   FuzzyFileSearchResponse,
   PermissionProfileListResponse,
   ConfigReadResponse,
+  ConfigWriteResponse,
   ConfigRequirementsReadResponse,
   AppsListResponse,
   PluginListResponse,
@@ -67,6 +68,7 @@ import {
   validateFuzzyFileSearchResponse as validateFuzzyFileSearchResponseSchema,
   validatePermissionProfileListResponse as validatePermissionProfileListResponseSchema,
   validateConfigReadResponse as validateConfigReadResponseSchema,
+  validateConfigWriteResponse as validateConfigWriteResponseSchema,
   validateConfigRequirementsReadResponse as validateConfigRequirementsReadResponseSchema,
   validateAppsListResponse as validateAppsListResponseSchema,
   validatePluginListResponse as validatePluginListResponseSchema,
@@ -387,6 +389,12 @@ export function validateConfigReadResponse(
   value: unknown,
 ): ProtocolValidationResult<ConfigReadResponse> {
   return validateWithSchema(value, validateConfigReadResponseSchema, "invalid_params", "params", "config/read 响应校验失败");
+}
+
+export function validateConfigWriteResponse(
+  value: unknown,
+): ProtocolValidationResult<ConfigWriteResponse> {
+  return validateWithSchema(value, validateConfigWriteResponseSchema, "invalid_params", "params", "config/value/write 响应校验失败");
 }
 
 export function validateConfigRequirementsReadResponse(

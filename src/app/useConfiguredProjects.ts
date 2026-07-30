@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { CapabilityClient } from "../appServer";
 import type { ConfigReadResponse } from "../protocol/generated";
@@ -7,20 +7,23 @@ export interface ConfiguredProjectsState {
   readonly directories: readonly string[];
   readonly loading: boolean;
   readonly error: string | null;
+  readonly remove: (directory: string) => Promise<void>;
 }
+
+type ConfiguredProjectsSnapshot = Omit<ConfiguredProjectsState, "remove">;
 
 const EMPTY_DIRECTORIES = Object.freeze([]) as readonly string[];
 const IDLE_STATE = Object.freeze({
   directories: EMPTY_DIRECTORIES,
   loading: false,
   error: null,
-}) satisfies ConfiguredProjectsState;
+}) satisfies ConfiguredProjectsSnapshot;
 
 export function useConfiguredProjects(
   client: CapabilityClient | null,
   refreshKey: string | null = null,
 ): ConfiguredProjectsState {
-  const [state, setState] = useState<ConfiguredProjectsState>(IDLE_STATE);
+  const [state, setState] = useState<ConfiguredProjectsSnapshot>(IDLE_STATE);
 
   useEffect(() => {
     let disposed = false;
@@ -69,7 +72,24 @@ export function useConfiguredProjects(
     };
   }, [client, refreshKey]);
 
-  return state;
+  const remove = useCallback(async (directory: string) => {
+    if (client === null) {
+      throw new TypeError("cannot remove a project without an app-server client");
+    }
+    await client.writeConfigValue({
+      keyPath: `projects.${JSON.stringify(directory)}`,
+      value: null,
+      mergeStrategy: "replace",
+    }).result;
+    setState((current) => ({
+      ...current,
+      directories: Object.freeze(
+        current.directories.filter((candidate) => candidate !== directory),
+      ),
+    }));
+  }, [client]);
+
+  return { ...state, remove };
 }
 
 export function configuredProjectDirectories(

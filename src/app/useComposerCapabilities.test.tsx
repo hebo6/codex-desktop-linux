@@ -52,6 +52,11 @@ describe("useComposerCapabilities", () => {
       }),
       readConfigRequirements: () => completed({ requirements: null }),
       searchFiles: () => completed({ files: [] }),
+      writeConfigValue: () => completed({
+        filePath: "/config.toml",
+        status: "ok",
+        version: "sha256:updated",
+      }),
     } satisfies CapabilityClient;
 
     const { result } = renderHook(() => useComposerCapabilities(client, "/workspace"));
@@ -121,6 +126,11 @@ describe("useComposerCapabilities", () => {
       }),
       readConfigRequirements: () => completed({ requirements: null }),
       searchFiles: () => completed({ files: [] }),
+      writeConfigValue: () => completed({
+        filePath: "/config.toml",
+        status: "ok",
+        version: "sha256:updated",
+      }),
     } satisfies CapabilityClient;
     const { result } = renderHook(() => useComposerCapabilities(client, "/workspace"));
     await waitFor(() => expect(result.current.modelsLoading).toBe(false));
@@ -176,6 +186,11 @@ describe("useComposerCapabilities", () => {
         },
       }),
       searchFiles: () => completed({ files: [] }),
+      writeConfigValue: () => completed({
+        filePath: "/config.toml",
+        status: "ok",
+        version: "sha256:updated",
+      }),
     } satisfies CapabilityClient;
 
     const { result } = renderHook(() => useComposerCapabilities(client, "/workspace"));

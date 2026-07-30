@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import type { ExtractedLink } from "../content/linkResolver";
 import { useModalLayer } from "./modalStack";
-import styles from "./ThreadDeleteDialog.module.css";
+import styles from "./DeleteDialog.module.css";
 
 export function ExternalLinkDialog({
   link,

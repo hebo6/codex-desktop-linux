@@ -27,6 +27,11 @@ describe("AppServerCapabilityClient", () => {
     client.searchFiles({ query: "readme", roots: ["/workspace"], cancellationToken: "search-1" });
     client.listPermissionProfiles({ cwd: "/workspace" });
     client.readConfig({ cwd: "/workspace", includeLayers: false });
+    client.writeConfigValue({
+      keyPath: "projects.\"/workspace\"",
+      mergeStrategy: "replace",
+      value: null,
+    });
     client.readConfigRequirements();
     client.listApps({ limit: 100 });
     client.listPlugins({ cwds: ["/workspace"] });
@@ -40,6 +45,14 @@ describe("AppServerCapabilityClient", () => {
       },
       { method: "permissionProfile/list", params: { cwd: "/workspace" } },
       { method: "config/read", params: { cwd: "/workspace", includeLayers: false } },
+      {
+        method: "config/value/write",
+        params: {
+          keyPath: "projects.\"/workspace\"",
+          mergeStrategy: "replace",
+          value: null,
+        },
+      },
       { method: "configRequirements/read", params: undefined },
       { method: "app/list", params: { limit: 100 } },
       { method: "plugin/list", params: { cwds: ["/workspace"] } },
