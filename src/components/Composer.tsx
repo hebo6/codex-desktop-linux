@@ -140,7 +140,7 @@ export interface ComposerProps {
   readonly defaultPermission?: string | null;
   readonly permissions?: readonly PermissionProfileSummary[];
   readonly permissionsLoading?: boolean;
-  readonly recentCwds?: readonly string[];
+  readonly projectCwds?: readonly string[];
   readonly mentionReferences?: readonly ComposerMentionReference[];
   readonly mentionsLoading?: boolean;
   readonly mentionsError?: string | null;
@@ -195,7 +195,7 @@ export function Composer({
   defaultPermission = null,
   permissions = [],
   permissionsLoading = false,
-  recentCwds = [],
+  projectCwds = [],
   mentionReferences = [],
   mentionsLoading = false,
   mentionsError = null,
@@ -357,14 +357,7 @@ export function Composer({
     : savedPrompts.prompts.filter((prompt) =>
       `${prompt.name}\n${prompt.content}`.toLocaleLowerCase().includes(normalizedSavedPromptQuery)),
   [normalizedSavedPromptQuery, savedPrompts.prompts]);
-  const cwdOptions = useMemo(() => {
-    const directories = new Set(recentCwds.map((directory) => directory.trim()));
-    directories.delete("");
-    if (cwd !== null) {
-      directories.add(cwd);
-    }
-    return [...directories];
-  }, [cwd, recentCwds]);
+  const cwdOptions = projectCwds;
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -1933,7 +1926,7 @@ function ProjectPicker({
       {open ? (
         <div aria-label="项目设置" className={styles.projectMenu} id={listboxId} role="dialog">
           {directories.length === 0 ? (
-            <p>尚无最近项目</p>
+            <p>尚无配置项目</p>
           ) : (
             <div aria-label="选择项目" className={styles.projectOptions} role="listbox">
               {directories.map((directory, index) => (

@@ -19,6 +19,7 @@ import type { ServerConnectionTestControllerOptions } from "./app/useServerConne
 import type { ServerProfileMutationCommands } from "./app/useServerProfileMutations";
 import type { WindowStateControllerOptions } from "./app/useWindowState";
 import {
+  AppServerCapabilityClient,
   AppServerConversationClient,
   AppServerThreadClient,
   type ServerConnectionTestProbe,
@@ -26,7 +27,6 @@ import {
 import {
   App,
   collectHighRiskServerIds,
-  recentWorkingDirectories,
   type AppWindowOpener,
   type CredentialStorageStatusLoader,
 } from "./App";
@@ -386,15 +386,6 @@ describe("App", () => {
     expect(setServerCredential).toHaveBeenCalledWith(
       expect.objectContaining({ plaintextFallbackConfirmed: true }),
     );
-  });
-
-  it("按会话新旧顺序提取去重后的最近工作目录", () => {
-    expect(recentWorkingDirectories([
-      { cwd: "/workspace/alpha" },
-      { cwd: "/workspace/beta" },
-      { cwd: " /workspace/alpha " },
-      { cwd: "" },
-    ])).toEqual(["/workspace/alpha", "/workspace/beta"]);
   });
 
   it("快速切换和新建入口在末尾追加标签并保留各自草稿", async () => {
@@ -1160,7 +1151,7 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: /停止/u })).not.toBeInTheDocument();
   });
 
-  it("没有已打开会话时默认选择最近项目", async () => {
+  it("没有已打开会话时仅从配置选择项目", async () => {
     const recentThread = {
       cliVersion: "1.0.0",
       createdAt: 200,
@@ -1189,16 +1180,32 @@ describe("App", () => {
         return {
           cancel: () => undefined,
           id: `request:${request.method}`,
-          result: Promise.resolve(
-            request.method === "thread/list"
-              ? { data: [recentThread, olderThread], nextCursor: null }
-              : {},
-          ),
+          result: Promise.resolve(request.method === "thread/list"
+            ? { data: [recentThread, olderThread], nextCursor: null }
+            : request.method === "config/read"
+              ? {
+                  config: {
+                    projects: {
+                      "/workspace/config-project": {
+                        trust_level: "trusted",
+                      },
+                    },
+                  },
+                  origins: {},
+                }
+              : request.method === "model/list"
+                ? { data: [], nextCursor: null }
+                : request.method === "permissionProfile/list"
+                  ? { data: [], nextCursor: null }
+                  : request.method === "configRequirements/read"
+                    ? { requirements: null }
+                    : {}),
         };
       },
       subscribeNotifications: () => () => undefined,
     };
     const sessionFactory: ConfiguredServerSessionFactory = (options) => ({
+      capabilityClient: new AppServerCapabilityClient(requestSession as never),
       threadClient: new AppServerThreadClient(requestSession as never),
       async start() {
         options.onStateChange({
@@ -1237,8 +1244,14 @@ describe("App", () => {
     });
 
     const projectPicker = await screen.findByRole("button", { name: "项目" });
-    await waitFor(() => expect(projectPicker).toHaveAttribute("title", recentThread.cwd));
-    expect(projectPicker).toHaveTextContent("recent");
+    await waitFor(() =>
+      expect(projectPicker).toHaveAttribute("title", "/workspace/config-project"),
+    );
+    expect(projectPicker).toHaveTextContent("config-project");
+    await userEvent.setup().click(projectPicker);
+    expect(screen.getByRole("option", { name: /config-project/u })).toBeVisible();
+    expect(screen.queryByRole("option", { name: /recent/u })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /configured/u })).not.toBeInTheDocument();
   });
 
   it("在服务器选择器展示其他窗口共享物理连接的权威状态", async () => {

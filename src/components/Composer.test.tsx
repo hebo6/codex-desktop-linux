@@ -699,7 +699,7 @@ describe("Composer", () => {
   it("仅在新建会话页通过 Ctrl+O 打开项目选择器", () => {
     const view = renderComposer({
       onCwdChange: vi.fn(),
-      recentCwds: ["/workspace/project", "/workspace/other"],
+      projectCwds: ["/workspace/project", "/workspace/other"],
     });
 
     fireEvent.keyDown(window, { ctrlKey: true, key: "o" });
@@ -1344,13 +1344,13 @@ describe("Composer", () => {
     expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
   });
 
-  it("支持切换最近目录和输入绝对路径且结构化令牌需两次退格删除", async () => {
+  it("支持切换配置项目和输入绝对路径且结构化令牌需两次退格删除", async () => {
     const user = userEvent.setup();
     const onCwdChange = vi.fn();
     renderComposer({
       cwd: null,
       onCwdChange,
-      recentCwds: ["/workspace/recent", "/workspace/recent"],
+      projectCwds: ["/workspace/recent"],
       onLoadSkills: vi.fn(async () => undefined),
       skills: [{ description: "部署", enabled: true, name: "deploy", path: "/skills/deploy", scope: "repo" }],
     });
@@ -1370,6 +1370,11 @@ describe("Composer", () => {
     await user.type(cwdInput, "/remote/project");
     await user.click(screen.getByRole("button", { name: "应用" }));
     expect(onCwdChange).toHaveBeenCalledWith("/remote/project");
+
+    await user.click(cwdPicker);
+    expect(screen.getByRole("option", { name: /recent/u })).toBeVisible();
+    expect(screen.queryByRole("option", { name: /remote\/project/u })).not.toBeInTheDocument();
+    await user.click(cwdPicker);
 
     const editor = screen.getByRole("textbox", { name: "任务输入" });
     await user.type(editor, "$dep");

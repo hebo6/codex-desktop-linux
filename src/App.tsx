@@ -12,6 +12,7 @@ import {
 import { useConversation } from "./app/useConversation";
 import { useBackgroundTerminals } from "./app/useBackgroundTerminals";
 import { useComposerCapabilities } from "./app/useComposerCapabilities";
+import { useConfiguredProjects } from "./app/useConfiguredProjects";
 import { useTurnPlan } from "./app/useTurnPlan";
 import {
   useServerProfileMutations,
@@ -441,13 +442,14 @@ export function App({
   const configuredCwd = selectedServer?.configuration.type === "localStdio"
     ? selectedServer.configuration.defaultWorkingDirectory ?? null
     : null;
-  const recentCwds = useMemo(
-    () => recentWorkingDirectories(serverThreads.threads),
-    [serverThreads.threads],
+  const configuredProjects = useConfiguredProjects(
+    connection.capabilityClient,
+    currentThreadId === null ? activeTabId : null,
   );
+  const projectCwds = configuredProjects.directories;
   const composerCwd = restoredThread?.metadata.cwd
     ?? draftCwd
-    ?? recentCwds[0]
+    ?? projectCwds[0]
     ?? configuredCwd;
   const composerCapabilities = useComposerCapabilities(
     connection.capabilityClient,
@@ -1869,7 +1871,7 @@ export function App({
         : serverThreads.threads.find(({ id }) => id === tab.threadId);
       const cwd = thread?.cwd ||
         (tab.threadId === null
-          ? draftCwds.get(tab.id) ?? recentCwds[0] ?? configuredCwd
+          ? draftCwds.get(tab.id) ?? projectCwds[0] ?? configuredCwd
           : null);
       const waiting = tab.threadId === null
         ? undefined
@@ -1898,8 +1900,8 @@ export function App({
       boundServerName,
       configuredCwd,
       draftCwds,
-      recentCwds,
       pendingThreadResults.pendingThreadIds,
+      projectCwds,
       serverInteractions.pending,
       serverThreads.threads,
       windowTabs,
@@ -1976,7 +1978,11 @@ export function App({
               ) ? (
                 <Composer
                   activeTurn={conversation.activeTurnId !== null}
-                  capabilitiesError={composerCapabilities.error}
+                  capabilitiesError={
+                    currentThreadId === null
+                      ? configuredProjects.error ?? composerCapabilities.error
+                      : composerCapabilities.error
+                  }
                   canRunImmediateCommands={
                     currentThreadId !== null
                   }
@@ -2057,7 +2063,7 @@ export function App({
                   onStop={conversation.stop}
                   permissions={composerCapabilities.permissions}
                   permissionsLoading={composerCapabilities.permissionsLoading}
-                  recentCwds={recentCwds}
+                  projectCwds={projectCwds}
                   skills={composerCapabilities.skills}
                   skillsLoading={composerCapabilities.skillsLoading}
                   shellCommandActive={conversation.shellCommandActive}
@@ -2476,19 +2482,6 @@ export function disableRequestedNotifications(
       ? { notifyConnectionFailure: false }
       : {}),
   };
-}
-
-export function recentWorkingDirectories(
-  threads: readonly Pick<ThreadSummary, "cwd">[],
-): readonly string[] {
-  const directories = new Set<string>();
-  for (const thread of threads) {
-    const cwd = thread.cwd.trim();
-    if (cwd.length > 0) {
-      directories.add(cwd);
-    }
-  }
-  return Object.freeze([...directories]);
 }
 
 function composerDraftKey(
