@@ -733,7 +733,7 @@ describe("ConversationView", () => {
     );
   });
 
-  it("最终回答开始时重新定位视口上方活动并恢复自动跟随", async () => {
+  it("最终回答开始时将当前问题重新定位到首问位置并恢复自动跟随", async () => {
     const viewportHeight = 600;
     let contentHeight = 1_800;
     let finalAnswerDocumentTop = 1_700;
@@ -833,6 +833,19 @@ describe("ConversationView", () => {
             toJSON: () => ({}),
           };
         }
+        if (this.matches("[data-user-message]")) {
+          return {
+            bottom: 102 - scrollTop,
+            height: 50,
+            left: 0,
+            right: 680,
+            top: 52 - scrollTop,
+            width: 680,
+            x: 0,
+            y: 52 - scrollTop,
+            toJSON: () => ({}),
+          };
+        }
         if (
           this.matches(
             '[data-item-id="answer-final-position"][data-final-answer="true"]',
@@ -887,6 +900,11 @@ describe("ConversationView", () => {
         );
       },
     });
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
+      });
+    });
     userScroll(scroller, 800);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
 
@@ -908,14 +926,11 @@ describe("ConversationView", () => {
       />,
     );
 
-    const finalAnswer = screen.getByText("最终回答开始").closest<HTMLElement>(
-      '[data-final-answer="true"]',
+    const question = screen.getByText("检查最终回答定位").closest<HTMLElement>(
+      "[data-user-message]",
     );
-    await waitFor(() => expect(finalAnswer?.getBoundingClientRect().top).toBe(52));
-    expect(scroller.scrollTop).toBe(1_648);
-    expect(scroller.scrollTop).toBe(
-      scroller.scrollHeight - scroller.clientHeight,
-    );
+    await waitFor(() => expect(question?.getBoundingClientRect().top).toBe(52));
+    expect(scroller.scrollTop).toBe(0);
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
 
@@ -923,8 +938,8 @@ describe("ConversationView", () => {
     finalAnswerDocumentTop = 400;
     act(() => contentResize?.());
 
-    await waitFor(() => expect(finalAnswer?.getBoundingClientRect().top).toBe(52));
-    expect(scroller.scrollTop).toBe(348);
+    await waitFor(() => expect(question?.getBoundingClientRect().top).toBe(52));
+    expect(scroller.scrollTop).toBe(0);
     expect(scroller.scrollTop).toBe(
       scroller.scrollHeight - scroller.clientHeight,
     );

@@ -169,13 +169,13 @@ interface HistoryQuestion {
 interface RunningTurnFloor {
   readonly contentHeight: number;
   readonly floorHeight: number;
-  readonly kind: "answer" | "page" | "question";
+  readonly kind: "finalQuestion" | "page" | "question";
   readonly turnId: string;
   readonly viewportHeight: number;
 }
 
-interface PendingFinalAnswerPosition {
-  readonly itemId: string;
+interface PendingFinalAnswerQuestionPosition {
+  readonly questionItemId: string;
   readonly turnId: string;
 }
 
@@ -210,8 +210,8 @@ export function ConversationView({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pendingQuestionPositionRef = useRef<string | null>(null);
-  const pendingFinalAnswerPositionRef =
-    useRef<PendingFinalAnswerPosition | null>(null);
+  const pendingFinalAnswerQuestionPositionRef =
+    useRef<PendingFinalAnswerQuestionPosition | null>(null);
   const pendingHistoryAnchorRef = useRef<{
     readonly firstTurnId: string | null;
     readonly scrollHeight: number;
@@ -249,6 +249,13 @@ export function ConversationView({
   const runningTurnId = runningTurn?.id ?? null;
   const runningFinalAnswer =
     runningTurn?.items.find(isFinalAnswer) ?? null;
+  const runningQuestion =
+    runningTurnId === null
+      ? null
+      : historyQuestions.findLast((question) => {
+        const row = rows[question.rowIndex];
+        return row?.type === "segment" && row.turn.id === runningTurnId;
+      }) ?? null;
   const observedRunningFinalAnswerRef = useRef({
     itemId: runningFinalAnswer?.id ?? null,
     threadId: restoredThread.metadata.id,
@@ -288,6 +295,19 @@ export function ConversationView({
       return conversationListTop(scroller) + rowElement.offsetTop + rowPadding;
     },
     [historyQuestions],
+  );
+
+  const questionTargetTop = useCallback(
+    (
+      scroller: HTMLDivElement,
+      question: HistoryQuestion,
+    ): number | null => {
+      const top = questionTop(question);
+      return top === null
+        ? null
+        : Math.max(0, top - initialQuestionTop(scroller));
+    },
+    [questionTop],
   );
 
   const updateBottomState = useCallback(
@@ -334,37 +354,36 @@ export function ConversationView({
     setShowJumpToBottom(false);
   }, []);
 
-  const positionPendingFinalAnswer = useCallback(
+  const positionPendingFinalAnswerQuestion = useCallback(
     (scroller: HTMLDivElement) => {
-      const pending = pendingFinalAnswerPositionRef.current;
+      const pending = pendingFinalAnswerQuestionPositionRef.current;
       if (pending === null) {
         return false;
       }
       if (
         !runningTurnFloorVisible ||
-        runningTurnFloor?.kind !== "answer" ||
+        runningTurnFloor?.kind !== "finalQuestion" ||
         runningTurnFloor.turnId !== pending.turnId
       ) {
         return true;
       }
-      const source = conversationItemElement(scroller, pending.itemId);
-      if (source === null) {
-        pendingFinalAnswerPositionRef.current = null;
+      const question = historyQuestions.find(
+        ({ itemId }) => itemId === pending.questionItemId,
+      );
+      if (question === undefined) {
+        pendingFinalAnswerQuestionPositionRef.current = null;
         return false;
       }
       const content = contentRef.current;
       if (content === null) {
         return true;
       }
+      const targetTop = questionTargetTop(scroller, question);
+      if (targetTop === null) {
+        return true;
+      }
       const contentRect = content.getBoundingClientRect();
-      const sourceRect = source.getBoundingClientRect();
       const scrollerRect = scroller.getBoundingClientRect();
-      const sourceTop =
-        scroller.scrollTop + sourceRect.top - scrollerRect.top;
-      const targetTop = Math.max(
-        0,
-        sourceTop - initialQuestionTop(scroller),
-      );
       const floorHeight = targetTop + scroller.clientHeight;
       if (
         Math.abs(runningTurnFloor.floorHeight - floorHeight) >
@@ -389,7 +408,7 @@ export function ConversationView({
       followBottomRef.current = true;
       setShowJumpToBottom(false);
       if (!turnHasMountedActivityContent(scroller, pending.turnId)) {
-        pendingFinalAnswerPositionRef.current = null;
+        pendingFinalAnswerQuestionPositionRef.current = null;
         if (contentRect.bottom >= scrollerRect.bottom - BOTTOM_THRESHOLD) {
           const naturalBottom =
             scroller.scrollTop + contentRect.bottom - scrollerRect.top;
@@ -406,7 +425,12 @@ export function ConversationView({
       }
       return true;
     },
-    [runningTurnFloor, runningTurnFloorVisible],
+    [
+      historyQuestions,
+      questionTargetTop,
+      runningTurnFloor,
+      runningTurnFloorVisible,
+    ],
   );
 
   const requestOlderTurns = useCallback(() => {
@@ -452,7 +476,7 @@ export function ConversationView({
 
   const followContent = useCallback(
     (scroller: HTMLDivElement) => {
-      if (positionPendingFinalAnswer(scroller)) {
+      if (positionPendingFinalAnswerQuestion(scroller)) {
         return;
       }
       if (pendingQuestionPositionRef.current !== null) {
@@ -536,7 +560,7 @@ export function ConversationView({
       runningTurnId,
       runningTurnFloor,
       runningTurnFloorVisible,
-      positionPendingFinalAnswer,
+      positionPendingFinalAnswerQuestion,
       scrollToBottom,
     ],
   );
@@ -631,14 +655,10 @@ export function ConversationView({
       pendingQuestionPositionRef.current = null;
       return;
     }
-    const top = questionTop(question);
-    if (top === null) {
+    const targetTop = questionTargetTop(scroller, question);
+    if (targetTop === null) {
       return;
     }
-    const targetTop = Math.max(
-      0,
-      top - initialQuestionTop(scroller),
-    );
     const floorHeight = targetTop + scroller.clientHeight;
     if (
       Math.abs(runningTurnFloor.floorHeight - floorHeight) > BOTTOM_THRESHOLD ||
@@ -656,7 +676,7 @@ export function ConversationView({
     pendingQuestionPositionRef.current = null;
   }, [
     historyQuestions,
-    questionTop,
+    questionTargetTop,
     runningTurnFloor,
     runningTurnFloorVisible,
     scrollerHeight,
@@ -673,19 +693,20 @@ export function ConversationView({
       observed.threadId !== current.threadId ||
       current.itemId === null ||
       observed.itemId === current.itemId ||
-      runningTurnId === null
+      runningTurnId === null ||
+      runningQuestion === null
     ) {
       return;
     }
     const scroller = scrollerRef.current;
     const content = contentRef.current;
-    const source = scroller === null
+    const finalAnswer = scroller === null
       ? null
       : conversationItemElement(scroller, current.itemId);
     if (
       scroller === null ||
       content === null ||
-      source === null ||
+      finalAnswer === null ||
       (
         !followBottomRef.current &&
         !turnActivityHeaderIsAboveViewport(scroller, runningTurnId)
@@ -693,17 +714,13 @@ export function ConversationView({
     ) {
       return;
     }
-    const sourceRect = source.getBoundingClientRect();
-    const scrollerRect = scroller.getBoundingClientRect();
-    const sourceTop =
-      scroller.scrollTop + sourceRect.top - scrollerRect.top;
-    const targetTop = Math.max(
-      0,
-      sourceTop - initialQuestionTop(scroller),
-    );
+    const targetTop = questionTargetTop(scroller, runningQuestion);
+    if (targetTop === null) {
+      return;
+    }
     pendingQuestionPositionRef.current = null;
-    pendingFinalAnswerPositionRef.current = {
-      itemId: current.itemId,
+    pendingFinalAnswerQuestionPositionRef.current = {
+      questionItemId: runningQuestion.itemId,
       turnId: runningTurnId,
     };
     followBottomRef.current = true;
@@ -711,14 +728,16 @@ export function ConversationView({
     setRunningTurnFloor({
       contentHeight: content.getBoundingClientRect().height,
       floorHeight: targetTop + scroller.clientHeight,
-      kind: "answer",
+      kind: "finalQuestion",
       turnId: runningTurnId,
       viewportHeight: scroller.clientHeight,
     });
   }, [
     restoredThread.metadata.id,
     runningFinalAnswer?.id,
+    runningQuestion,
     runningTurnId,
+    questionTargetTop,
   ]);
 
   useLayoutEffect(() => {
@@ -774,7 +793,7 @@ export function ConversationView({
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     pendingQuestionPositionRef.current = null;
-    pendingFinalAnswerPositionRef.current = null;
+    pendingFinalAnswerQuestionPositionRef.current = null;
     setRunningTurnFloor(null);
     followBottomRef.current = true;
     setShowJumpToBottom(false);
