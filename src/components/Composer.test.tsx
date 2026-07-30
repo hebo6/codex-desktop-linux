@@ -134,6 +134,76 @@ describe("Composer", () => {
     ), { timeout: 1_500 });
   });
 
+  it("切换草稿键时保存并恢复各自内容", async () => {
+    const drafts = new Map<string, StoredDraft>([
+      ["tab:a", { text: "草稿 A", tokens: [] }],
+      ["tab:b", { text: "草稿 B", tokens: [] }],
+    ]);
+    const draftStore: DraftStore = {
+      listKeys: vi.fn(async () => [...drafts.keys()]),
+      load: vi.fn(async (draftKey) => drafts.get(draftKey) ?? null),
+      save: vi.fn(async (draftKey, draft) => {
+        drafts.set(draftKey, draft);
+      }),
+      delete: vi.fn(async (draftKey) => {
+        drafts.delete(draftKey);
+      }),
+      transition: vi.fn(async () => undefined),
+    };
+
+    function Harness() {
+      const [draftKey, setDraftKey] = useState("tab:a");
+      return (
+        <>
+          <button onClick={() => setDraftKey("tab:a")} type="button">
+            标签 A
+          </button>
+          <button onClick={() => setDraftKey("tab:b")} type="button">
+            标签 B
+          </button>
+          <Composer
+            activeTurn={false}
+            cwd="/workspace/project"
+            draftKey={draftKey}
+            draftStore={draftStore}
+            error={null}
+            onRunShellCommand={async () => true}
+            onSend={async () => true}
+            onStop={async () => true}
+            showProjectPicker
+            stopping={false}
+            submitting={false}
+          />
+        </>
+      );
+    }
+
+    render(<Harness />);
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", {
+      name: "任务输入",
+    });
+    await waitFor(() => expect(editor).toHaveValue("草稿 A"));
+
+    fireEvent.change(editor, { target: { value: "修改后的草稿 A" } });
+    fireEvent.click(screen.getByRole("button", { name: "标签 B" }));
+    await waitFor(() => expect(draftStore.save).toHaveBeenCalledWith(
+      "tab:a",
+      { text: "修改后的草稿 A", tokens: [] },
+    ));
+    await waitFor(() => expect(editor).toHaveValue("草稿 B"));
+
+    fireEvent.change(editor, { target: { value: "修改后的草稿 B" } });
+    fireEvent.click(screen.getByRole("button", { name: "标签 A" }));
+    await waitFor(() => expect(draftStore.save).toHaveBeenCalledWith(
+      "tab:b",
+      { text: "修改后的草稿 B", tokens: [] },
+    ));
+    await waitFor(() => expect(editor).toHaveValue("修改后的草稿 A"));
+
+    fireEvent.click(screen.getByRole("button", { name: "标签 B" }));
+    await waitFor(() => expect(editor).toHaveValue("修改后的草稿 B"));
+  });
+
   it("Enter 发送成功后清空，Shift+Enter 保留换行", async () => {
     const user = userEvent.setup();
     const { onSend } = renderComposer();
