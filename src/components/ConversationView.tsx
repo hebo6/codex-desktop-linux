@@ -22,6 +22,7 @@ import {
   type BlobUrlFactory,
 } from "../content/useBlobUrl";
 import { recordConversationFirstCommit } from "../diagnostics/conversationLoadDiagnostics";
+import { AnsiCommandOutput } from "./AnsiCommandOutput";
 import { markdownToPlainText, SafeMarkdown } from "./SafeMarkdown";
 import styles from "./ConversationView.module.css";
 
@@ -1554,7 +1555,7 @@ function CommandActivity({
       label={commandActivityTitle(item)}
       status={item.status}
     >
-      {output === null ? null : <pre>{output}</pre>}
+      {output === null ? null : <AnsiCommandOutput output={output} />}
     </ActivityDisclosure>
   );
 }

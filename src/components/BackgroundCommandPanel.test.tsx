@@ -67,7 +67,8 @@ describe("BackgroundCommandPanel", () => {
     vi.setSystemTime(new Date("2026-07-24T00:00:00Z"));
     const observedAt = Date.now();
     const command = {
-      aggregatedOutput: "第一行输出\n第二行输出\n最后一行输出\n",
+      aggregatedOutput:
+        "第一行输出\n第二行输出\n\u001b[32m最后一行输出\u001b[0m\n",
       command: "pnpm test -- --runInBand && pnpm build",
       commandActions: [] as never[],
       cwd: "/workspace/project",
@@ -108,9 +109,12 @@ describe("BackgroundCommandPanel", () => {
     }));
 
     expect(screen.getByText(command.command)).toBeVisible();
-    expect(screen.getByLabelText("命令输出").textContent).toBe(
-      command.aggregatedOutput,
+    expect(screen.getByLabelText("命令输出")).toHaveTextContent(
+      "第一行输出 第二行输出 最后一行输出",
     );
+    expect(screen.getByText("最后一行输出")).toHaveStyle({
+      color: "var(--ansi-color-2)",
+    });
   });
 
   it("可以终止当前会话中的所有运行命令", async () => {

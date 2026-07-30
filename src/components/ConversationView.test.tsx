@@ -1291,7 +1291,7 @@ describe("ConversationView", () => {
       items: [
         ...thinkingTurn.items,
         {
-          aggregatedOutput: "处理中",
+          aggregatedOutput: "\u001b[32m处理中\u001b[0m",
           command: "pnpm test",
           commandActions: [],
           cwd: "/workspace/project",
@@ -1313,6 +1313,9 @@ describe("ConversationView", () => {
     expect(screen.queryByText("处理中")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Running pnpm test" }));
     await waitFor(() => expect(screen.getByText("处理中")).toBeVisible());
+    expect(screen.getByText("处理中")).toHaveStyle({
+      color: "var(--ansi-color-2)",
+    });
   });
 
   it("用户停止后保留最终回答并以中性标题冻结耗时", () => {

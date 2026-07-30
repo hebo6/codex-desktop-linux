@@ -8,6 +8,7 @@ import {
 
 import type { ObservedBackgroundTerminal } from "../app/useBackgroundTerminals";
 import type { ThreadTurn } from "../app/useServerThreads";
+import { AnsiCommandOutput } from "./AnsiCommandOutput";
 import { ComposerAccessoryDisclosure } from "./ComposerAccessoryPanel";
 import styles from "./BackgroundCommandPanel.module.css";
 
@@ -228,7 +229,7 @@ function CommandOutput({
 
   return (
     <div className={styles.output}>
-      <samp
+      <AnsiCommandOutput
         aria-label="命令输出"
         onScroll={(event) => {
           const element = event.currentTarget;
@@ -237,10 +238,9 @@ function CommandOutput({
             element.clientHeight;
           updateFollowing(distanceToBottom <= OUTPUT_BOTTOM_THRESHOLD_PX);
         }}
+        output={output}
         ref={outputRef}
-      >
-        {output}
-      </samp>
+      />
       {following ? null : (
         <button
           aria-label={hasNewOutput ? "有新输出，回到最新" : "回到最新输出"}

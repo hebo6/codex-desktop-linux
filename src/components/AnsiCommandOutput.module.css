@@ -1,0 +1,93 @@
+.output {
+  --ansi-default-background: var(--color-content-bg);
+  --ansi-default-foreground: var(--color-text-primary);
+  --ansi-color-0: #242422;
+  --ansi-color-1: #b43b31;
+  --ansi-color-2: #347a47;
+  --ansi-color-3: #8d6500;
+  --ansi-color-4: #2b64c8;
+  --ansi-color-5: #8854a3;
+  --ansi-color-6: #147486;
+  --ansi-color-7: #d8d7d1;
+  --ansi-color-8: #77756f;
+  --ansi-color-9: #d55248;
+  --ansi-color-10: #469259;
+  --ansi-color-11: #ad7d08;
+  --ansi-color-12: #4e7fd7;
+  --ansi-color-13: #a36cc0;
+  --ansi-color-14: #258b9d;
+  --ansi-color-15: #f8f8f7;
+  --ansi-foreground-0: #242422;
+  --ansi-foreground-7: #5f5e59;
+  --ansi-foreground-15: #242422;
+}
+
+.output > span[data-ansi-bold="true"] {
+  font-weight: 600;
+}
+
+.output > span[data-ansi-dim="true"] {
+  opacity: 0.68;
+}
+
+.output > span[data-ansi-italic="true"] {
+  font-style: italic;
+}
+
+.output > span[data-ansi-underline="true"] {
+  text-decoration-line: underline;
+}
+
+.output > span[data-ansi-strikethrough="true"] {
+  text-decoration-line: line-through;
+}
+
+.output > span[data-ansi-underline="true"][data-ansi-strikethrough="true"] {
+  text-decoration-line: underline line-through;
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(:root:not([data-theme="light"])) .output {
+    --ansi-color-0: #242422;
+    --ansi-color-1: #e36c60;
+    --ansi-color-2: #65b86f;
+    --ansi-color-3: #d7a548;
+    --ansi-color-4: #72a7ff;
+    --ansi-color-5: #c58be2;
+    --ansi-color-6: #5db7c5;
+    --ansi-color-7: #aaa8a1;
+    --ansi-color-8: #77756f;
+    --ansi-color-9: #f08074;
+    --ansi-color-10: #7bc986;
+    --ansi-color-11: #e4b85e;
+    --ansi-color-12: #8eb7ff;
+    --ansi-color-13: #d8a2ed;
+    --ansi-color-14: #78cad5;
+    --ansi-color-15: #eeede9;
+    --ansi-foreground-0: #77756f;
+    --ansi-foreground-7: #aaa8a1;
+    --ansi-foreground-15: #eeede9;
+  }
+}
+
+:global(:root[data-theme="dark"]) .output {
+  --ansi-color-0: #242422;
+  --ansi-color-1: #e36c60;
+  --ansi-color-2: #65b86f;
+  --ansi-color-3: #d7a548;
+  --ansi-color-4: #72a7ff;
+  --ansi-color-5: #c58be2;
+  --ansi-color-6: #5db7c5;
+  --ansi-color-7: #aaa8a1;
+  --ansi-color-8: #77756f;
+  --ansi-color-9: #f08074;
+  --ansi-color-10: #7bc986;
+  --ansi-color-11: #e4b85e;
+  --ansi-color-12: #8eb7ff;
+  --ansi-color-13: #d8a2ed;
+  --ansi-color-14: #78cad5;
+  --ansi-color-15: #eeede9;
+  --ansi-foreground-0: #77756f;
+  --ansi-foreground-7: #aaa8a1;
+  --ansi-foreground-15: #eeede9;
+}
