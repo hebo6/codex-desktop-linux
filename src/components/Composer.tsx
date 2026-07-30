@@ -1875,6 +1875,7 @@ function ProjectPicker({
 }) {
   const listboxId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
+  const focusedOptionRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const selectedIndex = cwd === null ? -1 : directories.indexOf(cwd);
@@ -1898,6 +1899,14 @@ function ProjectPicker({
   useEffect(() => {
     if (disabled) setOpen(false);
   }, [disabled]);
+
+  useEffect(() => {
+    if (!open) return;
+    focusedOptionRef.current?.scrollIntoView?.({
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [focusedIndex, open]);
 
   useEffect(() => {
     if (disabled) {
@@ -1980,6 +1989,7 @@ function ProjectPicker({
                   data-selected={directory === cwd}
                   key={directory}
                   onMouseMove={() => setFocusedIndex(index)}
+                  ref={index === focusedIndex ? focusedOptionRef : undefined}
                   role="presentation"
                 >
                   <button

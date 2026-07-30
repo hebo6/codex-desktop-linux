@@ -782,6 +782,28 @@ describe("Composer", () => {
     expect(screen.queryByRole("dialog", { name: "项目设置" })).not.toBeInTheDocument();
   });
 
+  it("键盘切换项目时将高亮项目滚动到可视区域", async () => {
+    const user = userEvent.setup();
+    renderComposer({
+      onCwdChange: vi.fn(),
+      projectCwds: ["/workspace/project", "/workspace/other"],
+    });
+
+    const projectPicker = screen.getByRole("button", { name: "项目" });
+    await user.click(projectPicker);
+    const otherProject = screen.getByRole("option", { name: /other/u }).parentElement;
+    const scrollIntoView = vi.fn();
+    if (otherProject === null) throw new Error("缺少项目选项容器");
+    otherProject.scrollIntoView = scrollIntoView;
+
+    fireEvent.keyDown(projectPicker, { key: "ArrowDown" });
+
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      block: "nearest",
+      inline: "nearest",
+    });
+  });
+
   it("在项目下拉框中删除任意受信任项目", async () => {
     const user = userEvent.setup();
     const onDeleteProject = vi.fn(async () => undefined);
