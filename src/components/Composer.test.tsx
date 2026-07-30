@@ -782,7 +782,7 @@ describe("Composer", () => {
     expect(screen.queryByRole("dialog", { name: "项目设置" })).not.toBeInTheDocument();
   });
 
-  it("在项目选择器右侧删除当前受信任项目", async () => {
+  it("在项目下拉框中删除任意受信任项目", async () => {
     const user = userEvent.setup();
     const onDeleteProject = vi.fn(async () => undefined);
     renderComposer({
@@ -793,21 +793,25 @@ describe("Composer", () => {
     });
 
     const projectPicker = screen.getByRole("button", { name: "项目" });
-    const deleteButton = screen.getByRole("button", {
+    expect(screen.queryByRole("button", {
       name: "删除项目 project",
+    })).not.toBeInTheDocument();
+
+    await user.click(projectPicker);
+    expect(screen.getByRole("button", {
+      name: "删除项目 project",
+    })).toBeVisible();
+    const deleteButton = screen.getByRole("button", {
+      name: "删除项目 other",
     });
-    expect(
-      projectPicker.compareDocumentPosition(deleteButton) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).not.toBe(0);
 
     await user.click(deleteButton);
     const dialog = screen.getByRole("dialog", { name: "删除受信任项目？" });
-    expect(dialog).toHaveTextContent("/workspace/project");
+    expect(dialog).toHaveTextContent("/workspace/other");
     expect(dialog).toHaveTextContent("不会删除项目文件");
     await user.click(within(dialog).getByRole("button", { name: "删除项目" }));
 
-    expect(onDeleteProject).toHaveBeenCalledWith("/workspace/project");
+    expect(onDeleteProject).toHaveBeenCalledWith("/workspace/other");
     await waitFor(() =>
       expect(
         screen.queryByRole("dialog", { name: "删除受信任项目？" }),
@@ -826,6 +830,7 @@ describe("Composer", () => {
       projectCwds: ["/workspace/project"],
     });
 
+    await user.click(screen.getByRole("button", { name: "项目" }));
     await user.click(screen.getByRole("button", {
       name: "删除项目 project",
     }));

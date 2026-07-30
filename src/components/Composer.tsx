@@ -1261,31 +1261,16 @@ export function Composer({
                     setCwdError(null);
                     setEditingCwd(true);
                   }}
+                  onDelete={onDeleteProject === undefined ? undefined : (directory) => {
+                    setProjectDeleteError(null);
+                    setProjectToDelete(directory);
+                  }}
                   onSelect={(directory) => {
                     onCwdChange?.(directory);
                     textareaRef.current?.focus();
                   }}
                   picking={pickingCwd}
                 />
-                {cwd === null ||
-                !cwdOptions.includes(cwd) ||
-                onDeleteProject === undefined ? null : (
-                  <button
-                    aria-label={`删除项目 ${projectName(cwd)}`}
-                    className={styles.projectDeleteButton}
-                    disabled={activeTurn || submitting || deletingProject}
-                    onClick={() => {
-                      setProjectDeleteError(null);
-                      setProjectToDelete(cwd);
-                    }}
-                    title="删除受信任项目"
-                    type="button"
-                  >
-                    <svg aria-hidden="true" viewBox="0 0 24 24">
-                      <path d="M4.5 7h15M9.5 3.5h5L16 7H8zM7 7l.8 13h8.4L17 7M10 10.5v6M14 10.5v6" />
-                    </svg>
-                  </button>
-                )}
                 {editingCwd ? (
                   <div className={styles.cwdEditor}>
                     <label>
@@ -1875,6 +1860,7 @@ function ProjectPicker({
   disabled,
   onBrowse,
   onCustom,
+  onDelete,
   onSelect,
   picking,
 }: {
@@ -1883,6 +1869,7 @@ function ProjectPicker({
   readonly disabled: boolean;
   readonly onBrowse: (() => void) | undefined;
   readonly onCustom: () => void;
+  readonly onDelete: ((directory: string) => void) | undefined;
   readonly onSelect: (directory: string) => void;
   readonly picking: boolean;
 }) {
@@ -1988,18 +1975,40 @@ function ProjectPicker({
           ) : (
             <div aria-label="选择项目" className={styles.projectOptions} role="listbox">
               {directories.map((directory, index) => (
-                <button
-                  aria-selected={directory === cwd}
+                <div
                   data-focused={index === focusedIndex}
+                  data-selected={directory === cwd}
                   key={directory}
-                  onClick={() => choose(index)}
                   onMouseMove={() => setFocusedIndex(index)}
-                  role="option"
-                  type="button"
+                  role="presentation"
                 >
-                  <strong>{directory === cwd ? "✓ " : ""}{projectName(directory)}</strong>
-                  <small>{directory}</small>
-                </button>
+                  <button
+                    aria-selected={directory === cwd}
+                    className={styles.projectOptionSelect}
+                    onClick={() => choose(index)}
+                    role="option"
+                    type="button"
+                  >
+                    <strong>{directory === cwd ? "✓ " : ""}{projectName(directory)}</strong>
+                    <small>{directory}</small>
+                  </button>
+                  {onDelete === undefined ? null : (
+                    <button
+                      aria-label={`删除项目 ${projectName(directory)}`}
+                      className={styles.projectOptionDelete}
+                      onClick={() => {
+                        setOpen(false);
+                        onDelete(directory);
+                      }}
+                      title="删除受信任项目"
+                      type="button"
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 24 24">
+                        <path d="M4.5 7h15M9.5 3.5h5L16 7H8zM7 7l.8 13h8.4L17 7M10 10.5v6M14 10.5v6" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           )}
