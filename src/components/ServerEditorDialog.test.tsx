@@ -153,7 +153,8 @@ describe("ServerEditorDialog", () => {
     ).toHaveFocus();
   });
 
-  it("编辑远程服务器时聚焦已选择类型且不回填凭据", () => {
+  it("编辑远程服务器时不回填凭据并支持切换令牌显隐", async () => {
+    const user = userEvent.setup();
     render(
       <ServerEditorDialog
         {...createProps({
@@ -172,6 +173,26 @@ describe("ServerEditorDialog", () => {
       "password",
     );
     expect(screen.getByText(/已保存的 Bearer 令牌/u)).toBeInTheDocument();
+
+    const tokenInput = screen.getByLabelText(/^Bearer 令牌/u);
+    await user.type(tokenInput, "replacement-token");
+    const showToken = screen.getByRole("button", {
+      name: "显示 Bearer 令牌",
+    });
+    expect(showToken).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(showToken);
+    expect(tokenInput).toHaveAttribute("type", "text");
+    expect(tokenInput).toHaveValue("replacement-token");
+    expect(
+      screen.getByRole("button", { name: "隐藏 Bearer 令牌" }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(
+      screen.getByRole("button", { name: "隐藏 Bearer 令牌" }),
+    );
+    expect(tokenInput).toHaveAttribute("type", "password");
+    expect(tokenInput).toHaveValue("replacement-token");
   });
 
   it("归一化动态本机字段并把敏感环境变量作为 set 意图提交", async () => {

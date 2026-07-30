@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { ProxyProfile, TlsCertificatePolicy } from "../configuration";
 import { FieldError, KeyValueList } from "./ServerEditorFields";
@@ -28,6 +28,26 @@ function proxyEndpoint(proxy: ProxyProfile): string {
   }
 }
 
+function BearerTokenVisibilityIcon({ visible }: { readonly visible: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height="18"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+      width="18"
+    >
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="2.5" />
+      {visible ? <path d="m4 4 16 16" /> : null}
+    </svg>
+  );
+}
+
 interface ServerEditorRemoteFieldsProps {
   readonly draft: RemoteDraft;
   readonly proxies: readonly ProxyProfile[];
@@ -47,6 +67,7 @@ export function ServerEditorRemoteFields({
   credentialStatus,
   support,
 }: ServerEditorRemoteFieldsProps) {
+  const [bearerTokenVisible, setBearerTokenVisible] = useState(false);
   const isPlaintext = isPlaintextWebSocketUrl(draft.url);
   const selectedProxy = proxies.find(
     ({ proxyId }) => proxyId === draft.proxyId,
@@ -154,6 +175,7 @@ export function ServerEditorRemoteFields({
             }
             id={support.fieldId("authentication")}
             onChange={(event) => {
+              setBearerTokenVisible(false);
               onChange({
                 authentication: event.target.value as "none" | "bearer",
               });
@@ -209,42 +231,59 @@ export function ServerEditorRemoteFields({
       </div>
 
       {draft.authentication === "bearer" ? (
-        <label
-          className={styles.field}
-          htmlFor={support.fieldId("bearerToken")}
-        >
-          <span>Bearer 令牌</span>
-          <input
-            aria-describedby={[
-              `${support.fieldId("bearerToken")}-help`,
-              support.fieldErrors.bearerToken === undefined
-                ? undefined
-                : support.errorId("bearerToken"),
-              support.fieldErrors.credential === undefined
-                ? undefined
-                : support.errorId("credential"),
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            aria-invalid={
-              support.fieldErrors.bearerToken !== undefined ||
-              support.fieldErrors.credential !== undefined
-            }
-            autoComplete="new-password"
-            id={support.fieldId("bearerToken")}
-            onChange={(event) => {
-              onChange({ bearerToken: event.target.value });
-              if (event.target.value.length > 0) {
-                onBearerInput();
+        <div className={styles.field}>
+          <label htmlFor={support.fieldId("bearerToken")}>Bearer 令牌</label>
+          <div className={styles.secretInput}>
+            <input
+              aria-describedby={[
+                `${support.fieldId("bearerToken")}-help`,
+                support.fieldErrors.bearerToken === undefined
+                  ? undefined
+                  : support.errorId("bearerToken"),
+                support.fieldErrors.credential === undefined
+                  ? undefined
+                  : support.errorId("credential"),
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              aria-invalid={
+                support.fieldErrors.bearerToken !== undefined ||
+                support.fieldErrors.credential !== undefined
               }
-              support.clearFieldError("bearerToken");
-              support.clearFieldError("credential");
-            }}
-            ref={support.registerField("bearerToken")}
-            spellCheck={false}
-            type="password"
-            value={draft.bearerToken}
-          />
+              autoComplete="new-password"
+              id={support.fieldId("bearerToken")}
+              onChange={(event) => {
+                onChange({ bearerToken: event.target.value });
+                if (event.target.value.length > 0) {
+                  onBearerInput();
+                }
+                support.clearFieldError("bearerToken");
+                support.clearFieldError("credential");
+              }}
+              ref={support.registerField("bearerToken")}
+              spellCheck={false}
+              type={bearerTokenVisible ? "text" : "password"}
+              value={draft.bearerToken}
+            />
+            <button
+              aria-label={
+                bearerTokenVisible
+                  ? "隐藏 Bearer 令牌"
+                  : "显示 Bearer 令牌"
+              }
+              aria-pressed={bearerTokenVisible}
+              className={styles.secretVisibilityButton}
+              onClick={() => setBearerTokenVisible((visible) => !visible)}
+              title={
+                bearerTokenVisible
+                  ? "隐藏 Bearer 令牌"
+                  : "显示 Bearer 令牌"
+              }
+              type="button"
+            >
+              <BearerTokenVisibilityIcon visible={bearerTokenVisible} />
+            </button>
+          </div>
           <small id={`${support.fieldId("bearerToken")}-help`}>
             已保存令牌不会回填；身份范围不变时留空可保持原令牌
           </small>
@@ -252,7 +291,7 @@ export function ServerEditorRemoteFields({
             id={support.errorId("bearerToken")}
             message={support.fieldErrors.bearerToken}
           />
-        </label>
+        </div>
       ) : null}
 
       {credentialStatus}

@@ -203,6 +203,37 @@
   padding: 0 var(--space-3);
 }
 
+.secretInput {
+  position: relative;
+}
+
+.field .secretInput input {
+  padding-right: 42px;
+}
+
+.secretVisibilityButton {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transform: translateY(-50%);
+  place-items: center;
+}
+
+.secretVisibilityButton:hover,
+.secretVisibilityButton:focus-visible {
+  color: var(--color-text-primary);
+  background: var(--color-fill-hover);
+}
+
 .field textarea,
 .fieldGroup textarea {
   min-height: 82px;
