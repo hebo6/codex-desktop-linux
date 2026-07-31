@@ -147,6 +147,7 @@ import {
 } from "./transport/windowFocus";
 
 export type AppWindowOpener = typeof openAppWindow;
+export type ExternalUrlOpener = typeof openExternalUrl;
 export type { CredentialStorageStatusLoader } from "./app/usePlaintextCredentialConfirmation";
 
 export interface AppProps {
@@ -168,6 +169,7 @@ export interface AppProps {
   readonly pendingThreadResultStore?: PendingThreadResultStore;
   readonly windowFocusSource?: WindowFocusSource;
   readonly protocolDebugWindowOpener?: () => Promise<void>;
+  readonly externalUrlOpener?: ExternalUrlOpener;
 }
 
 interface DraftThreadPresence {
@@ -265,6 +267,7 @@ export function App({
   pendingThreadResultStore = persistentPendingThreadResultStore,
   windowFocusSource = defaultWindowFocusSource,
   protocolDebugWindowOpener = openProtocolDebugWindow,
+  externalUrlOpener = openExternalUrl,
 }: AppProps = {}) {
   const configuration = useAppSelector(selectConfiguration);
   const windowState = useWindowState(windowStateOptions);
@@ -499,6 +502,7 @@ export function App({
   const [contentError, setContentError] = useState<string | null>(null);
   const [previewRequest, setPreviewRequest] = useState<FilePreviewRequest | null>(null);
   const [externalLink, setExternalLink] = useState<ExtractedLink | null>(null);
+  const [externalLinkError, setExternalLinkError] = useState<string | null>(null);
   const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
   const [recentConnectionError, setRecentConnectionError] = useState<string | null>(null);
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
@@ -1715,15 +1719,18 @@ export function App({
     trustDomain: boolean,
   ): Promise<void> => {
     setOpeningExternalLink(true);
-    setContentError(null);
+    setExternalLinkError(null);
     try {
-      await openExternalUrl(link.url);
+      await externalUrlOpener(link.url);
       if (trustDomain) {
         trustedDomainsRef.current.add(link.domain);
       }
       setExternalLink(null);
     } catch {
-      setContentError("无法使用系统默认浏览器打开此网页");
+      setExternalLink(link);
+      setExternalLinkError(
+        "网页未能通过系统默认浏览器打开，对话内容未受影响。请检查默认浏览器设置后重试，或复制网址手动打开",
+      );
     } finally {
       setOpeningExternalLink(false);
     }
@@ -1742,6 +1749,7 @@ export function App({
         });
         return;
       case "external":
+        setExternalLinkError(null);
         if (trustedDomainsRef.current.has(resolved.domain)) {
           void openConfirmedExternalLink(resolved, false);
         } else {
@@ -2216,10 +2224,14 @@ export function App({
       />
 
       <ExternalLinkDialog
+        error={externalLinkError}
         link={externalLink}
         opening={openingExternalLink}
         onCancel={() => {
-          if (!openingExternalLink) setExternalLink(null);
+          if (!openingExternalLink) {
+            setExternalLink(null);
+            setExternalLinkError(null);
+          }
         }}
         onConfirm={(trustDomain) => {
           if (externalLink !== null) void openConfirmedExternalLink(externalLink, trustDomain);

@@ -8,6 +8,7 @@ describe("ExternalLinkDialog", () => {
     const onConfirm = vi.fn();
     render(
       <ExternalLinkDialog
+        error={null}
         link={{ type: "external", domain: "example.com", url: "https://example.com/path" }}
         onCancel={vi.fn()}
         onConfirm={onConfirm}
@@ -23,6 +24,7 @@ describe("ExternalLinkDialog", () => {
   it("将键盘焦点限制在最上层对话框", () => {
     render(
       <ExternalLinkDialog
+        error={null}
         link={{ type: "external", domain: "example.com", url: "https://example.com" }}
         onCancel={vi.fn()}
         onConfirm={vi.fn()}
@@ -38,5 +40,28 @@ describe("ExternalLinkDialog", () => {
     expect(trust).toHaveFocus();
     fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
     expect(open).toHaveFocus();
+  });
+
+  it("在操作附近显示打开错误并支持复制网址", async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    render(
+      <ExternalLinkDialog
+        error="网页未能打开，对话内容未受影响"
+        link={{ type: "external", domain: "example.com", url: "https://example.com/path" }}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        opening={false}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "网页未能打开，对话内容未受影响",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "复制网址" }));
+
+    expect(writeText).toHaveBeenCalledWith("https://example.com/path");
+    expect(await screen.findByRole("button", { name: "已复制" })).toBeVisible();
+    vi.unstubAllGlobals();
   });
 });

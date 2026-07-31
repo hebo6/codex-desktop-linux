@@ -5,11 +5,13 @@ import { useModalLayer } from "./modalStack";
 import styles from "./DeleteDialog.module.css";
 
 export function ExternalLinkDialog({
+  error,
   link,
   opening,
   onCancel,
   onConfirm,
 }: {
+  readonly error: string | null;
   readonly link: ExtractedLink | null;
   readonly opening: boolean;
   readonly onCancel: () => void;
@@ -20,15 +22,32 @@ export function ExternalLinkDialog({
   const cancelRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const [trustDomain, setTrustDomain] = useState(false);
+  const [copyState, setCopyState] = useState<
+    "idle" | "copying" | "copied" | "error"
+  >("idle");
   const isTopmostModal = useModalLayer(link !== null);
 
   useLayoutEffect(() => {
     if (link === null) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setTrustDomain(false);
+    setCopyState("idle");
     cancelRef.current?.focus();
     return () => { if (previous?.isConnected) previous.focus(); };
   }, [link]);
+
+  const copyUrl = async () => {
+    if (link === null || copyState === "copying") {
+      return;
+    }
+    setCopyState("copying");
+    try {
+      await navigator.clipboard.writeText(link.url);
+      setCopyState("copied");
+    } catch {
+      setCopyState("error");
+    }
+  };
 
   useEffect(() => {
     if (link === null) return;
@@ -81,7 +100,26 @@ export function ExternalLinkDialog({
             </div>
           </div>
         </div>
+        {error === null ? null : (
+          <div className={styles.error} role="alert">{error}</div>
+        )}
+        {copyState === "error" ? (
+          <div className={styles.error} role="alert">
+            无法复制网址，请手动选择上方网址
+          </div>
+        ) : null}
         <div className={styles.actions}>
+          <button
+            disabled={opening || copyState === "copying"}
+            onClick={() => void copyUrl()}
+            type="button"
+          >
+            {copyState === "copying"
+              ? "正在复制"
+              : copyState === "copied"
+                ? "已复制"
+                : "复制网址"}
+          </button>
           <button disabled={opening} onClick={onCancel} ref={cancelRef} type="button">取消</button>
           <button className={styles.primaryButton} disabled={opening} onClick={() => onConfirm(trustDomain)} type="button">{opening ? "正在打开" : "打开网页"}</button>
         </div>

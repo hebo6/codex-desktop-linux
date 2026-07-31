@@ -29,6 +29,7 @@ import {
   collectHighRiskServerIds,
   type AppWindowOpener,
   type CredentialStorageStatusLoader,
+  type ExternalUrlOpener,
 } from "./App";
 import {
   ConfigurationCommandError,
@@ -194,6 +195,7 @@ function renderApp(
     readonly pendingThreadResultStore?: PendingThreadResultStore;
     readonly windowFocusSource?: WindowFocusSource;
     readonly protocolDebugWindowOpener?: () => Promise<void>;
+    readonly externalUrlOpener?: ExternalUrlOpener;
   } = {},
 ) {
   const testStore = createTestStore();
@@ -291,6 +293,9 @@ function renderApp(
         protocolDebugWindowOpener={
           options.protocolDebugWindowOpener ?? (async () => undefined)
         }
+        {...(options.externalUrlOpener === undefined
+          ? {}
+          : { externalUrlOpener: options.externalUrlOpener })}
         windowStateOptions={windowStateOptions}
       />
     </Provider>,
@@ -462,6 +467,138 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getByRole("button", { name: "发送" })).toBeVisible());
     expect(screen.getByText("首次问题")).toBeVisible();
+  });
+
+  it("可信域名打开失败时在确认框恢复操作上下文", async () => {
+    const user = userEvent.setup();
+    const thread = {
+      cliVersion: "1.0.0",
+      createdAt: 100,
+      cwd: "/workspace/project",
+      ephemeral: false,
+      historyMode: "paginated",
+      id: "thread-external-link",
+      modelProvider: "openai",
+      name: "外部链接会话",
+      preview: "打开项目官网",
+      sessionId: "session-external-link",
+      source: "appServer",
+      status: { type: "idle" },
+      turns: [{
+        id: "turn-external-link",
+        items: [{
+          id: "answer-external-link",
+          phase: "final_answer",
+          text: "[项目官网](https://example.com/path)",
+          type: "agentMessage",
+        }],
+        itemsView: "full",
+        status: "completed",
+      }],
+      updatedAt: 200,
+    } as const;
+    const requestSession = {
+      sendRequest(request: { readonly method: string }) {
+        const result = request.method === "thread/list"
+          ? { data: [thread], nextCursor: null }
+          : request.method === "thread/resume"
+            ? {
+              approvalPolicy: "on-request",
+              approvalsReviewer: "user",
+              cwd: thread.cwd,
+              model: "gpt-5",
+              modelProvider: "openai",
+              reasoningEffort: null,
+              sandbox: { type: "readOnly" },
+              serviceTier: null,
+              initialTurnsPage: {
+                data: thread.turns,
+                nextCursor: null,
+              },
+              thread,
+            }
+            : request.method === "thread/items/list"
+              ? {
+                data: thread.turns[0].items.map((item) => ({
+                  item,
+                  turnId: thread.turns[0].id,
+                })),
+                nextCursor: null,
+              }
+              : request.method === "thread/backgroundTerminals/list"
+                ? { data: [], nextCursor: null }
+                : {};
+        return {
+          cancel: () => undefined,
+          id: `request:${request.method}`,
+          result: Promise.resolve(result),
+        };
+      },
+      subscribeNotifications: () => () => undefined,
+    };
+    const sessionFactory: ConfiguredServerSessionFactory = (options) => ({
+      threadClient: new AppServerThreadClient(requestSession as never),
+      conversationClient: new AppServerConversationClient(requestSession as never),
+      async start() {
+        options.onStateChange({
+          phase: "ready",
+          connectionStage: null,
+          initializeResponse: null,
+          errorCode: null,
+        });
+      },
+      async close() {},
+    });
+    const externalUrlOpener = vi.fn<ExternalUrlOpener>()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("launcher unavailable"));
+
+    renderApp(() => ({ servers: [localServer()], proxies: [] }), {
+      externalUrlOpener,
+      sessionFactory,
+      windowStateOptions: {
+        loader: vi.fn(async () => ({
+          windowId: "main",
+          version: 1,
+          serverId: SERVER_ID,
+          tabs: [{ id: "tab-external-link", threadId: thread.id }],
+          activeTabId: "tab-external-link",
+          updatedAtMs: 1,
+        })),
+      },
+    });
+
+    const link = await screen.findByRole(
+      "button",
+      { name: "项目官网" },
+      { timeout: 5_000 },
+    );
+    await user.click(link);
+    await user.click(screen.getByRole("checkbox", {
+      name: "本次运行期间信任此域名",
+    }));
+    await user.click(screen.getByRole("button", { name: "打开网页" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "在系统浏览器中打开网页？" }),
+      ).not.toBeInTheDocument();
+    });
+
+    await user.click(link);
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "在系统浏览器中打开网页？",
+    });
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "网页未能通过系统默认浏览器打开，对话内容未受影响",
+    );
+    expect(externalUrlOpener).toHaveBeenNthCalledWith(
+      2,
+      "https://example.com/path",
+    );
+    expect(within(
+      screen.getByRole("list", { name: "会话内容列表" }),
+    ).queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("同时恢复全部标签且切换时保持订阅，关闭后立即退订", async () => {
