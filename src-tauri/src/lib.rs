@@ -291,7 +291,6 @@ pub fn run() {
             diagnostics::read_system_diagnostics,
             desktop_notifications::desktop_notification_availability,
             desktop_notifications::show_desktop_notification,
-            protocol_trace::protocol_debug_availability,
             protocol_trace::subscribe_protocol_trace,
             protocol_trace::unsubscribe_protocol_trace,
             protocol_trace::clear_protocol_trace,

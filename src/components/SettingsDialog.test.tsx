@@ -51,7 +51,6 @@ function renderSettings(overrides: Partial<Parameters<typeof SettingsDialog>[0]>
     notificationPermission: "granted",
     onBeforeClearAllLocalData: vi.fn(async () => undefined),
     onAllLocalDataCleared: vi.fn(),
-    protocolDebugAvailable: false,
     onOpenProtocolDebug: vi.fn(),
     ...overrides,
   };
@@ -60,9 +59,9 @@ function renderSettings(overrides: Partial<Parameters<typeof SettingsDialog>[0]>
 }
 
 describe("SettingsDialog", () => {
-  it("提供全部 P0 分区并立即提交主题选择", () => {
+  it("提供全部设置分区并立即提交主题选择", () => {
     const { props } = renderSettings();
-    expect(screen.getAllByRole("button", { name: /外观|通用|通知|服务器|代理|权限|数据与隐私|快捷键|诊断/u })).toHaveLength(9);
+    expect(screen.getAllByRole("button", { name: /外观|通用|通知|服务器|代理|权限|数据与隐私|快捷键|诊断|开发者/u })).toHaveLength(10);
     fireEvent.click(screen.getByRole("radio", { name: "深色" }));
     expect(props.onUpdatePreferences).toHaveBeenCalledWith({ theme: "dark" });
   });
@@ -75,14 +74,14 @@ describe("SettingsDialog", () => {
     expect(screen.getByText("Ctrl+PageDown")).toBeVisible();
     expect(screen.getByText("Ctrl+B")).toBeVisible();
     expect(screen.getByText("Ctrl+Shift+W")).toBeVisible();
+    expect(screen.getByText("Ctrl+Shift+D")).toBeVisible();
     expect(screen.getByText("Ctrl+Q")).toBeVisible();
     expect(screen.getByText("打开项目选择器（仅新会话）")).toBeVisible();
   });
 
-  it("仅在调试构建中展示协议检查器入口", () => {
+  it("展示协议检查器入口", () => {
     const { props } = renderSettings({
       initialSection: "developer",
-      protocolDebugAvailable: true,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "打开协议检查器" }));

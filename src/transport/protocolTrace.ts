@@ -1,6 +1,5 @@
 import { tauriIpc, type TauriIpc } from "./tauriIpc";
 
-const AVAILABILITY_COMMAND = "protocol_debug_availability";
 const OPEN_COMMAND = "open_protocol_debug_window";
 const SUBSCRIBE_COMMAND = "subscribe_protocol_trace";
 const UNSUBSCRIBE_COMMAND = "unsubscribe_protocol_trace";
@@ -47,17 +46,6 @@ export interface ProtocolTraceBatch {
 export type ProtocolTraceSubscriber = (
   onBatch: (batch: ProtocolTraceBatch) => void,
 ) => Promise<() => void>;
-
-export async function protocolDebugAvailable(
-  ipc: TauriIpc = tauriIpc,
-): Promise<boolean> {
-  const response = record(
-    await ipc.invoke<unknown>(AVAILABILITY_COMMAND, {}),
-  );
-  return response !== null &&
-    hasExactKeys(response, ["available"]) &&
-    response.available === true;
-}
 
 export async function openProtocolDebugWindow(
   ipc: TauriIpc = tauriIpc,

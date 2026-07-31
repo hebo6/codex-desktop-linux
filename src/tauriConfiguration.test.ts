@@ -74,5 +74,7 @@ describe("Tauri 发布配置", () => {
     expect(protocolDebugCapability.permissions).not.toContain(
       "allow-connect-configured-server",
     );
+    expect(windowPermission).toContain('"open_protocol_debug_window"');
+    expect(windowPermission).not.toContain('"protocol_debug_availability"');
   });
 });

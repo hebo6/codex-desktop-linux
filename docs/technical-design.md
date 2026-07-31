@@ -106,7 +106,7 @@ flowchart LR
 
 ### 协议追踪
 
-调试构建提供进程级 `ProtocolTraceHub`，在配置连接共享池和连接测试事件边界旁路记录实际线级 JSON-RPC 消息
+应用提供进程级 `ProtocolTraceHub`，在配置连接共享池和连接测试事件边界旁路记录实际线级 JSON-RPC 消息
 
 没有活动订阅者时追踪中心只执行原子启用状态检查，不解析或复制 JSON
 

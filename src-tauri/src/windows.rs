@@ -106,13 +106,6 @@ impl CommandError {
         )
     }
 
-    const fn protocol_debug_unavailable() -> Self {
-        Self::new(
-            "protocolDebugUnavailable",
-            "The protocol debugger is only available in debug builds",
-        )
-    }
-
     const fn activation_failed() -> Self {
         Self::new(
             "windowActivationFailed",
@@ -624,9 +617,6 @@ pub(crate) async fn open_app_window<R: Runtime>(
 pub(crate) fn open_protocol_debug_window<R: Runtime>(
     app: AppHandle<R>,
 ) -> Result<(), CommandError> {
-    if !cfg!(debug_assertions) {
-        return Err(CommandError::protocol_debug_unavailable());
-    }
     if let Some(window) = app.get_webview_window(PROTOCOL_DEBUG_WINDOW_LABEL) {
         return activate_window(&window).map_err(|error| {
             tracing::warn!(%error, "failed to focus existing protocol debugger window");

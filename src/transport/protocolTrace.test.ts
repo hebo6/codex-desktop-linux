@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  openProtocolDebugWindow,
   parseProtocolTraceBatch,
-  protocolDebugAvailable,
   subscribeProtocolTrace,
 } from "./protocolTrace";
 import type { TauriIpc } from "./tauriIpc";
@@ -66,13 +66,16 @@ describe("协议追踪传输", () => {
     })).toBeNull();
   });
 
-  it("只接受明确启用的调试构建状态", async () => {
+  it("请求后端打开协议检查器窗口", async () => {
     const ipc = ipcStub();
-    ipc.invoke.mockResolvedValueOnce({ available: true });
-    await expect(protocolDebugAvailable(ipc)).resolves.toBe(true);
+    ipc.invoke.mockResolvedValueOnce(undefined);
 
-    ipc.invoke.mockResolvedValueOnce({ available: false });
-    await expect(protocolDebugAvailable(ipc)).resolves.toBe(false);
+    await openProtocolDebugWindow(ipc);
+
+    expect(ipc.invoke).toHaveBeenCalledWith(
+      "open_protocol_debug_window",
+      {},
+    );
   });
 
   it("退订时使用后端返回的订阅标识", async () => {

@@ -30,8 +30,8 @@ const SECTIONS: readonly { readonly id: SettingsSection; readonly label: string 
   { id: "privacy", label: "数据与隐私" },
   { id: "shortcuts", label: "快捷键" },
   { id: "diagnostics", label: "诊断" },
+  { id: "developer", label: "开发者" },
 ];
-const DEVELOPER_SECTION = { id: "developer", label: "开发者" } as const;
 
 export interface SettingsDialogProps {
   readonly open: boolean;
@@ -63,7 +63,6 @@ export interface SettingsDialogProps {
   readonly notificationPermission: DesktopNotificationPermission;
   readonly onBeforeClearAllLocalData: () => Promise<void>;
   readonly onAllLocalDataCleared: () => void;
-  readonly protocolDebugAvailable: boolean;
   readonly onOpenProtocolDebug: () => void;
 }
 
@@ -104,7 +103,6 @@ function SettingsDialogContent({
   notificationPermission,
   onBeforeClearAllLocalData,
   onAllLocalDataCleared,
-  protocolDebugAvailable,
   onOpenProtocolDebug,
 }: SettingsDialogProps) {
   const [section, setSection] = useState<SettingsSection>(initialSection);
@@ -119,10 +117,6 @@ function SettingsDialogContent({
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const isTopmostModal = useModalLayer();
-  const sections = protocolDebugAvailable
-    ? [...SECTIONS, DEVELOPER_SECTION]
-    : SECTIONS;
-
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     closeRef.current?.focus();
@@ -211,11 +205,11 @@ function SettingsDialogContent({
         <aside>
           <h1 id={titleId}>设置</h1>
           <nav aria-label="设置分区">
-            {sections.map((item) => <button aria-current={section === item.id ? "page" : undefined} key={item.id} onClick={() => setSection(item.id)} type="button">{item.label}</button>)}
+            {SECTIONS.map((item) => <button aria-current={section === item.id ? "page" : undefined} key={item.id} onClick={() => setSection(item.id)} type="button">{item.label}</button>)}
           </nav>
         </aside>
         <main>
-          <header><div><strong>{sections.find(({ id }) => id === section)?.label}</strong>{preferencesSaving ? <small>正在保存</small> : null}</div><button aria-label="关闭设置" onClick={onClose} ref={closeRef} type="button">×</button></header>
+          <header><div><strong>{SECTIONS.find(({ id }) => id === section)?.label}</strong>{preferencesSaving ? <small>正在保存</small> : null}</div><button aria-label="关闭设置" onClick={onClose} ref={closeRef} type="button">×</button></header>
           {preferencesError ? <p className={styles.error} role="status">{preferencesError}</p> : null}
           <div className={styles.content}>
             {section === "appearance" ? <AppearanceSection disabled={preferencesLoading} preferences={preferences} update={onUpdatePreferences} /> : null}
@@ -225,7 +219,7 @@ function SettingsDialogContent({
             {section === "proxies" ? <ProxiesSection onDelete={onDeleteProxy} onEdit={onEditProxy} onNew={onNewProxy} proxies={proxies} /> : null}
             {section === "permissions" ? <PermissionsSection profiles={permissionProfiles} /> : null}
             {section === "privacy" ? <PrivacySection clearData={clearData} state={cleanupState} setState={setCleanupState} /> : null}
-            {section === "shortcuts" ? <ShortcutsSection protocolDebugAvailable={protocolDebugAvailable} /> : null}
+            {section === "shortcuts" ? <ShortcutsSection /> : null}
             {section === "diagnostics" ? (
               <DiagnosticsSection
                 copied={copied}
@@ -237,7 +231,7 @@ function SettingsDialogContent({
                 }, () => setDiagnosticsError("无法复制诊断报告"))}
               />
             ) : null}
-            {section === "developer" && protocolDebugAvailable ? (
+            {section === "developer" ? (
               <DeveloperSection onOpenProtocolDebug={onOpenProtocolDebug} />
             ) : null}
           </div>
@@ -291,18 +285,16 @@ function PrivacySection({ clearData, setState, state }: { readonly clearData: (k
   })}</Section>;
 }
 
-function ShortcutsSection({ protocolDebugAvailable }: { readonly protocolDebugAvailable: boolean }) {
+function ShortcutsSection() {
   const shortcuts = [
     ...KEYBOARD_SHORTCUT_GROUPS.flatMap(({ shortcuts }) => shortcuts),
-    ...(protocolDebugAvailable
-      ? [{ label: "打开协议检查器", keys: ["Ctrl+Shift+D"] as const }]
-      : []),
+    { label: "打开协议检查器", keys: ["Ctrl+Shift+D"] as const },
   ];
   return <Section title="默认快捷键" description="文本编辑器中的常见编辑操作保持不变"><dl className={styles.shortcuts}>{shortcuts.map(({ keys, label }) => <div key={label}><dt>{keys.map((key) => <kbd key={key}>{key}</kbd>)}</dt><dd>{label}</dd></div>)}</dl></Section>;
 }
 
 function DeveloperSection({ onOpenProtocolDebug }: { readonly onOpenProtocolDebug: () => void }) {
-  return <Section title="协议检查器" description="仅调试构建可用。窗口打开期间只读采集实际 app-server 收发消息，关闭后立即清空内存记录"><button className={styles.primary} onClick={onOpenProtocolDebug} type="button">打开协议检查器</button><p className={styles.muted}>内容可能包含提示词、代码、文件路径和工具输出；认证字段会在进入调试缓存前强制脱敏</p></Section>;
+  return <Section title="协议检查器" description="窗口打开期间只读采集实际 app-server 收发消息，关闭后立即清空内存记录"><button className={styles.primary} onClick={onOpenProtocolDebug} type="button">打开协议检查器</button><p className={styles.muted}>内容可能包含提示词、代码、文件路径和工具输出；认证字段会在进入调试缓存前强制脱敏</p></Section>;
 }
 
 function DiagnosticsSection({ copied, error, onCopy, report }: { readonly copied: boolean; readonly error: string | null; readonly onCopy: () => void; readonly report: string }) {

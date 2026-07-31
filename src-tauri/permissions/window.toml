@@ -7,7 +7,6 @@ commands.allow = [
     "update_window_tabs",
     "open_app_window",
     "open_protocol_debug_window",
-    "protocol_debug_availability",
     "pick_local_directory",
     "open_external_url",
     "open_html_in_browser",

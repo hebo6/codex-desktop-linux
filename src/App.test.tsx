@@ -193,7 +193,6 @@ function renderApp(
     readonly draftStore?: DraftStore;
     readonly pendingThreadResultStore?: PendingThreadResultStore;
     readonly windowFocusSource?: WindowFocusSource;
-    readonly protocolDebugAvailabilityLoader?: () => Promise<boolean>;
     readonly protocolDebugWindowOpener?: () => Promise<void>;
   } = {},
 ) {
@@ -289,9 +288,6 @@ function renderApp(
         {...(options.windowFocusSource === undefined
           ? {}
           : { windowFocusSource: options.windowFocusSource })}
-        protocolDebugAvailabilityLoader={
-          options.protocolDebugAvailabilityLoader ?? (async () => false)
-        }
         protocolDebugWindowOpener={
           options.protocolDebugWindowOpener ?? (async () => undefined)
         }
@@ -316,17 +312,14 @@ describe("App", () => {
     expect(screen.queryByRole("dialog", { name: "键盘快捷键" })).not.toBeInTheDocument();
   });
 
-  it("调试构建通过 Ctrl+Shift+D 打开协议检查器", async () => {
+  it("通过 Ctrl+Shift+D 打开协议检查器", () => {
     const protocolDebugWindowOpener = vi.fn(async () => undefined);
     renderApp(() => ({ servers: [], proxies: [] }), {
-      protocolDebugAvailabilityLoader: async () => true,
       protocolDebugWindowOpener,
     });
 
-    await waitFor(() => {
-      fireEvent.keyDown(window, { ctrlKey: true, shiftKey: true, key: "D" });
-      expect(protocolDebugWindowOpener).toHaveBeenCalledTimes(1);
-    });
+    fireEvent.keyDown(window, { ctrlKey: true, shiftKey: true, key: "D" });
+    expect(protocolDebugWindowOpener).toHaveBeenCalledTimes(1);
   });
 
   it("新建线程首次发送直接采用创建响应", async () => {

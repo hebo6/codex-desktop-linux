@@ -138,25 +138,12 @@ pub(crate) struct UnsubscribeProtocolTraceRequest {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ProtocolDebugAvailability {
-    available: bool,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub(crate) struct ProtocolTraceCommandError {
     code: &'static str,
     message: &'static str,
 }
 
 impl ProtocolTraceCommandError {
-    const fn unavailable() -> Self {
-        Self {
-            code: "protocolDebugUnavailable",
-            message: "The protocol debugger is only available in debug builds",
-        }
-    }
-
     const fn invalid_window() -> Self {
         Self {
             code: "invalidProtocolDebugWindow",
@@ -751,23 +738,13 @@ fn unix_timestamp_ms() -> u64 {
         .unwrap_or(u64::MAX)
 }
 
-fn require_debug_window<R: Runtime>(
+fn require_protocol_debug_window<R: Runtime>(
     window: &WebviewWindow<R>,
 ) -> Result<(), ProtocolTraceCommandError> {
-    if !cfg!(debug_assertions) {
-        return Err(ProtocolTraceCommandError::unavailable());
-    }
     if window.label() != PROTOCOL_DEBUG_WINDOW_LABEL || window.as_ref().url().is_err() {
         return Err(ProtocolTraceCommandError::invalid_window());
     }
     Ok(())
-}
-
-#[tauri::command]
-pub(crate) const fn protocol_debug_availability() -> ProtocolDebugAvailability {
-    ProtocolDebugAvailability {
-        available: cfg!(debug_assertions),
-    }
 }
 
 #[tauri::command]
@@ -776,7 +753,7 @@ pub(crate) fn subscribe_protocol_trace<R: Runtime>(
     hub: State<'_, ProtocolTraceHub>,
     events: Channel<ProtocolTraceBatch>,
 ) -> Result<u64, ProtocolTraceCommandError> {
-    require_debug_window(&window)?;
+    require_protocol_debug_window(&window)?;
     hub.subscribe(window.label().to_owned(), events)
 }
 
@@ -786,7 +763,7 @@ pub(crate) fn unsubscribe_protocol_trace<R: Runtime>(
     hub: State<'_, ProtocolTraceHub>,
     request: UnsubscribeProtocolTraceRequest,
 ) -> Result<(), ProtocolTraceCommandError> {
-    require_debug_window(&window)?;
+    require_protocol_debug_window(&window)?;
     hub.unsubscribe(window.label(), request.subscription_id);
     Ok(())
 }
@@ -796,7 +773,7 @@ pub(crate) fn clear_protocol_trace<R: Runtime>(
     window: WebviewWindow<R>,
     hub: State<'_, ProtocolTraceHub>,
 ) -> Result<(), ProtocolTraceCommandError> {
-    require_debug_window(&window)?;
+    require_protocol_debug_window(&window)?;
     hub.clear(window.label())
 }
 

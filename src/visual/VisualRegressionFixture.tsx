@@ -258,7 +258,6 @@ export function VisualRegressionFixture({ state, theme }: VisualRegressionQuery)
         preferencesLoading={false}
         preferencesSaving={false}
         preferencesStore={VISUAL_PREFERENCES_STORE}
-        protocolDebugAvailable={false}
         proxies={[]}
         recentConnectionError={null}
         servers={[]}

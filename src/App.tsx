@@ -136,10 +136,7 @@ import {
   createTransientDraftStore,
   type DraftStore,
 } from "./transport/drafts";
-import {
-  openProtocolDebugWindow,
-  protocolDebugAvailable,
-} from "./transport/protocolTrace";
+import { openProtocolDebugWindow } from "./transport/protocolTrace";
 import {
   pendingThreadResultStore as persistentPendingThreadResultStore,
   type PendingThreadResultStore,
@@ -170,7 +167,6 @@ export interface AppProps {
   readonly draftStore?: DraftStore;
   readonly pendingThreadResultStore?: PendingThreadResultStore;
   readonly windowFocusSource?: WindowFocusSource;
-  readonly protocolDebugAvailabilityLoader?: () => Promise<boolean>;
   readonly protocolDebugWindowOpener?: () => Promise<void>;
 }
 
@@ -268,7 +264,6 @@ export function App({
   draftStore = persistentDraftStore,
   pendingThreadResultStore = persistentPendingThreadResultStore,
   windowFocusSource = defaultWindowFocusSource,
-  protocolDebugAvailabilityLoader = protocolDebugAvailable,
   protocolDebugWindowOpener = openProtocolDebugWindow,
 }: AppProps = {}) {
   const configuration = useAppSelector(selectConfiguration);
@@ -528,7 +523,6 @@ export function App({
   const [windowReferenceError, setWindowReferenceError] = useState<
     string | null
   >(null);
-  const [protocolDebugEnabled, setProtocolDebugEnabled] = useState(false);
   const [
     windowReferenceSubscriptionAttempt,
     setWindowReferenceSubscriptionAttempt,
@@ -549,21 +543,6 @@ export function App({
   const appliedWindowServerRef = useRef<ServerId | null | undefined>(
     undefined,
   );
-
-  useEffect(() => {
-    let active = true;
-    void protocolDebugAvailabilityLoader().then(
-      (available) => {
-        if (active) setProtocolDebugEnabled(available);
-      },
-      () => {
-        if (active) setProtocolDebugEnabled(false);
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [protocolDebugAvailabilityLoader]);
 
   const openProtocolDebugger = useCallback(() => {
     setWindowActionError(null);
@@ -1595,7 +1574,7 @@ export function App({
       } else if (key === ",") {
         event.preventDefault();
         setSettingsSection("appearance");
-      } else if (key === "d" && event.shiftKey && protocolDebugEnabled) {
+      } else if (key === "d" && event.shiftKey) {
         event.preventDefault();
         openProtocolDebugger();
       } else if (key === "l") {
@@ -1640,7 +1619,6 @@ export function App({
     openNewTab,
     openNewWindowTask,
     openProtocolDebugger,
-    protocolDebugEnabled,
     windowState,
     windowTabs,
   ]);
@@ -2297,7 +2275,6 @@ export function App({
         preferencesLoading={preferences.loading}
         preferencesSaving={preferences.saving}
         preferencesStore={preferences.store}
-        protocolDebugAvailable={protocolDebugEnabled}
         proxies={proxies}
         recentConnectionError={recentConnectionError}
         servers={servers}
