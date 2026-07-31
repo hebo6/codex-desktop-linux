@@ -1,7 +1,13 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { ThreadTurn } from "../app/useServerThreads";
 import { BackgroundCommandPanel } from "./BackgroundCommandPanel";
+
+type CommandExecutionItem = Extract<
+  ThreadTurn["items"][number],
+  { type: "commandExecution" }
+>;
 
 afterEach(() => {
   vi.useRealTimers();
@@ -16,12 +22,12 @@ describe("BackgroundCommandPanel", () => {
       id: "command-running",
       type: "commandExecution",
       command: "sleep 60",
-      commandActions: [] as never[],
+      commandActions: [],
       cwd: "/workspace/project",
       durationMs: 0,
       processId: "42",
       status: "inProgress",
-    } as const;
+    } satisfies CommandExecutionItem;
 
     render(
       <BackgroundCommandPanel
@@ -62,22 +68,32 @@ describe("BackgroundCommandPanel", () => {
     ).toBeVisible();
   });
 
-  it("展开后显示完整命令和聚合输出", () => {
+  it("标题和展开内容显示解析后的真实命令", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-24T00:00:00Z"));
     const observedAt = Date.now();
     const command = {
       aggregatedOutput:
         "第一行输出\n第二行输出\n\u001b[32m最后一行输出\u001b[0m\n",
-      command: "pnpm test -- --runInBand && pnpm build",
-      commandActions: [] as never[],
+      command:
+        "/usr/bin/bash -lc 'pnpm test -- --runInBand && pnpm build'",
+      commandActions: [
+        {
+          command: "pnpm test -- --runInBand",
+          type: "unknown",
+        },
+        {
+          command: "pnpm build",
+          type: "unknown",
+        },
+      ],
       cwd: "/workspace/project",
       durationMs: 0,
       id: "command-running",
       processId: "42",
       status: "inProgress",
       type: "commandExecution",
-    } as const;
+    } satisfies CommandExecutionItem;
 
     render(
       <BackgroundCommandPanel
@@ -105,10 +121,14 @@ describe("BackgroundCommandPanel", () => {
 
     act(() => vi.advanceTimersByTime(3_000));
     fireEvent.click(screen.getByRole("button", {
-      name: /1 个命令正在运行/u,
+      name:
+        "1 个命令正在运行 · 3 秒 · pnpm test -- --runInBand · pnpm build",
     }));
 
-    expect(screen.getByText(command.command)).toBeVisible();
+    expect(
+      screen.getByText("pnpm test -- --runInBand · pnpm build"),
+    ).toBeVisible();
+    expect(screen.queryByText(command.command)).not.toBeInTheDocument();
     expect(screen.getByLabelText("命令输出")).toHaveTextContent(
       "第一行输出 第二行输出 最后一行输出",
     );
@@ -170,7 +190,7 @@ describe("BackgroundCommandPanel", () => {
     );
 
     fireEvent.click(screen.getByRole("button", {
-      name: /2 个命令正在运行/u,
+      name: "2 个命令正在运行 · 3 秒 · sleep 60",
     }));
     fireEvent.click(screen.getByRole("button", {
       name: "终止所有命令",

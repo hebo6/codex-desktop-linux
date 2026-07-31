@@ -81,11 +81,17 @@ export function BackgroundCommandPanel({
   if (commands.length === 0) {
     return null;
   }
+  const firstCommand = commands[0];
+  if (firstCommand === undefined) {
+    return null;
+  }
 
   const longestDuration = Math.max(
     ...commands.map(({ durationMs }) => durationMs),
   );
-  const summary = `${commands.length} 个命令正在运行 · ${formatDuration(longestDuration)}`;
+  const summary = `${commands.length} 个命令正在运行 · ${
+    formatDuration(longestDuration)
+  } · ${firstCommand.command}`;
   const visibleProcessIds = commandProcessIds(commands);
   const allProcessIds = commandProcessIds(running);
   const anyCommandTerminating = allProcessIds.some((processId) =>
@@ -323,7 +329,7 @@ function commandPresentation(
   now: number,
 ): RunningCommand {
   return {
-    command,
+    command: displayCommand(command, item),
     cwd,
     durationMs: Math.max(
       0,
@@ -334,6 +340,16 @@ function commandPresentation(
     output: commandOutput(item?.aggregatedOutput),
     processId,
   };
+}
+
+function displayCommand(
+  command: string,
+  item: CommandExecutionItem | undefined,
+): string {
+  const parsedCommands = item?.commandActions
+    .map((action) => action.command.trim())
+    .filter((parsedCommand) => parsedCommand.length > 0) ?? [];
+  return parsedCommands.length === 0 ? command : parsedCommands.join(" · ");
 }
 
 function commandOutput(output: string | null | undefined): string | null {
