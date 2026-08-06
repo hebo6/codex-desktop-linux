@@ -231,6 +231,11 @@ const schemaDeclarations = [
     validatorName: "validateFsGetMetadataResponse",
   },
   {
+    typeName: "GetAccountResponse",
+    schemaPath: "v2/GetAccountResponse.json",
+    validatorName: "validateGetAccountResponse",
+  },
+  {
     typeName: "GetAccountRateLimitsResponse",
     schemaPath: "v2/GetAccountRateLimitsResponse.json",
     validatorName: "validateGetAccountRateLimitsResponse",

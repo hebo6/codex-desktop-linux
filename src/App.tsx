@@ -39,6 +39,7 @@ import {
   type ThreadSessionState,
 } from "./app/useThreadSession";
 import { useServerInteractions } from "./app/useServerInteractions";
+import { useAccountIdentity } from "./app/useAccountIdentity";
 import { useAccountRateLimits } from "./app/useAccountRateLimits";
 import { useAccountTokenUsage } from "./app/useAccountTokenUsage";
 import { usePreferences } from "./app/usePreferences";
@@ -473,8 +474,15 @@ export function App({
       ? "config" as const
       : "catalog" as const;
   const serverInteractions = useServerInteractions(connection.interactionClient);
+  const accountIdentity = useAccountIdentity(connection.accountClient);
   const accountRateLimits = useAccountRateLimits(connection.accountClient);
   const accountTokenUsage = useAccountTokenUsage(connection.accountClient);
+  const refreshAccountDetails = useCallback(async () => {
+    await Promise.all([
+      accountIdentity.refresh(),
+      accountRateLimits.refresh(),
+    ]);
+  }, [accountIdentity.refresh, accountRateLimits.refresh]);
   const preferences = usePreferences(preferencesStore);
   const connectionTest = useServerConnectionTest(connectionTestOptions);
   const mutations = useServerProfileMutations(
@@ -2149,10 +2157,11 @@ export function App({
         }
         topbarAccessory={
           <RateLimitIndicator
+            accountEmail={accountIdentity.email}
             data={accountRateLimits.data}
             error={accountRateLimits.error}
             loading={accountRateLimits.loading}
-            onRefresh={accountRateLimits.refresh}
+            onRefresh={refreshAccountDetails}
             refreshing={accountRateLimits.refreshing}
             updatedAt={accountRateLimits.updatedAt}
             onConsumeResetCredit={accountRateLimits.consumeResetCredit}

@@ -1,6 +1,7 @@
 import type {
   ConsumeAccountRateLimitResetCreditParams,
   ConsumeAccountRateLimitResetCreditResponse,
+  GetAccountResponse,
   GetAccountRateLimitsResponse,
   GetAccountTokenUsageResponse,
   ServerNotification,
@@ -8,6 +9,7 @@ import type {
 import type { RequestHandle, ResultValidator } from "../protocol/rpc";
 import {
   validateConsumeAccountRateLimitResetCreditResponse,
+  validateGetAccountResponse,
   validateGetAccountRateLimitsResponse,
   validateGetAccountTokenUsageResponse,
 } from "../protocol/validation";
@@ -16,10 +18,18 @@ type RateLimitsNotification = Extract<
   ServerNotification,
   { method: "account/rateLimits/updated" }
 >;
+type AccountUpdatedNotification = Extract<
+  ServerNotification,
+  { method: "account/updated" }
+>;
 
 type AccountSession = Pick<AppServerSession, "sendRequest" | "subscribeNotifications">;
 
 export interface AccountClient {
+  readAccount(): RequestHandle<GetAccountResponse>;
+  subscribeAccountUpdates(
+    handler: (notification: AccountUpdatedNotification) => void,
+  ): () => void;
   readRateLimits(): RequestHandle<GetAccountRateLimitsResponse>;
   subscribeRateLimitUpdates(
     handler: (notification: RateLimitsNotification) => void,
@@ -32,6 +42,24 @@ export interface AccountClient {
 
 export class AppServerAccountClient implements AccountClient {
   constructor(private readonly session: AccountSession) {}
+
+  readAccount(): RequestHandle<GetAccountResponse> {
+    return this.session.sendRequest({
+      method: "account/read",
+      params: {},
+      validateResult: getAccountResponseValidator,
+    });
+  }
+
+  subscribeAccountUpdates(
+    handler: (notification: AccountUpdatedNotification) => void,
+  ): () => void {
+    return this.session.subscribeNotifications((notification) => {
+      if (notification.method === "account/updated") {
+        handler(notification);
+      }
+    });
+  }
 
   readRateLimits(): RequestHandle<GetAccountRateLimitsResponse> {
     return this.session.sendRequest({
@@ -67,6 +95,9 @@ export class AppServerAccountClient implements AccountClient {
     });
   }
 }
+
+const getAccountResponseValidator: ResultValidator<GetAccountResponse> =
+  validateGetAccountResponse;
 
 const getAccountRateLimitsResponseValidator: ResultValidator<GetAccountRateLimitsResponse> =
   validateGetAccountRateLimitsResponse;

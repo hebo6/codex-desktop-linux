@@ -64,6 +64,7 @@ export type { FsReadFileParams } from "./types/FsReadFileParams";
 export type { FsReadFileResponse } from "./types/FsReadFileResponse";
 export type { FsGetMetadataParams } from "./types/FsGetMetadataParams";
 export type { FsGetMetadataResponse } from "./types/FsGetMetadataResponse";
+export type { GetAccountResponse } from "./types/GetAccountResponse";
 export type { GetAccountRateLimitsResponse } from "./types/GetAccountRateLimitsResponse";
 export type { CommandExecutionRequestApprovalResponse } from "./types/CommandExecutionRequestApprovalResponse";
 export type { FileChangeRequestApprovalResponse } from "./types/FileChangeRequestApprovalResponse";

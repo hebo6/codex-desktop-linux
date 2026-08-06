@@ -8,6 +8,7 @@ describe("RateLimitIndicator", () => {
   it("圆环和详情都展示最紧迫窗口的剩余量", () => {
     render(
       <RateLimitIndicator
+        accountEmail="alice@example.com"
         data={{
           rateLimits: { planType: "plus", primary: { usedPercent: 20 } },
           rateLimitsByLimitId: {
@@ -37,7 +38,7 @@ describe("RateLimitIndicator", () => {
         .trim(),
     ).toBe("40");
     expect(screen.getByRole("progressbar", { name: /剩余 8%/u })).toHaveAttribute("aria-valuenow", "8");
-    expect(screen.getByText("套餐 plus")).toBeVisible();
+    expect(screen.getByText("alice@example.com · 套餐 plus")).toBeVisible();
   });
 
   it("读取失败时展示未知圆环和刷新入口", () => {

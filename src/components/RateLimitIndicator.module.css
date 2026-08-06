@@ -109,6 +109,7 @@
 
 .popover > header > div {
   display: grid;
+  min-width: 0;
   gap: 2px;
 }
 
@@ -121,6 +122,10 @@
 .windows article > small {
   color: var(--color-text-tertiary);
   font-size: 10px;
+}
+
+.popover > header small {
+  overflow-wrap: anywhere;
 }
 
 .popover > header button {

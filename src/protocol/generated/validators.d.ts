@@ -12,6 +12,7 @@ import type {
   FsReadFileResponse,
   FuzzyFileSearchResponse,
   GetAccountRateLimitsResponse,
+  GetAccountResponse,
   GetAccountTokenUsageResponse,
   InitializeResponse,
   JSONRPCMessage,
@@ -80,6 +81,7 @@ export const validateReviewStartResponse: StandaloneValidateFunction<ReviewStart
 export const validateThreadForkResponse: StandaloneValidateFunction<ThreadForkResponse>;
 export const validateFsReadFileResponse: StandaloneValidateFunction<FsReadFileResponse>;
 export const validateFsGetMetadataResponse: StandaloneValidateFunction<FsGetMetadataResponse>;
+export const validateGetAccountResponse: StandaloneValidateFunction<GetAccountResponse>;
 export const validateGetAccountRateLimitsResponse: StandaloneValidateFunction<GetAccountRateLimitsResponse>;
 export const validateConsumeAccountRateLimitResetCreditResponse: StandaloneValidateFunction<ConsumeAccountRateLimitResetCreditResponse>;
 export const validateGetAccountTokenUsageResponse: StandaloneValidateFunction<GetAccountTokenUsageResponse>;

@@ -38,6 +38,7 @@ import type {
   ThreadForkResponse,
   FsReadFileResponse,
   FsGetMetadataResponse,
+  GetAccountResponse,
   GetAccountRateLimitsResponse,
   ConsumeAccountRateLimitResetCreditResponse,
   GetAccountTokenUsageResponse,
@@ -78,6 +79,7 @@ import {
   validateThreadForkResponse as validateThreadForkResponseSchema,
   validateFsReadFileResponse as validateFsReadFileResponseSchema,
   validateFsGetMetadataResponse as validateFsGetMetadataResponseSchema,
+  validateGetAccountResponse as validateGetAccountResponseSchema,
   validateGetAccountRateLimitsResponse as validateGetAccountRateLimitsResponseSchema,
   validateConsumeAccountRateLimitResetCreditResponse as validateConsumeAccountRateLimitResetCreditResponseSchema,
   validateGetAccountTokenUsageResponse as validateGetAccountTokenUsageResponseSchema,
@@ -455,6 +457,12 @@ export function validateFsGetMetadataResponse(
   value: unknown,
 ): ProtocolValidationResult<FsGetMetadataResponse> {
   return validateWithSchema(value, validateFsGetMetadataResponseSchema, "invalid_params", "params", "fs/getMetadata 响应校验失败");
+}
+
+export function validateGetAccountResponse(
+  value: unknown,
+): ProtocolValidationResult<GetAccountResponse> {
+  return validateWithSchema(value, validateGetAccountResponseSchema, "invalid_params", "params", "account/read 响应校验失败");
 }
 
 export function validateGetAccountRateLimitsResponse(

@@ -13,6 +13,7 @@ import {
 import styles from "./RateLimitIndicator.module.css";
 
 export interface RateLimitIndicatorProps {
+  readonly accountEmail?: string | null;
   readonly data: GetAccountRateLimitsResponse | null;
   readonly error: string | null;
   readonly loading: boolean;
@@ -27,6 +28,7 @@ export interface RateLimitIndicatorProps {
 }
 
 export function RateLimitIndicator({
+  accountEmail = null,
   data,
   error,
   loading,
@@ -99,7 +101,7 @@ export function RateLimitIndicator({
       {open ? (
         <section aria-label="账户剩余限额详情" className={styles.popover} role="dialog">
           <header>
-            <div><strong>账户剩余限额</strong><small>{accountSummary(data)}</small></div>
+            <div><strong>账户剩余限额</strong><small>{accountSummary(accountEmail, data)}</small></div>
             <button disabled={loading || refreshing} onClick={() => void onRefresh()} type="button">{refreshing ? "刷新中" : "刷新"}</button>
           </header>
           {windows.length === 0 ? (
@@ -218,11 +220,14 @@ export function RateLimitIndicator({
   );
 }
 
-function accountSummary(data: GetAccountRateLimitsResponse | null): string {
-  if (data === null) return "等待服务器数据";
+function accountSummary(
+  accountEmail: string | null,
+  data: GetAccountRateLimitsResponse | null,
+): string {
+  const parts = accountEmail === null ? [] : [accountEmail];
+  if (data === null) return [...parts, "等待服务器数据"].join(" · ");
   const snapshots = Object.values(data.rateLimitsByLimitId ?? {});
   const snapshot = snapshots[0] ?? data.rateLimits;
-  const parts: string[] = [];
   if (snapshot.planType) parts.push(`套餐 ${planName(snapshot.planType)}`);
   if (snapshot.credits?.unlimited) parts.push("点数不限量");
   else if (snapshot.credits?.balance) parts.push(`点数 ${snapshot.credits.balance}`);

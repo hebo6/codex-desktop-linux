@@ -5,6 +5,7 @@ import {
   parseJsonRpcMessage,
   validateConfigReadResponse,
   validateConfigRequirementsReadResponse,
+  validateGetAccountResponse,
   validateInitializeResponse,
   validateJsonRpcMessage,
   validateModelListResponse,
@@ -94,6 +95,17 @@ describe("协议运行时边界", () => {
         nextCursor: null,
       }).ok,
     ).toBe(true);
+  });
+
+  it("校验账户读取响应中的 ChatGPT 邮箱", () => {
+    expect(validateGetAccountResponse({
+      account: { email: "alice@example.com", planType: "plus", type: "chatgpt" },
+      requiresOpenaiAuth: true,
+    }).ok).toBe(true);
+    expect(validateGetAccountResponse({
+      account: { planType: "plus", type: "chatgpt" },
+      requiresOpenaiAuth: true,
+    }).ok).toBe(false);
   });
 
   it("拒绝非法 JSON、非法 envelope 和已知方法的非法 params", () => {
