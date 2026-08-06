@@ -32,6 +32,10 @@ export interface WindowStateControls extends WindowStateSnapshot {
   readonly openTab: (threadId?: string | null) => Promise<WindowState>;
   readonly activateTab: (tabId: string) => Promise<WindowState>;
   readonly closeTab: (tabId: string) => Promise<WindowState>;
+  readonly closeTabs: (
+    tabIds: readonly string[],
+    activeTabId: string,
+  ) => Promise<WindowState>;
   readonly attachThread: (tabId: string, threadId: string) => Promise<WindowState>;
   readonly applyExternalState: (state: WindowState) => void;
 }
@@ -88,6 +92,11 @@ type WindowMutation =
       readonly type: "closeTab";
       readonly tabId: string;
       readonly replacementTabId: string;
+    }
+  | {
+      readonly type: "closeTabs";
+      readonly tabIds: readonly string[];
+      readonly activeTabId: string;
     }
   | {
       readonly type: "attachThread";
@@ -173,6 +182,16 @@ export class WindowStateController {
       type: "closeTab",
       tabId,
       replacementTabId: crypto.randomUUID(),
+    });
+
+  readonly closeTabs = (
+    tabIds: readonly string[],
+    activeTabId: string,
+  ): Promise<WindowState> =>
+    this.enqueueMutation({
+      type: "closeTabs",
+      tabIds: Object.freeze([...tabIds]),
+      activeTabId,
     });
 
   readonly attachThread = (
@@ -421,6 +440,7 @@ export function useWindowState(
       openTab: controller.openTab,
       activateTab: controller.activateTab,
       closeTab: controller.closeTab,
+      closeTabs: controller.closeTabs,
       attachThread: controller.attachThread,
       applyExternalState: controller.applyExternalState,
     }),
@@ -533,6 +553,22 @@ function applyTabsMutation(
         throw new WindowStateControllerError("operationFailed");
       }
       return { tabs, activeTabId: next.id };
+    }
+    case "closeTabs": {
+      const tabIds = new Set(mutation.tabIds);
+      const tabs = Object.freeze(
+        state.tabs.filter(({ id }) => !tabIds.has(id)),
+      );
+      if (sameTabs(tabs, state.tabs)) {
+        return null;
+      }
+      if (
+        tabs.length === 0 ||
+        !tabs.some(({ id }) => id === mutation.activeTabId)
+      ) {
+        throw new WindowStateControllerError("operationFailed");
+      }
+      return { tabs, activeTabId: mutation.activeTabId };
     }
     case "attachThread": {
       const source = state.tabs.find(({ id }) => id === mutation.tabId);

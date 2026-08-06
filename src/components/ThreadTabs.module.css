@@ -167,6 +167,56 @@
   opacity: 0.5;
 }
 
+.contextMenu {
+  position: fixed;
+  z-index: var(--z-popover);
+  display: grid;
+  width: 208px;
+  max-height: calc(100dvh - 16px);
+  gap: 2px;
+  padding: var(--space-1);
+  overflow-y: auto;
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-content-bg);
+  box-shadow: 0 12px 36px rgb(20 20 18 / 20%);
+}
+
+.contextMenu button {
+  display: grid;
+  width: 100%;
+  min-height: 36px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+
+.contextMenu button:hover:not(:disabled),
+.contextMenu button:focus-visible {
+  color: var(--color-text-primary);
+  background: var(--color-fill-hover);
+}
+
+.contextMenu button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.contextMenu small {
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+}
+
 @media (max-width: 720px) {
   .tab {
     min-width: 128px;

@@ -80,6 +80,10 @@ import type { ProxyEditorMode, ProxyEditorSubmission } from "./components/proxyE
 import { ServerSwitcher } from "./components/ServerSwitcher";
 import { ThreadDeleteDialog } from "./components/ThreadDeleteDialog";
 import { ThreadForkDialog } from "./components/ThreadForkDialog";
+import {
+  TabCloseDialog,
+  type TabCloseConfirmation,
+} from "./components/TabCloseDialog";
 import { ThreadQuickSwitcher } from "./components/ThreadQuickSwitcher";
 import { ThreadTabs, type ThreadTabView } from "./components/ThreadTabs";
 import { WindowResizeHandles } from "./components/WindowResizeHandles";
@@ -176,6 +180,16 @@ export interface AppProps {
 interface DraftThreadPresence {
   readonly keyPrefix: string | null;
   readonly threadIds: ReadonlySet<string>;
+}
+
+interface TransientDraftPresence {
+  readonly keyPrefix: string | null;
+  readonly tabIds: ReadonlySet<string>;
+}
+
+interface PendingTabClose extends TabCloseConfirmation {
+  readonly activeTabId: string;
+  readonly tabIds: readonly string[];
 }
 
 interface DraftPresenceOverrides {
@@ -518,6 +532,11 @@ export function App({
   const [composerFocusTabId, setComposerFocusTabId] = useState<string | null>(null);
   const [draftThreadPresence, setDraftThreadPresence] =
     useState<DraftThreadPresence>({ keyPrefix: null, threadIds: new Set() });
+  const [transientDraftPresence, setTransientDraftPresence] =
+    useState<TransientDraftPresence>({ keyPrefix: null, tabIds: new Set() });
+  const [pendingTabClose, setPendingTabClose] =
+    useState<PendingTabClose | null>(null);
+  const [bulkTabsClosing, setBulkTabsClosing] = useState(false);
   const [shortcutStatus, setShortcutStatus] = useState<string | null>(null);
   const [commandLocationRequest, setCommandLocationRequest] =
     useState<CommandLocationRequest | null>(null);
@@ -588,9 +607,14 @@ export function App({
   const boundServerId = windowState.windowState?.serverId ?? null;
   const windowId = windowState.windowState?.windowId ?? null;
   const draftKeyPrefix = composerDraftKeyPrefix(windowId, boundServerId);
+  const transientKeyPrefix = transientDraftKeyPrefix(windowId, boundServerId);
   const draftThreadIds = draftThreadPresence.keyPrefix === draftKeyPrefix
     ? draftThreadPresence.threadIds
     : EMPTY_THREAD_IDS;
+  const transientDraftTabIds =
+    transientDraftPresence.keyPrefix === transientKeyPrefix
+      ? transientDraftPresence.tabIds
+      : EMPTY_THREAD_IDS;
   const deletingServer =
     deletingServerId === null
       ? null
@@ -694,6 +718,22 @@ export function App({
   }, [draftKeyPrefix, draftStore]);
 
   const updateDraftPresence = useCallback((draftKey: string, present: boolean) => {
+    const transientTabId = transientDraftTabId(
+      windowId,
+      boundServerId,
+      draftKey,
+    );
+    if (transientTabId !== null) {
+      setTransientDraftPresence((current) => {
+        const tabIds = new Set(
+          current.keyPrefix === transientKeyPrefix ? current.tabIds : [],
+        );
+        if (present) tabIds.add(transientTabId);
+        else tabIds.delete(transientTabId);
+        return { keyPrefix: transientKeyPrefix, tabIds };
+      });
+      return;
+    }
     if (draftKeyPrefix === null) return;
     const threadId = draftThreadId(draftKeyPrefix, draftKey);
     if (threadId === null) return;
@@ -714,7 +754,7 @@ export function App({
       else threadIds.delete(threadId);
       return { keyPrefix: draftKeyPrefix, threadIds };
     });
-  }, [draftKeyPrefix]);
+  }, [boundServerId, draftKeyPrefix, transientKeyPrefix, windowId]);
 
   useEffect(() => {
     let disposed = false;
@@ -1477,6 +1517,17 @@ export function App({
         next.delete(tabId);
         return next;
       });
+      setTransientDraftPresence((current) => {
+        if (
+          current.keyPrefix !== transientKeyPrefix ||
+          !current.tabIds.has(tabId)
+        ) {
+          return current;
+        }
+        const tabIds = new Set(current.tabIds);
+        tabIds.delete(tabId);
+        return { keyPrefix: current.keyPrefix, tabIds };
+      });
       if (tab?.threadId === null) {
         const key = transientDraftKey(
           windowState.windowState?.windowId ?? null,
@@ -1489,6 +1540,109 @@ export function App({
       }
     } catch {
       setWindowActionError("无法关闭会话标签，请重试");
+    }
+  };
+
+  const closeTabGroup = async (request: PendingTabClose): Promise<void> => {
+    if (
+      windowState.status !== "ready" ||
+      conversation.submitting ||
+      bulkTabsClosing
+    ) {
+      return;
+    }
+    const closingTabs = windowTabs.filter(({ id }) =>
+      request.tabIds.includes(id)
+    );
+    if (closingTabs.length === 0) {
+      setPendingTabClose(null);
+      return;
+    }
+    setBulkTabsClosing(true);
+    setWindowActionError(null);
+    try {
+      await windowState.closeTabs(request.tabIds, request.activeTabId);
+      const closedTabIds = new Set(closingTabs.map(({ id }) => id));
+      setDraftCwds((current) => {
+        if (![...closedTabIds].some((tabId) => current.has(tabId))) {
+          return current;
+        }
+        const next = new Map(current);
+        for (const tabId of closedTabIds) next.delete(tabId);
+        return next;
+      });
+      setTransientDraftPresence((current) => {
+        if (
+          current.keyPrefix !== transientKeyPrefix ||
+          ![...closedTabIds].some((tabId) => current.tabIds.has(tabId))
+        ) {
+          return current;
+        }
+        const tabIds = new Set(current.tabIds);
+        for (const tabId of closedTabIds) tabIds.delete(tabId);
+        return { keyPrefix: current.keyPrefix, tabIds };
+      });
+      for (const tab of closingTabs) {
+        if (tab.threadId !== null) {
+          continue;
+        }
+        const key = transientDraftKey(
+          windowState.windowState?.windowId ?? null,
+          boundServerId,
+          tab.id,
+        );
+        if (key !== null) {
+          tabDraftStore.discardTransient(key);
+        }
+      }
+      setPendingTabClose(null);
+    } catch {
+      setPendingTabClose(null);
+      setWindowActionError("无法关闭多个会话标签，请重试");
+    } finally {
+      setBulkTabsClosing(false);
+    }
+  };
+
+  const requestTabGroupClose = (
+    tabId: string,
+    kind: PendingTabClose["kind"],
+  ) => {
+    if (
+      windowState.status !== "ready" ||
+      conversation.submitting ||
+      activeTabId === null
+    ) {
+      return;
+    }
+    const targetIndex = windowTabs.findIndex(({ id }) => id === tabId);
+    if (targetIndex < 0) {
+      return;
+    }
+    const closingTabs = kind === "others"
+      ? windowTabs.filter(({ id }) => id !== tabId)
+      : windowTabs.slice(targetIndex + 1);
+    if (closingTabs.length === 0) {
+      return;
+    }
+    const closingTabIds = Object.freeze(closingTabs.map(({ id }) => id));
+    const request = {
+      activeTabId:
+        kind === "others" || closingTabIds.includes(activeTabId)
+          ? tabId
+          : activeTabId,
+      draftCount: closingTabs.filter(
+        ({ id, threadId }) =>
+          threadId === null && transientDraftTabIds.has(id),
+      ).length,
+      kind,
+      tabCount: closingTabs.length,
+      tabIds: closingTabIds,
+    } satisfies PendingTabClose;
+    if (request.draftCount > 0) {
+      setPendingTabClose(request);
+    } else {
+      void closeTabGroup(request);
     }
   };
 
@@ -1864,7 +2018,7 @@ export function App({
     ],
   );
   const tabControlsDisabled =
-    windowState.status !== "ready" || conversation.submitting;
+    windowState.status !== "ready" || conversation.submitting || bulkTabsClosing;
 
   const serverControl = (
     <ServerSwitcher
@@ -2150,6 +2304,8 @@ export function App({
               disabled={tabControlsDisabled}
               onActivate={(tabId) => void activateTab(tabId)}
               onClose={(tabId) => void closeTab(tabId)}
+              onCloseOthers={(tabId) => requestTabGroupClose(tabId, "others")}
+              onCloseRight={(tabId) => requestTabGroupClose(tabId, "right")}
               onNew={() => void openNewTab()}
               tabs={tabViews}
             />
@@ -2207,6 +2363,21 @@ export function App({
         onConfirm={(threadId) => void deleteThread(threadId)}
         serverName={boundServerName}
         thread={deletingThread}
+      />
+
+      <TabCloseDialog
+        closing={bulkTabsClosing}
+        confirmation={pendingTabClose}
+        onCancel={() => {
+          if (!bulkTabsClosing) {
+            setPendingTabClose(null);
+          }
+        }}
+        onConfirm={() => {
+          if (pendingTabClose !== null) {
+            void closeTabGroup(pendingTabClose);
+          }
+        }}
       />
 
       <ThreadForkDialog
@@ -2471,9 +2642,32 @@ function transientDraftKey(
   serverId: string | null,
   tabId: string | null,
 ): string | null {
-  return windowId === null || serverId === null || tabId === null
+  const keyPrefix = transientDraftKeyPrefix(windowId, serverId);
+  return keyPrefix === null || tabId === null
     ? null
-    : `transient:${windowId}:${serverId}:${tabId}`;
+    : `${keyPrefix}${tabId}`;
+}
+
+function transientDraftTabId(
+  windowId: string | null,
+  serverId: string | null,
+  draftKey: string,
+): string | null {
+  const keyPrefix = transientDraftKeyPrefix(windowId, serverId);
+  return keyPrefix !== null &&
+      draftKey.startsWith(keyPrefix) &&
+      draftKey.length > keyPrefix.length
+    ? draftKey.slice(keyPrefix.length)
+    : null;
+}
+
+function transientDraftKeyPrefix(
+  windowId: string | null,
+  serverId: string | null,
+): string | null {
+  return windowId === null || serverId === null
+    ? null
+    : `transient:${windowId}:${serverId}:`;
 }
 
 const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();

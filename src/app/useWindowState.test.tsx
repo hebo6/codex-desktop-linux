@@ -176,6 +176,40 @@ describe("WindowStateController", () => {
     expect(authoritative.tabs[0]?.threadId).toBe("thread-c");
   });
 
+  it("一次更新关闭多个标签并激活指定保留标签", async () => {
+    const pendingLoad = deferred<WindowState>();
+    let authoritative = boundState(
+      1,
+      [
+        { id: "tab-a", threadId: "thread-a" },
+        { id: "tab-b", threadId: "thread-b" },
+        { id: "tab-c", threadId: "thread-c" },
+      ],
+      "tab-a",
+    );
+    const tabsUpdater = vi.fn(async (request: UpdateWindowTabsRequest) => {
+      authoritative = {
+        ...authoritative,
+        version: authoritative.version + 1,
+        tabs: request.tabs,
+        activeTabId: request.activeTabId,
+        updatedAtMs: authoritative.updatedAtMs + 1,
+      };
+      return authoritative;
+    });
+    const controller = new WindowStateController({
+      loader: () => pendingLoad.promise,
+      tabsUpdater,
+    });
+    await loadController(controller, pendingLoad, authoritative);
+
+    const next = await controller.closeTabs(["tab-a", "tab-c"], "tab-b");
+
+    expect(tabsUpdater).toHaveBeenCalledOnce();
+    expect(next.tabs).toEqual([{ id: "tab-b", threadId: "thread-b" }]);
+    expect(next.activeTabId).toBe("tab-b");
+  });
+
   it("打开已经存在的会话只激活标签且不重复创建", async () => {
     const pendingLoad = deferred<WindowState>();
     const current = boundState(
@@ -348,6 +382,7 @@ describe("useWindowState", () => {
       openTab: result.current.openTab,
       activateTab: result.current.activateTab,
       closeTab: result.current.closeTab,
+      closeTabs: result.current.closeTabs,
       attachThread: result.current.attachThread,
     };
 
@@ -364,6 +399,7 @@ describe("useWindowState", () => {
     expect(result.current.openTab).toBe(controls.openTab);
     expect(result.current.activateTab).toBe(controls.activateTab);
     expect(result.current.closeTab).toBe(controls.closeTab);
+    expect(result.current.closeTabs).toBe(controls.closeTabs);
     expect(result.current.attachThread).toBe(controls.attachThread);
     unmount();
   });

@@ -20,12 +20,16 @@ const TAB = {
 function renderTabs(tabs: readonly ThreadTabView[] = [TAB]) {
   const onActivate = vi.fn();
   const onClose = vi.fn();
+  const onCloseOthers = vi.fn();
+  const onCloseRight = vi.fn();
   const onNew = vi.fn();
   const rendered = render(
     <ThreadTabs
       activeTabId={TAB.id}
       onActivate={onActivate}
       onClose={onClose}
+      onCloseOthers={onCloseOthers}
+      onCloseRight={onCloseRight}
       onNew={onNew}
       tabs={tabs}
     />,
@@ -33,6 +37,8 @@ function renderTabs(tabs: readonly ThreadTabView[] = [TAB]) {
   return {
     onActivate,
     onClose,
+    onCloseOthers,
+    onCloseRight,
     onNew,
     rerenderTabs(nextTabs: readonly ThreadTabView[]) {
       rendered.rerender(
@@ -40,6 +46,8 @@ function renderTabs(tabs: readonly ThreadTabView[] = [TAB]) {
           activeTabId={TAB.id}
           onActivate={onActivate}
           onClose={onClose}
+          onCloseOthers={onCloseOthers}
+          onCloseRight={onCloseRight}
           onNew={onNew}
           tabs={nextTabs}
         />,
@@ -116,5 +124,60 @@ describe("ThreadTabs", () => {
     expect(onActivate).toHaveBeenCalledWith(TAB.id);
     expect(onClose).toHaveBeenCalledWith(TAB.id);
     expect(onNew).toHaveBeenCalledOnce();
+  });
+
+  it("通过右键菜单关闭目标、其他或右侧标签", () => {
+    const tabs = [
+      TAB,
+      { ...TAB, id: "tab-2", title: "第二个标签" },
+      { ...TAB, id: "tab-3", title: "第三个标签" },
+    ];
+    const { onClose, onCloseOthers, onCloseRight } = renderTabs(tabs);
+    const second = screen.getByRole("tab", { name: /第二个标签/u });
+
+    fireEvent.contextMenu(second, { clientX: 120, clientY: 80 });
+    expect(screen.getByRole("menu", { name: "标签“第二个标签”操作" }))
+      .toBeVisible();
+    fireEvent.click(screen.getByRole("menuitem", { name: /关闭标签/u }));
+    expect(onClose).toHaveBeenCalledWith("tab-2");
+
+    fireEvent.contextMenu(second, { clientX: 120, clientY: 80 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "关闭其他标签页" }));
+    expect(onCloseOthers).toHaveBeenCalledWith("tab-2");
+
+    fireEvent.contextMenu(second, { clientX: 120, clientY: 80 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "关闭右侧标签页" }));
+    expect(onCloseRight).toHaveBeenCalledWith("tab-2");
+  });
+
+  it("支持键盘打开菜单、菜单导航和焦点恢复", () => {
+    renderTabs([
+      TAB,
+      { ...TAB, id: "tab-2", title: "第二个标签" },
+    ]);
+    const first = screen.getByRole("tab", { name: /修复测试失败/u });
+
+    first.focus();
+    fireEvent.keyDown(first, { key: "F10", shiftKey: true });
+    const close = screen.getByRole("menuitem", { name: /关闭标签/u });
+    const closeOthers = screen.getByRole("menuitem", {
+      name: "关闭其他标签页",
+    });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(close, { key: "ArrowDown" });
+    expect(closeOthers).toHaveFocus();
+    fireEvent.keyDown(closeOthers, { key: "Escape" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(first).toHaveFocus();
+  });
+
+  it("没有可关闭目标时禁用对应批量操作", () => {
+    renderTabs();
+    fireEvent.contextMenu(screen.getByRole("tab"));
+
+    expect(screen.getByRole("menuitem", { name: "关闭其他标签页" }))
+      .toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: "关闭右侧标签页" }))
+      .toBeDisabled();
   });
 });
