@@ -303,6 +303,106 @@ function renderApp(
   return { loader, testStore, windowOpener, unmount: view.unmount };
 }
 
+const SIDEBAR_THREAD = {
+  cliVersion: "1.0.0",
+  createdAt: 100,
+  cwd: "/workspace/sidebar",
+  ephemeral: false,
+  historyMode: "paginated",
+  id: "thread-sidebar",
+  modelProvider: "openai",
+  name: "侧边栏目标",
+  preview: "从侧边栏打开",
+  sessionId: "session-sidebar",
+  source: "appServer",
+  status: { type: "idle" },
+  turns: [],
+  updatedAt: 200,
+} as const;
+
+function renderSidebarThreadScenario(existingThreadTab = false) {
+  const requestSession = {
+    sendRequest(request: { readonly method: string }) {
+      const result = request.method === "thread/list"
+        ? { data: [SIDEBAR_THREAD], nextCursor: null }
+        : request.method === "thread/resume"
+          ? {
+              approvalPolicy: "on-request",
+              approvalsReviewer: "user",
+              cwd: SIDEBAR_THREAD.cwd,
+              model: "gpt-5",
+              modelProvider: "openai",
+              reasoningEffort: null,
+              sandbox: { type: "readOnly" },
+              serviceTier: null,
+              initialTurnsPage: { data: [], nextCursor: null },
+              thread: SIDEBAR_THREAD,
+            }
+          : request.method === "thread/backgroundTerminals/list"
+            ? { data: [], nextCursor: null }
+            : {};
+      return {
+        cancel: () => undefined,
+        id: `request:${request.method}`,
+        result: Promise.resolve(result),
+      };
+    },
+    subscribeNotifications: () => () => undefined,
+  };
+  const sessionFactory: ConfiguredServerSessionFactory = (options) => ({
+    conversationClient: new AppServerConversationClient(requestSession as never),
+    threadClient: new AppServerThreadClient(requestSession as never),
+    async start() {
+      options.onStateChange({
+        phase: "ready",
+        connectionStage: null,
+        initializeResponse: null,
+        errorCode: null,
+      });
+    },
+    async close() {},
+  });
+  let authoritative: WindowState = {
+    windowId: "main",
+    version: 1,
+    serverId: SERVER_ID,
+    tabs: [
+      { id: "tab-new", threadId: null },
+      ...(existingThreadTab
+        ? [{ id: "tab-existing", threadId: SIDEBAR_THREAD.id }]
+        : []),
+    ],
+    activeTabId: "tab-new",
+    updatedAtMs: 1,
+  };
+  const tabsUpdater = vi.fn(async (request: UpdateWindowTabsRequest) => {
+    authoritative = {
+      ...authoritative,
+      version: authoritative.version + 1,
+      tabs: request.tabs,
+      activeTabId: request.activeTabId,
+      updatedAtMs: authoritative.updatedAtMs + 1,
+    };
+    return authoritative;
+  });
+  const draftStore: DraftStore = {
+    listKeys: vi.fn(async () => []),
+    load: vi.fn(async () => null),
+    save: vi.fn(async () => undefined),
+    delete: vi.fn(async () => undefined),
+    transition: vi.fn(async () => undefined),
+  };
+  renderApp(() => ({ servers: [localServer()], proxies: [] }), {
+    draftStore,
+    sessionFactory,
+    windowStateOptions: {
+      loader: vi.fn(async () => authoritative),
+      tabsUpdater,
+    },
+  });
+  return { tabsUpdater };
+}
+
 describe("App", () => {
   it("通过 Ctrl+/ 打开并关闭键盘快捷键列表", async () => {
     renderApp(() => ({ servers: [], proxies: [] }));
@@ -467,6 +567,59 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getByRole("button", { name: "发送" })).toBeVisible());
     expect(screen.getByText("首次问题")).toBeVisible();
+  });
+
+  it("点击侧边栏会话时覆盖无草稿的活动新建标签", async () => {
+    const user = userEvent.setup();
+    const { tabsUpdater } = renderSidebarThreadScenario();
+    await screen.findByRole("textbox", { name: "任务输入" });
+
+    await user.click(await screen.findByRole("button", {
+      name: /^侧边栏目标，/u,
+    }));
+
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(1));
+    expect(tabsUpdater).toHaveBeenCalledWith({
+      expectedVersion: 1,
+      tabs: [{ id: "tab-new", threadId: SIDEBAR_THREAD.id }],
+      activeTabId: "tab-new",
+    });
+  });
+
+  it("目标会话已打开时移除无草稿新建标签并激活已有标签", async () => {
+    const user = userEvent.setup();
+    const { tabsUpdater } = renderSidebarThreadScenario(true);
+    await screen.findByRole("textbox", { name: "任务输入" });
+
+    await user.click(await screen.findByRole("button", {
+      name: /^侧边栏目标，/u,
+    }));
+
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(1));
+    expect(tabsUpdater).toHaveBeenCalledWith({
+      expectedVersion: 1,
+      tabs: [{ id: "tab-existing", threadId: SIDEBAR_THREAD.id }],
+      activeTabId: "tab-existing",
+    });
+  });
+
+  it("点击侧边栏会话时保留有草稿的新建标签并追加会话标签", async () => {
+    const user = userEvent.setup();
+    const { tabsUpdater } = renderSidebarThreadScenario();
+    const composer = await screen.findByRole("textbox", { name: "任务输入" });
+    await user.type(composer, "未发送草稿");
+
+    await user.click(await screen.findByRole("button", {
+      name: /^侧边栏目标，/u,
+    }));
+
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(1));
+    const request = tabsUpdater.mock.calls[0]?.[0];
+    expect(request?.tabs).toEqual([
+      { id: "tab-new", threadId: null },
+      { id: expect.any(String), threadId: SIDEBAR_THREAD.id },
+    ]);
+    expect(request?.activeTabId).toBe(request?.tabs[1]?.id);
   });
 
   it("可信域名打开失败时在确认框恢复操作上下文", async () => {

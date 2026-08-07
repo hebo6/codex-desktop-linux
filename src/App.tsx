@@ -184,6 +184,7 @@ interface DraftThreadPresence {
 }
 
 interface TransientDraftPresence {
+  readonly knownTabIds: ReadonlySet<string>;
   readonly keyPrefix: string | null;
   readonly tabIds: ReadonlySet<string>;
 }
@@ -537,7 +538,11 @@ export function App({
   const [draftThreadPresence, setDraftThreadPresence] =
     useState<DraftThreadPresence>({ keyPrefix: null, threadIds: new Set() });
   const [transientDraftPresence, setTransientDraftPresence] =
-    useState<TransientDraftPresence>({ keyPrefix: null, tabIds: new Set() });
+    useState<TransientDraftPresence>({
+      knownTabIds: new Set(),
+      keyPrefix: null,
+      tabIds: new Set(),
+    });
   const [pendingTabClose, setPendingTabClose] =
     useState<PendingTabClose | null>(null);
   const [bulkTabsClosing, setBulkTabsClosing] = useState(false);
@@ -618,6 +623,10 @@ export function App({
   const transientDraftTabIds =
     transientDraftPresence.keyPrefix === transientKeyPrefix
       ? transientDraftPresence.tabIds
+      : EMPTY_THREAD_IDS;
+  const knownTransientDraftTabIds =
+    transientDraftPresence.keyPrefix === transientKeyPrefix
+      ? transientDraftPresence.knownTabIds
       : EMPTY_THREAD_IDS;
   const deletingServer =
     deletingServerId === null
@@ -729,12 +738,16 @@ export function App({
     );
     if (transientTabId !== null) {
       setTransientDraftPresence((current) => {
+        const knownTabIds = new Set(
+          current.keyPrefix === transientKeyPrefix ? current.knownTabIds : [],
+        );
         const tabIds = new Set(
           current.keyPrefix === transientKeyPrefix ? current.tabIds : [],
         );
+        knownTabIds.add(transientTabId);
         if (present) tabIds.add(transientTabId);
         else tabIds.delete(transientTabId);
-        return { keyPrefix: transientKeyPrefix, tabIds };
+        return { knownTabIds, keyPrefix: transientKeyPrefix, tabIds };
       });
       return;
     }
@@ -1437,6 +1450,52 @@ export function App({
     }
   };
 
+  const openThreadFromSidebar = async (threadId: string): Promise<void> => {
+    if (windowState.status !== "ready") {
+      return;
+    }
+    const replaceableTab =
+      activeTab?.threadId === null &&
+      knownTransientDraftTabIds.has(activeTab.id) &&
+      !transientDraftTabIds.has(activeTab.id)
+        ? activeTab
+        : null;
+    if (replaceableTab === null) {
+      await openThreadInNewTab(threadId, true);
+      return;
+    }
+    setWindowActionError(null);
+    try {
+      const existingTab = windowTabs.find((tab) => tab.threadId === threadId);
+      const state = existingTab === undefined
+        ? await windowState.replaceActiveThread(threadId)
+        : await windowState.closeTabs([replaceableTab.id], existingTab.id);
+      setDraftCwds((current) => {
+        if (!current.has(replaceableTab.id)) {
+          return current;
+        }
+        const next = new Map(current);
+        next.delete(replaceableTab.id);
+        return next;
+      });
+      setTransientDraftPresence((current) => {
+        if (current.keyPrefix !== transientKeyPrefix) {
+          return current;
+        }
+        const knownTabIds = new Set(current.knownTabIds);
+        const tabIds = new Set(current.tabIds);
+        knownTabIds.delete(replaceableTab.id);
+        tabIds.delete(replaceableTab.id);
+        return { knownTabIds, keyPrefix: current.keyPrefix, tabIds };
+      });
+      if (state.activeTabId !== undefined) {
+        setComposerFocusTabId(state.activeTabId);
+      }
+    } catch {
+      setWindowActionError("无法打开会话，请重试");
+    }
+  };
+
   const openNewTask = async (
     targetCwd: string | null = restoredThread?.metadata.cwd ?? null,
   ): Promise<void> => {
@@ -1524,13 +1583,15 @@ export function App({
       setTransientDraftPresence((current) => {
         if (
           current.keyPrefix !== transientKeyPrefix ||
-          !current.tabIds.has(tabId)
+          (!current.knownTabIds.has(tabId) && !current.tabIds.has(tabId))
         ) {
           return current;
         }
+        const knownTabIds = new Set(current.knownTabIds);
         const tabIds = new Set(current.tabIds);
+        knownTabIds.delete(tabId);
         tabIds.delete(tabId);
-        return { keyPrefix: current.keyPrefix, tabIds };
+        return { knownTabIds, keyPrefix: current.keyPrefix, tabIds };
       });
       if (tab?.threadId === null) {
         const key = transientDraftKey(
@@ -1578,13 +1639,19 @@ export function App({
       setTransientDraftPresence((current) => {
         if (
           current.keyPrefix !== transientKeyPrefix ||
-          ![...closedTabIds].some((tabId) => current.tabIds.has(tabId))
+          ![...closedTabIds].some((tabId) =>
+            current.knownTabIds.has(tabId) || current.tabIds.has(tabId)
+          )
         ) {
           return current;
         }
+        const knownTabIds = new Set(current.knownTabIds);
         const tabIds = new Set(current.tabIds);
-        for (const tabId of closedTabIds) tabIds.delete(tabId);
-        return { keyPrefix: current.keyPrefix, tabIds };
+        for (const tabId of closedTabIds) {
+          knownTabIds.delete(tabId);
+          tabIds.delete(tabId);
+        }
+        return { knownTabIds, keyPrefix: current.keyPrefix, tabIds };
       });
       for (const tab of closingTabs) {
         if (tab.threadId !== null) {
@@ -2273,7 +2340,7 @@ export function App({
         onNewTaskInProject={(cwd) => void openNewTab(cwd)}
         onRefreshThreads={() => void serverThreads.refreshThreads()}
         onSearchThreads={() => setQuickSwitcherOpen(true)}
-        onOpenThread={(threadId) => void openThreadInNewTab(threadId, true)}
+        onOpenThread={(threadId) => void openThreadFromSidebar(threadId)}
         onOpenThreadInNewTab={(threadId) =>
           void openThreadInNewTab(threadId, true)}
         onUndoArchive={() => void serverThreads.undoArchive()}
