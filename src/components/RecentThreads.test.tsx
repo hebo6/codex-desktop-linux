@@ -203,11 +203,24 @@ describe("RecentThreads", () => {
     expect(
       getThreadRow("预览标题").querySelector('[data-thread-status="active"]'),
     ).toHaveTextContent("运行中");
+    const activeMetadata = getThreadRow("预览标题")
+      .querySelector("time")?.parentElement;
+    expect(activeMetadata?.children[0]).toHaveAttribute(
+      "data-thread-status",
+      "active",
+    );
+    expect(activeMetadata?.children[1]).toHaveAttribute("title", THREAD_TWO.cwd);
     expect(screen.getByRole("img", { name: "等待输入" })).toHaveTextContent("待回复");
     expect(
       getThreadRow("失败会话").querySelector('[data-thread-status="systemError"]'),
     ).toHaveTextContent("失败");
-    expect(getThreadRow("未加载会话").querySelector("[data-thread-status]")).toBeNull();
+    const notLoadedMetadata = getThreadRow("未加载会话")
+      .querySelector("time")?.parentElement;
+    expect(notLoadedMetadata?.querySelector("[data-thread-status]")).toBeNull();
+    expect(notLoadedMetadata?.firstElementChild).toHaveAttribute(
+      "title",
+      THREAD_ONE.cwd,
+    );
   });
 
   it("在空闲和状态同步中的会话展示待查看完成结果", () => {

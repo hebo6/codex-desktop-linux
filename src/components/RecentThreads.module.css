@@ -406,9 +406,8 @@
 }
 
 .threadMetadata {
-  display: grid;
+  display: flex;
   min-width: 0;
-  grid-template-columns: 42px minmax(0, 1fr) max-content;
   align-items: center;
   gap: var(--space-2);
   color: var(--color-text-tertiary);
@@ -416,11 +415,8 @@
   line-height: 18px;
 }
 
-.threadStatusSlot {
-  min-width: 0;
-}
-
 .threadStatus {
+  flex: none;
   white-space: nowrap;
 }
 
@@ -435,11 +431,14 @@
 .projectName {
   overflow: hidden;
   min-width: 0;
+  flex: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .updatedAt {
+  flex: none;
+  margin-left: auto;
   white-space: nowrap;
 }
 

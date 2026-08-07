@@ -762,17 +762,18 @@ function ThreadRow({
           </span>
         </span>
         <span className={styles.threadMetadata}>
-          <span className={styles.threadStatusSlot}>
-            {threadStatus === null ? null : (
-              <span
-                className={styles.threadStatus}
-                data-thread-status={threadStatus.kind}
-              >
-                {threadStatus.text}
-              </span>
-            )}
-          </span>
-          <span className={styles.projectName} title={thread.cwd}>
+          {threadStatus === null ? null : (
+            <span
+              className={styles.threadStatus}
+              data-thread-status={threadStatus.kind}
+            >
+              {threadStatus.text}
+            </span>
+          )}
+          <span
+            className={styles.projectName}
+            title={thread.cwd}
+          >
             {projectName}
           </span>
           <time
