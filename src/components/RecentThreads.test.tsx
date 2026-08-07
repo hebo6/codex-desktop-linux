@@ -241,18 +241,39 @@ describe("RecentThreads", () => {
     ).toHaveTextContent("空闲");
   });
 
-  it("以易读相对时间展示最近更新时间并定时刷新", () => {
+  it("以易读相对时间展示各时间跨度并定时刷新", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-07T12:00:00-07:00"));
-    const thread = {
+    const nowSeconds = Date.now() / 1_000;
+    const elapsedSeconds = [
+      5 * 60 + 30,
+      2 * 60 * 60,
+      3 * 24 * 60 * 60,
+      2 * 7 * 24 * 60 * 60,
+      3 * 30 * 24 * 60 * 60,
+      2 * 365 * 24 * 60 * 60,
+    ];
+    const threads = elapsedSeconds.map((elapsed, index) => ({
       ...THREAD_ONE,
-      updatedAt: Date.now() / 1_000 - 5 * 60 - 30,
-    } satisfies ThreadSummary;
-    renderThreads({ threads: [thread] });
+      id: `thread-relative-${index}`,
+      name: `相对时间 ${index}`,
+      sessionId: `session-relative-${index}`,
+      updatedAt: nowSeconds - elapsed,
+    } satisfies ThreadSummary));
+    renderThreads({ threads });
 
-    expect(screen.getByText("5 分钟前")).toBeVisible();
+    for (const label of [
+      "5分钟前",
+      "2小时前",
+      "3天前",
+      "2周前",
+      "3个月前",
+      "2年前",
+    ]) {
+      expect(screen.getByText(label)).toBeVisible();
+    }
     act(() => vi.advanceTimersByTime(30_000));
-    expect(screen.getByText("6 分钟前")).toBeVisible();
+    expect(screen.getByText("6分钟前")).toBeVisible();
   });
 
   it("支持点击和方向键移动会话焦点", () => {

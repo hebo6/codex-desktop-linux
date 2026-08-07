@@ -104,6 +104,15 @@ const ACTION_ROW_HEIGHT = 40;
 const INITIAL_GROUP_THREAD_COUNT = 3;
 const GROUP_THREAD_PAGE_SIZE = 3;
 const RELATIVE_TIME_REFRESH_MS = 30_000;
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+const WEEK_MS = 7 * DAY_MS;
+const MONTH_MS = 30 * DAY_MS;
+const YEAR_MS = 365 * DAY_MS;
+const RELATIVE_TIME_FORMATTER = new Intl.RelativeTimeFormat("zh-CN", {
+  numeric: "always",
+});
 const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();
 
 export function RecentThreads({
@@ -840,39 +849,43 @@ function displayedThreadStatus(
 function formatRelativeUpdatedAt(updatedAt: number, nowMs: number): string {
   const updatedAtMs = updatedAt * 1_000;
   const elapsedMs = Math.max(0, nowMs - updatedAtMs);
-  const elapsedMinutes = Math.floor(elapsedMs / 60_000);
-  if (elapsedMinutes < 1) {
+  if (elapsedMs < MINUTE_MS) {
     return "刚刚";
   }
-  if (elapsedMinutes < 60) {
-    return `${elapsedMinutes} 分钟前`;
+  if (elapsedMs < HOUR_MS) {
+    return RELATIVE_TIME_FORMATTER.format(
+      -Math.floor(elapsedMs / MINUTE_MS),
+      "minute",
+    );
   }
-  const elapsedHours = Math.floor(elapsedMs / 3_600_000);
-  if (elapsedHours < 24) {
-    return `${elapsedHours} 小时前`;
+  if (elapsedMs < DAY_MS) {
+    return RELATIVE_TIME_FORMATTER.format(
+      -Math.floor(elapsedMs / HOUR_MS),
+      "hour",
+    );
   }
-  const updatedDate = new Date(updatedAtMs);
-  const nowDate = new Date(nowMs);
-  const calendarDays = Math.round(
-    (
-      Date.UTC(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate())
-      - Date.UTC(
-        updatedDate.getFullYear(),
-        updatedDate.getMonth(),
-        updatedDate.getDate(),
-      )
-    ) / 86_400_000,
+  if (elapsedMs < WEEK_MS) {
+    return RELATIVE_TIME_FORMATTER.format(
+      -Math.floor(elapsedMs / DAY_MS),
+      "day",
+    );
+  }
+  if (elapsedMs < MONTH_MS) {
+    return RELATIVE_TIME_FORMATTER.format(
+      -Math.floor(elapsedMs / WEEK_MS),
+      "week",
+    );
+  }
+  if (elapsedMs < YEAR_MS) {
+    return RELATIVE_TIME_FORMATTER.format(
+      -Math.floor(elapsedMs / MONTH_MS),
+      "month",
+    );
+  }
+  return RELATIVE_TIME_FORMATTER.format(
+    -Math.floor(elapsedMs / YEAR_MS),
+    "year",
   );
-  if (calendarDays === 1) {
-    return "昨天";
-  }
-  if (calendarDays < 7) {
-    return `${calendarDays} 天前`;
-  }
-  const date = `${updatedDate.getMonth() + 1}月${updatedDate.getDate()}日`;
-  return updatedDate.getFullYear() === nowDate.getFullYear()
-    ? date
-    : `${updatedDate.getFullYear()}年${date}`;
 }
 
 function contextMenuPosition(x: number, y: number): CSSProperties {
