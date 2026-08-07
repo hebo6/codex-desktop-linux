@@ -15,7 +15,6 @@ import type {
   ThreadSummary,
   ServerThreadsPhase,
 } from "../app/useServerThreads";
-import { threadIndicatorStatus } from "../app/threadIndicatorStatus";
 import { useVirtualRows } from "./useVirtualRows";
 import {
   ArchiveIcon,
@@ -100,8 +99,11 @@ type RecentThreadEntry =
 type RecentThreadGroupEntry = Extract<RecentThreadEntry, { type: "group" }>;
 
 const GROUP_HEADING_HEIGHT = 32;
+const THREAD_ROW_HEIGHT = 56;
+const ACTION_ROW_HEIGHT = 40;
 const INITIAL_GROUP_THREAD_COUNT = 3;
 const GROUP_THREAD_PAGE_SIZE = 3;
+const RELATIVE_TIME_REFRESH_MS = 30_000;
 const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();
 
 export function RecentThreads({
@@ -147,6 +149,7 @@ export function RecentThreads({
     ReadonlySet<string>
   >(() => new Set());
   const [contextMenu, setContextMenu] = useState<ThreadContextMenuState | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const groups = useMemo(() => groupThreads(threads, grouped), [grouped, threads]);
   const entries = useMemo(
     () => recentThreadEntries({
@@ -192,7 +195,11 @@ export function RecentThreads({
   const estimateEntrySize = useCallback(
     (index: number) => {
       const entry = entries[index];
-      return entry?.type === "group" ? GROUP_HEADING_HEIGHT : 40;
+      return entry?.type === "group"
+        ? GROUP_HEADING_HEIGHT
+        : entry?.type === "thread"
+          ? THREAD_ROW_HEIGHT
+          : ACTION_ROW_HEIGHT;
     },
     [entries],
   );
@@ -226,6 +233,14 @@ export function RecentThreads({
     setLoadingProjectGroupKeys(new Set());
     setFailedProjectGroupKeys(new Set());
   }, [phase]);
+
+  useEffect(() => {
+    const interval = window.setInterval(
+      () => setNowMs(Date.now()),
+      RELATIVE_TIME_REFRESH_MS,
+    );
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!grouped || currentThreadId === null) {
@@ -456,6 +471,7 @@ export function RecentThreads({
                         navigate(entry.thread.id, direction)
                       }
                       onOpen={() => onOpenThread(entry.thread.id)}
+                      nowMs={nowMs}
                       {...(onOpenThreadInNewTab === undefined
                         ? {}
                         : {
@@ -607,6 +623,7 @@ function ThreadRow({
   onOpen,
   onOpenContextMenu,
   onOpenInNewTab,
+  nowMs,
   thread,
 }: {
   readonly backgroundCommandCount: number;
@@ -621,13 +638,34 @@ function ThreadRow({
   readonly onOpen: () => void;
   readonly onOpenContextMenu?: (x: number, y: number) => void;
   readonly onOpenInNewTab?: () => void;
+  readonly nowMs: number;
   readonly thread: ThreadSummary;
 }) {
   const title = threadTitle(thread);
-  const status = threadIndicatorStatus(thread, { resultPending });
+  const projectName = thread.cwd.trim().length === 0
+    ? "其他会话"
+    : pathLabel(thread.cwd);
+  const relativeUpdatedAt = formatRelativeUpdatedAt(thread.updatedAt, nowMs);
+  const threadStatus = displayedThreadStatus(thread.status.type);
+  const activeFlags = thread.status.type === "active"
+    ? thread.status.activeFlags
+    : [];
+  const accessibleLabel = [
+    title,
+    ...(resultPending ? ["任务已完成，等待查看"] : []),
+    ...(hasDraft ? ["存在未发送草稿"] : []),
+    ...(threadStatus === null ? [] : [threadStatus.label]),
+    ...activeFlags.map((flag) => ACTIVE_FLAG_CONTENT[flag].label),
+    ...(backgroundCommandCount === 0
+      ? []
+      : [`${backgroundCommandCount} 个后台命令正在运行`]),
+    `项目 ${projectName}`,
+    `${relativeUpdatedAt}更新`,
+  ].join("，");
   return (
     <div className={styles.threadRowContainer} data-pending={disabled} role="listitem">
       <button
+        aria-label={accessibleLabel}
         aria-current={current ? "page" : undefined}
         className={styles.threadRow}
         data-current={current}
@@ -674,31 +712,76 @@ function ThreadRow({
         title={`${title}\n${thread.cwd}`}
         type="button"
       >
-        {hasDraft ? (
-          <span
-            aria-label="存在未发送草稿"
-            className={styles.draftIndicator}
-            data-present="true"
-            role="img"
-            title="存在未发送草稿"
-          >
-            <DraftIcon />
+        <span className={styles.threadTitleLine}>
+          <span className={styles.titleIndicators}>
+            <ThreadStatusIndicator
+              status={resultPending ? "resultReady" : null}
+            />
+            {hasDraft ? (
+              <span
+                aria-label="存在未发送草稿"
+                className={styles.draftIndicator}
+                data-present="true"
+                role="img"
+                title="存在未发送草稿"
+              >
+                <DraftIcon />
+              </span>
+            ) : null}
           </span>
-        ) : null}
-        <span className={styles.threadTitle}>{title}</span>
-        <span className={styles.threadIndicators}>
-          <ThreadStatusIndicator status={status} />
-          {backgroundCommandCount === 0 ? null : (
-            <span
-              aria-label={`${backgroundCommandCount} 个后台命令正在运行`}
-              className={styles.backgroundCommands}
-              role="img"
-              title={`${backgroundCommandCount} 个后台命令正在运行`}
-            >
-              <TerminalIcon />
-              <span>{backgroundCommandCount}</span>
+          <span className={styles.threadTitle}>{title}</span>
+          <span className={styles.titleTrailingIndicators}>
+            <span className={styles.activeFlags}>
+              {activeFlags.map((flag) => {
+                const content = ACTIVE_FLAG_CONTENT[flag];
+                return (
+                  <span
+                    aria-label={content.label}
+                    className={styles.activeFlag}
+                    data-active-flag={flag}
+                    key={flag}
+                    role="img"
+                    title={content.label}
+                  >
+                    {content.text}
+                  </span>
+                );
+              })}
             </span>
-          )}
+            {backgroundCommandCount === 0 ? null : (
+              <span
+                aria-label={`${backgroundCommandCount} 个后台命令正在运行`}
+                className={styles.backgroundCommands}
+                role="img"
+                title={`${backgroundCommandCount} 个后台命令正在运行`}
+              >
+                <TerminalIcon />
+                <span>{backgroundCommandCount}</span>
+              </span>
+            )}
+          </span>
+        </span>
+        <span className={styles.threadMetadata}>
+          <span className={styles.threadStatusSlot}>
+            {threadStatus === null ? null : (
+              <span
+                className={styles.threadStatus}
+                data-thread-status={threadStatus.kind}
+              >
+                {threadStatus.text}
+              </span>
+            )}
+          </span>
+          <span className={styles.projectName} title={thread.cwd}>
+            {projectName}
+          </span>
+          <time
+            className={styles.updatedAt}
+            dateTime={new Date(thread.updatedAt * 1_000).toISOString()}
+            title={new Date(thread.updatedAt * 1_000).toLocaleString()}
+          >
+            {relativeUpdatedAt}
+          </time>
         </span>
       </button>
       <span className={styles.rowActions}>
@@ -726,6 +809,70 @@ function ThreadRow({
 }
 
 const EMPTY_COMMAND_COUNTS: ReadonlyMap<string, number> = new Map();
+
+const ACTIVE_FLAG_CONTENT = Object.freeze({
+  waitingOnApproval: { label: "等待审批", text: "待审批" },
+  waitingOnUserInput: { label: "等待输入", text: "待回复" },
+});
+
+interface DisplayedThreadStatus {
+  readonly kind: "active" | "idle" | "systemError";
+  readonly label: string;
+  readonly text: string;
+}
+
+function displayedThreadStatus(
+  type: ThreadSummary["status"]["type"],
+): DisplayedThreadStatus | null {
+  switch (type) {
+    case "active":
+      return { kind: type, label: "线程正在运行", text: "运行中" };
+    case "idle":
+      return { kind: type, label: "线程空闲", text: "空闲" };
+    case "systemError":
+      return { kind: type, label: "线程失败", text: "失败" };
+    case "notLoaded":
+      return null;
+  }
+}
+
+function formatRelativeUpdatedAt(updatedAt: number, nowMs: number): string {
+  const updatedAtMs = updatedAt * 1_000;
+  const elapsedMs = Math.max(0, nowMs - updatedAtMs);
+  const elapsedMinutes = Math.floor(elapsedMs / 60_000);
+  if (elapsedMinutes < 1) {
+    return "刚刚";
+  }
+  if (elapsedMinutes < 60) {
+    return `${elapsedMinutes} 分钟前`;
+  }
+  const elapsedHours = Math.floor(elapsedMs / 3_600_000);
+  if (elapsedHours < 24) {
+    return `${elapsedHours} 小时前`;
+  }
+  const updatedDate = new Date(updatedAtMs);
+  const nowDate = new Date(nowMs);
+  const calendarDays = Math.round(
+    (
+      Date.UTC(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate())
+      - Date.UTC(
+        updatedDate.getFullYear(),
+        updatedDate.getMonth(),
+        updatedDate.getDate(),
+      )
+    ) / 86_400_000,
+  );
+  if (calendarDays === 1) {
+    return "昨天";
+  }
+  if (calendarDays < 7) {
+    return `${calendarDays} 天前`;
+  }
+  const date = `${updatedDate.getMonth() + 1}月${updatedDate.getDate()}日`;
+  return updatedDate.getFullYear() === nowDate.getFullYear()
+    ? date
+    : `${updatedDate.getFullYear()}年${date}`;
+}
 
 function contextMenuPosition(x: number, y: number): CSSProperties {
   return {

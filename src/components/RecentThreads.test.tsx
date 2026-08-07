@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -13,11 +14,25 @@ import { RecentThreads } from "./RecentThreads";
 const OriginalResizeObserver = globalThis.ResizeObserver;
 
 afterEach(() => {
+  vi.useRealTimers();
   Object.defineProperty(globalThis, "ResizeObserver", {
     configurable: true,
     value: OriginalResizeObserver,
   });
 });
+
+function threadRowName(title: string): RegExp {
+  const escaped = title.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(`^${escaped}，`, "u");
+}
+
+function getThreadRow(title: string): HTMLButtonElement {
+  return screen.getByRole("button", { name: threadRowName(title) });
+}
+
+function queryThreadRow(title: string): HTMLButtonElement | null {
+  return screen.queryByRole("button", { name: threadRowName(title) });
+}
 
 const THREAD_ONE = {
   cliVersion: "1.0.0",
@@ -99,40 +114,46 @@ describe("RecentThreads", () => {
     renderThreads({ phase: "loading" });
 
     expect(screen.getByRole("list", { name: "最近会话" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "服务端标题 正在运行" })).toBeVisible();
+    expect(getThreadRow("服务端标题")).toBeVisible();
     expect(screen.queryByRole("status", { name: "正在加载最近会话" }))
       .not.toBeInTheDocument();
   });
 
-  it("展示当前会话、服务端状态和标题回退", () => {
+  it("独立展示线程状态、activeFlag、项目和标题回退", () => {
     renderThreads();
 
-    expect(screen.getByRole("button", { name: "服务端标题 正在运行" })).toHaveAttribute(
+    expect(getThreadRow("服务端标题")).toHaveAttribute(
       "aria-current",
       "page",
     );
-    expect(screen.getByRole("button", { name: "预览标题 等待审批" })).not.toHaveAttribute(
+    expect(getThreadRow("预览标题")).not.toHaveAttribute(
       "aria-current",
     );
-    expect(screen.getByRole("img", { name: "正在运行" })).toBeVisible();
+    expect(
+      getThreadRow("服务端标题").querySelector('[data-thread-status="active"]'),
+    ).toHaveTextContent("运行中");
+    expect(
+      getThreadRow("预览标题").querySelector('[data-thread-status="active"]'),
+    ).toHaveTextContent("运行中");
     expect(screen.getByRole("img", { name: "等待审批" })).toBeVisible();
+    expect(screen.getByText("alpha")).toHaveAttribute("title", THREAD_ONE.cwd);
   });
 
-  it("加载运行中会话后复用圆环节点并保持独立动画层", () => {
-    const { rerenderThreads } = renderThreads({
-      currentThreadId: THREAD_TWO.id,
-    });
-    const indicator = screen.getByRole("img", { name: "正在运行" });
+  it("同时展示多个 activeFlag 且不覆盖线程状态", () => {
+    const thread = {
+      ...THREAD_ONE,
+      status: {
+        activeFlags: ["waitingOnApproval", "waitingOnUserInput"],
+        type: "active",
+      },
+    } satisfies ThreadSummary;
+    renderThreads({ threads: [thread] });
 
-    rerenderThreads({
-      backgroundCommandCounts: new Map([[THREAD_ONE.id, 1]]),
-      currentThreadId: THREAD_ONE.id,
-      threads: [{ ...THREAD_ONE }, THREAD_TWO],
-    });
-
-    expect(screen.getByRole("img", { name: "正在运行" })).toBe(indicator);
-    expect(getComputedStyle(indicator).transform).toBe("rotate(0deg)");
-    expect(getComputedStyle(indicator).willChange).toBe("transform");
+    expect(
+      getThreadRow("服务端标题").querySelector('[data-thread-status="active"]'),
+    ).toHaveTextContent("运行中");
+    expect(screen.getByRole("img", { name: "等待审批" })).toHaveTextContent("待审批");
+    expect(screen.getByRole("img", { name: "等待输入" })).toHaveTextContent("待回复");
   });
 
   it("在固定槽位展示可与运行状态并存的草稿标识", () => {
@@ -141,15 +162,14 @@ describe("RecentThreads", () => {
     const draft = screen.getByRole("img", { name: "存在未发送草稿" });
     expect(draft).toHaveAttribute("title", "存在未发送草稿");
     expect(draft).toHaveAttribute("data-present", "true");
-    expect(draft.closest("button")).toContainElement(
-      screen.getByRole("img", { name: "正在运行" }),
-    );
+    expect(draft.closest("button")?.querySelector("[data-thread-status]"))
+      .toHaveTextContent("运行中");
     expect(document.querySelectorAll("[data-present]")).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "预览标题 等待审批" }))
+    expect(getThreadRow("预览标题"))
       .toHaveAttribute("data-has-draft", "false");
   });
 
-  it("空闲会话不展示状态并区分待回复与失败", () => {
+  it("显示空闲与失败，隐藏 notLoaded，并独立显示待回复", () => {
     const idleThread = {
       ...THREAD_ONE,
       status: { type: "idle" },
@@ -165,14 +185,29 @@ describe("RecentThreads", () => {
       sessionId: "session-failed",
       status: { type: "systemError" },
     } satisfies ThreadSummary;
+    const notLoadedThread = {
+      ...THREAD_ONE,
+      id: "thread-not-loaded",
+      name: "未加载会话",
+      sessionId: "session-not-loaded",
+      status: { type: "notLoaded" },
+    } satisfies ThreadSummary;
 
-    renderThreads({ threads: [idleThread, inputThread, failedThread] });
+    renderThreads({
+      threads: [idleThread, inputThread, failedThread, notLoadedThread],
+    });
 
     expect(
-      screen.getByRole("button", { name: "服务端标题" }).querySelector("[data-status]"),
-    ).toBeNull();
+      getThreadRow("服务端标题").querySelector('[data-thread-status="idle"]'),
+    ).toHaveTextContent("空闲");
+    expect(
+      getThreadRow("预览标题").querySelector('[data-thread-status="active"]'),
+    ).toHaveTextContent("运行中");
     expect(screen.getByRole("img", { name: "等待输入" })).toHaveTextContent("待回复");
-    expect(screen.getByRole("img", { name: "会话失败" })).toHaveTextContent("失败");
+    expect(
+      getThreadRow("失败会话").querySelector('[data-thread-status="systemError"]'),
+    ).toHaveTextContent("失败");
+    expect(getThreadRow("未加载会话").querySelector("[data-thread-status]")).toBeNull();
   });
 
   it("在空闲和状态同步中的会话展示待查看完成结果", () => {
@@ -189,16 +224,28 @@ describe("RecentThreads", () => {
       screen.getByRole("img", { name: "任务已完成，等待查看" }),
     ).toHaveAttribute("data-status", "resultReady");
     expect(
-      screen.getByRole("button", {
-        name: "服务端标题 任务已完成，等待查看",
-      }),
-    ).toBeVisible();
+      getThreadRow("服务端标题").querySelector('[data-thread-status="idle"]'),
+    ).toHaveTextContent("空闲");
+  });
+
+  it("以易读相对时间展示最近更新时间并定时刷新", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-07T12:00:00-07:00"));
+    const thread = {
+      ...THREAD_ONE,
+      updatedAt: Date.now() / 1_000 - 5 * 60 - 30,
+    } satisfies ThreadSummary;
+    renderThreads({ threads: [thread] });
+
+    expect(screen.getByText("5 分钟前")).toBeVisible();
+    act(() => vi.advanceTimersByTime(30_000));
+    expect(screen.getByText("6 分钟前")).toBeVisible();
   });
 
   it("支持点击和方向键移动会话焦点", () => {
     const { onOpenThread } = renderThreads();
-    const first = screen.getByRole("button", { name: "服务端标题 正在运行" });
-    const second = screen.getByRole("button", { name: "预览标题 等待审批" });
+    const first = getThreadRow("服务端标题");
+    const second = getThreadRow("预览标题");
 
     first.focus();
     fireEvent.keyDown(first, { key: "ArrowDown" });
@@ -209,8 +256,8 @@ describe("RecentThreads", () => {
 
   it("支持中键和键盘上下文菜单在新标签打开会话", () => {
     const { onOpenThreadInNewTab } = renderThreads();
-    const first = screen.getByRole("button", { name: "服务端标题 正在运行" });
-    const second = screen.getByRole("button", { name: "预览标题 等待审批" });
+    const first = getThreadRow("服务端标题");
+    const second = getThreadRow("预览标题");
 
     fireEvent(
       first,
@@ -229,7 +276,7 @@ describe("RecentThreads", () => {
 
   it("支持右键打开并以 Esc 关闭会话上下文菜单", () => {
     renderThreads();
-    const first = screen.getByRole("button", { name: "服务端标题 正在运行" });
+    const first = getThreadRow("服务端标题");
 
     fireEvent.contextMenu(first, { clientX: 80, clientY: 120 });
     expect(screen.getByRole("menuitem", { name: "在新标签打开" })).toHaveFocus();
@@ -249,9 +296,7 @@ describe("RecentThreads", () => {
     expect(alphaGroup).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(alphaGroup);
     expect(alphaGroup).toHaveAttribute("aria-expanded", "false");
-    expect(
-      screen.queryByRole("button", { name: "服务端标题 正在运行" }),
-    ).not.toBeInTheDocument();
+    expect(queryThreadRow("服务端标题")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "加载更早会话" }));
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
@@ -295,24 +340,24 @@ describe("RecentThreads", () => {
     }));
     renderThreads({ currentThreadId: null, grouped: true, threads });
 
-    expect(screen.getByRole("button", { name: "会话 3" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "会话 4" })).not.toBeInTheDocument();
+    expect(getThreadRow("会话 3")).toBeVisible();
+    expect(queryThreadRow("会话 4")).not.toBeInTheDocument();
     const loadMore = screen.getByRole("button", {
       name: "加载“alpha”的更多会话",
     });
     fireEvent.click(loadMore);
-    expect(screen.getByRole("button", { name: "会话 6" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "会话 7" })).not.toBeInTheDocument();
+    expect(getThreadRow("会话 6")).toBeVisible();
+    expect(queryThreadRow("会话 7")).not.toBeInTheDocument();
 
     const group = screen.getByRole("button", { name: "alpha" });
     fireEvent.click(group);
     fireEvent.click(group);
-    expect(screen.getByRole("button", { name: "会话 6" })).toBeVisible();
+    expect(getThreadRow("会话 6")).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", {
       name: "加载“alpha”的更多会话",
     }));
-    expect(screen.getByRole("button", { name: "会话 7" })).toBeVisible();
+    expect(getThreadRow("会话 7")).toBeVisible();
     expect(screen.queryByRole("button", {
       name: "加载“alpha”的更多会话",
     })).not.toBeInTheDocument();
@@ -334,7 +379,7 @@ describe("RecentThreads", () => {
       threads,
     });
 
-    expect(screen.getByRole("button", { name: "会话 7" })).toHaveAttribute(
+    expect(getThreadRow("会话 7")).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -354,12 +399,12 @@ describe("RecentThreads", () => {
       grouped: true,
       threads,
     });
-    expect(screen.queryByRole("button", { name: "会话 4" })).not.toBeInTheDocument();
+    expect(queryThreadRow("会话 4")).not.toBeInTheDocument();
 
     rerenderThreads({ threads: threads.slice(1) });
 
-    expect(screen.getByRole("button", { name: "会话 4" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "会话 5" })).not.toBeInTheDocument();
+    expect(getThreadRow("会话 4")).toBeVisible();
+    expect(queryThreadRow("会话 5")).not.toBeInTheDocument();
   });
 
   it("在项目组内展示加载失败并允许重试", async () => {
@@ -415,9 +460,7 @@ describe("RecentThreads", () => {
     renderThreads({ removingThreadIds: [THREAD_ONE.id] });
 
     expect(
-      screen
-        .getByRole("button", { name: "服务端标题 正在运行" })
-        .closest("[data-removing]"),
+      getThreadRow("服务端标题").closest("[data-removing]"),
     ).toHaveAttribute("data-removing", "true");
   });
 
@@ -430,19 +473,19 @@ describe("RecentThreads", () => {
     fireEvent.click(screen.getByRole("button", { name: `归档“${THREAD_ONE.name}”` }));
     expect(onArchiveThread).toHaveBeenCalledWith(THREAD_ONE.id);
 
-    const firstRow = screen.getByRole("button", { name: "服务端标题 正在运行" });
+    const firstRow = getThreadRow("服务端标题");
     firstRow.focus();
     fireEvent.keyDown(firstRow, { key: "Delete" });
     expect(onDeleteThread).toHaveBeenCalledWith(THREAD_ONE.id);
 
-    expect(screen.getByRole("button", { name: "预览标题 等待审批" })).toBeDisabled();
+    expect(getThreadRow("预览标题")).toBeDisabled();
     expect(screen.getByRole("button", { name: "撤销" })).toBeDisabled();
     expect(onUndoArchive).not.toHaveBeenCalled();
   });
 
   it("离线只读时仍可打开会话但禁用服务端修改", () => {
     const { onArchiveThread, onOpenThread } = renderThreads({ readOnly: true });
-    const row = screen.getByRole("button", { name: "服务端标题 正在运行" });
+    const row = getThreadRow("服务端标题");
     fireEvent.click(row);
     expect(onOpenThread).toHaveBeenCalledWith(THREAD_ONE.id);
     expect(screen.getByRole("button", { name: `归档“${THREAD_ONE.name}”` })).toBeDisabled();

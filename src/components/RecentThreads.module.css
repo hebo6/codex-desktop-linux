@@ -74,7 +74,7 @@
 }
 
 .skeleton span {
-  height: 40px;
+  height: 56px;
   border-radius: var(--radius-sm);
   background: var(--color-fill-subtle);
   animation: pulse 1.4s ease-in-out infinite alternate;
@@ -190,21 +190,17 @@
   position: relative;
   display: grid;
   width: 100%;
-  height: 40px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-2);
+  height: 56px;
+  grid-template-rows: 24px 18px;
+  align-content: center;
+  gap: 0;
+  padding: 4px var(--space-2);
   border-radius: var(--radius-sm);
   color: var(--color-text-secondary);
   background: transparent;
   cursor: pointer;
   text-align: left;
   transition: padding-right 120ms ease;
-}
-
-.threadRow[data-has-draft="true"] {
-  grid-template-columns: 16px minmax(0, 1fr) auto;
 }
 
 .draftIndicator {
@@ -311,8 +307,8 @@
 
 .threadRow::before {
   position: absolute;
-  top: 9px;
-  bottom: 9px;
+  top: 10px;
+  bottom: 10px;
   left: 0;
   width: 2px;
   border-radius: 999px;
@@ -334,14 +330,52 @@
   background: currentColor;
 }
 
-.threadIndicators {
-  display: inline-flex;
+.threadTitleLine {
+  display: flex;
+  min-width: 0;
   align-items: center;
   gap: var(--space-1);
 }
 
-.threadIndicators:empty {
+.titleIndicators,
+.titleTrailingIndicators,
+.activeFlags {
+  display: inline-flex;
+  min-width: 0;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.titleIndicators:empty,
+.titleTrailingIndicators:empty,
+.activeFlags:empty {
   display: none;
+}
+
+.titleTrailingIndicators {
+  margin-left: auto;
+}
+
+.activeFlag {
+  display: inline-flex;
+  min-height: 18px;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.activeFlag[data-active-flag="waitingOnApproval"] {
+  color: var(--color-status-warning);
+  background: color-mix(in srgb, var(--color-status-warning) 12%, transparent);
+}
+
+.activeFlag[data-active-flag="waitingOnUserInput"] {
+  color: var(--color-text-secondary);
+  background: var(--color-fill-strong);
 }
 
 .backgroundCommands {
@@ -364,8 +398,48 @@
 
 .threadTitle {
   overflow: hidden;
+  min-width: 0;
+  flex: 1;
   font-size: 13px;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.threadMetadata {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 42px minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.threadStatusSlot {
+  min-width: 0;
+}
+
+.threadStatus {
+  white-space: nowrap;
+}
+
+.threadStatus[data-thread-status="active"] {
+  color: var(--color-status-progress);
+}
+
+.threadStatus[data-thread-status="systemError"] {
+  color: var(--color-status-danger);
+}
+
+.projectName {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.updatedAt {
   white-space: nowrap;
 }
 
