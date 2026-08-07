@@ -200,7 +200,6 @@
   background: transparent;
   cursor: pointer;
   text-align: left;
-  transition: padding-right 120ms ease;
 }
 
 .draftIndicator {
@@ -243,9 +242,9 @@
   opacity: 1;
 }
 
-.threadRowContainer:hover .threadRow,
-.threadRowContainer:focus-within .threadRow {
-  padding-right: 64px;
+.threadRowContainer:hover .threadTitleLine,
+.threadRowContainer:focus-within .threadTitleLine {
+  padding-right: 56px;
 }
 
 .rowActions button {
@@ -335,6 +334,7 @@
   min-width: 0;
   align-items: center;
   gap: var(--space-1);
+  transition: padding-right 120ms ease;
 }
 
 .titleIndicators,
