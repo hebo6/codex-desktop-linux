@@ -804,6 +804,49 @@ describe("Composer", () => {
     });
   });
 
+  it("项目名溢出时渐隐并在悬浮或键盘聚焦时显示全文", async () => {
+    const longName = "这是一个超过项目下拉框可用宽度的项目名称";
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        return this.matches("[data-project-option-name]") ? 100 : 0;
+      });
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        return this.matches("[data-project-option-name]")
+          ? this.textContent === longName ? 240 : 60
+          : 0;
+      });
+    renderComposer({
+      onCwdChange: vi.fn(),
+      projectCwds: [`/workspace/${longName}`, "/workspace/short"],
+    });
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "项目" }));
+    const longOption = screen.getByRole("option", { name: new RegExp(longName, "u") });
+    const shortOption = screen.getByRole("option", { name: /short/u });
+    const longNameElement = within(longOption).getByText(longName);
+    await waitFor(() =>
+      expect(longNameElement).toHaveAttribute("data-truncated", "true")
+    );
+    expect(within(shortOption).getByText("short")).toHaveAttribute(
+      "data-truncated",
+      "false",
+    );
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    fireEvent.mouseEnter(longOption.parentElement!);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(longName);
+    fireEvent.mouseLeave(longOption.parentElement!);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    fireEvent.focus(longOption);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(longName);
+    expect(longOption).toHaveAttribute("aria-describedby");
+    fireEvent.blur(longOption);
+    fireEvent.focus(shortOption);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
   it("在项目下拉框中删除任意受信任项目", async () => {
     const user = userEvent.setup();
     const onDeleteProject = vi.fn(async () => undefined);

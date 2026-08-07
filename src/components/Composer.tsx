@@ -4,13 +4,16 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ChangeEvent,
   type ClipboardEvent,
   type DragEvent,
   type FormEvent,
   type KeyboardEvent,
+  type Ref,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 import type { ConversationTurnConfiguration } from "../app/useConversation";
 import type { ComposerMentionReference } from "../app/useComposerCapabilities";
@@ -1984,41 +1987,22 @@ function ProjectPicker({
           ) : (
             <div aria-label="选择项目" className={styles.projectOptions} role="listbox">
               {directories.map((directory, index) => (
-                <div
-                  data-focused={index === focusedIndex}
-                  data-selected={directory === cwd}
+                <ProjectOption
+                  directory={directory}
+                  focused={index === focusedIndex}
                   key={directory}
-                  onMouseMove={() => setFocusedIndex(index)}
-                  ref={index === focusedIndex ? focusedOptionRef : undefined}
-                  role="presentation"
-                >
-                  <button
-                    aria-selected={directory === cwd}
-                    className={styles.projectOptionSelect}
-                    onClick={() => choose(index)}
-                    role="option"
-                    type="button"
-                  >
-                    <strong>{directory === cwd ? "✓ " : ""}{projectName(directory)}</strong>
-                    <small>{directory}</small>
-                  </button>
-                  {onDelete === undefined ? null : (
-                    <button
-                      aria-label={`删除项目 ${projectName(directory)}`}
-                      className={styles.projectOptionDelete}
-                      onClick={() => {
+                  onDelete={onDelete === undefined
+                    ? undefined
+                    : () => {
                         setOpen(false);
                         onDelete(directory);
                       }}
-                      title="删除受信任项目"
-                      type="button"
-                    >
-                      <svg aria-hidden="true" viewBox="0 0 24 24">
-                        <path d="M4.5 7h15M9.5 3.5h5L16 7H8zM7 7l.8 13h8.4L17 7M10 10.5v6M14 10.5v6" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
+                  onFocus={() => setFocusedIndex(index)}
+                  onMouseMove={() => setFocusedIndex(index)}
+                  onSelect={() => choose(index)}
+                  optionRef={index === focusedIndex ? focusedOptionRef : undefined}
+                  selected={directory === cwd}
+                />
               ))}
             </div>
           )}
@@ -2034,6 +2018,131 @@ function ProjectPicker({
       ) : null}
     </div>
   );
+}
+
+function ProjectOption({
+  directory,
+  focused,
+  onDelete,
+  onFocus,
+  onMouseMove,
+  onSelect,
+  optionRef,
+  selected,
+}: {
+  readonly directory: string;
+  readonly focused: boolean;
+  readonly onDelete: (() => void) | undefined;
+  readonly onFocus: () => void;
+  readonly onMouseMove: () => void;
+  readonly onSelect: () => void;
+  readonly optionRef: Ref<HTMLDivElement> | undefined;
+  readonly selected: boolean;
+}) {
+  const name = projectName(directory);
+  const tooltipId = useId();
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const nameRef = useRef<HTMLSpanElement>(null);
+  const [nameTruncated, setNameTruncated] = useState(false);
+  const [showFullName, setShowFullName] = useState(false);
+
+  useEffect(() => {
+    const element = nameRef.current;
+    if (element === null) {
+      return;
+    }
+    const measure = () => {
+      const truncated = element.scrollWidth > element.clientWidth;
+      setNameTruncated((current) => current === truncated ? current : truncated);
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(measure);
+    observer?.observe(element);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [name]);
+
+  const tooltipVisible = nameTruncated && showFullName;
+  return (
+    <div
+      data-focused={focused}
+      data-selected={selected}
+      onMouseEnter={() => setShowFullName(true)}
+      onMouseLeave={() => setShowFullName(false)}
+      onMouseMove={onMouseMove}
+      ref={optionRef}
+      role="presentation"
+    >
+      <button
+        aria-describedby={tooltipVisible ? tooltipId : undefined}
+        aria-selected={selected}
+        className={styles.projectOptionSelect}
+        onBlur={() => setShowFullName(false)}
+        onClick={onSelect}
+        onFocus={() => {
+          onFocus();
+          setShowFullName(true);
+        }}
+        ref={buttonRef}
+        role="option"
+        type="button"
+      >
+        <strong>
+          {selected ? <span aria-hidden="true">✓&nbsp;</span> : null}
+          <span
+            className={styles.projectOptionName}
+            data-project-option-name
+            data-truncated={nameTruncated}
+            ref={nameRef}
+          >
+            {name}
+          </span>
+        </strong>
+        <small>{directory}</small>
+      </button>
+      {onDelete === undefined ? null : (
+        <button
+          aria-label={`删除项目 ${name}`}
+          className={styles.projectOptionDelete}
+          onClick={onDelete}
+          title="删除受信任项目"
+          type="button"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M4.5 7h15M9.5 3.5h5L16 7H8zM7 7l.8 13h8.4L17 7M10 10.5v6M14 10.5v6" />
+          </svg>
+        </button>
+      )}
+      {tooltipVisible && buttonRef.current !== null
+        ? createPortal(
+            <span
+              className={styles.projectNameTooltip}
+              id={tooltipId}
+              role="tooltip"
+              style={projectNameTooltipPosition(buttonRef.current)}
+            >
+              {name}
+            </span>,
+            document.body,
+          )
+        : null}
+    </div>
+  );
+}
+
+function projectNameTooltipPosition(element: HTMLElement): CSSProperties {
+  const bounds = element.getBoundingClientRect();
+  const width = Math.min(340, window.innerWidth - 16);
+  return {
+    left: Math.max(8, Math.min(bounds.left, window.innerWidth - width - 8)),
+    top: Math.min(bounds.bottom + 4, window.innerHeight - 48),
+    width,
+  };
 }
 
 function findFastServiceTier(model: Model | null) {
