@@ -601,7 +601,7 @@ describe("App", () => {
     ).queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("同时恢复全部标签且切换时保持订阅，关闭后立即退订", async () => {
+  it("连接后恢复当前绑定周期的全部标签且关闭后立即退订", async () => {
     const user = userEvent.setup();
     const threads = [
       {

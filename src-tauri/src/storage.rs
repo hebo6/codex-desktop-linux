@@ -615,16 +615,21 @@ mod tests {
             drafts,
             vec![("main:server-1:thread-1".to_owned(), "thread".to_owned())]
         );
-        for table in ["window_states", "window_server_states"] {
-            let legacy_column_count: i64 = sqlx::query_scalar(
-                "SELECT count(*) FROM pragma_table_info(?) WHERE name = 'draft_key'",
-            )
-            .bind(table)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-            assert_eq!(legacy_column_count, 0);
-        }
+        let legacy_column_count: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM pragma_table_info('window_states') WHERE name = 'draft_key'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(legacy_column_count, 0);
+        let server_workspace_count: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM sqlite_schema
+             WHERE type = 'table' AND name = 'window_server_states'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(server_workspace_count, 0);
     }
 
     #[cfg(unix)]
