@@ -127,7 +127,7 @@ describe("AppServerThreadClient", () => {
     ]);
   });
 
-  it("恢复时请求最近一页 turn 骨架且不走兼容性全量路径", () => {
+  it("恢复时请求最近一页 turn 摘要且不走兼容性全量路径", () => {
     const session = new RecordingSession();
     const client = new AppServerThreadClient(session);
 
@@ -138,7 +138,7 @@ describe("AppServerThreadClient", () => {
       params: {
         excludeTurns: true,
         initialTurnsPage: {
-          itemsView: "notLoaded",
+          itemsView: "summary",
           limit: THREAD_TURN_PAGE_SIZE,
           sortDirection: "desc",
         },
@@ -147,7 +147,7 @@ describe("AppServerThreadClient", () => {
     }]);
   });
 
-  it("分页读取更早 turn 骨架和单个 turn 的完整项目", () => {
+  it("分页读取更早 turn 摘要和单个 turn 的项目页", () => {
     const session = new RecordingSession();
     const client = new AppServerThreadClient(session);
 
@@ -162,7 +162,7 @@ describe("AppServerThreadClient", () => {
         method: "thread/turns/list",
         params: {
           cursor: "older-turns",
-          itemsView: "notLoaded",
+          itemsView: "summary",
           limit: THREAD_TURN_PAGE_SIZE,
           sortDirection: "desc",
           threadId: "thread-1",

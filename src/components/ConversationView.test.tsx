@@ -10,6 +10,7 @@ import type { ReactElement, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { RestoredThread, ThreadTurn } from "../app/useServerThreads";
+import type { TurnItemPageState } from "../app/useThreadSession";
 import { ConversationPlaceholder, ConversationView } from "./ConversationView";
 import { ConversationWorkspace } from "./ConversationWorkspace";
 
@@ -166,6 +167,74 @@ const RESTORED = {
 } satisfies RestoredThread;
 
 describe("ConversationView", () => {
+  it("按点击逐页展开摘要回合并在加载完成后移除入口", async () => {
+    const user = TURN.items[0]!;
+    const command = TURN.items.find(({ id }) => id === "command")!;
+    const answer = TURN.items.at(-1)!;
+    const summaryTurn = {
+      ...TURN,
+      items: [user, answer],
+      itemsView: "summary" as const,
+    } satisfies ThreadTurn;
+    const onLoadTurnItemPage = vi.fn(async () => true);
+    const { rerender } = render(
+      <ConversationView
+        onLoadTurnItemPage={onLoadTurnItemPage}
+        restoredThread={{ ...RESTORED, turns: [summaryTurn] }}
+      />,
+    );
+
+    expect(screen.getByText("请检查项目")).toBeVisible();
+    expect(screen.getByText("已经完成检查")).toBeVisible();
+    expect(screen.queryByText("pnpm test")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "展开详细过程" }));
+    expect(onLoadTurnItemPage).toHaveBeenCalledWith("turn-1");
+
+    const partialTurn = {
+      ...summaryTurn,
+      clientItemsView: "partial" as const,
+      items: [user, command, answer],
+    } satisfies ThreadTurn;
+    const partialPage = {
+      items: [user, command],
+      nextCursor: "next-items",
+      complete: false,
+      loading: false,
+      error: false,
+    } satisfies TurnItemPageState;
+    rerender(
+      <ConversationView
+        onLoadTurnItemPage={onLoadTurnItemPage}
+        restoredThread={{ ...RESTORED, turns: [partialTurn] }}
+        turnItemPages={new Map([["turn-1", partialPage]])}
+      />,
+    );
+
+    expect(screen.getByText("Ran pnpm test")).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "展开更多详细过程" }),
+    );
+    expect(onLoadTurnItemPage).toHaveBeenCalledTimes(2);
+
+    const completePage = {
+      ...partialPage,
+      items: TURN.items,
+      nextCursor: null,
+      complete: true,
+    } satisfies TurnItemPageState;
+    rerender(
+      <ConversationView
+        onLoadTurnItemPage={onLoadTurnItemPage}
+        restoredThread={RESTORED}
+        turnItemPages={new Map([["turn-1", completePage]])}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /展开.*详细过程/u }),
+    ).not.toBeInTheDocument();
+  });
+
   it("安全渲染用户问题 Markdown 并保留结构化输入", () => {
     const onOpenLink = vi.fn();
     const markdownTurn = {

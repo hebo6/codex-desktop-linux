@@ -76,13 +76,25 @@ describe("useThreadSession", () => {
     expect(unsubscribeThread).toHaveBeenCalledWith("thread-a");
   });
 
-  it("按回合项目分页恢复完整工具历史并向前加载更早回合", async () => {
+  it("先恢复回合摘要，再按点击逐页加载对应回合项目", async () => {
+    const userMessage = (id: string, text: string) => ({
+      content: [{ text, type: "text" as const }],
+      id,
+      type: "userMessage" as const,
+    }) satisfies ThreadItemsListResponse["data"][number]["item"];
+    const agentMessage = {
+      id: "agent-3",
+      phase: "final_answer",
+      text: "已完成",
+      type: "agentMessage",
+    } satisfies ThreadItemsListResponse["data"][number]["item"];
     const turn = (
       id: string,
+      items: ThreadTurnsListResponse["data"][number]["items"] = [],
     ): ThreadTurnsListResponse["data"][number] => ({
       id,
-      items: [],
-      itemsView: "notLoaded",
+      items,
+      itemsView: "summary",
       status: "completed",
     });
     const command = {
@@ -95,20 +107,13 @@ describe("useThreadSession", () => {
       status: "completed",
       type: "commandExecution",
     } satisfies ThreadItemsListResponse["data"][number]["item"];
-    const userMessage = (id: string, text: string) => ({
-      content: [{ text, type: "text" as const }],
-      id,
-      type: "userMessage" as const,
-    }) satisfies ThreadItemsListResponse["data"][number]["item"];
-    const agentMessage = {
-      id: "agent-3",
-      phase: "final_answer",
-      text: "已完成",
-      type: "agentMessage",
-    } satisfies ThreadItemsListResponse["data"][number]["item"];
+    const user3 = userMessage("message-turn-3", "turn-3");
     const resumeThread = vi.fn(() => ({
       result: Promise.resolve(resumeResponse({
-        data: [turn("turn-3"), turn("turn-2")],
+        data: [
+          turn("turn-3", [user3, agentMessage]),
+          turn("turn-2", [userMessage("message-turn-2", "turn-2")]),
+        ],
         nextCursor: "older-turns",
       })),
     }));
@@ -126,7 +131,10 @@ describe("useThreadSession", () => {
       const response: ThreadItemsListResponse =
         turnId === "turn-3" && cursor === null
           ? {
-              data: [{ item: command, turnId }],
+              data: [
+                { item: user3, turnId },
+                { item: command, turnId },
+              ],
               nextCursor: "turn-3-more",
             }
           : turnId === "turn-3"
@@ -164,13 +172,46 @@ describe("useThreadSession", () => {
     ).toEqual(["turn-2", "turn-3"]);
     expect(
       result.current.state.restoredThread?.turns.at(-1)?.items.map(({ id }) => id),
-    ).toEqual(["command-3", "agent-3"]);
+    ).toEqual(["message-turn-3", "agent-3"]);
     expect(result.current.state.olderTurnsCursor).toBe("older-turns");
-    expect(listThreadItems).toHaveBeenCalledWith(
+    expect(listThreadItems).not.toHaveBeenCalled();
+
+    await act(async () => {
+      expect(await result.current.loadTurnItemPage("turn-3")).toBe(true);
+    });
+
+    expect(listThreadItems).toHaveBeenCalledTimes(1);
+    expect(listThreadItems).toHaveBeenLastCalledWith(
+      "thread-a",
+      "turn-3",
+      null,
+    );
+    expect(
+      result.current.state.restoredThread?.turns.at(-1)?.items.map(({ id }) => id),
+    ).toEqual(["message-turn-3", "command-3", "agent-3"]);
+    expect(
+      result.current.state.turnItemPages.get("turn-3")?.nextCursor,
+    ).toBe("turn-3-more");
+    expect(
+      result.current.state.restoredThread?.turns.at(-1)?.clientItemsView,
+    ).toBe("partial");
+
+    await act(async () => {
+      expect(await result.current.loadTurnItemPage("turn-3")).toBe(true);
+    });
+
+    expect(listThreadItems).toHaveBeenCalledTimes(2);
+    expect(listThreadItems).toHaveBeenLastCalledWith(
       "thread-a",
       "turn-3",
       "turn-3-more",
     );
+    expect(
+      result.current.state.turnItemPages.get("turn-3")?.complete,
+    ).toBe(true);
+    expect(
+      result.current.state.restoredThread?.turns.at(-1)?.itemsView,
+    ).toBe("full");
 
     await act(async () => {
       expect(await result.current.loadOlderTurns()).toBe(true);
@@ -183,6 +224,7 @@ describe("useThreadSession", () => {
     expect(
       result.current.state.restoredThread?.turns.map(({ id }) => id),
     ).toEqual(["turn-1", "turn-2", "turn-3"]);
+    expect(listThreadItems).toHaveBeenCalledTimes(2);
     expect(result.current.state.olderTurnsCursor).toBeNull();
     expect(result.current.state.olderTurnsError).toBeNull();
   });

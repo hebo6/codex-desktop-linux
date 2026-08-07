@@ -2,9 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   ServerNotification,
-  ThreadItemsListResponse,
   ThreadResumeResponse,
-  ThreadTurnsListResponse,
 } from "../protocol/generated";
 import { recordConversationProjection } from "../diagnostics/conversationLoadDiagnostics";
 import { reduceConversationNotification } from "./useConversation";
@@ -22,6 +20,7 @@ export interface ThreadSessionState {
   readonly restoredThread: RestoredThread | null;
   readonly resumedThreadId: string | null;
   readonly olderTurnsCursor: string | null;
+  readonly turnItemPages: ReadonlyMap<string, TurnItemPageState>;
   readonly loadingOlderTurns: boolean;
   readonly olderTurnsError: string | null;
   readonly deleted: boolean;
@@ -32,6 +31,15 @@ export interface ThreadSessionState {
 export interface ThreadSessionControls {
   readonly state: ThreadSessionState;
   readonly loadOlderTurns: () => Promise<boolean>;
+  readonly loadTurnItemPage: (turnId: string) => Promise<boolean>;
+}
+
+export interface TurnItemPageState {
+  readonly items: readonly ThreadTurn["items"][number][];
+  readonly nextCursor: string | null;
+  readonly complete: boolean;
+  readonly loading: boolean;
+  readonly error: boolean;
 }
 
 interface ThreadSubscriptionSource {
@@ -51,6 +59,7 @@ const IDLE_STATE = Object.freeze({
   restoredThread: null,
   resumedThreadId: null,
   olderTurnsCursor: null,
+  turnItemPages: new Map<string, TurnItemPageState>(),
   loadingOlderTurns: false,
   olderTurnsError: null,
   deleted: false,
@@ -80,6 +89,11 @@ export function useThreadSession(
     readonly cursor: string;
     readonly result: Promise<boolean>;
   } | null>(null);
+  const turnItemRequestsRef = useRef(new Map<string, {
+    readonly source: ThreadSubscriptionSource;
+    readonly cursor: string | null;
+    readonly result: Promise<boolean>;
+  }>());
   const retainedThreadIdRef = useRef<string | null>(null);
   const preparedStateRef = useRef(preparedState);
   useEffect(() => {
@@ -135,6 +149,8 @@ export function useThreadSession(
       resumedThreadId: preparedThread === null ? null : threadId,
       olderTurnsCursor:
         (preparedSession ?? retainedSession)?.olderTurnsCursor ?? null,
+      turnItemPages:
+        (preparedSession ?? retainedSession)?.turnItemPages ?? IDLE_STATE.turnItemPages,
       loadingOlderTurns: false,
       olderTurnsError: null,
       deleted: false,
@@ -199,7 +215,7 @@ export function useThreadSession(
         ? existingResume!.result
         : Promise.resolve()
           .then(() => client.resumeThread(threadId).result)
-          .then((response) => restoredThreadPageFrom(client, response));
+          .then(restoredThreadPageFrom);
       if (resumeResult !== existingResume?.result) {
         const request = { source, result: resumeResult };
         resumeRequestRef.current = request;
@@ -225,11 +241,13 @@ export function useThreadSession(
             resumePending = false;
             retainedThreadIdRef.current = threadId;
             readySubscriptionRef.current = source;
+            const turnItemPages = stateRef.current.turnItemPages;
             const resumedState: ThreadSessionState = {
               phase: "ready",
-              restoredThread,
+              restoredThread: applyTurnItemPages(restoredThread, turnItemPages),
               resumedThreadId: threadId,
               olderTurnsCursor,
+              turnItemPages,
               loadingOlderTurns: false,
               olderTurnsError: null,
               deleted: false,
@@ -326,18 +344,13 @@ export function useThreadSession(
           source.threadId,
           cursor,
         ).result;
-        const hydratedTurns = await hydrateTurns(
-          source.client,
-          source.threadId,
-          page.data,
-        );
         if (sourceRef.current !== source) {
           return false;
         }
         const loadedTurnIds = new Set(
           stateRef.current.restoredThread?.turns.map(({ id }) => id) ?? [],
         );
-        const loadedOlderTurns = hydratedTurns
+        const loadedOlderTurns = page.data
           .toReversed()
           .filter(({ id }) => !loadedTurnIds.has(id));
         setState((latest) => {
@@ -347,9 +360,15 @@ export function useThreadSession(
           const currentTurnIds = new Set(
             latest.restoredThread.turns.map(({ id }) => id),
           );
-          const olderTurns = hydratedTurns
+          const olderTurns = page.data
             .toReversed()
-            .filter(({ id }) => !currentTurnIds.has(id));
+            .filter(({ id }) => !currentTurnIds.has(id))
+            .map((turn) => {
+              const itemPage = latest.turnItemPages.get(turn.id);
+              return itemPage === undefined
+                ? turn
+                : mergeTurnItemPage(turn, itemPage.items, itemPage.complete);
+            });
           const next = {
             ...latest,
             restoredThread: Object.freeze({
@@ -388,9 +407,113 @@ export function useThreadSession(
     return result;
   }, []);
 
+  const loadTurnItemPage = useCallback((turnId: string): Promise<boolean> => {
+    const source = sourceRef.current;
+    const current = stateRef.current;
+    const turn = current.restoredThread?.turns.find(({ id }) => id === turnId);
+    const pageState = current.turnItemPages.get(turnId);
+    if (
+      source === null ||
+      turn === undefined ||
+      turn.status === "inProgress" ||
+      turn.itemsView === "full" ||
+      pageState?.complete === true ||
+      current.offline
+    ) {
+      return Promise.resolve(false);
+    }
+    const cursor = pageState?.nextCursor ?? null;
+    const existing = turnItemRequestsRef.current.get(turnId);
+    if (
+      existing !== undefined &&
+      sameSubscriptionSource(existing.source, source) &&
+      existing.cursor === cursor
+    ) {
+      return existing.result;
+    }
+
+    const result = (async () => {
+      setState((latest) => withTurnItemPageState(latest, turnId, (page) => ({
+        ...page,
+        loading: true,
+        error: false,
+      })));
+      try {
+        const page = await source.client.listThreadItems(
+          source.threadId,
+          turnId,
+          cursor,
+        ).result;
+        if (sourceRef.current !== source) {
+          return false;
+        }
+        const items = page.data.map((entry) => {
+          if (entry.turnId !== turnId) {
+            throw new TypeError("thread/items/list 返回了其他回合的项目");
+          }
+          return entry.item;
+        });
+        const nextCursor = page.nextCursor ?? null;
+        if (cursor !== null && nextCursor === cursor) {
+          throw new TypeError("thread/items/list 返回了未推进的游标");
+        }
+        setState((latest) => {
+          if (latest.restoredThread === null) {
+            return latest;
+          }
+          const currentPage = latest.turnItemPages.get(turnId)
+            ?? emptyTurnItemPageState();
+          const loadedItems = mergeUniqueItems(currentPage.items, items);
+          const complete = nextCursor === null;
+          const turns = latest.restoredThread.turns.map((candidate) =>
+            candidate.id === turnId
+              ? mergeTurnItemPage(candidate, loadedItems, complete)
+              : candidate
+          );
+          const turnItemPages = new Map(latest.turnItemPages);
+          turnItemPages.set(turnId, Object.freeze({
+            items: Object.freeze(loadedItems),
+            nextCursor,
+            complete,
+            loading: false,
+            error: false,
+          }));
+          const next = {
+            ...latest,
+            restoredThread: Object.freeze({
+              ...latest.restoredThread,
+              turns: Object.freeze(turns),
+            }),
+            turnItemPages,
+          };
+          stateRef.current = next;
+          return next;
+        });
+        return true;
+      } catch {
+        if (sourceRef.current === source) {
+          setState((latest) => withTurnItemPageState(latest, turnId, (page) => ({
+            ...page,
+            loading: false,
+            error: true,
+          })));
+        }
+        return false;
+      }
+    })();
+    const request = { source, cursor, result };
+    turnItemRequestsRef.current.set(turnId, request);
+    void result.finally(() => {
+      if (turnItemRequestsRef.current.get(turnId) === request) {
+        turnItemRequestsRef.current.delete(turnId);
+      }
+    });
+    return result;
+  }, []);
+
   return useMemo(
-    () => ({ state, loadOlderTurns }),
-    [loadOlderTurns, state],
+    () => ({ state, loadOlderTurns, loadTurnItemPage }),
+    [loadOlderTurns, loadTurnItemPage, state],
   );
 }
 
@@ -457,6 +580,7 @@ function reduceThreadNotification(
         restoredThread: null,
         resumedThreadId: null,
         olderTurnsCursor: null,
+        turnItemPages: IDLE_STATE.turnItemPages,
         loadingOlderTurns: false,
         olderTurnsError: null,
         deleted: true,
@@ -507,7 +631,6 @@ function isProjectionDelta(notification: ServerNotification): boolean {
 }
 
 async function restoredThreadPageFrom(
-  client: ServerThreadsClient,
   response: ThreadResumeResponse,
 ): Promise<RestoredThreadPage> {
   if (response.thread.historyMode !== "paginated") {
@@ -517,16 +640,11 @@ async function restoredThreadPageFrom(
   if (initialPage === null || initialPage === undefined) {
     throw new TypeError("thread/resume 未返回 initialTurnsPage");
   }
-  const hydratedTurns = await hydrateTurns(
-    client,
-    response.thread.id,
-    initialPage.data,
-  );
   const projectionStartedAt = performance.now();
   const restoredThread = Object.freeze({
     metadata: response.thread,
     modelSettings: modelSettingsFrom(response),
-    turns: Object.freeze(hydratedTurns.toReversed()),
+    turns: Object.freeze(initialPage.data.toReversed()),
   });
   recordConversationProjection(
     response.thread,
@@ -539,46 +657,83 @@ async function restoredThreadPageFrom(
   });
 }
 
-async function hydrateTurns(
-  client: ServerThreadsClient,
-  threadId: string,
-  turns: ThreadTurnsListResponse["data"],
-): Promise<ThreadTurn[]> {
-  return Promise.all(
-    turns.map(async (turn) => {
-      const hydratedTurn: ThreadTurn = {
-        ...turn,
-        items: await loadAllTurnItems(client, threadId, turn.id),
-        itemsView: "full",
-      };
-      return Object.freeze(hydratedTurn);
-    }),
-  );
+function emptyTurnItemPageState(): TurnItemPageState {
+  return {
+    items: Object.freeze([]),
+    nextCursor: null,
+    complete: false,
+    loading: false,
+    error: false,
+  };
 }
 
-async function loadAllTurnItems(
-  client: ServerThreadsClient,
-  threadId: string,
+function withTurnItemPageState(
+  state: ThreadSessionState,
   turnId: string,
-): Promise<ThreadTurn["items"][number][]> {
-  const items: ThreadTurn["items"][number][] = [];
-  let cursor: string | null = null;
-  do {
-    const page: ThreadItemsListResponse =
-      await client.listThreadItems(threadId, turnId, cursor).result;
-    for (const entry of page.data) {
-      if (entry.turnId !== turnId) {
-        throw new TypeError("thread/items/list 返回了其他回合的项目");
-      }
-      items.push(entry.item);
+  update: (page: TurnItemPageState) => TurnItemPageState,
+): ThreadSessionState {
+  const turnItemPages = new Map(state.turnItemPages);
+  turnItemPages.set(
+    turnId,
+    Object.freeze(update(turnItemPages.get(turnId) ?? emptyTurnItemPageState())),
+  );
+  return { ...state, turnItemPages };
+}
+
+function mergeUniqueItems(
+  existing: readonly ThreadTurn["items"][number][],
+  incoming: readonly ThreadTurn["items"][number][],
+): ThreadTurn["items"][number][] {
+  const items = [...existing];
+  const indexes = new Map(items.map((item, index) => [item.id, index]));
+  for (const item of incoming) {
+    const index = indexes.get(item.id);
+    if (index === undefined) {
+      indexes.set(item.id, items.length);
+      items.push(item);
+    } else {
+      items[index] = item;
     }
-    const nextCursor: string | null = page.nextCursor ?? null;
-    if (nextCursor !== null && nextCursor === cursor) {
-      throw new TypeError("thread/items/list 返回了未推进的游标");
-    }
-    cursor = nextCursor;
-  } while (cursor !== null);
+  }
   return items;
+}
+
+function mergeTurnItemPage(
+  turn: ThreadTurn,
+  loadedItems: readonly ThreadTurn["items"][number][],
+  complete: boolean,
+): ThreadTurn {
+  const loadedIds = new Set(loadedItems.map(({ id }) => id));
+  const { clientItemsView: _clientItemsView, ...serverTurn } = turn;
+  return Object.freeze({
+    ...serverTurn,
+    items: complete
+      ? [...loadedItems]
+      : [
+          ...loadedItems,
+          ...turn.items.filter(({ id }) => !loadedIds.has(id)),
+        ],
+    itemsView: complete ? "full" : "summary",
+    ...(complete ? {} : { clientItemsView: "partial" as const }),
+  });
+}
+
+function applyTurnItemPages(
+  restoredThread: RestoredThread,
+  pages: ReadonlyMap<string, TurnItemPageState>,
+): RestoredThread {
+  if (pages.size === 0) {
+    return restoredThread;
+  }
+  return Object.freeze({
+    ...restoredThread,
+    turns: Object.freeze(restoredThread.turns.map((turn) => {
+      const page = pages.get(turn.id);
+      return page === undefined
+        ? turn
+        : mergeTurnItemPage(turn, page.items, page.complete);
+    })),
+  });
 }
 
 function modelSettingsFrom(

@@ -18,7 +18,10 @@ import { recordConversationProjection } from "../diagnostics/conversationLoadDia
 
 export type ServerThreadsPhase = "idle" | "loading" | "ready" | "error";
 export type ThreadSummary = ThreadListResponse["data"][number];
-export type ThreadTurn = ThreadResumeResponse["thread"]["turns"][number];
+type ServerThreadTurn = ThreadResumeResponse["thread"]["turns"][number];
+export type ThreadTurn = ServerThreadTurn & {
+  readonly clientItemsView?: "partial";
+};
 
 export interface ThreadModelSettings {
   readonly model: string;

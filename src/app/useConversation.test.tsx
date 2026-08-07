@@ -487,6 +487,54 @@ describe("useConversation", () => {
     expect(result.current.activeTurnId).toBe(RUNNING_TURN.id);
   });
 
+  it("同一会话的分页详情替换摘要投影", async () => {
+    const user = {
+      id: "user-page",
+      type: "userMessage" as const,
+      content: [{ type: "text" as const, text: "检查项目" }],
+    };
+    const answer = {
+      id: "agent-page",
+      type: "agentMessage" as const,
+      text: "检查完成",
+      phase: "final_answer" as const,
+    };
+    const summary = {
+      id: "turn-page",
+      items: [user, answer],
+      itemsView: "summary" as const,
+      status: "completed" as const,
+    } satisfies ThreadTurn;
+    const command = {
+      id: "command-page",
+      type: "commandExecution" as const,
+      command: "pnpm test",
+      cwd: "/workspace",
+      status: "completed" as const,
+      commandActions: [],
+    };
+    const partial = {
+      ...summary,
+      items: [user, command, answer],
+      clientItemsView: "partial" as const,
+    } satisfies ThreadTurn;
+    const client = new FakeConversationClient();
+    const { result, rerender } = renderHook(
+      ({ snapshot }) => useConversation({
+        client,
+        currentThreadId: "thread-1",
+        restoredThread: snapshot,
+        onThreadCreated: vi.fn(async () => undefined),
+      }),
+      { initialProps: { snapshot: restored([summary]) } },
+    );
+
+    await waitFor(() => expect(result.current.turns).toEqual([summary]));
+    rerender({ snapshot: restored([partial]) });
+
+    await waitFor(() => expect(result.current.turns).toEqual([partial]));
+  });
+
   it("同一帧内只提交一次纯文本增量渲染", async () => {
     const client = new FakeConversationClient();
     let pendingFrame: FrameRequestCallback | null = null;

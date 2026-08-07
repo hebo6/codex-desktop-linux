@@ -37,6 +37,7 @@ import {
   useThreadSession,
   type ThreadSessionControls,
   type ThreadSessionState,
+  type TurnItemPageState,
 } from "./app/useThreadSession";
 import { useServerInteractions } from "./app/useServerInteractions";
 import { useAccountIdentity } from "./app/useAccountIdentity";
@@ -339,6 +340,7 @@ export function App({
           threadId: response.thread.id,
           state: preparedState,
           loadOlderTurns: null,
+          loadTurnItemPage: null,
           preparedClient: connection.threadClient,
         });
         return next;
@@ -428,7 +430,8 @@ export function App({
       if (
         existing?.threadId === threadId &&
         existing.state === session.state &&
-        existing.loadOlderTurns === session.loadOlderTurns
+        existing.loadOlderTurns === session.loadOlderTurns &&
+        existing.loadTurnItemPage === session.loadTurnItemPage
       ) {
         return current;
       }
@@ -437,6 +440,7 @@ export function App({
         threadId,
         state: session.state,
         loadOlderTurns: session.loadOlderTurns,
+        loadTurnItemPage: session.loadTurnItemPage,
         preparedClient: null,
       });
       return next;
@@ -2205,6 +2209,10 @@ export function App({
                     activeTabSession?.loadOlderTurns === undefined
                   ? {}
                   : { onLoadOlderTurns: activeTabSession.loadOlderTurns })}
+                {...(activeTabSession?.loadTurnItemPage === null ||
+                    activeTabSession?.loadTurnItemPage === undefined
+                  ? {}
+                  : { onLoadTurnItemPage: activeTabSession.loadTurnItemPage })}
                 onOpenDiff={openDiff}
                 onOpenLink={openContentLink}
                 onOpenImage={(url, name) => {
@@ -2236,6 +2244,9 @@ export function App({
                   }
                 } })}
                 restoredThread={displayedRestoredThread}
+                turnItemPages={
+                  activeThreadSession?.turnItemPages ?? EMPTY_TURN_ITEM_PAGES
+                }
               />
             ) : (
               <ConversationPlaceholder
@@ -2671,6 +2682,7 @@ function transientDraftKeyPrefix(
 }
 
 const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();
+const EMPTY_TURN_ITEM_PAGES: ReadonlyMap<string, TurnItemPageState> = new Map();
 const EMPTY_THREAD_TURNS = Object.freeze([]);
 const EMPTY_WINDOW_TABS: readonly WindowTab[] = Object.freeze([]);
 
@@ -2706,6 +2718,7 @@ interface TabThreadSession {
   readonly threadId: string;
   readonly state: ThreadSessionState;
   readonly loadOlderTurns: (() => Promise<boolean>) | null;
+  readonly loadTurnItemPage: ((turnId: string) => Promise<boolean>) | null;
   readonly preparedClient: ServerThreadsClient | null;
 }
 
@@ -2755,6 +2768,7 @@ function startedThreadSession(
     }),
     resumedThreadId: response.thread.id,
     olderTurnsCursor: null,
+    turnItemPages: new Map(),
     loadingOlderTurns: false,
     olderTurnsError: null,
     deleted: false,

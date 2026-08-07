@@ -228,11 +228,13 @@ P0 不支持 ProxyJump、多级堡垒机、端口转发命令模板或用户自�
 
 首次发送任务时才创建 thread，并在 `thread/start` 中指定 `historyMode: "paginated"`
 
-恢复时使用 `thread/resume` 的 `excludeTurns: true` 和 `initialTurnsPage` 取得最新一页 `itemsView: "notLoaded"` 回合骨架，不依赖默认恢复和 `itemsView: "full"` 的兼容性全量物化路径
+恢复时使用 `thread/resume` 的 `excludeTurns: true` 和 `initialTurnsPage` 取得最新一页 `itemsView: "summary"` 回合摘要，不依赖默认恢复和 `itemsView: "full"` 的兼容性全量物化路径
 
-客户端使用 `thread/items/list` 按升序完整水合当前页中的每个回合，使用 `thread/turns/list` 按降序继续读取更早回合；服务端返回的每页回合在写入标签会话状态前反转为正文使用的升序
+客户端使用 `thread/turns/list` 按降序继续读取更早回合摘要，服务端返回的每页回合在写入标签会话状态前反转为正文使用的升序
 
-分页游标、加载状态和已水合正文保存在对应标签的进程内会话状态中，更早页完成水合后原子前插
+用户展开已完成回合时，客户端使用 `thread/items/list` 按升序读取一页项目，每次点击只推进一页，最后一页到达后将回合标记为完整视图
+
+回合与项目的分页游标、加载状态和已加载正文保存在对应标签的进程内会话状态中，更早回合摘要页原子前插，进程退出后不保留详情缓存
 
 `legacy` 会话不具备完整项目投影且不能原地转换，客户端不回退到会丢失工具记录的旧恢复路径；这类会话恢复为明确错误，新创建会话统一使用 `paginated`
 

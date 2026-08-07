@@ -102,7 +102,7 @@ export class AppServerThreadClient {
       threadId,
       excludeTurns: true,
       initialTurnsPage: {
-        itemsView: "notLoaded",
+        itemsView: "summary",
         limit: THREAD_TURN_PAGE_SIZE,
         sortDirection: "desc",
       },
@@ -133,7 +133,7 @@ export class AppServerThreadClient {
     const params: ThreadTurnsListParams = {
       threadId,
       cursor,
-      itemsView: "notLoaded",
+      itemsView: "summary",
       limit: THREAD_TURN_PAGE_SIZE,
       sortDirection: "desc",
     };

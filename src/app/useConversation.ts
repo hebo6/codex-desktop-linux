@@ -640,6 +640,9 @@ function mergeTurnProjection(
   if (incoming.itemsView === undefined || incoming.itemsView === "full") {
     return incoming;
   }
+  if (incoming.clientItemsView === "partial") {
+    return incoming;
+  }
   if (incoming.itemsView === "notLoaded") {
     return {
       ...incoming,
@@ -656,6 +659,9 @@ function mergeTurnProjection(
       ...incoming.items.filter(({ id }) => !existingIds.has(id)),
     ],
     itemsView: existing.itemsView === "full" ? "full" : "summary",
+    ...(existing.clientItemsView === "partial"
+      ? { clientItemsView: "partial" as const }
+      : {}),
   };
 }
 
@@ -741,7 +747,10 @@ function mergeRestoredTurns(
   const currentById = new Map(currentTurns.map((turn) => [turn.id, turn]));
   const restoredIds = new Set(restoredTurns.map(({ id }) => id));
   return Object.freeze([
-    ...restoredTurns.map((turn) => currentById.get(turn.id) ?? turn),
+    ...restoredTurns.map((turn) => {
+      const current = currentById.get(turn.id);
+      return current === undefined ? turn : mergeTurnProjection(current, turn);
+    }),
     ...currentTurns.filter(({ id }) => !restoredIds.has(id)),
   ]);
 }

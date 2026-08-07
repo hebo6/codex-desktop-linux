@@ -15,6 +15,7 @@ import {
 } from "react";
 
 import type { RestoredThread, ThreadTurn } from "../app/useServerThreads";
+import type { TurnItemPageState } from "../app/useThreadSession";
 import { decodeDataImageUrl } from "../content/dataImage";
 import {
   browserBlobUrls,
@@ -25,6 +26,8 @@ import { recordConversationFirstCommit } from "../diagnostics/conversationLoadDi
 import { AnsiCommandOutput } from "./AnsiCommandOutput";
 import { markdownToPlainText, SafeMarkdown } from "./SafeMarkdown";
 import styles from "./ConversationView.module.css";
+
+const EMPTY_TURN_ITEM_PAGES: ReadonlyMap<string, TurnItemPageState> = new Map();
 
 export interface CommandLocationRequest {
   readonly itemId: string;
@@ -39,6 +42,7 @@ export interface ConversationViewProps {
   readonly loadingOlderTurns?: boolean;
   readonly olderTurnsError?: string | null;
   readonly onLoadOlderTurns?: () => Promise<boolean>;
+  readonly onLoadTurnItemPage?: (turnId: string) => Promise<boolean>;
   readonly onForkTurn?: (turnId: string, isLatest: boolean) => void;
   readonly actionError?: string | null;
   readonly onOpenLink?: (link: string) => void;
@@ -46,6 +50,7 @@ export interface ConversationViewProps {
   readonly onOpenImage?: (url: string, name: string) => void;
   readonly onRunShellCommand?: (command: string) => Promise<boolean>;
   readonly shellCommandDisabled?: boolean;
+  readonly turnItemPages?: ReadonlyMap<string, TurnItemPageState>;
 }
 
 export function ConversationPlaceholder({
@@ -61,7 +66,7 @@ export function ConversationPlaceholder({
     kind === "blank"
       ? ["开始一个新任务", "发送第一条消息时才会创建服务端会话"]
       : kind === "loading"
-        ? ["正在恢复会话", "正在读取最近回合、完整项目和服务端状态"]
+        ? ["正在恢复会话", "正在读取最近回合摘要和服务端状态"]
         : kind === "deleted"
           ? ["会话已被删除", "服务端已删除此会话，不能继续提交输入"]
           : [
@@ -184,6 +189,12 @@ type ConversationRow =
   | { readonly key: "empty"; readonly type: "empty" }
   | {
       readonly key: string;
+      readonly type: "turnDetails";
+      readonly firstInTurn: boolean;
+      readonly turn: ThreadTurn;
+    }
+  | {
+      readonly key: string;
       readonly type: "segment";
       readonly firstInTurn: boolean;
       readonly isLatestTurn: boolean;
@@ -198,6 +209,7 @@ export function ConversationView({
   loadingOlderTurns = false,
   olderTurnsError = null,
   onLoadOlderTurns,
+  onLoadTurnItemPage,
   onForkTurn,
   actionError = null,
   onOpenLink,
@@ -206,6 +218,7 @@ export function ConversationView({
   onRunShellCommand,
   restoredThread,
   shellCommandDisabled = false,
+  turnItemPages = EMPTY_TURN_ITEM_PAGES,
 }: ConversationViewProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -232,8 +245,13 @@ export function ConversationView({
     0,
   );
   const rows = useMemo(
-    () => conversationRows(restoredThread.turns, actionError !== null),
-    [actionError, restoredThread.turns],
+    () => conversationRows(
+      restoredThread.turns,
+      actionError !== null,
+      onLoadTurnItemPage !== undefined,
+      turnItemPages,
+    ),
+    [actionError, onLoadTurnItemPage, restoredThread.turns, turnItemPages],
   );
   const historyQuestions = useMemo(
     () => historyQuestionItems(restoredThread.turns, rows),
@@ -1019,17 +1037,22 @@ export function ConversationView({
               <div
                 className={styles.conversationRow}
                 data-first-in-turn={
-                  row.type === "segment" && row.firstInTurn
+                  (row.type === "segment" || row.type === "turnDetails") &&
+                  row.firstInTurn
                 }
                 data-row-index={rowIndex}
                 data-row-key={row.key}
                 data-row-type={row.type}
                 data-status={
-                  row.type === "segment" ? row.turn.status : undefined
+                  row.type === "segment" || row.type === "turnDetails"
+                    ? row.turn.status
+                    : undefined
                 }
                 data-question-index={questionIndexByRow.get(rowIndex)}
                 data-turn-id={
-                  row.type === "segment" ? row.turn.id : undefined
+                  row.type === "segment" || row.type === "turnDetails"
+                    ? row.turn.id
+                    : undefined
                 }
                 key={row.key}
                 role="listitem"
@@ -1038,6 +1061,9 @@ export function ConversationView({
                   actionError={actionError}
                   blobUrlFactory={blobUrlFactory}
                   commandLocationRequest={commandLocationRequest}
+                  {...(onLoadTurnItemPage === undefined
+                    ? {}
+                    : { onLoadTurnItemPage })}
                   {...(onForkTurn === undefined ? {} : { onForkTurn })}
                   {...(onOpenLink === undefined ? {} : { onOpenLink })}
                   {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
@@ -1047,6 +1073,15 @@ export function ConversationView({
                     : { onRunShellCommand })}
                   row={row}
                   shellCommandDisabled={shellCommandDisabled}
+                  {...(
+                    (row.type !== "segment" && row.type !== "turnDetails") ||
+                      !turnItemPages.has(row.turn.id)
+                      ? {}
+                      : {
+                          turnItemPage:
+                            turnItemPages.get(row.turn.id)!,
+                        }
+                  )}
                 />
               </div>
             ))}
@@ -1101,6 +1136,7 @@ function ConversationRowView({
   actionError,
   blobUrlFactory,
   commandLocationRequest,
+  onLoadTurnItemPage,
   onForkTurn,
   onOpenLink,
   onOpenDiff,
@@ -1108,10 +1144,12 @@ function ConversationRowView({
   onRunShellCommand,
   row,
   shellCommandDisabled,
+  turnItemPage,
 }: {
   readonly actionError: string | null;
   readonly blobUrlFactory: BlobUrlFactory;
   readonly commandLocationRequest: CommandLocationRequest | null;
+  readonly onLoadTurnItemPage?: (turnId: string) => Promise<boolean>;
   readonly onForkTurn?: (turnId: string, isLatest: boolean) => void;
   readonly onOpenLink?: (link: string) => void;
   readonly onOpenDiff?: (path: string, diff: string) => void;
@@ -1119,12 +1157,21 @@ function ConversationRowView({
   readonly onRunShellCommand?: (command: string) => Promise<boolean>;
   readonly row: ConversationRow;
   readonly shellCommandDisabled: boolean;
+  readonly turnItemPage?: TurnItemPageState;
 }) {
   if (row.type === "actionError") {
     return <div className={styles.actionError} role="alert">{actionError}</div>;
   }
   if (row.type === "empty") {
     return <div className={styles.empty}>这个会话还没有回合</div>;
+  }
+  if (row.type === "turnDetails") {
+    return onLoadTurnItemPage === undefined ? null : (
+      <TurnDetailsLoader
+        onLoad={() => onLoadTurnItemPage(row.turn.id)}
+        {...(turnItemPage === undefined ? {} : { page: turnItemPage })}
+      />
+    );
   }
   return row.segment.type === "item" ? (
     <ItemView
@@ -1155,9 +1202,37 @@ function ConversationRowView({
       commandLocationRequest={commandLocationRequest}
       items={row.segment.items}
       turn={row.turn}
+      detailsVersion={turnItemPage?.items.length ?? 0}
       {...(onOpenLink === undefined ? {} : { onOpenLink })}
       {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
     />
+  );
+}
+
+function TurnDetailsLoader({
+  onLoad,
+  page,
+}: {
+  readonly onLoad: () => Promise<boolean>;
+  readonly page?: TurnItemPageState;
+}) {
+  const label = page?.loading === true
+    ? "正在展开详细过程"
+    : page?.error === true
+      ? "重试展开详细过程"
+      : (page?.items.length ?? 0) > 0
+        ? "展开更多详细过程"
+        : "展开详细过程";
+  return (
+    <button
+      className={styles.turnDetailsLoader}
+      disabled={page?.loading === true}
+      onClick={() => void onLoad()}
+      type="button"
+    >
+      <span>{label}</span>
+      <span aria-hidden="true">›</span>
+    </button>
   );
 }
 
@@ -1614,12 +1689,14 @@ function AgentMessage({
 
 function ActivityGroup({
   commandLocationRequest,
+  detailsVersion = 0,
   items,
   onOpenDiff,
   onOpenLink,
   turn,
 }: {
   readonly commandLocationRequest: CommandLocationRequest | null;
+  readonly detailsVersion?: number;
   readonly items: readonly ThreadItem[];
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenLink?: (link: string) => void;
@@ -1633,9 +1710,10 @@ function ActivityGroup({
   const turnWorkRunning =
     turn.status === "inProgress" && !finalAnswerStarted;
   const automaticallyExpanded = turnWorkRunning;
-  const initiallyExpanded = automaticallyExpanded;
+  const initiallyExpanded = automaticallyExpanded || detailsVersion > 0;
   const transition = useCollapsibleContent(initiallyExpanded);
   const previousAutomaticallyExpandedRef = useRef(automaticallyExpanded);
+  const previousDetailsVersionRef = useRef(detailsVersion);
   const duration = useTurnDuration(turn, turnWorkRunning);
   const visibleItems = items;
   const setGroupOpen = transition.setOpen;
@@ -1654,6 +1732,14 @@ function ActivityGroup({
     }
     setGroupOpen(automaticallyExpanded);
   }, [automaticallyExpanded, setGroupOpen]);
+
+  useEffect(() => {
+    const previous = previousDetailsVersionRef.current;
+    previousDetailsVersionRef.current = detailsVersion;
+    if (detailsVersion > previous) {
+      setGroupOpen(true);
+    }
+  }, [detailsVersion, setGroupOpen]);
 
   useEffect(() => {
     if (
@@ -2152,6 +2238,8 @@ type TurnSegment =
 function conversationRows(
   turns: readonly ThreadTurn[],
   hasActionError: boolean,
+  turnDetailsEnabled: boolean,
+  turnItemPages: ReadonlyMap<string, TurnItemPageState>,
 ): readonly ConversationRow[] {
   const rows: ConversationRow[] = [];
   if (hasActionError) {
@@ -2167,19 +2255,45 @@ function conversationRows(
       turn.items,
       turn.status === "inProgress" && !finalAnswerStarted,
     );
+    const page = turnItemPages.get(turn.id);
+    const showTurnDetails =
+      turnDetailsEnabled &&
+      turn.status !== "inProgress" &&
+      turn.itemsView !== "full" &&
+      page?.complete !== true;
+    const firstUserSegment = segments.findIndex(
+      (segment) => segment.type === "item" && segment.item.type === "userMessage",
+    );
+    const detailsIndex = showTurnDetails
+      ? firstUserSegment < 0 ? 0 : firstUserSegment + 1
+      : -1;
+    const pushTurnDetails = () => {
+      rows.push({
+        key: `${turn.id}:details`,
+        type: "turnDetails",
+        firstInTurn: detailsIndex === 0,
+        turn,
+      });
+    };
     segments.forEach((segment, segmentIndex) => {
+      if (segmentIndex === detailsIndex) {
+        pushTurnDetails();
+      }
       const identity = segment.type === "item"
         ? segment.item.id
         : segment.items[0]?.id ?? `activities-${segmentIndex}`;
       rows.push({
         key: `${turn.id}:segment:${identity}`,
         type: "segment",
-        firstInTurn: segmentIndex === 0,
+        firstInTurn: segmentIndex === 0 && detailsIndex !== 0,
         isLatestTurn: turnIndex === turns.length - 1,
         segment,
         turn,
       });
     });
+    if (detailsIndex === segments.length) {
+      pushTurnDetails();
+    }
   });
   return rows;
 }
