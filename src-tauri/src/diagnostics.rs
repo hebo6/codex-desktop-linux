@@ -7,6 +7,11 @@ use tracing_subscriber::{
     util::SubscriberInitExt as _,
 };
 
+const CLIENT_VERSION: &str = match option_env!("CODEX_DESKTOP_VERSION") {
+    Some(version) => version,
+    None => env!("CARGO_PKG_VERSION"),
+};
+
 pub(crate) fn init() {
     let environment_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
@@ -41,7 +46,7 @@ pub(crate) struct SystemDiagnostics {
 #[tauri::command]
 pub(crate) fn read_system_diagnostics() -> SystemDiagnostics {
     SystemDiagnostics {
-        client_version: env!("CARGO_PKG_VERSION"),
+        client_version: CLIENT_VERSION,
         protocol_baseline: "ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c",
         operating_system: std::env::consts::OS,
         architecture: std::env::consts::ARCH,
@@ -64,7 +69,10 @@ mod tests {
     #[test]
     fn exposes_only_fixed_non_sensitive_environment_summary() {
         let report = serde_json::to_value(read_system_diagnostics()).unwrap();
+        let expected_client_version = std::env::var("CODEX_DESKTOP_VERSION")
+            .unwrap_or_else(|_| env!("CARGO_PKG_VERSION").to_owned());
         assert_eq!(report.as_object().unwrap().len(), 7);
+        assert_eq!(report["clientVersion"], expected_client_version);
         assert_eq!(
             report["protocolBaseline"],
             "ac3da4fb1a2ad0ee2f0c867bfa81a5a3a3737f9c"

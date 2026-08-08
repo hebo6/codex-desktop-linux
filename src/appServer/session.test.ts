@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import packageMetadata from "../../package.json";
+
 import type { JSONRPCMessage } from "../protocol/generated";
 import {
   RpcConnectionClosedError,
@@ -119,6 +121,12 @@ function respondToInitialize(transport: RecordingTransport): void {
 }
 
 describe("AppServerSession", () => {
+  it("使用发行构建版本初始化客户端信息", () => {
+    const expectedVersion = process.env.CODEX_DESKTOP_VERSION ?? packageMetadata.version;
+
+    expect(APP_SERVER_CLIENT_INFO.version).toBe(expectedVersion);
+  });
+
   it("按到达顺序接入早期消息并完成固定初始化握手", async () => {
     const notificationOrder: string[] = [];
     const { session, states, transport } = createSessionHarness({

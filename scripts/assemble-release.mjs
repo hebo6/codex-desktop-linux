@@ -6,10 +6,10 @@ const projectRoot = path.resolve(import.meta.dirname, "..");
 const inputRoot = path.resolve(process.argv[2] ?? path.join(projectRoot, "src-tauri/target"));
 const outputRoot = path.resolve(process.argv[3] ?? path.join(projectRoot, "release-artifacts"));
 const packageMetadata = JSON.parse(await readFile(path.join(projectRoot, "package.json"), "utf8"));
-const version = packageMetadata.version;
+const version = process.env.CODEX_DESKTOP_VERSION ?? packageMetadata.version;
 
 if (typeof version !== "string" || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(version)) {
-  throw new TypeError("package.json 中的版本号无效");
+  throw new TypeError("发行版本号无效");
 }
 
 const discovered = await collectPackages(inputRoot);

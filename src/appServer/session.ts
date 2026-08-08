@@ -35,7 +35,7 @@ export const DEFAULT_APP_SERVER_INBOUND_QUEUE_CAPACITY = 256;
 export const APP_SERVER_CLIENT_INFO = Object.freeze({
   name: packageMetadata.name,
   title: "Codex Desktop Linux",
-  version: packageMetadata.version,
+  version: CODEX_DESKTOP_VERSION,
 }) satisfies InitializeParams["clientInfo"];
 
 const INITIALIZE_PARAMS: InitializeParams = Object.freeze({

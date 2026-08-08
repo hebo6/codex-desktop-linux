@@ -43,7 +43,16 @@ jobs:
           pnpm test
           cargo test --locked --manifest-path src-tauri/Cargo.toml --target "${{ matrix.target }}"
       - name: Build Linux packages
-        run: pnpm tauri build --ci --target "${{ matrix.target }}" --bundles appimage,deb,rpm
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          release_version="${RELEASE_TAG#v}"
+          if [[ ! "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "发行 tag 必须采用 v<SemVer> 格式" >&2
+            exit 1
+          fi
+          export CODEX_DESKTOP_VERSION="$release_version"
+          pnpm tauri build --ci --target "${{ matrix.target }}" --bundles appimage,deb,rpm --config "{\"version\":\"$CODEX_DESKTOP_VERSION\"}"
       - name: Finalize AppImage portability
         run: bash scripts/finalize-appimage.sh "src-tauri/target/${{ matrix.target }}/release/bundle" "${{ matrix.target }}"
       - uses: actions/upload-artifact@v7
@@ -67,7 +76,9 @@ jobs:
         with:
           path: release-input
       - name: Assemble checksummed artifacts
-        run: node scripts/assemble-release.mjs release-input release-artifacts
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: CODEX_DESKTOP_VERSION="${RELEASE_TAG#v}" node scripts/assemble-release.mjs release-input release-artifacts
       - name: Import release signing key
         env:
           RELEASE_GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
@@ -85,9 +96,9 @@ jobs:
         run: |
           if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
             gh release upload "${{ github.ref_name }}" release-artifacts/* --clobber
-            gh release edit "${{ github.ref_name }}" --notes-file "docs/releases/${GITHUB_REF_NAME#v}.md" --title "Codex Desktop Linux ${{ github.ref_name }}"
+            gh release edit "${{ github.ref_name }}" --title "Codex Desktop Linux ${{ github.ref_name }}"
           else
-            gh release create "${{ github.ref_name }}" release-artifacts/* --notes-file "docs/releases/${GITHUB_REF_NAME#v}.md" --title "Codex Desktop Linux ${{ github.ref_name }}" --verify-tag
+            gh release create "${{ github.ref_name }}" release-artifacts/* --notes "" --title "Codex Desktop Linux ${{ github.ref_name }}" --verify-tag
           fi
 
   smoke:
