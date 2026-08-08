@@ -28,13 +28,10 @@ The screenshot is generated from the project's deterministic visual-regression f
 
 The [official desktop app](https://learn.chatgpt.com/docs/app) supports macOS and Windows and can use [remote projects over SSH](https://learn.chatgpt.com/docs/remote-connections). This project does not aim to reproduce every official capability. It focuses on native Linux desktop workflows and self-managed Codex infrastructure
 
-| User pain point | What this project provides |
-| --- | --- |
-| There is no official Linux desktop app | A native Linux client delivered as AppImage, deb, and rpm packages |
-| Code and toolchains live on a development host, in a container, or inside a private network | Connections to local or independently managed remote app-server processes without moving the working environment to the desktop host |
-| Remote environments require a proxy or bastion host | Direct TLS, HTTP CONNECT, SOCKS5, and SSH direct-tcpip paths with reusable server and proxy profiles |
-| The desktop client lifecycle should not determine the task lifecycle | A turn can continue after the client closes when the independently managed app-server remains running and the turn does not require approval or user input |
-| The desktop host cannot reach the model service directly | The client only needs a route to the app-server; the app-server host handles authentication and access to OpenAI or its configured model provider |
+- **Codex only on the server** — the server host only runs Codex app-server; no companion agent, desktop environment, or other backend from this project is required
+- **Headless by design** — app-server does not require a graphical session, making it suitable for development hosts, containers, and private networks
+- **No OpenAI relay between client and server** — protocol traffic follows the direct, proxy, or SSH path you configure and is never relayed through OpenAI. app-server still connects separately to OpenAI or the configured model provider
+- **Client and server can run on different computers** — keep the desktop interface on the Linux workstation while app-server, source code, and toolchains remain on the machine where the work happens
 
 This project is best suited to developers who need a native Linux interface, self-managed app-server processes, or flexible remote network paths. Use the official desktop app for first-party cloud tasks, ChatGPT, browser, plugin, and platform-integration capabilities
 

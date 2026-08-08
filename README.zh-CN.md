@@ -28,13 +28,10 @@
 
 [官方桌面应用](https://learn.chatgpt.com/docs/app)已经支持 macOS、Windows 和[通过 SSH 使用远程项目](https://learn.chatgpt.com/docs/remote-connections)。本项目并不以复刻全部官方能力为目标，而是面向 Linux 桌面和自主管理 Codex 基础设施的使用场景
 
-| 用户痛点 | 本项目提供 |
-| --- | --- |
-| 官方没有 Linux 桌面应用 | 面向 Linux 原生桌面使用，提供 AppImage、deb 和 rpm 交付物 |
-| 代码和工具链位于开发机、容器或私有网络 | 连接本机或独立运行的远程 app-server，无需将工作环境迁移到客户端主机 |
-| 远程环境需要代理或跳板机 | 支持直连 TLS、HTTP CONNECT、SOCKS5 和 SSH direct-tcpip，并可复用服务器与代理配置 |
-| 客户端生命周期不应决定任务生命周期 | 独立托管的 app-server 保持运行时，关闭客户端不会终止无需审批或用户输入的任务 |
-| 客户端无法直接访问模型服务 | 客户端只需能够连接 app-server，由 app-server 主机负责认证和访问 OpenAI 或配置的模型服务 |
+- **服务端只需 Codex** — 服务端只运行 Codex app-server，无需安装本项目的配套代理、桌面环境或其他后端服务
+- **服务端采用无头设计** — app-server 不依赖图形会话，适合运行在开发机、容器或私有网络中
+- **客户端与服务端之间不经 OpenAI 中转** — 协议数据通过用户配置的直连、代理或 SSH 路径传输，不经过 OpenAI 中继，app-server 仍会单独连接 OpenAI 或配置的模型服务
+- **客户端与服务端可运行在不同电脑上** — 桌面界面留在 Linux 工作站，app-server、源代码和工具链留在实际执行工作的主机
 
 本项目更适合需要 Linux 原生界面、自主管理 app-server 或复杂远程网络路径的开发者。需要官方云端任务、ChatGPT、浏览器、插件及平台集成时，应使用官方桌面应用
 
