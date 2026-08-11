@@ -91,38 +91,6 @@
   color: var(--color-status-danger);
 }
 
-.turnDetailsLoader {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: 36px;
-  padding: 0;
-  border: 0;
-  color: var(--color-text-tertiary);
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-}
-
-.turnDetailsLoader::after {
-  height: 1px;
-  background: var(--color-divider-subtle);
-  content: "";
-}
-
-.turnDetailsLoader:hover:not(:disabled) {
-  color: var(--color-text-secondary);
-}
-
-.turnDetailsLoader:disabled {
-  cursor: default;
-  opacity: 0.72;
-}
-
 .conversationRow {
   box-sizing: border-box;
   padding-bottom: var(--space-3);
@@ -391,6 +359,22 @@ button.imageAttachment {
   font-weight: 400;
 }
 
+.activityGroupHeader:disabled {
+  cursor: default;
+}
+
+.activityGroupLoadState {
+  color: var(--color-text-tertiary);
+}
+
+.activityGroupLoadState::before {
+  content: " · ";
+}
+
+.activityGroupLoadState[data-status="error"] {
+  color: var(--color-status-danger);
+}
+
 .activityGroupHeader > span:last-child {
   transition: transform var(--duration-panel) var(--ease-standard);
 }
@@ -436,6 +420,26 @@ button.imageAttachment {
 .activityGroupContent[data-visible="true"] {
   opacity: 1;
   visibility: visible;
+}
+
+.activityGroupLoadMore {
+  justify-self: start;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.activityGroupLoadMore:hover:not(:disabled) {
+  color: var(--color-text-secondary);
+}
+
+.activityGroupLoadMore:disabled {
+  cursor: default;
+  opacity: 0.72;
 }
 
 .activityDisclosure[data-command-item-id]:focus-within {

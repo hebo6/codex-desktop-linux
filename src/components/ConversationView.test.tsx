@@ -167,7 +167,7 @@ const RESTORED = {
 } satisfies RestoredThread;
 
 describe("ConversationView", () => {
-  it("按点击逐页展开摘要回合并在加载完成后移除入口", async () => {
+  it("通过活动组逐页加载摘要回合并在完成后移除加载入口", async () => {
     const user = TURN.items[0]!;
     const command = TURN.items.find(({ id }) => id === "command")!;
     const answer = TURN.items.at(-1)!;
@@ -187,7 +187,8 @@ describe("ConversationView", () => {
     expect(screen.getByText("请检查项目")).toBeVisible();
     expect(screen.getByText("已经完成检查")).toBeVisible();
     expect(screen.queryByText("pnpm test")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "展开详细过程" }));
+    expect(screen.queryByText(/展开.*详细过程/u)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /已运行/u }));
     expect(onLoadTurnItemPage).toHaveBeenCalledWith("turn-1");
 
     const partialTurn = {
@@ -210,10 +211,12 @@ describe("ConversationView", () => {
       />,
     );
 
-    expect(screen.getByText("Ran pnpm test")).toBeVisible();
-    fireEvent.click(
-      screen.getByRole("button", { name: "展开更多详细过程" }),
-    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /已运行/u }))
+        .toHaveAttribute("aria-expanded", "true");
+    });
+    await waitFor(() => expect(screen.getByText("Ran pnpm test")).toBeVisible());
+    fireEvent.click(screen.getByRole("button", { name: "加载更多活动" }));
     expect(onLoadTurnItemPage).toHaveBeenCalledTimes(2);
 
     const completePage = {
@@ -230,9 +233,73 @@ describe("ConversationView", () => {
       />,
     );
 
-    expect(
-      screen.queryByRole("button", { name: /展开.*详细过程/u }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /加载更多活动/u }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /已运行/u }))
+      .toHaveAttribute("aria-expanded", "true");
+
+    rerender(
+      <ConversationView
+        onLoadTurnItemPage={onLoadTurnItemPage}
+        restoredThread={{
+          ...RESTORED,
+          turns: [{ ...summaryTurn, itemsView: "full" as const }],
+        }}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /已运行/u }))
+      .not.toBeInTheDocument();
+  });
+
+  it("在活动组标题反馈首次加载状态并支持失败重试", () => {
+    const user = TURN.items[0]!;
+    const answer = TURN.items.at(-1)!;
+    const summaryTurn = {
+      ...TURN,
+      items: [user, answer],
+      itemsView: "summary" as const,
+    } satisfies ThreadTurn;
+    const onLoadTurnItemPage = vi.fn(async () => true);
+    const { rerender } = render(
+      <ConversationView
+        onLoadTurnItemPage={onLoadTurnItemPage}
+        restoredThread={{ ...RESTORED, turns: [summaryTurn] }}
+        turnItemPages={new Map([["turn-1", {
+          items: [],
+          nextCursor: null,
+          complete: false,
+          loading: true,
+          error: false,
+        }]])}
+      />,
+    );
+
+    const loadingGroup = screen.getByRole("button", {
+      name: /已运行.*正在加载/u,
+    });
+    expect(loadingGroup).toBeDisabled();
+    expect(loadingGroup).toHaveAttribute("aria-busy", "true");
+
+    rerender(
+      <ConversationView
+        onLoadTurnItemPage={onLoadTurnItemPage}
+        restoredThread={{ ...RESTORED, turns: [summaryTurn] }}
+        turnItemPages={new Map([["turn-1", {
+          items: [],
+          nextCursor: null,
+          complete: false,
+          loading: false,
+          error: true,
+        }]])}
+      />,
+    );
+
+    const failedGroup = screen.getByRole("button", {
+      name: /已运行.*加载失败，点击重试/u,
+    });
+    expect(failedGroup).toBeEnabled();
+    fireEvent.click(failedGroup);
+    expect(onLoadTurnItemPage).toHaveBeenCalledWith("turn-1");
   });
 
   it("安全渲染用户问题 Markdown 并保留结构化输入", () => {

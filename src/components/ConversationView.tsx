@@ -189,15 +189,10 @@ type ConversationRow =
   | { readonly key: "empty"; readonly type: "empty" }
   | {
       readonly key: string;
-      readonly type: "turnDetails";
-      readonly firstInTurn: boolean;
-      readonly turn: ThreadTurn;
-    }
-  | {
-      readonly key: string;
       readonly type: "segment";
       readonly firstInTurn: boolean;
       readonly isLatestTurn: boolean;
+      readonly loadsTurnDetails: boolean;
       readonly segment: TurnSegment;
       readonly turn: ThreadTurn;
     };
@@ -1036,24 +1031,13 @@ export function ConversationView({
             {rows.map((row, rowIndex) => (
               <div
                 className={styles.conversationRow}
-                data-first-in-turn={
-                  (row.type === "segment" || row.type === "turnDetails") &&
-                  row.firstInTurn
-                }
+                data-first-in-turn={row.type === "segment" && row.firstInTurn}
                 data-row-index={rowIndex}
                 data-row-key={row.key}
                 data-row-type={row.type}
-                data-status={
-                  row.type === "segment" || row.type === "turnDetails"
-                    ? row.turn.status
-                    : undefined
-                }
+                data-status={row.type === "segment" ? row.turn.status : undefined}
                 data-question-index={questionIndexByRow.get(rowIndex)}
-                data-turn-id={
-                  row.type === "segment" || row.type === "turnDetails"
-                    ? row.turn.id
-                    : undefined
-                }
+                data-turn-id={row.type === "segment" ? row.turn.id : undefined}
                 key={row.key}
                 role="listitem"
               >
@@ -1074,8 +1058,7 @@ export function ConversationView({
                   row={row}
                   shellCommandDisabled={shellCommandDisabled}
                   {...(
-                    (row.type !== "segment" && row.type !== "turnDetails") ||
-                      !turnItemPages.has(row.turn.id)
+                    row.type !== "segment" || !turnItemPages.has(row.turn.id)
                       ? {}
                       : {
                           turnItemPage:
@@ -1165,14 +1148,6 @@ function ConversationRowView({
   if (row.type === "empty") {
     return <div className={styles.empty}>这个会话还没有回合</div>;
   }
-  if (row.type === "turnDetails") {
-    return onLoadTurnItemPage === undefined ? null : (
-      <TurnDetailsLoader
-        onLoad={() => onLoadTurnItemPage(row.turn.id)}
-        {...(turnItemPage === undefined ? {} : { page: turnItemPage })}
-      />
-    );
-  }
   return row.segment.type === "item" ? (
     <ItemView
       blobUrlFactory={blobUrlFactory}
@@ -1202,37 +1177,15 @@ function ConversationRowView({
       commandLocationRequest={commandLocationRequest}
       items={row.segment.items}
       turn={row.turn}
-      detailsVersion={turnItemPage?.items.length ?? 0}
+      {...(turnItemPage === undefined ? {} : { detailsPage: turnItemPage })}
+      {...(
+        !row.loadsTurnDetails || onLoadTurnItemPage === undefined
+          ? {}
+          : { onLoadDetails: () => onLoadTurnItemPage(row.turn.id) }
+      )}
       {...(onOpenLink === undefined ? {} : { onOpenLink })}
       {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
     />
-  );
-}
-
-function TurnDetailsLoader({
-  onLoad,
-  page,
-}: {
-  readonly onLoad: () => Promise<boolean>;
-  readonly page?: TurnItemPageState;
-}) {
-  const label = page?.loading === true
-    ? "正在展开详细过程"
-    : page?.error === true
-      ? "重试展开详细过程"
-      : (page?.items.length ?? 0) > 0
-        ? "展开更多详细过程"
-        : "展开详细过程";
-  return (
-    <button
-      className={styles.turnDetailsLoader}
-      disabled={page?.loading === true}
-      onClick={() => void onLoad()}
-      type="button"
-    >
-      <span>{label}</span>
-      <span aria-hidden="true">›</span>
-    </button>
   );
 }
 
@@ -1689,15 +1642,17 @@ function AgentMessage({
 
 function ActivityGroup({
   commandLocationRequest,
-  detailsVersion = 0,
+  detailsPage,
   items,
+  onLoadDetails,
   onOpenDiff,
   onOpenLink,
   turn,
 }: {
   readonly commandLocationRequest: CommandLocationRequest | null;
-  readonly detailsVersion?: number;
+  readonly detailsPage?: TurnItemPageState;
   readonly items: readonly ThreadItem[];
+  readonly onLoadDetails?: () => Promise<boolean>;
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenLink?: (link: string) => void;
   readonly turn: ThreadTurn;
@@ -1710,13 +1665,25 @@ function ActivityGroup({
   const turnWorkRunning =
     turn.status === "inProgress" && !finalAnswerStarted;
   const automaticallyExpanded = turnWorkRunning;
-  const initiallyExpanded = automaticallyExpanded || detailsVersion > 0;
+  const detailsHydrated = detailsPage !== undefined && (
+    detailsPage.items.length > 0 ||
+    detailsPage.nextCursor !== null ||
+    detailsPage.complete
+  );
+  const initiallyExpanded = automaticallyExpanded || detailsHydrated;
   const transition = useCollapsibleContent(initiallyExpanded);
   const previousAutomaticallyExpandedRef = useRef(automaticallyExpanded);
-  const previousDetailsVersionRef = useRef(detailsVersion);
+  const previousDetailsHydratedRef = useRef(detailsHydrated);
   const duration = useTurnDuration(turn, turnWorkRunning);
   const visibleItems = items;
   const setGroupOpen = transition.setOpen;
+  const canLoadDetails = onLoadDetails !== undefined &&
+    turn.itemsView !== "full" && detailsPage?.complete !== true;
+  const initialDetailsLoading = canLoadDetails && !detailsHydrated &&
+    detailsPage?.loading === true;
+  const initialDetailsError = canLoadDetails && !detailsHydrated &&
+    detailsPage?.error === true;
+  const showLoadMore = canLoadDetails && detailsHydrated;
   const commandLocationRequestId = commandLocationRequest?.requestId;
   const runningCommand = visibleItems.findLast(
     (item): item is Extract<ThreadItem, { type: "commandExecution" }> =>
@@ -1734,12 +1701,12 @@ function ActivityGroup({
   }, [automaticallyExpanded, setGroupOpen]);
 
   useEffect(() => {
-    const previous = previousDetailsVersionRef.current;
-    previousDetailsVersionRef.current = detailsVersion;
-    if (detailsVersion > previous) {
+    const wasHydrated = previousDetailsHydratedRef.current;
+    previousDetailsHydratedRef.current = detailsHydrated;
+    if (!wasHydrated && detailsHydrated) {
       setGroupOpen(true);
     }
-  }, [detailsVersion, setGroupOpen]);
+  }, [detailsHydrated, setGroupOpen]);
 
   useEffect(() => {
     if (
@@ -1752,6 +1719,10 @@ function ActivityGroup({
 
   const toggle = () => {
     const nextExpanded = !transition.targetExpandedRef.current;
+    if (nextExpanded && canLoadDetails && !detailsHydrated) {
+      void onLoadDetails();
+      return;
+    }
     transition.setOpen(nextExpanded);
   };
 
@@ -1765,17 +1736,34 @@ function ActivityGroup({
     >
       <button
         aria-expanded={transition.targetExpanded}
+        aria-busy={initialDetailsLoading}
         className={styles.activityGroupHeader}
         data-activity-group-header
+        disabled={initialDetailsLoading}
         onClick={toggle}
         type="button"
       >
-        <span>{activityGroupLabel(
-          turn.status,
-          duration,
-          finalAnswerStarted,
-          runningCommandCount,
-        )}</span>
+        <span>
+          {activityGroupLabel(
+            turn.status,
+            duration,
+            finalAnswerStarted,
+            runningCommandCount,
+          )}
+          {initialDetailsLoading ? (
+            <span className={styles.activityGroupLoadState} role="status">
+              正在加载
+            </span>
+          ) : initialDetailsError ? (
+            <span
+              className={styles.activityGroupLoadState}
+              data-status="error"
+              role="alert"
+            >
+              加载失败，点击重试
+            </span>
+          ) : null}
+        </span>
         <span aria-hidden="true">›</span>
       </button>
       {transition.contentMounted ? (
@@ -1802,6 +1790,20 @@ function ActivityGroup({
                   : ""}
               </div>
             )}
+            {showLoadMore ? (
+              <button
+                className={styles.activityGroupLoadMore}
+                disabled={detailsPage?.loading === true}
+                onClick={() => void onLoadDetails()}
+                type="button"
+              >
+                {detailsPage?.loading === true
+                  ? "正在加载更多活动"
+                  : detailsPage?.error === true
+                    ? "重试加载更多活动"
+                    : "加载更多活动"}
+              </button>
+            ) : null}
             </div>
           </div>
         </div>
@@ -2251,12 +2253,12 @@ function conversationRows(
   }
   turns.forEach((turn, turnIndex) => {
     const finalAnswerStarted = turn.items.some(isFinalAnswer);
-    const segments = groupTurnItems(
+    const segments = [...groupTurnItems(
       turn.items,
       turn.status === "inProgress" && !finalAnswerStarted,
-    );
+    )];
     const page = turnItemPages.get(turn.id);
-    const showTurnDetails =
+    const canLoadTurnDetails =
       turnDetailsEnabled &&
       turn.status !== "inProgress" &&
       turn.itemsView !== "full" &&
@@ -2264,36 +2266,34 @@ function conversationRows(
     const firstUserSegment = segments.findIndex(
       (segment) => segment.type === "item" && segment.item.type === "userMessage",
     );
-    const detailsIndex = showTurnDetails
+    const deferredActivitiesIndex = canLoadTurnDetails
       ? firstUserSegment < 0 ? 0 : firstUserSegment + 1
       : -1;
-    const pushTurnDetails = () => {
-      rows.push({
-        key: `${turn.id}:details`,
-        type: "turnDetails",
-        firstInTurn: detailsIndex === 0,
-        turn,
+    let detailsHostIndex = canLoadTurnDetails
+      ? segments.findIndex((segment) => segment.type === "activities")
+      : -1;
+    if (canLoadTurnDetails && detailsHostIndex < 0) {
+      segments.splice(deferredActivitiesIndex, 0, {
+        type: "activities",
+        items: [],
       });
-    };
+      detailsHostIndex = deferredActivitiesIndex;
+    }
+    let activityGroupIndex = 0;
     segments.forEach((segment, segmentIndex) => {
-      if (segmentIndex === detailsIndex) {
-        pushTurnDetails();
-      }
       const identity = segment.type === "item"
         ? segment.item.id
-        : segment.items[0]?.id ?? `activities-${segmentIndex}`;
+        : `activities-${activityGroupIndex++}`;
       rows.push({
         key: `${turn.id}:segment:${identity}`,
         type: "segment",
-        firstInTurn: segmentIndex === 0 && detailsIndex !== 0,
+        firstInTurn: segmentIndex === 0,
         isLatestTurn: turnIndex === turns.length - 1,
+        loadsTurnDetails: segmentIndex === detailsHostIndex,
         segment,
         turn,
       });
     });
-    if (detailsIndex === segments.length) {
-      pushTurnDetails();
-    }
   });
   return rows;
 }
