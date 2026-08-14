@@ -2,6 +2,8 @@ import type {
   ServerNotification,
   ThreadListParams,
   ThreadListResponse,
+  ThreadSectionMoveParams,
+  ThreadSectionMoveResponse,
   ThreadReadParams,
   ThreadReadResponse,
   ThreadResumeParams,
@@ -28,6 +30,7 @@ import type {
 } from "../protocol/rpc";
 import {
   validateThreadListResponse,
+  validateThreadSectionMoveResponse,
   validateThreadReadResponse,
   validateThreadResumeResponse,
   validateThreadTurnsListResponse,
@@ -44,6 +47,8 @@ import { beginConversationLoadMeasurement } from "../diagnostics/conversationLoa
 export const RECENT_THREAD_PAGE_SIZE = 50;
 export const THREAD_TURN_PAGE_SIZE = 25;
 export const THREAD_ITEM_PAGE_SIZE = 100;
+// app-server 为内置 Pinned Section 保留的稳定标识
+export const PINNED_THREAD_SECTION_ID = "01984de2-8f74-7c91-a3b2-5c5e937cf318";
 
 export interface RecentThreadPageOptions {
   readonly archived?: boolean;
@@ -77,6 +82,22 @@ export class AppServerThreadClient {
       sortKey: "updated_at",
       ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
       ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+    };
+    return this.session.sendRequest({
+      method: "thread/list",
+      params,
+      validateResult: threadListResponseValidator,
+    });
+  }
+
+  listPinnedThreads(cursor?: string | null): RequestHandle<ThreadListResponse> {
+    const params: ThreadListParams = {
+      archived: false,
+      limit: RECENT_THREAD_PAGE_SIZE,
+      sectionId: PINNED_THREAD_SECTION_ID,
+      sortDirection: "asc",
+      sortKey: "section_position",
+      ...(cursor === undefined ? {} : { cursor }),
     };
     return this.session.sendRequest({
       method: "thread/list",
@@ -199,6 +220,23 @@ export class AppServerThreadClient {
     });
   }
 
+  setThreadPinned(
+    threadId: string,
+    pinned: boolean,
+    beforeThreadId: string | null = null,
+  ): RequestHandle<ThreadSectionMoveResponse> {
+    const params: ThreadSectionMoveParams = {
+      beforeThreadId: pinned ? beforeThreadId : null,
+      sectionId: pinned ? PINNED_THREAD_SECTION_ID : null,
+      threadId,
+    };
+    return this.session.sendRequest({
+      method: "thread/section/move",
+      params,
+      validateResult: threadSectionMoveResponseValidator,
+    });
+  }
+
   forkThread(threadId: string, lastTurnId: string): RequestHandle<ThreadForkResponse> {
     const params: ThreadForkParams = {
       threadId,
@@ -215,6 +253,8 @@ export class AppServerThreadClient {
 
 const threadListResponseValidator: ResultValidator<ThreadListResponse> =
   validateThreadListResponse;
+const threadSectionMoveResponseValidator: ResultValidator<ThreadSectionMoveResponse> =
+  validateThreadSectionMoveResponse;
 const threadReadResponseValidator: ResultValidator<ThreadReadResponse> =
   validateThreadReadResponse;
 const threadResumeResponseValidator: ResultValidator<ThreadResumeResponse> =

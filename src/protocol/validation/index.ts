@@ -8,6 +8,7 @@ import type {
   ServerNotification,
   ServerRequest,
   ThreadListResponse,
+  ThreadSectionMoveResponse,
   ThreadReadResponse,
   ThreadResumeResponse,
   ThreadTurnsListResponse,
@@ -49,6 +50,7 @@ import {
   validateServerNotification as validateServerNotificationSchema,
   validateServerRequest as validateServerRequestSchema,
   validateThreadListResponse as validateThreadListResponseSchema,
+  validateThreadSectionMoveResponse as validateThreadSectionMoveResponseSchema,
   validateThreadReadResponse as validateThreadReadResponseSchema,
   validateThreadResumeResponse as validateThreadResumeResponseSchema,
   validateThreadTurnsListResponse as validateThreadTurnsListResponseSchema,
@@ -204,6 +206,18 @@ export function validateThreadListResponse(
     "invalid_params",
     "params",
     "thread/list 响应校验失败",
+  );
+}
+
+export function validateThreadSectionMoveResponse(
+  value: unknown,
+): ProtocolValidationResult<ThreadSectionMoveResponse> {
+  return validateWithSchema(
+    value,
+    validateThreadSectionMoveResponseSchema,
+    "invalid_params",
+    "params",
+    "thread/section/move 响应校验失败",
   );
 }
 

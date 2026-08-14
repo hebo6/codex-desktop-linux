@@ -82,6 +82,8 @@ export type { ThreadBackgroundTerminalsTerminateParams } from "./types/ThreadBac
 export type { ThreadBackgroundTerminalsTerminateResponse } from "./types/ThreadBackgroundTerminalsTerminateResponse";
 export type { ThreadShellCommandParams } from "./types/ThreadShellCommandParams";
 export type { ThreadShellCommandResponse } from "./types/ThreadShellCommandResponse";
+export type { ThreadSectionMoveParams } from "./types/ThreadSectionMoveParams";
+export type { ThreadSectionMoveResponse } from "./types/ThreadSectionMoveResponse";
 
 export {
   KNOWN_SERVER_NOTIFICATION_METHODS,

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { PINNED_THREAD_SECTION_ID } from "../appServer/threadClient";
+import type { ServerId } from "../configuration";
+import { recordConversationProjection } from "../diagnostics/conversationLoadDiagnostics";
 import type {
   ServerNotification,
   ThreadListResponse,
@@ -12,9 +15,8 @@ import type {
   ThreadArchiveResponse,
   ThreadUnarchiveResponse,
   ThreadDeleteResponse,
+  ThreadSectionMoveResponse,
 } from "../protocol/generated";
-import type { ServerId } from "../configuration";
-import { recordConversationProjection } from "../diagnostics/conversationLoadDiagnostics";
 
 export type ServerThreadsPhase = "idle" | "loading" | "ready" | "error";
 export type ThreadSummary = ThreadListResponse["data"][number];
@@ -40,9 +42,12 @@ export interface ServerThreadsState {
   readonly threadRestorePhase: ServerThreadsPhase;
   readonly resumedThreadId: string | null;
   readonly threads: readonly ThreadSummary[];
+  readonly pinnedThreads: readonly ThreadSummary[];
   readonly nextThreadCursor: string | null;
+  readonly nextPinnedThreadCursor: string | null;
   readonly restoredThread: RestoredThread | null;
   readonly loadingMoreThreads: boolean;
+  readonly loadingMorePinnedThreads: boolean;
   readonly refreshingThreads: boolean;
   readonly pendingThreadIds: readonly string[];
   readonly removingThreadIds: readonly string[];
@@ -50,6 +55,7 @@ export interface ServerThreadsState {
   readonly threadListError: string | null;
   readonly threadRestoreError: string | null;
   readonly offline: boolean;
+  readonly pinningAvailable: boolean;
   readonly lastSyncedAt: number | null;
 }
 
@@ -66,6 +72,7 @@ export interface ServerThreadsControls extends ServerThreadsState {
   readonly loadArchivedThreads: () => Promise<void>;
   readonly loadMoreArchivedThreads: () => Promise<void>;
   readonly loadMoreThreads: () => Promise<void>;
+  readonly loadMorePinnedThreads: () => Promise<void>;
   readonly loadProjectThreads: (
     cwd: string,
     limit: number,
@@ -75,6 +82,10 @@ export interface ServerThreadsControls extends ServerThreadsState {
   readonly archiveThread: (threadId: string) => Promise<boolean>;
   readonly unarchiveThread: (threadId: string) => Promise<boolean>;
   readonly deleteThread: (threadId: string) => Promise<boolean>;
+  readonly setThreadPinned: (
+    threadId: string,
+    pinned: boolean,
+  ) => Promise<boolean>;
 }
 
 export interface ProjectThreadPage {
@@ -97,6 +108,7 @@ export interface ServerThreadsClient {
       readonly limit?: number;
     },
   ): ThreadRequest<ThreadListResponse>;
+  listPinnedThreads(cursor?: string | null): ThreadRequest<ThreadListResponse>;
   readThread(threadId: string): ThreadRequest<ThreadReadResponse>;
   resumeThread(threadId: string): ThreadRequest<ThreadResumeResponse>;
   listThreadTurns(
@@ -112,6 +124,11 @@ export interface ServerThreadsClient {
   archiveThread(threadId: string): ThreadRequest<ThreadArchiveResponse>;
   unarchiveThread(threadId: string): ThreadRequest<ThreadUnarchiveResponse>;
   deleteThread(threadId: string): ThreadRequest<ThreadDeleteResponse>;
+  setThreadPinned(
+    threadId: string,
+    pinned: boolean,
+    beforeThreadId?: string | null,
+  ): ThreadRequest<ThreadSectionMoveResponse>;
 }
 
 const IDLE_STATE = Object.freeze({
@@ -119,9 +136,12 @@ const IDLE_STATE = Object.freeze({
   threadRestorePhase: "idle",
   resumedThreadId: null,
   threads: Object.freeze([]),
+  pinnedThreads: Object.freeze([]),
   nextThreadCursor: null,
+  nextPinnedThreadCursor: null,
   restoredThread: null,
   loadingMoreThreads: false,
+  loadingMorePinnedThreads: false,
   refreshingThreads: false,
   pendingThreadIds: Object.freeze([]),
   removingThreadIds: Object.freeze([]),
@@ -129,6 +149,7 @@ const IDLE_STATE = Object.freeze({
   threadListError: null,
   threadRestoreError: null,
   offline: false,
+  pinningAvailable: false,
   lastSyncedAt: null,
 }) satisfies ServerThreadsState;
 
@@ -160,6 +181,8 @@ const ARCHIVED_THREAD_REFRESH_FAILED = "无法刷新已归档会话";
 const THREAD_ARCHIVE_FAILED = "无法归档会话";
 const THREAD_UNARCHIVE_FAILED = "无法撤销归档";
 const THREAD_DELETE_FAILED = "无法删除会话";
+const THREAD_PIN_FAILED = "无法置顶会话";
+const THREAD_UNPIN_FAILED = "无法取消置顶";
 const THREAD_SYNC_FAILED = "无法同步其他窗口的会话变化";
 const THREAD_REMOVAL_DURATION_MS = 200;
 
@@ -199,6 +222,7 @@ export function useServerThreads(
   const currentClientRef = useRef(client);
   currentClientRef.current = client;
   const loadingThreadsRef = useRef<ActiveSource | null>(null);
+  const loadingPinnedThreadsRef = useRef<ActiveSource | null>(null);
   const refreshingThreadsRef = useRef<ActiveSource | null>(null);
   const loadingArchivedThreadsRef = useRef<ServerThreadsClient | null>(null);
   const refreshingArchivedThreadsRef = useRef<ServerThreadsClient | null>(null);
@@ -271,6 +295,7 @@ export function useServerThreads(
 
   useEffect(() => {
     loadingThreadsRef.current = null;
+    loadingPinnedThreadsRef.current = null;
     refreshingThreadsRef.current = null;
     if (client === null) {
       sourceRef.current = null;
@@ -288,14 +313,21 @@ export function useServerThreads(
         threadListPhase: canRetainThreadList ? "ready" : "idle",
         threadRestorePhase: canRetainSelection ? "ready" : "idle",
         threads: canRetainThreadList ? current.threads : IDLE_STATE.threads,
+        pinnedThreads: canRetainThreadList
+          ? current.pinnedThreads
+          : IDLE_STATE.pinnedThreads,
         nextThreadCursor: canRetainThreadList
           ? current.nextThreadCursor
+          : null,
+        nextPinnedThreadCursor: canRetainThreadList
+          ? current.nextPinnedThreadCursor
           : null,
         restoredThread: canRetainSelection ? current.restoredThread : null,
         currentThreadDeleted: canRetainSelection
           ? current.currentThreadDeleted
           : false,
         offline: canRetainThreadList || canRetainSelection,
+        pinningAvailable: canRetainThreadList && current.pinningAvailable,
         lastSyncedAt: canRetainThreadList ? current.lastSyncedAt : null,
       }));
       return;
@@ -360,6 +392,7 @@ export function useServerThreads(
             threads: Object.freeze(
               current.threads.filter(({ id }) => id !== threadId),
             ),
+            pinnedThreads: removeThreadById(current.pinnedThreads, threadId),
             pendingThreadIds: removePendingThread(
               current.pendingThreadIds,
               threadId,
@@ -389,6 +422,9 @@ export function useServerThreads(
                   current.threads,
                   response.thread,
                 ),
+                pinnedThreads: isPinnedThread(response.thread)
+                  ? appendThread(current.pinnedThreads, response.thread)
+                  : current.pinnedThreads,
               }
             : current,
         );
@@ -576,6 +612,13 @@ export function useServerThreads(
         nextThreadCursor: canRetainThreadList
           ? current.nextThreadCursor
           : null,
+        pinnedThreads: canRetainThreadList
+          ? current.pinnedThreads
+          : IDLE_STATE.pinnedThreads,
+        nextPinnedThreadCursor: canRetainThreadList
+          ? current.nextPinnedThreadCursor
+          : null,
+        pinningAvailable: canRetainThreadList && current.pinningAvailable,
         restoredThread:
           preparedRestoredThread ??
           (canRetainSelection ? current.restoredThread : null),
@@ -602,12 +645,16 @@ export function useServerThreads(
             );
             setState((current) => {
               const restored = current.restoredThread;
+              const listedWithPinned = mergeThreadsByRecency(
+                listedThreads,
+                current.pinnedThreads,
+              );
               const threads =
                 restored === null ||
                 restored.metadata.id !== source.currentThreadId ||
                 removedThreadIds.has(restored.metadata.id)
-                  ? Object.freeze(listedThreads)
-                  : insertThreadByRecency(listedThreads, restored.metadata);
+                  ? listedWithPinned
+                  : insertThreadByRecency(listedWithPinned, restored.metadata);
               return {
                 ...current,
                 threadListPhase: "ready",
@@ -628,6 +675,37 @@ export function useServerThreads(
               threadListPhase: canRetainThreadList ? "ready" : "error",
               threadListError: THREAD_LIST_FAILED,
               offline: isReconcilingRetainedState(),
+            }));
+          },
+        );
+
+      void Promise.resolve()
+        .then(() => source.client.listPinnedThreads().result)
+        .then(
+          (list) => {
+            if (sourceRef.current !== source) {
+              return;
+            }
+            const pinnedThreads = list.data.filter(
+              ({ id }) => !removedThreadIds.has(id),
+            );
+            setState((current) => ({
+              ...current,
+              threads: mergeThreadsByRecency(current.threads, pinnedThreads),
+              pinnedThreads: Object.freeze(pinnedThreads),
+              nextPinnedThreadCursor: list.nextCursor ?? null,
+              pinningAvailable: true,
+            }));
+          },
+          () => {
+            if (sourceRef.current !== source) {
+              return;
+            }
+            setState((current) => ({
+              ...current,
+              pinnedThreads: IDLE_STATE.pinnedThreads,
+              nextPinnedThreadCursor: null,
+              pinningAvailable: false,
             }));
           },
         );
@@ -873,6 +951,57 @@ export function useServerThreads(
     }
   }, [state.nextThreadCursor, state.offline, state.threadListPhase]);
 
+  const loadMorePinnedThreads = useCallback(async (): Promise<void> => {
+    const source = sourceRef.current;
+    if (
+      source === null ||
+      state.threadListPhase !== "ready" ||
+      state.offline ||
+      !state.pinningAvailable ||
+      loadingPinnedThreadsRef.current !== null ||
+      state.nextPinnedThreadCursor === null
+    ) {
+      return;
+    }
+    loadingPinnedThreadsRef.current = source;
+    const cursor = state.nextPinnedThreadCursor;
+    setState((current) => ({
+      ...current,
+      loadingMorePinnedThreads: true,
+      threadListError: null,
+    }));
+    try {
+      const page = await source.client.listPinnedThreads(cursor).result;
+      if (sourceRef.current !== source) {
+        return;
+      }
+      setState((current) => ({
+        ...current,
+        loadingMorePinnedThreads: false,
+        nextPinnedThreadCursor: page.nextCursor ?? null,
+        pinnedThreads: mergeUniqueById(current.pinnedThreads, page.data),
+        threads: mergeThreadsByRecency(current.threads, page.data),
+      }));
+    } catch {
+      if (sourceRef.current === source) {
+        setState((current) => ({
+          ...current,
+          loadingMorePinnedThreads: false,
+          threadListError: THREAD_PAGE_FAILED,
+        }));
+      }
+    } finally {
+      if (loadingPinnedThreadsRef.current === source) {
+        loadingPinnedThreadsRef.current = null;
+      }
+    }
+  }, [
+    state.nextPinnedThreadCursor,
+    state.offline,
+    state.pinningAvailable,
+    state.threadListPhase,
+  ]);
+
   const loadProjectThreads = useCallback(async (
     cwd: string,
     limit: number,
@@ -909,17 +1038,35 @@ export function useServerThreads(
       threadListError: null,
     }));
     try {
-      const page = await source.client.listRecentThreads().result;
+      const [page, pinnedPage] = await Promise.all([
+        source.client.listRecentThreads().result,
+        source.client.listPinnedThreads().result.then(
+          (result) => result,
+          () => null,
+        ),
+      ]);
       if (sourceRef.current !== source) {
         return;
       }
-      setState((current) => ({
-        ...current,
-        threads: mergeUniqueById(page.data, current.threads),
-        nextThreadCursor: page.nextCursor ?? null,
-        refreshingThreads: false,
-        lastSyncedAt: Date.now(),
-      }));
+      setState((current) => {
+        const refreshedThreads = mergeUniqueById(page.data, current.threads);
+        return {
+          ...current,
+          threads: pinnedPage === null
+            ? refreshedThreads
+            : mergeThreadsByRecency(refreshedThreads, pinnedPage.data),
+          pinnedThreads: pinnedPage === null
+            ? current.pinnedThreads
+            : Object.freeze(pinnedPage.data),
+          nextThreadCursor: page.nextCursor ?? null,
+          nextPinnedThreadCursor: pinnedPage === null
+            ? current.nextPinnedThreadCursor
+            : pinnedPage.nextCursor ?? null,
+          pinningAvailable: current.pinningAvailable || pinnedPage !== null,
+          refreshingThreads: false,
+          lastSyncedAt: Date.now(),
+        };
+      });
     } catch {
       if (sourceRef.current === source) {
         setState((current) => ({
@@ -934,6 +1081,83 @@ export function useServerThreads(
       }
     }
   }, [state.offline, state.threadListPhase]);
+
+  const setThreadPinned = useCallback(async (
+    threadId: string,
+    pinned: boolean,
+  ): Promise<boolean> => {
+    const source = sourceRef.current;
+    const currentlyPinned = state.pinnedThreads.some(
+      ({ id }) => id === threadId,
+    );
+    if (
+      source === null ||
+      state.threadListPhase !== "ready" ||
+      state.offline ||
+      !state.pinningAvailable ||
+      !state.threads.some(({ id }) => id === threadId) ||
+      state.pendingThreadIds.includes(threadId) ||
+      currentlyPinned === pinned
+    ) {
+      return false;
+    }
+    setState((current) => ({
+      ...current,
+      pendingThreadIds: addPendingThread(current.pendingThreadIds, threadId),
+      threadListError: null,
+    }));
+    try {
+      await source.client.setThreadPinned(
+        threadId,
+        pinned,
+        pinned ? state.pinnedThreads[0]?.id ?? null : null,
+      ).result;
+      const response = await source.client.readThread(threadId).result;
+      if (sourceRef.current !== source) {
+        return false;
+      }
+      setState((current) => {
+        const nowPinned = isPinnedThread(response.thread);
+        return {
+          ...current,
+          threads: insertThreadByRecency(current.threads, response.thread),
+          pinnedThreads: nowPinned
+            ? pinned
+              ? Object.freeze([
+                  response.thread,
+                  ...current.pinnedThreads.filter(({ id }) => id !== threadId),
+                ])
+              : replaceThreadInOrder(current.pinnedThreads, response.thread)
+            : removeThreadById(current.pinnedThreads, threadId),
+          restoredThread: replaceRestoredThreadMetadata(
+            current.restoredThread,
+            response.thread,
+          ),
+          pendingThreadIds: removePendingThread(
+            current.pendingThreadIds,
+            threadId,
+          ),
+        };
+      });
+      return true;
+    } catch {
+      if (sourceRef.current === source) {
+        setState((current) => ({
+          ...current,
+          pendingThreadIds: removePendingThread(current.pendingThreadIds, threadId),
+          threadListError: pinned ? THREAD_PIN_FAILED : THREAD_UNPIN_FAILED,
+        }));
+      }
+      return false;
+    }
+  }, [
+    state.offline,
+    state.pendingThreadIds,
+    state.pinnedThreads,
+    state.pinningAvailable,
+    state.threadListPhase,
+    state.threads,
+  ]);
 
   const archiveThread = useCallback(
     async (threadId: string): Promise<boolean> => {
@@ -976,6 +1200,7 @@ export function useServerThreads(
         setState((current) => ({
           ...current,
           threads: Object.freeze(current.threads.filter(({ id }) => id !== threadId)),
+          pinnedThreads: removeThreadById(current.pinnedThreads, threadId),
           pendingThreadIds: removePendingThread(current.pendingThreadIds, threadId),
           removingThreadIds: removePendingThread(
             current.removingThreadIds,
@@ -1045,6 +1270,9 @@ export function useServerThreads(
       setState((current) => ({
         ...current,
         threads: insertThreadByRecency(current.threads, response.thread),
+        pinnedThreads: isPinnedThread(response.thread)
+          ? appendThread(current.pinnedThreads, response.thread)
+          : current.pinnedThreads,
         pendingThreadIds: removePendingThread(current.pendingThreadIds, threadId),
       }));
       setArchivedState((current) => removeArchivedThread(current, threadId));
@@ -1108,6 +1336,7 @@ export function useServerThreads(
         setState((current) => ({
           ...current,
           threads: Object.freeze(current.threads.filter(({ id }) => id !== threadId)),
+          pinnedThreads: removeThreadById(current.pinnedThreads, threadId),
           pendingThreadIds: removePendingThread(current.pendingThreadIds, threadId),
           removingThreadIds: removePendingThread(
             current.removingThreadIds,
@@ -1142,12 +1371,14 @@ export function useServerThreads(
     loadArchivedThreads,
     loadMoreArchivedThreads,
     loadMoreThreads,
+    loadMorePinnedThreads,
     loadProjectThreads,
     refreshArchivedThreads,
     refreshThreads,
     archiveThread,
     unarchiveThread,
     deleteThread,
+    setThreadPinned,
   };
 }
 
@@ -1167,17 +1398,24 @@ function updateThreadMetadata(
     changed = true;
     return update(thread);
   });
+  const pinnedThreads = state.pinnedThreads.map((thread) =>
+    thread.id === threadId ? update(thread) : thread,
+  );
   const restored = state.restoredThread;
   const restoredThread =
     restored?.metadata.id === threadId
       ? Object.freeze({ ...restored, metadata: update(restored.metadata) })
       : restored;
-  if (!changed && restoredThread === restored) {
+  const pinnedChanged = pinnedThreads.some(
+    (thread, index) => thread !== state.pinnedThreads[index],
+  );
+  if (!changed && !pinnedChanged && restoredThread === restored) {
     return state;
   }
   return {
     ...state,
     threads: changed ? Object.freeze(threads) : state.threads,
+    pinnedThreads: pinnedChanged ? Object.freeze(pinnedThreads) : state.pinnedThreads,
     restoredThread,
   };
 }
@@ -1283,6 +1521,50 @@ function insertThreadByRecency(
     thread,
     ...withoutThread.slice(insertionIndex),
   ]);
+}
+
+function mergeThreadsByRecency(
+  existing: readonly ThreadSummary[],
+  incoming: readonly ThreadSummary[],
+): readonly ThreadSummary[] {
+  return incoming.reduce<readonly ThreadSummary[]>(
+    (threads, thread) => insertThreadByRecency(threads, thread),
+    existing,
+  );
+}
+
+function appendThread(
+  existing: readonly ThreadSummary[],
+  thread: ThreadSummary,
+): readonly ThreadSummary[] {
+  return Object.freeze([
+    ...existing.filter(({ id }) => id !== thread.id),
+    thread,
+  ]);
+}
+
+function replaceThreadInOrder(
+  existing: readonly ThreadSummary[],
+  thread: ThreadSummary,
+): readonly ThreadSummary[] {
+  return existing.some(({ id }) => id === thread.id)
+    ? Object.freeze(
+        existing.map((item) => item.id === thread.id ? thread : item),
+      )
+    : appendThread(existing, thread);
+}
+
+function isPinnedThread(thread: ThreadSummary): boolean {
+  return thread.section?.id === PINNED_THREAD_SECTION_ID;
+}
+
+function replaceRestoredThreadMetadata(
+  restored: RestoredThread | null,
+  thread: ThreadSummary,
+): RestoredThread | null {
+  return restored?.metadata.id === thread.id
+    ? Object.freeze({ ...restored, metadata: thread })
+    : restored;
 }
 
 function unsubscribeSafely(client: ServerThreadsClient, threadId: string): void {

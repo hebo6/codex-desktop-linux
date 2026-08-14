@@ -2152,9 +2152,11 @@ export function App({
         currentThreadId={currentThreadId}
         draftThreadIds={draftThreadIds}
         hasMoreThreads={serverThreads.nextThreadCursor !== null}
+        hasMorePinnedThreads={serverThreads.nextPinnedThreadCursor !== null}
         hasMoreArchivedThreads={serverThreads.nextArchivedThreadCursor !== null}
         loadingMoreArchivedThreads={serverThreads.loadingMoreArchivedThreads}
         loadingMoreThreads={serverThreads.loadingMoreThreads}
+        loadingMorePinnedThreads={serverThreads.loadingMorePinnedThreads}
         mainContent={
           <ConversationWorkspace
             composer={
@@ -2344,6 +2346,8 @@ export function App({
         onLoadMoreArchivedThreads={() =>
           void serverThreads.loadMoreArchivedThreads()}
         onLoadMoreThreads={() => void serverThreads.loadMoreThreads()}
+        onLoadMorePinnedThreads={() =>
+          void serverThreads.loadMorePinnedThreads()}
         onLoadProjectThreads={serverThreads.loadProjectThreads}
         onNewTask={() => void openNewTab()}
         onNewTaskInProject={(cwd) => void openNewTab(cwd)}
@@ -2354,9 +2358,16 @@ export function App({
         onOpenThread={(threadId) => void openThreadFromSidebar(threadId)}
         onOpenThreadInNewTab={(threadId) =>
           void openThreadInNewTab(threadId, true)}
+        {...(serverThreads.pinningAvailable
+          ? {
+              onSetThreadPinned: (threadId: string, pinned: boolean) =>
+                void serverThreads.setThreadPinned(threadId, pinned),
+            }
+          : {})}
         onUnarchiveThread={(threadId) =>
           void serverThreads.unarchiveThread(threadId)}
         pendingThreadIds={serverThreads.pendingThreadIds}
+        pinnedThreads={serverThreads.pinnedThreads}
         pendingResultThreadIds={pendingThreadResults.pendingThreadIds}
         removingThreadIds={serverThreads.removingThreadIds}
         refreshingArchivedThreads={serverThreads.refreshingArchivedThreads}

@@ -35,7 +35,9 @@ export interface RecentThreadsProps {
   readonly headerActions?: ReactNode;
   readonly sidebarToggle?: ReactNode;
   readonly hasMore: boolean;
+  readonly hasMorePinnedThreads?: boolean;
   readonly loadingMore: boolean;
+  readonly loadingMorePinnedThreads?: boolean;
   readonly pendingThreadIds: readonly string[];
   readonly pendingResultThreadIds?: ReadonlySet<string>;
   readonly removingThreadIds: readonly string[];
@@ -44,6 +46,7 @@ export interface RecentThreadsProps {
   readonly onDeleteThread: (threadId: string) => void;
   readonly onDismissArchiveNotice: (threadId: string) => void;
   readonly onLoadMore: () => void;
+  readonly onLoadMorePinnedThreads?: () => void;
   readonly onLoadProjectThreads?: (
     cwd: string,
     limit: number,
@@ -51,8 +54,10 @@ export interface RecentThreadsProps {
   readonly onNewTaskInProject?: (cwd: string) => void;
   readonly onOpenThread: (threadId: string) => void;
   readonly onOpenThreadInNewTab?: (threadId: string) => void;
+  readonly onSetThreadPinned?: (threadId: string, pinned: boolean) => void;
   readonly onUnarchiveThread: (threadId: string) => void;
   readonly phase: ServerThreadsPhase;
+  readonly pinnedThreads?: readonly ThreadSummary[];
   readonly threads: readonly ThreadSummary[];
   readonly readOnly?: boolean;
   readonly view: ThreadListView;
@@ -61,6 +66,7 @@ export interface RecentThreadsProps {
 export type ThreadListView = "recent" | "archived";
 
 interface ThreadGroup {
+  readonly kind: "all" | "pinned" | "project";
   readonly key: string;
   readonly label: string;
   readonly path: string | null;
@@ -68,6 +74,7 @@ interface ThreadGroup {
 }
 
 interface ThreadContextMenuState {
+  readonly pinned: boolean;
   readonly threadId: string;
   readonly title: string;
   readonly x: number;
@@ -99,6 +106,10 @@ type RecentThreadEntry =
   | {
       readonly key: string;
       readonly type: "loadMoreThreads";
+    }
+  | {
+      readonly key: string;
+      readonly type: "loadMorePinnedThreads";
     };
 
 type RecentThreadGroupEntry = Extract<RecentThreadEntry, { type: "group" }>;
@@ -130,7 +141,9 @@ export function RecentThreads({
   headerActions,
   sidebarToggle,
   hasMore,
+  hasMorePinnedThreads = false,
   loadingMore,
+  loadingMorePinnedThreads = false,
   pendingThreadIds,
   pendingResultThreadIds = EMPTY_THREAD_IDS,
   removingThreadIds,
@@ -139,12 +152,15 @@ export function RecentThreads({
   onDeleteThread,
   onDismissArchiveNotice,
   onLoadMore,
+  onLoadMorePinnedThreads,
   onLoadProjectThreads,
   onNewTaskInProject,
   onOpenThread,
   onOpenThreadInNewTab,
+  onSetThreadPinned,
   onUnarchiveThread,
   phase,
+  pinnedThreads = [],
   threads,
   readOnly = false,
   view,
@@ -167,15 +183,22 @@ export function RecentThreads({
   >(() => new Set());
   const [contextMenu, setContextMenu] = useState<ThreadContextMenuState | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const groups = useMemo(() => groupThreads(threads, grouped), [grouped, threads]);
+  const groups = useMemo(
+    () => groupThreads(threads, pinnedThreads, grouped),
+    [grouped, pinnedThreads, threads],
+  );
+  const pinnedThreadIds = useMemo(
+    () => new Set(pinnedThreads.map(({ id }) => id)),
+    [pinnedThreads],
+  );
   const entries = useMemo(
     () => recentThreadEntries({
       collapsedGroupKeys,
       currentThreadId,
       failedProjectGroupKeys,
-      grouped,
       groups,
       hasMore,
+      hasMorePinnedThreads,
       loadingProjectGroupKeys,
       projectGroupHasMore,
       visibleGroupThreadCounts,
@@ -184,9 +207,9 @@ export function RecentThreads({
       collapsedGroupKeys,
       currentThreadId,
       failedProjectGroupKeys,
-      grouped,
       groups,
       hasMore,
+      hasMorePinnedThreads,
       loadingProjectGroupKeys,
       projectGroupHasMore,
       visibleGroupThreadCounts,
@@ -264,6 +287,9 @@ export function RecentThreads({
       return;
     }
     for (const group of groups) {
+      if (group.kind !== "project") {
+        continue;
+      }
       const currentIndex = group.threads.findIndex(
         ({ id }) => id === currentThreadId,
       );
@@ -424,7 +450,9 @@ export function RecentThreads({
         <p className={styles.empty}>
           {view === "recent" ? "连接完成后加载会话" : "打开后加载已归档会话"}
         </p>
-      ) : phase === "loading" && threads.length === 0 ? (
+      ) : phase === "loading" &&
+        threads.length === 0 &&
+        pinnedThreads.length === 0 ? (
         <div
           aria-label={view === "recent" ? "正在加载最近会话" : "正在加载已归档会话"}
           className={styles.skeleton}
@@ -434,11 +462,13 @@ export function RecentThreads({
           <span />
           <span />
         </div>
-      ) : phase === "error" && threads.length === 0 ? (
+      ) : phase === "error" &&
+        threads.length === 0 &&
+        pinnedThreads.length === 0 ? (
         <p className={styles.empty}>
           {view === "recent" ? "最近会话暂时不可用" : "已归档会话暂时不可用"}
         </p>
-      ) : threads.length === 0 ? (
+      ) : threads.length === 0 && pinnedThreads.length === 0 ? (
         <p className={styles.empty}>
           {view === "recent" ? "尚无最近会话，可新建任务开始" : "尚无已归档会话"}
         </p>
@@ -515,18 +545,26 @@ export function RecentThreads({
                         }
                       }}
                       nowMs={nowMs}
-                      {...(view === "archived" || onOpenThreadInNewTab === undefined
+                      {...(view === "archived" || (
+                        onOpenThreadInNewTab === undefined &&
+                        onSetThreadPinned === undefined
+                      )
                         ? {}
                         : {
                             onOpenContextMenu: (x: number, y: number) =>
                               setContextMenu({
+                                pinned: pinnedThreadIds.has(entry.thread.id),
                                 threadId: entry.thread.id,
                                 title: threadTitle(entry.thread),
                                 x,
                                 y,
                               }),
-                            onOpenInNewTab: () =>
-                              onOpenThreadInNewTab(entry.thread.id),
+                            ...(onOpenThreadInNewTab === undefined
+                              ? {}
+                              : {
+                                  onOpenInNewTab: () =>
+                                    onOpenThreadInNewTab(entry.thread.id),
+                                }),
                           })}
                       thread={entry.thread}
                     />
@@ -550,6 +588,15 @@ export function RecentThreads({
                         : entry.error
                           ? "加载失败，点击重试"
                           : "加载更多"}
+                    </button>
+                  ) : entry.type === "loadMorePinnedThreads" ? (
+                    <button
+                      className={styles.loadMore}
+                      disabled={loadingMorePinnedThreads}
+                      onClick={onLoadMorePinnedThreads}
+                      type="button"
+                    >
+                      {loadingMorePinnedThreads ? "正在加载" : "加载更多置顶会话"}
                     </button>
                   ) : (
                     <button
@@ -578,7 +625,7 @@ export function RecentThreads({
         pendingThreadIds={pendingThreadIds}
         readOnly={readOnly}
       />
-      {contextMenu === null || onOpenThreadInNewTab === undefined
+      {contextMenu === null
         ? null
         : createPortal(
             <div
@@ -588,17 +635,35 @@ export function RecentThreads({
               role="menu"
               style={contextMenuPosition(contextMenu.x, contextMenu.y)}
             >
-              <button
-                autoFocus
-                onClick={() => {
-                  onOpenThreadInNewTab(contextMenu.threadId);
-                  setContextMenu(null);
-                }}
-                role="menuitem"
-                type="button"
-              >
-                在新标签打开
-              </button>
+              {onOpenThreadInNewTab === undefined ? null : (
+                <button
+                  autoFocus
+                  onClick={() => {
+                    onOpenThreadInNewTab(contextMenu.threadId);
+                    setContextMenu(null);
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  在新标签打开
+                </button>
+              )}
+              {onSetThreadPinned === undefined ? null : (
+                <button
+                  autoFocus={onOpenThreadInNewTab === undefined}
+                  disabled={
+                    readOnly || pendingThreadIds.includes(contextMenu.threadId)
+                  }
+                  onClick={() => {
+                    onSetThreadPinned(contextMenu.threadId, !contextMenu.pinned);
+                    setContextMenu(null);
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  {contextMenu.pinned ? "取消置顶" : "置顶会话"}
+                </button>
+              )}
             </div>,
             document.body,
           )}
@@ -1058,7 +1123,7 @@ function formatRelativeUpdatedAt(updatedAt: number, nowMs: number): string {
 function contextMenuPosition(x: number, y: number): CSSProperties {
   return {
     left: Math.max(8, Math.min(x, window.innerWidth - 208)),
-    top: Math.max(8, Math.min(y, window.innerHeight - 52)),
+    top: Math.max(8, Math.min(y, window.innerHeight - 96)),
   };
 }
 
@@ -1073,13 +1138,36 @@ function threadTitle(thread: ThreadSummary): string {
 
 function groupThreads(
   threads: readonly ThreadSummary[],
+  pinnedThreads: readonly ThreadSummary[],
   grouped: boolean,
 ): readonly ThreadGroup[] {
+  const pinnedThreadIds = new Set(pinnedThreads.map(({ id }) => id));
+  const unpinnedThreads = threads.filter(({ id }) => !pinnedThreadIds.has(id));
+  const pinnedGroup: readonly ThreadGroup[] = pinnedThreads.length === 0
+    ? []
+    : [
+        {
+          key: "pinned",
+          kind: "pinned",
+          label: "已置顶",
+          path: null,
+          threads: pinnedThreads,
+        },
+      ];
   if (!grouped) {
-    return [{ key: "all", label: "", path: null, threads }];
+    return [
+      ...pinnedGroup,
+      {
+        key: "all",
+        kind: "all",
+        label: "",
+        path: null,
+        threads: unpinnedThreads,
+      },
+    ];
   }
   const groups = new Map<string, ThreadSummary[]>();
-  for (const thread of threads) {
+  for (const thread of unpinnedThreads) {
     const key = thread.cwd.trim() || "\u0000other";
     const group = groups.get(key);
     if (group === undefined) {
@@ -1088,12 +1176,14 @@ function groupThreads(
       group.push(thread);
     }
   }
-  return [...groups.entries()].map(([path, group]) => ({
+  const projectGroups = [...groups.entries()].map(([path, group]) => ({
     key: path,
+    kind: "project" as const,
     label: path === "\u0000other" ? "其他会话" : pathLabel(path),
     path: path === "\u0000other" ? null : path,
     threads: group,
   }));
+  return [...pinnedGroup, ...projectGroups];
 }
 
 function pathLabel(path: string): string {
@@ -1106,9 +1196,9 @@ function recentThreadEntries({
   collapsedGroupKeys,
   currentThreadId,
   failedProjectGroupKeys,
-  grouped,
   groups,
   hasMore,
+  hasMorePinnedThreads,
   loadingProjectGroupKeys,
   projectGroupHasMore,
   visibleGroupThreadCounts,
@@ -1116,16 +1206,17 @@ function recentThreadEntries({
   readonly collapsedGroupKeys: ReadonlySet<string>;
   readonly currentThreadId: string | null;
   readonly failedProjectGroupKeys: ReadonlySet<string>;
-  readonly grouped: boolean;
   readonly groups: readonly ThreadGroup[];
   readonly hasMore: boolean;
+  readonly hasMorePinnedThreads: boolean;
   readonly loadingProjectGroupKeys: ReadonlySet<string>;
   readonly projectGroupHasMore: ReadonlyMap<string, boolean>;
   readonly visibleGroupThreadCounts: ReadonlyMap<string, number>;
 }): readonly RecentThreadEntry[] {
   const entries: RecentThreadEntry[] = [];
   for (const group of groups) {
-    if (grouped) {
+    const hasHeading = group.kind !== "all";
+    if (hasHeading) {
       const key = `group:${group.key}`;
       const collapsed = collapsedGroupKeys.has(key);
       entries.push({
@@ -1142,7 +1233,7 @@ function recentThreadEntries({
     const currentIndex = currentThreadId === null
       ? -1
       : group.threads.findIndex(({ id }) => id === currentThreadId);
-    const visibleCount = grouped
+    const visibleCount = group.kind === "project"
       ? Math.max(
           visibleGroupThreadCounts.get(group.key) ?? INITIAL_GROUP_THREAD_COUNT,
           currentIndex + 1,
@@ -1154,7 +1245,7 @@ function recentThreadEntries({
     const projectHasMore = projectGroupHasMore.get(group.key)
       ?? (hasMore && group.threads.length >= INITIAL_GROUP_THREAD_COUNT);
     if (
-      grouped &&
+      group.kind === "project" &&
       (group.threads.length > visibleCount || projectHasMore)
     ) {
       entries.push({
@@ -1165,6 +1256,12 @@ function recentThreadEntries({
         cwd: group.path ?? "",
         error: failedProjectGroupKeys.has(group.key),
         loading: loadingProjectGroupKeys.has(group.key),
+      });
+    }
+    if (group.kind === "pinned" && hasMorePinnedThreads) {
+      entries.push({
+        key: "load-more-pinned-threads",
+        type: "loadMorePinnedThreads",
       });
     }
   }

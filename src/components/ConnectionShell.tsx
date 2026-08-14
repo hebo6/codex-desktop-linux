@@ -35,12 +35,15 @@ interface ConnectionShellProps {
   detail?: string;
   serverControl?: ReactNode;
   threads?: readonly ThreadSummary[];
+  pinnedThreads?: readonly ThreadSummary[];
   threadListPhase?: ServerThreadsPhase;
   threadListError?: string | null;
   currentThreadId?: string | null;
   draftThreadIds?: ReadonlySet<string>;
   hasMoreThreads?: boolean;
+  hasMorePinnedThreads?: boolean;
   loadingMoreThreads?: boolean;
+  loadingMorePinnedThreads?: boolean;
   refreshingThreads?: boolean;
   pendingThreadIds?: readonly string[];
   pendingResultThreadIds?: ReadonlySet<string>;
@@ -59,6 +62,7 @@ interface ConnectionShellProps {
   onLoadArchivedThreads?: () => void;
   onLoadMoreArchivedThreads?: () => void;
   onLoadMoreThreads?: () => void;
+  onLoadMorePinnedThreads?: () => void;
   onLoadProjectThreads?: (
     cwd: string,
     limit: number,
@@ -70,6 +74,7 @@ interface ConnectionShellProps {
   onNewTaskInProject?: (cwd: string) => void;
   onOpenThread?: (threadId: string) => void;
   onOpenThreadInNewTab?: (threadId: string) => void;
+  onSetThreadPinned?: (threadId: string, pinned: boolean) => void;
   onUnarchiveThread?: (threadId: string) => void;
   onRetry?: () => void;
   onOpenDiagnostics?: () => void;
@@ -161,12 +166,15 @@ export function ConnectionShell({
   detail,
   serverControl,
   threads = [],
+  pinnedThreads = [],
   threadListPhase = "idle",
   threadListError = null,
   currentThreadId = null,
   draftThreadIds = EMPTY_THREAD_IDS,
   hasMoreThreads = false,
+  hasMorePinnedThreads = false,
   loadingMoreThreads = false,
+  loadingMorePinnedThreads = false,
   refreshingThreads = false,
   pendingThreadIds = [],
   pendingResultThreadIds = EMPTY_THREAD_IDS,
@@ -185,6 +193,7 @@ export function ConnectionShell({
   onLoadArchivedThreads,
   onLoadMoreArchivedThreads,
   onLoadMoreThreads,
+  onLoadMorePinnedThreads,
   onLoadProjectThreads,
   onRefreshThreads,
   onRefreshArchivedThreads,
@@ -193,6 +202,7 @@ export function ConnectionShell({
   onNewTaskInProject,
   onOpenThread,
   onOpenThreadInNewTab,
+  onSetThreadPinned,
   onUnarchiveThread,
   onRetry,
   onOpenDiagnostics,
@@ -410,6 +420,9 @@ export function ConnectionShell({
           error={displayedThreadListError}
           grouped={!viewingArchivedThreads && groupThreads}
           hasMore={displayedHasMoreThreads}
+          hasMorePinnedThreads={
+            !viewingArchivedThreads && hasMorePinnedThreads
+          }
           sidebarToggle={
             <button
               aria-controls={sidebarId}
@@ -570,6 +583,9 @@ export function ConnectionShell({
             </div>
           }
           loadingMore={displayedLoadingMoreThreads}
+          loadingMorePinnedThreads={
+            !viewingArchivedThreads && loadingMorePinnedThreads
+          }
           onArchiveThread={(threadId) => onArchiveThread?.(threadId)}
           onDeleteThread={(threadId) => onDeleteThread?.(threadId)}
           onDismissArchiveNotice={(threadId) =>
@@ -581,6 +597,9 @@ export function ConnectionShell({
               onLoadMoreThreads?.();
             }
           }}
+          {...(viewingArchivedThreads || onLoadMorePinnedThreads === undefined
+            ? {}
+            : { onLoadMorePinnedThreads })}
           {...(viewingArchivedThreads || onLoadProjectThreads === undefined
             ? {}
             : { onLoadProjectThreads })}
@@ -599,11 +618,15 @@ export function ConnectionShell({
           {...(onOpenThreadInNewTab === undefined
             ? {}
             : { onOpenThreadInNewTab })}
+          {...(viewingArchivedThreads || onSetThreadPinned === undefined
+            ? {}
+            : { onSetThreadPinned })}
           onUnarchiveThread={(threadId) => onUnarchiveThread?.(threadId)}
           pendingThreadIds={pendingThreadIds}
           pendingResultThreadIds={pendingResultThreadIds}
           removingThreadIds={removingThreadIds}
           phase={displayedThreadListPhase}
+          pinnedThreads={viewingArchivedThreads ? [] : pinnedThreads}
           readOnly={offline}
           threads={displayedThreads}
           view={threadListView}

@@ -66,12 +66,14 @@ function renderThreads(
   const onOpenThread = vi.fn();
   const onOpenThreadInNewTab = vi.fn();
   const onLoadMore = vi.fn();
+  const onLoadMorePinnedThreads = vi.fn();
   const onLoadProjectThreads = vi.fn(async () => ({ hasMore: false }));
   const onNewTaskInProject = vi.fn();
   const onArchiveThread = vi.fn();
   const onDeleteThread = vi.fn();
   const onDismissArchiveNotice = vi.fn();
   const onUnarchiveThread = vi.fn();
+  const onSetThreadPinned = vi.fn();
   const props: ComponentProps<typeof RecentThreads> = {
     archiveNotices: [],
     currentThreadId: THREAD_ONE.id,
@@ -80,18 +82,22 @@ function renderThreads(
     grouped: false,
     hasMore: false,
     loadingMore: false,
+    loadingMorePinnedThreads: false,
     onArchiveThread,
     onDeleteThread,
     onDismissArchiveNotice,
     onLoadMore,
+    onLoadMorePinnedThreads,
     onLoadProjectThreads,
     onNewTaskInProject,
     onOpenThread,
     onOpenThreadInNewTab,
+    onSetThreadPinned,
     onUnarchiveThread,
     pendingThreadIds: [],
     removingThreadIds: [],
     phase: "ready",
+    pinnedThreads: [],
     threads: [THREAD_ONE, THREAD_TWO],
     view: "recent",
     ...overrides,
@@ -102,10 +108,12 @@ function renderThreads(
     onDeleteThread,
     onDismissArchiveNotice,
     onLoadMore,
+    onLoadMorePinnedThreads,
     onLoadProjectThreads,
     onNewTaskInProject,
     onOpenThread,
     onOpenThreadInNewTab,
+    onSetThreadPinned,
     onUnarchiveThread,
     rerenderThreads(next: Partial<ComponentProps<typeof RecentThreads>>) {
       rendered.rerender(<RecentThreads {...props} {...next} />);
@@ -320,6 +328,33 @@ describe("RecentThreads", () => {
     expect(screen.getByRole("menuitem", { name: "在新标签打开" })).toHaveFocus();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("独立展示置顶分组并支持置顶操作和分页", () => {
+    const {
+      onLoadMorePinnedThreads,
+      onSetThreadPinned,
+    } = renderThreads({
+      hasMorePinnedThreads: true,
+      pinnedThreads: [THREAD_TWO],
+    });
+
+    expect(screen.getByRole("heading", { name: "已置顶" })).toBeVisible();
+    expect(screen.getAllByRole("listitem").map((item) => item.textContent))
+      .toEqual([
+        expect.stringContaining("预览标题"),
+        expect.stringContaining("服务端标题"),
+      ]);
+    fireEvent.click(screen.getByRole("button", { name: "加载更多置顶会话" }));
+    expect(onLoadMorePinnedThreads).toHaveBeenCalledTimes(1);
+
+    fireEvent.contextMenu(getThreadRow("预览标题"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "取消置顶" }));
+    expect(onSetThreadPinned).toHaveBeenCalledWith(THREAD_TWO.id, false);
+
+    fireEvent.contextMenu(getThreadRow("服务端标题"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "置顶会话" }));
+    expect(onSetThreadPinned).toHaveBeenCalledWith(THREAD_ONE.id, true);
   });
 
   it("按工作目录分组并提供全局分页操作", () => {

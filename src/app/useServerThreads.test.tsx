@@ -11,10 +11,12 @@ import type {
   ThreadArchiveResponse,
   ThreadUnarchiveResponse,
   ThreadDeleteResponse,
+  ThreadSectionMoveResponse,
 } from "../protocol/generated";
 import { useServerThreads } from "./useServerThreads";
 import type { ServerThreadsClient } from "./useServerThreads";
 import type { ServerId } from "../configuration";
+import { PINNED_THREAD_SECTION_ID } from "../appServer/threadClient";
 
 const THREAD_ONE = {
   cliVersion: "1.0.0",
@@ -49,6 +51,15 @@ const THREAD_THREE = {
   updatedAt: 180,
 } satisfies ThreadListResponse["data"][number];
 
+const PINNED_THREAD_TWO = {
+  ...THREAD_TWO,
+  section: {
+    id: PINNED_THREAD_SECTION_ID,
+    name: "Pinned",
+  },
+  sectionEnteredAt: 210,
+} satisfies ThreadListResponse["data"][number];
+
 const TURN_ZERO = {
   id: "turn-0",
   items: [],
@@ -71,9 +82,17 @@ class FakeThreadClient implements ServerThreadsClient {
     (notification: ServerNotification) => void
   >();
   readonly listCalls: unknown[] = [];
+  readonly pinnedListCalls: Array<string | null | undefined> = [];
+  readonly pinCalls: Array<{
+    readonly beforeThreadId: string | null | undefined;
+    readonly pinned: boolean;
+    readonly threadId: string;
+  }> = [];
   readonly readCalls: string[] = [];
   readonly resumeCalls: string[] = [];
   readonly listResults: Array<Promise<ThreadListResponse>> = [];
+  readonly pinnedListResults: Array<Promise<ThreadListResponse>> = [];
+  readonly pinResults: Array<Promise<ThreadSectionMoveResponse>> = [];
   readonly readResults: Array<Promise<ThreadReadResponse>> = [];
   readonly resumeResults: Array<Promise<ThreadResumeResponse>> = [];
   readonly unsubscribeCalls: string[] = [];
@@ -96,6 +115,13 @@ class FakeThreadClient implements ServerThreadsClient {
   listRecentThreads(options: unknown = {}) {
     this.listCalls.push(options);
     return { result: nextResult(this.listResults) };
+  }
+
+  listPinnedThreads(cursor?: string | null) {
+    this.pinnedListCalls.push(cursor);
+    return {
+      result: this.pinnedListResults.shift() ?? Promise.resolve({ data: [] }),
+    };
   }
 
   readThread(threadId: string) {
@@ -140,6 +166,15 @@ class FakeThreadClient implements ServerThreadsClient {
   deleteThread(threadId: string) {
     this.deleteCalls.push(threadId);
     return { result: nextResult(this.deleteResults) };
+  }
+
+  setThreadPinned(
+    threadId: string,
+    pinned: boolean,
+    beforeThreadId?: string | null,
+  ) {
+    this.pinCalls.push({ beforeThreadId, pinned, threadId });
+    return { result: nextResult(this.pinResults) };
   }
 }
 
@@ -469,6 +504,83 @@ describe("useServerThreads", () => {
     expect(result.current.restoredThread?.turns.map(({ id }) => id)).toEqual([
       TURN_ONE.id,
       TURN_TWO.id,
+    ]);
+  });
+
+  it("独立分页加载置顶会话", async () => {
+    const client = new FakeThreadClient();
+    client.listResults.push(Promise.resolve({ data: [THREAD_ONE] }));
+    client.pinnedListResults.push(
+      Promise.resolve({ data: [PINNED_THREAD_TWO], nextCursor: "more-pinned" }),
+      Promise.resolve({ data: [THREAD_THREE] }),
+    );
+    const { result } = renderHook(() => useServerThreads(client, null));
+
+    await waitFor(() => expect(result.current.pinningAvailable).toBe(true));
+    expect(result.current.pinnedThreads.map(({ id }) => id)).toEqual([
+      THREAD_TWO.id,
+    ]);
+    expect(result.current.nextPinnedThreadCursor).toBe("more-pinned");
+
+    await act(async () => result.current.loadMorePinnedThreads());
+
+    expect(client.pinnedListCalls).toEqual([undefined, "more-pinned"]);
+    expect(result.current.pinnedThreads.map(({ id }) => id)).toEqual([
+      THREAD_TWO.id,
+      THREAD_THREE.id,
+    ]);
+    expect(result.current.nextPinnedThreadCursor).toBeNull();
+  });
+
+  it("通过服务端 Section 置顶和取消置顶会话", async () => {
+    const client = new FakeThreadClient();
+    client.listResults.push(
+      Promise.resolve({ data: [THREAD_ONE, PINNED_THREAD_TWO] }),
+    );
+    client.pinnedListResults.push(
+      Promise.resolve({ data: [PINNED_THREAD_TWO] }),
+    );
+    const pinnedThreadOne = {
+      ...THREAD_ONE,
+      section: {
+        id: PINNED_THREAD_SECTION_ID,
+        name: "Pinned",
+      },
+      sectionEnteredAt: 220,
+    } satisfies ThreadListResponse["data"][number];
+    client.pinResults.push(Promise.resolve({}), Promise.resolve({}));
+    client.readResults.push(
+      Promise.resolve({ thread: pinnedThreadOne }),
+      Promise.resolve({
+        thread: {
+          ...pinnedThreadOne,
+          section: null,
+          sectionEnteredAt: null,
+        },
+      }),
+    );
+    const { result } = renderHook(() => useServerThreads(client, null));
+    await waitFor(() => expect(result.current.pinningAvailable).toBe(true));
+
+    await act(async () => result.current.setThreadPinned(THREAD_ONE.id, true));
+    expect(client.pinCalls[0]).toEqual({
+      beforeThreadId: THREAD_TWO.id,
+      pinned: true,
+      threadId: THREAD_ONE.id,
+    });
+    expect(result.current.pinnedThreads.map(({ id }) => id)).toEqual([
+      THREAD_ONE.id,
+      THREAD_TWO.id,
+    ]);
+
+    await act(async () => result.current.setThreadPinned(THREAD_ONE.id, false));
+    expect(client.pinCalls[1]).toEqual({
+      beforeThreadId: null,
+      pinned: false,
+      threadId: THREAD_ONE.id,
+    });
+    expect(result.current.pinnedThreads.map(({ id }) => id)).toEqual([
+      THREAD_TWO.id,
     ]);
   });
 

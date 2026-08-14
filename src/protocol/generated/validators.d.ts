@@ -33,6 +33,7 @@ import type {
   ThreadListResponse,
   ThreadReadResponse,
   ThreadResumeResponse,
+  ThreadSectionMoveResponse,
   ThreadSettingsUpdateResponse,
   ThreadShellCommandResponse,
   ThreadStartResponse,
@@ -88,3 +89,4 @@ export const validateGetAccountTokenUsageResponse: StandaloneValidateFunction<Ge
 export const validateThreadBackgroundTerminalsListResponse: StandaloneValidateFunction<ThreadBackgroundTerminalsListResponse>;
 export const validateThreadBackgroundTerminalsTerminateResponse: StandaloneValidateFunction<ThreadBackgroundTerminalsTerminateResponse>;
 export const validateThreadShellCommandResponse: StandaloneValidateFunction<ThreadShellCommandResponse>;
+export const validateThreadSectionMoveResponse: StandaloneValidateFunction<ThreadSectionMoveResponse>;

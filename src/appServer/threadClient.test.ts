@@ -8,6 +8,7 @@ import type {
 import type { ServerNotification } from "../protocol/generated";
 import {
   AppServerThreadClient,
+  PINNED_THREAD_SECTION_ID,
   RECENT_THREAD_PAGE_SIZE,
   THREAD_ITEM_PAGE_SIZE,
   THREAD_TURN_PAGE_SIZE,
@@ -127,6 +128,47 @@ describe("AppServerThreadClient", () => {
     ]);
   });
 
+  it("按服务端顺序分页列出置顶会话并移动 Section", () => {
+    const session = new RecordingSession();
+    const client = new AppServerThreadClient(session);
+
+    client.listPinnedThreads("pinned-page");
+    client.setThreadPinned("thread-1", true, "thread-2");
+    client.setThreadPinned("thread-1", false);
+
+    expect(
+      session.requests.map(({ method, params }) => ({ method, params })),
+    ).toEqual([
+      {
+        method: "thread/list",
+        params: {
+          archived: false,
+          cursor: "pinned-page",
+          limit: RECENT_THREAD_PAGE_SIZE,
+          sectionId: PINNED_THREAD_SECTION_ID,
+          sortDirection: "asc",
+          sortKey: "section_position",
+        },
+      },
+      {
+        method: "thread/section/move",
+        params: {
+          beforeThreadId: "thread-2",
+          sectionId: PINNED_THREAD_SECTION_ID,
+          threadId: "thread-1",
+        },
+      },
+      {
+        method: "thread/section/move",
+        params: {
+          beforeThreadId: null,
+          sectionId: null,
+          threadId: "thread-1",
+        },
+      },
+    ]);
+  });
+
   it("恢复时请求最近一页 turn 摘要且不走兼容性全量路径", () => {
     const session = new RecordingSession();
     const client = new AppServerThreadClient(session);
@@ -223,6 +265,7 @@ describe("AppServerThreadClient", () => {
     const session = new RecordingSession();
     const client = new AppServerThreadClient(session);
     client.listRecentThreads();
+    client.listPinnedThreads();
     client.readThread("thread-1");
     client.resumeThread("thread-1");
     client.listThreadTurns("thread-1", "older-turns");
@@ -231,6 +274,7 @@ describe("AppServerThreadClient", () => {
     client.archiveThread("thread-1");
     client.unarchiveThread("thread-1");
     client.deleteThread("thread-1");
+    client.setThreadPinned("thread-1", true);
     client.forkThread("thread-1", "turn-3");
 
     for (const request of session.requests) {

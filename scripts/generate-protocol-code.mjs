@@ -309,6 +309,15 @@ const schemaDeclarations = [
     schemaPath: "v2/ThreadShellCommandResponse.json",
     validatorName: "validateThreadShellCommandResponse",
   },
+  {
+    typeName: "ThreadSectionMoveParams",
+    schemaPath: "v2/ThreadSectionMoveParams.json",
+  },
+  {
+    typeName: "ThreadSectionMoveResponse",
+    schemaPath: "v2/ThreadSectionMoveResponse.json",
+    validatorName: "validateThreadSectionMoveResponse",
+  },
 ];
 
 const validatorDeclarations = schemaDeclarations.filter(
