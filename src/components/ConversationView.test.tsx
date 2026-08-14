@@ -610,6 +610,112 @@ describe("ConversationView", () => {
       .not.toBeInTheDocument();
   });
 
+  it("将用户 Shell 从 AI 活动组拆出并显示原始命令", async () => {
+    const shellTurn = {
+      durationMs: 3_000,
+      id: "turn-user-shell",
+      items: [
+        {
+          content: [{ text: "检查后运行测试", type: "text" as const }],
+          id: "user-before-shell",
+          type: "userMessage" as const,
+        },
+        {
+          id: "reasoning-before-shell",
+          summary: ["先检查测试配置"],
+          type: "reasoning" as const,
+        },
+        {
+          aggregatedOutput: "Test Files  73 passed",
+          command: "pnpm test -- --runInBand",
+          commandActions: [
+            {
+              command: "pnpm test -- --runInBand",
+              name: "package.json",
+              path: "/workspace/project/package.json",
+              type: "read" as const,
+            },
+          ],
+          cwd: "/workspace/project",
+          durationMs: 1_500,
+          exitCode: 0,
+          id: "command-user-shell",
+          source: "userShell" as const,
+          status: "completed" as const,
+          type: "commandExecution" as const,
+        },
+        {
+          command: "git status --short",
+          commandActions: [],
+          cwd: "/workspace/project",
+          id: "command-agent-after-shell",
+          status: "completed" as const,
+          type: "commandExecution" as const,
+        },
+        {
+          id: "answer-after-shell",
+          phase: "final_answer" as const,
+          text: "测试已通过",
+          type: "agentMessage" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "completed" as const,
+    } satisfies ThreadTurn;
+    render(
+      <ConversationView
+        restoredThread={{ ...RESTORED, turns: [shellTurn] }}
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: /已运行/u })).toHaveLength(2);
+    const shellHeader = screen.getByRole("button", {
+      name: "你执行的 Shell：pnpm test -- --runInBand，已完成 · 1.5 秒",
+    });
+    const shellRecord = shellHeader.closest("section");
+    expect(shellRecord).not.toBeNull();
+    expect(shellRecord).not.toHaveAttribute("data-activity-group");
+    expect(within(shellRecord!).getByText("pnpm test -- --runInBand")).toBeVisible();
+    expect(screen.queryByText("Read package.json")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Test Files\s+73 passed/u)).not.toBeInTheDocument();
+
+    fireEvent.click(shellHeader);
+    await waitFor(() => expect(screen.getByText(/Test Files\s+73 passed/u)).toBeVisible());
+  });
+
+  it("运行中的用户 Shell 默认展开并显示运行状态", () => {
+    const shellTurn = {
+      id: "turn-running-user-shell",
+      items: [
+        {
+          aggregatedOutput: "正在编译",
+          command: "pnpm build",
+          commandActions: [],
+          cwd: "/workspace/project",
+          durationMs: 12_000,
+          id: "command-running-user-shell",
+          source: "userShell" as const,
+          status: "inProgress" as const,
+          type: "commandExecution" as const,
+        },
+      ],
+      itemsView: "full" as const,
+      status: "inProgress" as const,
+    } satisfies ThreadTurn;
+    render(
+      <ConversationView
+        restoredThread={{ ...RESTORED, turns: [shellTurn] }}
+      />,
+    );
+
+    expect(document.querySelector("[data-activity-group]")).toBeNull();
+    const shellHeader = screen.getByRole("button", {
+      name: "你执行的 Shell：pnpm build，正在运行 · 12 秒",
+    });
+    expect(shellHeader).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("正在编译")).toBeVisible();
+  });
+
   it("思考摘要逐行渲染并在存在内容或标题省略时支持展开", async () => {
     mockOverflowingTitle("仅有摘要");
     const onOpenLink = vi.fn();

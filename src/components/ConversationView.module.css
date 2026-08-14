@@ -124,6 +124,138 @@
   background: var(--color-fill-subtle);
 }
 
+.userShell {
+  width: min(88%, 760px);
+  margin-left: auto;
+  overflow: clip;
+  border: 1px solid var(--color-divider-subtle);
+  border-radius: var(--radius-md) var(--radius-md) 4px;
+  color: var(--color-text-primary);
+  background: var(--color-fill-subtle);
+}
+
+.userShellHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  width: 100%;
+  min-height: 36px;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 0;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+
+button.userShellHeader {
+  cursor: pointer;
+}
+
+button.userShellHeader:hover {
+  background: var(--color-fill-hover);
+}
+
+.userShellHeader strong {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userShellIcon {
+  display: grid;
+  color: var(--color-text-tertiary);
+  place-items: center;
+}
+
+.userShellStatus {
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.userShell[data-status="failed"] .userShellStatus {
+  color: var(--color-status-danger);
+}
+
+.userShellChevron {
+  color: var(--color-text-tertiary);
+  transition: transform var(--duration-panel) var(--ease-standard);
+}
+
+.userShell[data-expanded="true"] .userShellChevron {
+  transform: rotate(90deg);
+}
+
+.userShellCommand {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--color-divider-subtle);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.userShellCommand > span {
+  color: var(--color-text-tertiary);
+  user-select: none;
+}
+
+.userShellCommand code {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.userShellOutputSize {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-panel) var(--ease-standard);
+}
+
+.userShell[data-expanded="true"] .userShellOutputSize {
+  grid-template-rows: 1fr;
+}
+
+.userShellOutputClip {
+  min-height: 0;
+  overflow: clip;
+}
+
+.userShellOutput {
+  padding: var(--space-3);
+  border-top: 1px solid var(--color-divider-subtle);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  visibility: hidden;
+}
+
+.userShellOutput[data-visible="true"] {
+  opacity: 1;
+  visibility: visible;
+}
+
+.userShellOutput > samp {
+  display: block;
+  max-height: 320px;
+  padding: 0;
+  margin: 0;
+  overflow: auto;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .userMessage p,
 .agentMessage p,
 .activityDetail p,
@@ -835,6 +967,10 @@ button.fileChangeRow {
     max-width: 88%;
   }
 
+  .userShell {
+    width: 96%;
+  }
+
   .questionPreview {
     width: min(320px, calc(100vw - 76px));
   }
@@ -854,6 +990,9 @@ button.fileChangeRow {
   .activityRowChevron,
   .activityDetailSize,
   .activityDetail,
+  .userShellChevron,
+  .userShellOutputSize,
+  .userShellOutput,
   .messageActionTooltip,
   .questionMarkerLine,
   .questionPreview {

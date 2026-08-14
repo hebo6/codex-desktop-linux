@@ -25,6 +25,7 @@ import {
 import { recordConversationFirstCommit } from "../diagnostics/conversationLoadDiagnostics";
 import { AnsiCommandOutput } from "./AnsiCommandOutput";
 import { markdownToPlainText, SafeMarkdown } from "./SafeMarkdown";
+import { TerminalIcon } from "./SidebarIcons";
 import styles from "./ConversationView.module.css";
 
 const EMPTY_TURN_ITEM_PAGES: ReadonlyMap<string, TurnItemPageState> = new Map();
@@ -1297,7 +1298,9 @@ function ItemView({
         />
       );
     case "commandExecution":
-      return (
+      return item.source === "userShell" ? (
+        <UserShellActivity item={item} />
+      ) : (
         <CommandActivity
           item={item}
         />
@@ -1828,6 +1831,67 @@ function CommandActivity({
     >
       {output === null ? null : <AnsiCommandOutput output={output} />}
     </ActivityDisclosure>
+  );
+}
+
+function UserShellActivity({ item }: { readonly item: CommandExecutionItem }) {
+  const output = item.aggregatedOutput?.trim().length === 0
+    ? null
+    : item.aggregatedOutput ?? null;
+  const transition = useCollapsibleContent(item.status === "inProgress");
+  const hasOutput = output !== null;
+  const status = userShellStatus(item);
+  const toggle = () => {
+    transition.setOpen(!transition.targetExpandedRef.current);
+  };
+  const header = (
+    <>
+      <span className={styles.userShellIcon}><TerminalIcon /></span>
+      <strong>你执行的 Shell</strong>
+      <span className={styles.userShellStatus}>{status}</span>
+      {hasOutput ? (
+        <span aria-hidden="true" className={styles.userShellChevron}>›</span>
+      ) : null}
+    </>
+  );
+
+  return (
+    <section
+      className={styles.userShell}
+      data-command-item-id={item.id}
+      data-expanded={hasOutput && transition.expanded}
+      data-status={item.status}
+    >
+      {hasOutput ? (
+        <button
+          aria-expanded={transition.targetExpanded}
+          aria-label={`你执行的 Shell：${item.command}，${status}`}
+          className={styles.userShellHeader}
+          onClick={toggle}
+          type="button"
+        >
+          {header}
+        </button>
+      ) : (
+        <div className={styles.userShellHeader} tabIndex={0}>{header}</div>
+      )}
+      <div className={styles.userShellCommand}>
+        <span aria-hidden="true">$</span>
+        <code>{item.command}</code>
+      </div>
+      {hasOutput && transition.contentMounted ? (
+        <div className={styles.userShellOutputSize}>
+          <div className={styles.userShellOutputClip}>
+            <div
+              className={styles.userShellOutput}
+              data-visible={transition.contentVisible}
+            >
+              <AnsiCommandOutput output={output} />
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -2415,6 +2479,9 @@ function isWorkActivity(item: ThreadItem): boolean {
   if (item.type === "agentMessage") {
     return item.phase === "commentary";
   }
+  if (item.type === "commandExecution" && item.source === "userShell") {
+    return false;
+  }
   return [
     "hookPrompt",
     "plan",
@@ -2579,6 +2646,26 @@ function rawCommandTitle(
     inProgress: "Running",
   } as const;
   return `${verb[status]} ${command}`;
+}
+
+function userShellStatus(item: CommandExecutionItem): string {
+  const duration = typeof item.durationMs === "number"
+    ? ` · ${formatDuration(item.durationMs)}`
+    : "";
+  switch (item.status) {
+    case "completed":
+      return `已完成${duration}`;
+    case "declined":
+      return `未执行${duration}`;
+    case "failed":
+      return `${
+        typeof item.exitCode === "number"
+          ? `退出码 ${item.exitCode}`
+          : "运行失败"
+      }${duration}`;
+    case "inProgress":
+      return `正在运行${duration}`;
+  }
 }
 
 function reasoningParts(parts: readonly string[] | undefined): readonly string[] {
