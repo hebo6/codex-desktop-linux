@@ -466,18 +466,6 @@ export function ConnectionShell({
                   }
                   className={styles.threadActionsButton}
                   data-refreshing={displayedRefreshingThreads}
-                  disabled={
-                    displayedThreadListPhase !== "ready" ||
-                    (viewingArchivedThreads
-                      ? offline ||
-                        displayedRefreshingThreads ||
-                        onRefreshArchivedThreads === undefined
-                      : onSearchThreads === undefined && (
-                          offline ||
-                          displayedRefreshingThreads ||
-                          onRefreshThreads === undefined
-                        ))
-                  }
                   onClick={() => setThreadActionsOpen((open) => !open)}
                   onKeyDown={(event) => {
                     if (event.key === "Escape" && threadActionsOpen) {
@@ -486,7 +474,9 @@ export function ConnectionShell({
                     }
                   }}
                   ref={threadActionsButtonRef}
-                  title="最近会话操作"
+                  title={
+                    viewingArchivedThreads ? "已归档会话操作" : "最近会话操作"
+                  }
                   type="button"
                 >
                   {displayedRefreshingThreads ? <RefreshIcon /> : <MoreIcon />}
@@ -502,6 +492,38 @@ export function ConnectionShell({
                     ref={threadActionsMenuRef}
                     role="menu"
                   >
+                    <button
+                      aria-checked={!viewingArchivedThreads}
+                      onClick={() => {
+                        setThreadActionsOpen(false);
+                        setThreadListView("recent");
+                      }}
+                      role="menuitemradio"
+                      type="button"
+                    >
+                      <span aria-hidden="true" className={styles.menuSelectionMark}>
+                        {viewingArchivedThreads ? null : "✓"}
+                      </span>
+                      <span>最近会话</span>
+                    </button>
+                    <button
+                      aria-checked={viewingArchivedThreads}
+                      onClick={() => {
+                        setThreadActionsOpen(false);
+                        setThreadListView("archived");
+                        if (archivedThreadListPhase === "error") {
+                          onLoadArchivedThreads?.();
+                        }
+                      }}
+                      role="menuitemradio"
+                      type="button"
+                    >
+                      <span aria-hidden="true" className={styles.menuSelectionMark}>
+                        {viewingArchivedThreads ? "✓" : null}
+                      </span>
+                      <span>已归档会话</span>
+                    </button>
+                    <div className={styles.threadActionsSeparator} role="separator" />
                     {viewingArchivedThreads ? null : (
                       <button
                         disabled={onSearchThreads === undefined}
@@ -578,16 +600,6 @@ export function ConnectionShell({
             ? {}
             : { onOpenThreadInNewTab })}
           onUnarchiveThread={(threadId) => onUnarchiveThread?.(threadId)}
-          onViewChange={(view) => {
-            setThreadActionsOpen(false);
-            setThreadListView(view);
-            if (
-              view === "archived" &&
-              archivedThreadListPhase === "error"
-            ) {
-              onLoadArchivedThreads?.();
-            }
-          }}
           pendingThreadIds={pendingThreadIds}
           pendingResultThreadIds={pendingResultThreadIds}
           removingThreadIds={removingThreadIds}

@@ -72,7 +72,6 @@ function renderThreads(
   const onDeleteThread = vi.fn();
   const onDismissArchiveNotice = vi.fn();
   const onUnarchiveThread = vi.fn();
-  const onViewChange = vi.fn();
   const props: ComponentProps<typeof RecentThreads> = {
     archiveNotices: [],
     currentThreadId: THREAD_ONE.id,
@@ -90,7 +89,6 @@ function renderThreads(
     onOpenThread,
     onOpenThreadInNewTab,
     onUnarchiveThread,
-    onViewChange,
     pendingThreadIds: [],
     removingThreadIds: [],
     phase: "ready",
@@ -109,7 +107,6 @@ function renderThreads(
     onOpenThread,
     onOpenThreadInNewTab,
     onUnarchiveThread,
-    onViewChange,
     rerenderThreads(next: Partial<ComponentProps<typeof RecentThreads>>) {
       rendered.rerender(<RecentThreads {...props} {...next} />);
     },
@@ -559,7 +556,7 @@ describe("RecentThreads", () => {
   });
 
   it("展示已归档会话并提供单条恢复", () => {
-    const { onUnarchiveThread, onViewChange } = renderThreads({
+    const { onUnarchiveThread } = renderThreads({
       currentThreadId: null,
       threads: [THREAD_TWO],
       view: "archived",
@@ -568,9 +565,6 @@ describe("RecentThreads", () => {
     expect(screen.getByRole("list", { name: "已归档会话" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: `恢复“预览标题”` }));
     expect(onUnarchiveThread).toHaveBeenCalledWith(THREAD_TWO.id);
-
-    fireEvent.click(screen.getByRole("button", { name: "最近" }));
-    expect(onViewChange).toHaveBeenCalledWith("recent");
   });
 
   it("离线只读时仍可打开会话但禁用服务端修改", () => {

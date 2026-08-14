@@ -52,7 +52,6 @@ export interface RecentThreadsProps {
   readonly onOpenThread: (threadId: string) => void;
   readonly onOpenThreadInNewTab?: (threadId: string) => void;
   readonly onUnarchiveThread: (threadId: string) => void;
-  readonly onViewChange: (view: ThreadListView) => void;
   readonly phase: ServerThreadsPhase;
   readonly threads: readonly ThreadSummary[];
   readonly readOnly?: boolean;
@@ -145,7 +144,6 @@ export function RecentThreads({
   onOpenThread,
   onOpenThreadInNewTab,
   onUnarchiveThread,
-  onViewChange,
   phase,
   threads,
   readOnly = false,
@@ -414,22 +412,6 @@ export function RecentThreads({
       <header className={styles.sectionHeader}>
         <div className={styles.titleGroup}>
           {sidebarToggle}
-          <div aria-label="会话范围" className={styles.viewSwitch} role="group">
-            <button
-              aria-pressed={view === "recent"}
-              onClick={() => onViewChange("recent")}
-              type="button"
-            >
-              最近
-            </button>
-            <button
-              aria-pressed={view === "archived"}
-              onClick={() => onViewChange("archived")}
-              type="button"
-            >
-              已归档
-            </button>
-          </div>
         </div>
         {headerActions}
       </header>

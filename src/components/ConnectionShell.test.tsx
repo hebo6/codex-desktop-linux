@@ -122,6 +122,10 @@ describe("ConnectionShell", () => {
     ).toHaveAttribute("aria-pressed", "true");
 
     fireEvent.click(actionsButton);
+    expect(screen.getByRole("menuitemradio", { name: "最近会话" }))
+      .toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("menuitemradio", { name: "已归档会话" }))
+      .toHaveAttribute("aria-checked", "false");
     fireEvent.click(screen.getByRole("menuitem", { name: "刷新会话" }));
     fireEvent.click(screen.getByRole("button", { name: "最近会话操作" }));
     fireEvent.click(screen.getByRole("menuitem", { name: /搜索会话/u }));
@@ -160,7 +164,8 @@ describe("ConnectionShell", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "已归档" }));
+    fireEvent.click(screen.getByRole("button", { name: "最近会话操作" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "已归档会话" }));
     expect(onLoadArchivedThreads).toHaveBeenCalledOnce();
 
     rerender(
@@ -173,6 +178,10 @@ describe("ConnectionShell", () => {
         threadListPhase="ready"
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: "已归档会话操作" }));
+    expect(screen.getByRole("menuitemradio", { name: "已归档会话" }))
+      .toHaveAttribute("aria-checked", "true");
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "已归档会话" }));
     fireEvent.click(screen.getByRole("button", { name: "恢复“归档会话”" }));
     expect(onUnarchiveThread).toHaveBeenCalledWith(archivedThread.id);
   });
