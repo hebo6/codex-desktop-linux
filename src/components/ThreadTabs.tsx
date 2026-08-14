@@ -184,7 +184,11 @@ export function ThreadTabs({
 
   return (
     <div aria-label="会话标签" className={styles.root}>
-      <div className={styles.scroller} role="tablist">
+      <div
+        className={styles.scroller}
+        data-window-menu-region="self"
+        role="tablist"
+      >
         {tabs.map((tab) => {
           const active = tab.id === activeTabId;
           return (

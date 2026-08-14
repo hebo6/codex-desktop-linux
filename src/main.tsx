@@ -2,6 +2,7 @@ import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 
+import { ApplicationContextMenus } from "./components/ApplicationContextMenus";
 import { ApplicationShortcuts } from "./components/ApplicationShortcuts";
 import { store } from "./store/store";
 import { parseVisualRegressionQuery } from "./visual/visualRegressionQuery";
@@ -32,6 +33,7 @@ const protocolDebug =
 
 createRoot(rootElement).render(
   <StrictMode>
+    <ApplicationContextMenus />
     <ApplicationShortcuts />
     <Suspense fallback={<StartupShell />}>
       {protocolDebug

@@ -574,7 +574,11 @@ export function ConnectionShell({
       </aside>
 
       <main className={styles.main}>
-        <header className={styles.topbar} data-tauri-drag-region="deep">
+        <header
+          className={styles.topbar}
+          data-tauri-drag-region="deep"
+          data-window-menu-region="self"
+        >
           <WindowControls side="left" />
           {isSidebarCollapsed && (
             <button
@@ -600,7 +604,11 @@ export function ConnectionShell({
             <SidebarCollapseIcon collapsed={!isSidebarOpen} />
           </button>
           {topbarNavigation ?? (
-            <div className={styles.topbarTitle} title={`${contentSubtitle ?? content.eyebrow} / ${contentTitle}`}>
+            <div
+              className={styles.topbarTitle}
+              data-window-menu-region="deep"
+              title={`${contentSubtitle ?? content.eyebrow} / ${contentTitle}`}
+            >
               <span className={styles.topbarSubtitle}>{contentSubtitle ?? content.eyebrow}</span>
               <span className={styles.topbarSeparator}>/</span>
               <strong>{contentTitle}</strong>

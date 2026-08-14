@@ -149,13 +149,25 @@ export function ProtocolDebugWindow() {
 
   return (
     <div className={styles.window}>
-      <header className={styles.titlebar} data-tauri-drag-region>
+      <header
+        className={styles.titlebar}
+        data-tauri-drag-region
+        data-window-menu-region="self"
+      >
         <WindowControls side="left" />
-        <div className={styles.title} data-tauri-drag-region>
+        <div
+          className={styles.title}
+          data-tauri-drag-region
+          data-window-menu-region="deep"
+        >
           <strong data-tauri-drag-region>协议检查器</strong>
           <small data-tauri-drag-region>只读 · 关闭窗口后清空</small>
         </div>
-        <span className={styles.dragRegion} data-tauri-drag-region />
+        <span
+          className={styles.dragRegion}
+          data-tauri-drag-region
+          data-window-menu-region="self"
+        />
         <WindowControls side="right" />
       </header>
 

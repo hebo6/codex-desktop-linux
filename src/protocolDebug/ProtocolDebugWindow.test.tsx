@@ -36,6 +36,12 @@ describe("ProtocolDebugWindow", () => {
 
     expect(titlebar).not.toBeNull();
     expect(dragRegion).not.toBeNull();
+    expect(titlebar).toHaveAttribute("data-window-menu-region", "self");
+    expect(dragRegion).toHaveAttribute("data-window-menu-region", "self");
+    expect(screen.getByText("协议检查器").parentElement).toHaveAttribute(
+      "data-window-menu-region",
+      "deep",
+    );
     expect(getComputedStyle(titlebar!).display).toBe("flex");
     expect(getComputedStyle(dragRegion!).flexGrow).toBe("1");
   });

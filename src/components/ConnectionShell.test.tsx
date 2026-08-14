@@ -7,10 +7,14 @@ import { ConnectionShell } from "./ConnectionShell";
 describe("ConnectionShell", () => {
   it("顶部栏使用深层窗口拖拽区域", () => {
     const { container } = render(<ConnectionShell phase="ready" />);
+    const titlebar = container.querySelector(
+      "header[data-tauri-drag-region]",
+    );
 
-    expect(
-      container.querySelector("header[data-tauri-drag-region]"),
-    ).toHaveAttribute("data-tauri-drag-region", "deep");
+    expect(titlebar).toHaveAttribute("data-tauri-drag-region", "deep");
+    expect(titlebar).toHaveAttribute("data-window-menu-region", "self");
+    expect(titlebar?.querySelector("[data-window-menu-region='deep']"))
+      .not.toBeNull();
   });
 
   it("以可访问状态展示初始化进度", () => {

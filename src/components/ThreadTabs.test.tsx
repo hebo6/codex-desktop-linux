@@ -61,6 +61,10 @@ describe("ThreadTabs", () => {
     renderTabs();
 
     const tab = screen.getByRole("tab");
+    expect(screen.getByRole("tablist")).toHaveAttribute(
+      "data-window-menu-region",
+      "self",
+    );
     expect(tab).toHaveTextContent(/修复测试失败.*codex-desktop-linux/u);
     expect(tab).toHaveAttribute(
       "title",
