@@ -60,13 +60,19 @@ describe("Tauri 发布配置", () => {
     ]);
   });
 
-  it("仅向独立协议检查器窗口授予只读追踪权限", () => {
+  it("仅向独立协议检查器窗口授予只读追踪和主题权限", () => {
     expect(tauriConfiguration.app.security.capabilities).toContain(
       "protocol-debug",
     );
     expect(protocolDebugCapability.windows).toEqual(["protocol-debug"]);
     expect(protocolDebugCapability.permissions).toContain(
       "allow-protocol-trace",
+    );
+    expect(protocolDebugCapability.permissions).toContain(
+      "allow-load-theme-preference",
+    );
+    expect(protocolDebugCapability.permissions).not.toContain(
+      "allow-open-app-window",
     );
     expect(protocolDebugCapability.permissions).not.toContain(
       "allow-send-configured-server-message",
@@ -75,6 +81,7 @@ describe("Tauri 发布配置", () => {
       "allow-connect-configured-server",
     );
     expect(windowPermission).toContain('"open_protocol_debug_window"');
+    expect(windowPermission).toContain('commands.allow = ["load_theme_preference"]');
     expect(windowPermission).not.toContain('"protocol_debug_availability"');
   });
 });

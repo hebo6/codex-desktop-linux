@@ -279,6 +279,7 @@ pub fn run() {
             pending_thread_results::acknowledge_pending_thread_result,
             pending_thread_results::clear_pending_thread_result,
             preferences::load_preferences,
+            preferences::load_theme_preference,
             preferences::save_preferences,
             preferences::clear_application_logs,
             preferences::clear_temporary_files,

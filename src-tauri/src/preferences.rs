@@ -7,7 +7,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::{Row as _, SqlitePool};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter as _, State};
 
 use crate::{
     configuration::{
@@ -18,6 +18,7 @@ use crate::{
 };
 
 const MAX_PREFERENCES_BYTES: usize = 64 * 1024;
+const THEME_PREFERENCE_CHANGED_EVENT: &str = "theme-preference-changed";
 
 #[derive(Clone)]
 pub(crate) struct PreferencesRepository {
@@ -238,14 +239,35 @@ pub(crate) async fn load_preferences(
 }
 
 #[tauri::command]
+pub(crate) async fn load_theme_preference(
+    repository: State<'_, PreferencesRepository>,
+) -> Result<String, PreferencesCommandError> {
+    let preferences = repository.load().await?;
+    Ok(theme_preference(&preferences).to_owned())
+}
+
+#[tauri::command]
 pub(crate) async fn save_preferences(
+    app: AppHandle,
     repository: State<'_, PreferencesRepository>,
     request: SavePreferencesRequest,
 ) -> Result<Value, PreferencesCommandError> {
-    repository
-        .save(request.preferences)
-        .await
-        .map_err(Into::into)
+    let preferences = repository.save(request.preferences).await?;
+    if let Err(error) = app.emit(
+        THEME_PREFERENCE_CHANGED_EVENT,
+        theme_preference(&preferences),
+    ) {
+        tracing::warn!(%error, "failed to emit theme preference change");
+    }
+    Ok(preferences)
+}
+
+fn theme_preference(preferences: &Value) -> &str {
+    match preferences.get("theme").and_then(Value::as_str) {
+        Some("light") => "light",
+        Some("dark") => "dark",
+        _ => "system",
+    }
 }
 
 #[tauri::command]
@@ -293,7 +315,7 @@ mod tests {
     use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
     use uuid::Uuid;
 
-    use super::{PreferencesError, PreferencesRepository};
+    use super::{PreferencesError, PreferencesRepository, theme_preference};
     use crate::credentials::{CredentialDescriptor, CredentialReference, ServerCredentialKind};
 
     async fn repository() -> PreferencesRepository {
@@ -322,6 +344,15 @@ mod tests {
             repository.load().await.unwrap(),
             json!({"theme":"dark","enterToSend":false})
         );
+    }
+
+    #[test]
+    fn normalizes_theme_preference() {
+        assert_eq!(theme_preference(&json!({"theme":"light"})), "light");
+        assert_eq!(theme_preference(&json!({"theme":"dark"})), "dark");
+        assert_eq!(theme_preference(&json!({"theme":"system"})), "system");
+        assert_eq!(theme_preference(&json!({"theme":"contrast"})), "system");
+        assert_eq!(theme_preference(&json!({})), "system");
     }
 
     #[tokio::test]

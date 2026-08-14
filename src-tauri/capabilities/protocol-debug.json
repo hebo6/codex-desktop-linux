@@ -5,6 +5,7 @@
   "windows": ["protocol-debug"],
   "permissions": [
     "allow-protocol-trace",
+    "allow-load-theme-preference",
     "allow-quit-application",
     "core:event:allow-listen",
     "core:event:allow-unlisten",

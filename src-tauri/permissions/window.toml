@@ -45,3 +45,8 @@ commands.allow = [
 identifier = "allow-quit-application"
 description = "Allows an application or protocol debugger window to request a graceful application exit"
 commands.allow = ["quit_application"]
+
+[[permission]]
+identifier = "allow-load-theme-preference"
+description = "Allows a window to read the global theme preference"
+commands.allow = ["load_theme_preference"]

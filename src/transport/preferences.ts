@@ -71,13 +71,17 @@ export const preferencesStore = createPreferencesStore();
 export function parsePreferences(value: unknown): AppPreferences {
   if (!isRecord(value)) throw new TypeError("invalid preferences response");
   return {
-    theme: isTheme(value.theme) ? value.theme : DEFAULT_APP_PREFERENCES.theme,
+    theme: parseThemePreference(value.theme),
     codeWrap: booleanOrDefault(value.codeWrap, DEFAULT_APP_PREFERENCES.codeWrap),
     sidebarWidth: sidebarWidthOrDefault(value.sidebarWidth),
     notifyTaskComplete: booleanOrDefault(value.notifyTaskComplete, DEFAULT_APP_PREFERENCES.notifyTaskComplete),
     notifyApproval: booleanOrDefault(value.notifyApproval, DEFAULT_APP_PREFERENCES.notifyApproval),
     notifyConnectionFailure: booleanOrDefault(value.notifyConnectionFailure, DEFAULT_APP_PREFERENCES.notifyConnectionFailure),
   };
+}
+
+export function parseThemePreference(value: unknown): ThemePreference {
+  return isTheme(value) ? value : DEFAULT_APP_PREFERENCES.theme;
 }
 
 function parseSystemDiagnostics(value: unknown): SystemDiagnostics {

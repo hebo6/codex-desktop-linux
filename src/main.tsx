@@ -8,9 +8,9 @@ import { parseVisualRegressionQuery } from "./visual/visualRegressionQuery";
 import "./styles/global.css";
 
 const App = lazy(async () => ({ default: (await import("./App")).App }));
-const ProtocolDebugWindow = lazy(async () => ({
-  default: (await import("./protocolDebug/ProtocolDebugWindow"))
-    .ProtocolDebugWindow,
+const ProtocolDebugView = lazy(async () => ({
+  default: (await import("./protocolDebug/ProtocolDebugView"))
+    .ProtocolDebugView,
 }));
 const VisualRegressionFixture = import.meta.env.DEV
   ? lazy(async () => ({
@@ -35,7 +35,7 @@ createRoot(rootElement).render(
     <ApplicationShortcuts />
     <Suspense fallback={<StartupShell />}>
       {protocolDebug
-        ? <ProtocolDebugWindow />
+        ? <ProtocolDebugView />
         : (
           <Provider store={store}>
             {visualRegressionQuery === null || VisualRegressionFixture === null

@@ -6,6 +6,7 @@ import {
   type AppPreferences,
   type PreferencesStore,
 } from "../transport/preferences";
+import { applyThemePreference } from "./theme";
 
 export function usePreferences(store: PreferencesStore = preferencesStore) {
   const [preferences, setPreferences] = useState<AppPreferences>(DEFAULT_APP_PREFERENCES);
@@ -36,9 +37,7 @@ export function usePreferences(store: PreferencesStore = preferencesStore) {
   }, [store]);
 
   useEffect(() => {
-    const root = document.documentElement;
-    if (preferences.theme === "system") delete root.dataset.theme;
-    else root.dataset.theme = preferences.theme;
+    applyThemePreference(preferences.theme);
   }, [preferences.theme]);
 
   const update = useCallback((patch: Partial<AppPreferences>) => {
