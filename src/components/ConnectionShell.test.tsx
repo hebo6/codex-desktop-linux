@@ -132,6 +132,51 @@ describe("ConnectionShell", () => {
     expect(onNewTask).toHaveBeenCalledOnce();
   });
 
+  it("按需加载已归档会话并允许逐条恢复", () => {
+    const onLoadArchivedThreads = vi.fn();
+    const onUnarchiveThread = vi.fn();
+    const archivedThread = {
+      cliVersion: "1.0.0",
+      createdAt: 100,
+      cwd: "/workspace/archived",
+      ephemeral: false,
+      id: "thread-archived",
+      modelProvider: "openai",
+      name: "归档会话",
+      preview: "已归档",
+      sessionId: "session-archived",
+      source: "appServer",
+      status: { type: "idle" },
+      turns: [],
+      updatedAt: 200,
+    } satisfies ThreadSummary;
+    const { rerender } = render(
+      <ConnectionShell
+        archivedThreadListPhase="idle"
+        onLoadArchivedThreads={onLoadArchivedThreads}
+        onUnarchiveThread={onUnarchiveThread}
+        phase="ready"
+        threadListPhase="ready"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "已归档" }));
+    expect(onLoadArchivedThreads).toHaveBeenCalledOnce();
+
+    rerender(
+      <ConnectionShell
+        archivedThreadListPhase="ready"
+        archivedThreads={[archivedThread]}
+        onLoadArchivedThreads={onLoadArchivedThreads}
+        onUnarchiveThread={onUnarchiveThread}
+        phase="ready"
+        threadListPhase="ready"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "恢复“归档会话”" }));
+    expect(onUnarchiveThread).toHaveBeenCalledWith(archivedThread.id);
+  });
+
   it("新建任务后关闭覆盖式侧栏", () => {
     const onNewTask = vi.fn();
     render(

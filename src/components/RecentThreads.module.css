@@ -14,7 +14,7 @@
   min-height: 48px;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--space-1);
   padding: 0 var(--space-3);
   border-bottom: 1px solid var(--color-divider-subtle);
   box-sizing: border-box;
@@ -22,16 +22,49 @@
 
 .titleGroup {
   display: flex;
+  min-width: 0;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
-.sectionHeader h2 {
-  margin: 0;
+.viewSwitch {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--color-fill-subtle);
+}
+
+.viewSwitch button {
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
   color: var(--color-text-tertiary);
-  font-size: 12px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+}
+
+.viewSwitch button:first-child {
+  width: 26px;
+}
+
+.viewSwitch button:last-child {
+  width: 36px;
+}
+
+.viewSwitch button[aria-pressed="true"] {
+  color: var(--color-text-secondary);
+  background: var(--color-content-bg);
+  box-shadow: 0 1px 3px rgb(20 20 18 / 10%);
+}
+
+.viewSwitch button:hover:not([aria-pressed="true"]) {
+  color: var(--color-text-secondary);
 }
 
 .empty {
@@ -245,6 +278,11 @@
 .threadRowContainer:hover .threadTitleLine,
 .threadRowContainer:focus-within .threadTitleLine {
   padding-right: 56px;
+}
+
+.threadRowContainer[data-single-action="true"]:hover .threadTitleLine,
+.threadRowContainer[data-single-action="true"]:focus-within .threadTitleLine {
+  padding-right: 28px;
 }
 
 .rowActions button {
@@ -462,11 +500,21 @@
   cursor: wait;
 }
 
-.undoNotice {
+.undoNotices {
   position: absolute;
+  z-index: 2;
   right: var(--space-3);
   bottom: var(--space-3);
   left: var(--space-3);
+  display: grid;
+  max-height: min(50%, 240px);
+  gap: var(--space-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.undoNotice {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -477,6 +525,7 @@
   background: var(--color-content-bg);
   box-shadow: 0 8px 24px rgb(20 20 18 / 14%);
   font-size: 12px;
+  animation: undo-notice-enter 160ms var(--ease-standard);
 }
 
 .undoNotice span {
@@ -496,6 +545,23 @@
   font-weight: 650;
 }
 
+.undoNotice button:disabled {
+  cursor: wait;
+  opacity: 0.64;
+}
+
+@keyframes undo-notice-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes pulse {
   from {
     opacity: 0.45;
@@ -512,7 +578,9 @@
   }
 
   .virtualEntry,
-  .groupArrow {
+  .groupArrow,
+  .undoNotice {
+    animation: none;
     transition: none;
   }
 }

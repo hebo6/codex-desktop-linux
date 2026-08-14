@@ -2142,13 +2142,18 @@ export function App({
       <WindowResizeHandles />
       <ConnectionShell
         announcement={shortcutStatus}
-        archivedThread={serverThreads.archivedThread}
+        archiveNotices={serverThreads.archiveNotices}
+        archivedThreadListError={serverThreads.archivedThreadListError}
+        archivedThreadListPhase={serverThreads.archivedThreadListPhase}
+        archivedThreads={serverThreads.archivedThreads}
         backgroundCommandCounts={backgroundTerminals.counts}
         contentSubtitle={contentSubtitle}
         contentTitle={contentTitle}
         currentThreadId={currentThreadId}
         draftThreadIds={draftThreadIds}
         hasMoreThreads={serverThreads.nextThreadCursor !== null}
+        hasMoreArchivedThreads={serverThreads.nextArchivedThreadCursor !== null}
+        loadingMoreArchivedThreads={serverThreads.loadingMoreArchivedThreads}
         loadingMoreThreads={serverThreads.loadingMoreThreads}
         mainContent={
           <ConversationWorkspace
@@ -2334,19 +2339,27 @@ export function App({
         }
         onArchiveThread={(threadId) => void archiveThread(threadId)}
         onDeleteThread={setDeletingThreadId}
+        onDismissArchiveNotice={serverThreads.dismissArchiveNotice}
+        onLoadArchivedThreads={() => void serverThreads.loadArchivedThreads()}
+        onLoadMoreArchivedThreads={() =>
+          void serverThreads.loadMoreArchivedThreads()}
         onLoadMoreThreads={() => void serverThreads.loadMoreThreads()}
         onLoadProjectThreads={serverThreads.loadProjectThreads}
         onNewTask={() => void openNewTab()}
         onNewTaskInProject={(cwd) => void openNewTab(cwd)}
         onRefreshThreads={() => void serverThreads.refreshThreads()}
+        onRefreshArchivedThreads={() =>
+          void serverThreads.refreshArchivedThreads()}
         onSearchThreads={() => setQuickSwitcherOpen(true)}
         onOpenThread={(threadId) => void openThreadFromSidebar(threadId)}
         onOpenThreadInNewTab={(threadId) =>
           void openThreadInNewTab(threadId, true)}
-        onUndoArchive={() => void serverThreads.undoArchive()}
+        onUnarchiveThread={(threadId) =>
+          void serverThreads.unarchiveThread(threadId)}
         pendingThreadIds={serverThreads.pendingThreadIds}
         pendingResultThreadIds={pendingThreadResults.pendingThreadIds}
         removingThreadIds={serverThreads.removingThreadIds}
+        refreshingArchivedThreads={serverThreads.refreshingArchivedThreads}
         {...(shellDetail === null ? {} : { detail: shellDetail })}
         {...(applicationError !== null
           ? { onRetry: reloadApplicationState }

@@ -717,10 +717,12 @@ describe("useServerThreads", () => {
     await act(async () => expect(await archiveResult).toBe(true));
     expect(result.current.threads.map(({ id }) => id)).toEqual([THREAD_TWO.id]);
     expect(result.current.removingThreadIds).toEqual([]);
-    expect(result.current.archivedThread?.id).toBe(THREAD_ONE.id);
+    expect(result.current.archiveNotices.map(({ id }) => id)).toEqual([
+      THREAD_ONE.id,
+    ]);
 
     await act(async () => {
-      expect(await result.current.undoArchive()).toBe(true);
+      expect(await result.current.unarchiveThread(THREAD_ONE.id)).toBe(true);
     });
     expect(result.current.threads.map(({ id }) => id)).toEqual([
       THREAD_ONE.id,
@@ -734,6 +736,70 @@ describe("useServerThreads", () => {
     expect(client.archiveCalls).toEqual([THREAD_ONE.id]);
     expect(client.unarchiveCalls).toEqual([THREAD_ONE.id]);
     expect(client.deleteCalls).toEqual([THREAD_TWO.id]);
+  });
+
+  it("独立保留多次归档提示并允许分别关闭", async () => {
+    const client = new FakeThreadClient();
+    client.listResults.push(Promise.resolve({ data: [THREAD_ONE, THREAD_TWO] }));
+    client.archiveResults.push(Promise.resolve({}), Promise.resolve({}));
+    const { result } = renderHook(() => useServerThreads(client, null));
+    await waitFor(() => expect(result.current.threadListPhase).toBe("ready"));
+
+    await act(async () => {
+      expect(await result.current.archiveThread(THREAD_ONE.id)).toBe(true);
+    });
+    await act(async () => {
+      expect(await result.current.archiveThread(THREAD_TWO.id)).toBe(true);
+    });
+    expect(result.current.archiveNotices.map(({ id }) => id)).toEqual([
+      THREAD_ONE.id,
+      THREAD_TWO.id,
+    ]);
+
+    act(() => result.current.dismissArchiveNotice(THREAD_ONE.id));
+    expect(result.current.archiveNotices.map(({ id }) => id)).toEqual([
+      THREAD_TWO.id,
+    ]);
+  });
+
+  it("按需分页加载已归档会话并恢复单条会话", async () => {
+    const client = new FakeThreadClient();
+    client.listResults.push(
+      Promise.resolve({ data: [THREAD_TWO] }),
+      Promise.resolve({ data: [THREAD_ONE], nextCursor: "archived-next" }),
+      Promise.resolve({ data: [THREAD_THREE] }),
+    );
+    client.unarchiveResults.push(Promise.resolve({ thread: THREAD_ONE }));
+    const { result } = renderHook(() => useServerThreads(client, null));
+    await waitFor(() => expect(result.current.threadListPhase).toBe("ready"));
+
+    await act(async () => result.current.loadArchivedThreads());
+    expect(client.listCalls).toEqual([{}, { archived: true }]);
+    expect(result.current.archivedThreadListPhase).toBe("ready");
+    expect(result.current.archivedThreads.map(({ id }) => id)).toEqual([
+      THREAD_ONE.id,
+    ]);
+
+    await act(async () => result.current.loadMoreArchivedThreads());
+    expect(client.listCalls.at(-1)).toEqual({
+      archived: true,
+      cursor: "archived-next",
+    });
+    expect(result.current.archivedThreads.map(({ id }) => id)).toEqual([
+      THREAD_ONE.id,
+      THREAD_THREE.id,
+    ]);
+
+    await act(async () => {
+      expect(await result.current.unarchiveThread(THREAD_ONE.id)).toBe(true);
+    });
+    expect(result.current.archivedThreads.map(({ id }) => id)).toEqual([
+      THREAD_THREE.id,
+    ]);
+    expect(result.current.threads.map(({ id }) => id)).toEqual([
+      THREAD_ONE.id,
+      THREAD_TWO.id,
+    ]);
   });
 
   it("会话操作失败时保留原位置并显示稳定错误", async () => {

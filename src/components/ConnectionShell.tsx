@@ -14,7 +14,7 @@ import type {
 } from "../app/useServerThreads";
 import type { ReconnectViewState } from "../app/useConfiguredServerConnection";
 import type { ConnectionPhase } from "../store/connectionSlice";
-import { RecentThreads } from "./RecentThreads";
+import { RecentThreads, type ThreadListView } from "./RecentThreads";
 import {
   ComposeIcon,
   GroupIcon,
@@ -45,22 +45,32 @@ interface ConnectionShellProps {
   pendingThreadIds?: readonly string[];
   pendingResultThreadIds?: ReadonlySet<string>;
   removingThreadIds?: readonly string[];
-  archivedThread?: ThreadSummary | null;
+  archiveNotices?: readonly ThreadSummary[];
+  archivedThreads?: readonly ThreadSummary[];
+  archivedThreadListPhase?: ServerThreadsPhase;
+  archivedThreadListError?: string | null;
+  hasMoreArchivedThreads?: boolean;
+  loadingMoreArchivedThreads?: boolean;
+  refreshingArchivedThreads?: boolean;
   backgroundCommandCounts?: ReadonlyMap<string, number>;
   onArchiveThread?: (threadId: string) => void;
   onDeleteThread?: (threadId: string) => void;
+  onDismissArchiveNotice?: (threadId: string) => void;
+  onLoadArchivedThreads?: () => void;
+  onLoadMoreArchivedThreads?: () => void;
   onLoadMoreThreads?: () => void;
   onLoadProjectThreads?: (
     cwd: string,
     limit: number,
   ) => Promise<ProjectThreadPage>;
   onRefreshThreads?: () => void;
+  onRefreshArchivedThreads?: () => void;
   onSearchThreads?: () => void;
   onNewTask?: () => void;
   onNewTaskInProject?: (cwd: string) => void;
   onOpenThread?: (threadId: string) => void;
   onOpenThreadInNewTab?: (threadId: string) => void;
-  onUndoArchive?: () => void;
+  onUnarchiveThread?: (threadId: string) => void;
   onRetry?: () => void;
   onOpenDiagnostics?: () => void;
   onOpenSettings?: () => void;
@@ -161,19 +171,29 @@ export function ConnectionShell({
   pendingThreadIds = [],
   pendingResultThreadIds = EMPTY_THREAD_IDS,
   removingThreadIds = [],
-  archivedThread = null,
+  archiveNotices = [],
+  archivedThreads = [],
+  archivedThreadListPhase = "idle",
+  archivedThreadListError = null,
+  hasMoreArchivedThreads = false,
+  loadingMoreArchivedThreads = false,
+  refreshingArchivedThreads = false,
   backgroundCommandCounts,
   onArchiveThread,
   onDeleteThread,
+  onDismissArchiveNotice,
+  onLoadArchivedThreads,
+  onLoadMoreArchivedThreads,
   onLoadMoreThreads,
   onLoadProjectThreads,
   onRefreshThreads,
+  onRefreshArchivedThreads,
   onSearchThreads,
   onNewTask,
   onNewTaskInProject,
   onOpenThread,
   onOpenThreadInNewTab,
-  onUndoArchive,
+  onUnarchiveThread,
   onRetry,
   onOpenDiagnostics,
   onOpenSettings,
@@ -193,6 +213,7 @@ export function ConnectionShell({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [groupThreads, setGroupThreads] = useState(false);
+  const [threadListView, setThreadListView] = useState<ThreadListView>("recent");
   const [threadActionsOpen, setThreadActionsOpen] = useState(false);
   const sidebarId = useId();
   const titleId = useId();
@@ -210,6 +231,23 @@ export function ConnectionShell({
     readonly startWidth: number;
     width: number;
   } | null>(null);
+
+  useEffect(() => {
+    if (
+      threadListView === "archived" &&
+      phase === "ready" &&
+      !offline &&
+      archivedThreadListPhase === "idle"
+    ) {
+      onLoadArchivedThreads?.();
+    }
+  }, [
+    archivedThreadListPhase,
+    onLoadArchivedThreads,
+    offline,
+    phase,
+    threadListView,
+  ]);
 
   useEffect(() => {
     if (resizeRef.current === null) {
@@ -323,6 +361,24 @@ export function ConnectionShell({
     }
   };
 
+  const viewingArchivedThreads = threadListView === "archived";
+  const displayedThreads = viewingArchivedThreads ? archivedThreads : threads;
+  const displayedThreadListPhase = viewingArchivedThreads
+    ? archivedThreadListPhase
+    : threadListPhase;
+  const displayedThreadListError = viewingArchivedThreads
+    ? archivedThreadListError
+    : threadListError;
+  const displayedHasMoreThreads = viewingArchivedThreads
+    ? hasMoreArchivedThreads
+    : hasMoreThreads;
+  const displayedLoadingMoreThreads = viewingArchivedThreads
+    ? loadingMoreArchivedThreads
+    : loadingMoreThreads;
+  const displayedRefreshingThreads = viewingArchivedThreads
+    ? refreshingArchivedThreads
+    : refreshingThreads;
+
   return (
     <div
       className={styles.appShell}
@@ -345,15 +401,15 @@ export function ConnectionShell({
         id={sidebarId}
       >
         <RecentThreads
-          archivedThread={archivedThread}
+          archiveNotices={archiveNotices}
           {...(backgroundCommandCounts === undefined
             ? {}
             : { backgroundCommandCounts })}
-          currentThreadId={currentThreadId}
+          currentThreadId={viewingArchivedThreads ? null : currentThreadId}
           draftThreadIds={draftThreadIds}
-          error={threadListError}
-          grouped={groupThreads}
-          hasMore={hasMoreThreads}
+          error={displayedThreadListError}
+          grouped={!viewingArchivedThreads && groupThreads}
+          hasMore={displayedHasMoreThreads}
           sidebarToggle={
             <button
               aria-controls={sidebarId}
@@ -391,7 +447,9 @@ export function ConnectionShell({
                 aria-label={groupThreads ? "取消按项目分组" : "按项目分组"}
                 aria-pressed={groupThreads}
                 className={styles.groupButton}
-                disabled={threadListPhase !== "ready"}
+                disabled={
+                  viewingArchivedThreads || threadListPhase !== "ready"
+                }
                 onClick={() => setGroupThreads((grouped) => !grouped)}
                 title={groupThreads ? "取消按项目分组" : "按项目分组"}
                 type="button"
@@ -403,14 +461,22 @@ export function ConnectionShell({
                   aria-controls={threadActionsOpen ? threadActionsMenuId : undefined}
                   aria-expanded={threadActionsOpen}
                   aria-haspopup="menu"
-                  aria-label="最近会话操作"
+                  aria-label={
+                    viewingArchivedThreads ? "已归档会话操作" : "最近会话操作"
+                  }
                   className={styles.threadActionsButton}
-                  data-refreshing={refreshingThreads}
+                  data-refreshing={displayedRefreshingThreads}
                   disabled={
-                    threadListPhase !== "ready" ||
-                    (onSearchThreads === undefined && (
-                      offline || refreshingThreads || onRefreshThreads === undefined
-                    ))
+                    displayedThreadListPhase !== "ready" ||
+                    (viewingArchivedThreads
+                      ? offline ||
+                        displayedRefreshingThreads ||
+                        onRefreshArchivedThreads === undefined
+                      : onSearchThreads === undefined && (
+                          offline ||
+                          displayedRefreshingThreads ||
+                          onRefreshThreads === undefined
+                        ))
                   }
                   onClick={() => setThreadActionsOpen((open) => !open)}
                   onKeyDown={(event) => {
@@ -423,53 +489,77 @@ export function ConnectionShell({
                   title="最近会话操作"
                   type="button"
                 >
-                  {refreshingThreads ? <RefreshIcon /> : <MoreIcon />}
+                  {displayedRefreshingThreads ? <RefreshIcon /> : <MoreIcon />}
                 </button>
                 {threadActionsOpen ? (
                   <div
-                    aria-label="最近会话操作"
+                    aria-label={
+                      viewingArchivedThreads ? "已归档会话操作" : "最近会话操作"
+                    }
                     className={styles.threadActionsMenu}
                     id={threadActionsMenuId}
                     onKeyDown={handleThreadActionsKeyDown}
                     ref={threadActionsMenuRef}
                     role="menu"
                   >
+                    {viewingArchivedThreads ? null : (
+                      <button
+                        disabled={onSearchThreads === undefined}
+                        onClick={() => {
+                          setThreadActionsOpen(false);
+                          onSearchThreads?.();
+                        }}
+                        role="menuitem"
+                        type="button"
+                      >
+                        <SearchIcon />
+                        <span>搜索会话</span>
+                        <small>Ctrl+K</small>
+                      </button>
+                    )}
                     <button
-                      disabled={onSearchThreads === undefined}
+                      data-refreshing={displayedRefreshingThreads}
+                      disabled={
+                        offline ||
+                        displayedRefreshingThreads ||
+                        (viewingArchivedThreads
+                          ? onRefreshArchivedThreads === undefined
+                          : onRefreshThreads === undefined)
+                      }
                       onClick={() => {
                         setThreadActionsOpen(false);
-                        onSearchThreads?.();
-                      }}
-                      role="menuitem"
-                      type="button"
-                    >
-                      <SearchIcon />
-                      <span>搜索会话</span>
-                      <small>Ctrl+K</small>
-                    </button>
-                    <button
-                      data-refreshing={refreshingThreads}
-                      disabled={offline || refreshingThreads || onRefreshThreads === undefined}
-                      onClick={() => {
-                        setThreadActionsOpen(false);
-                        onRefreshThreads?.();
+                        if (viewingArchivedThreads) {
+                          onRefreshArchivedThreads?.();
+                        } else {
+                          onRefreshThreads?.();
+                        }
                       }}
                       role="menuitem"
                       type="button"
                     >
                       <RefreshIcon />
-                      <span>{refreshingThreads ? "正在刷新" : "刷新会话"}</span>
+                      <span>
+                        {displayedRefreshingThreads ? "正在刷新" : "刷新会话"}
+                      </span>
                     </button>
                   </div>
                 ) : null}
               </div>
             </div>
           }
-          loadingMore={loadingMoreThreads}
+          loadingMore={displayedLoadingMoreThreads}
           onArchiveThread={(threadId) => onArchiveThread?.(threadId)}
           onDeleteThread={(threadId) => onDeleteThread?.(threadId)}
-          onLoadMore={() => onLoadMoreThreads?.()}
-          {...(onLoadProjectThreads === undefined
+          onDismissArchiveNotice={(threadId) =>
+            onDismissArchiveNotice?.(threadId)}
+          onLoadMore={() => {
+            if (viewingArchivedThreads) {
+              onLoadMoreArchivedThreads?.();
+            } else {
+              onLoadMoreThreads?.();
+            }
+          }}
+          {...(viewingArchivedThreads || onLoadProjectThreads === undefined
             ? {}
             : { onLoadProjectThreads })}
           {...(onNewTaskInProject === undefined
@@ -487,13 +577,24 @@ export function ConnectionShell({
           {...(onOpenThreadInNewTab === undefined
             ? {}
             : { onOpenThreadInNewTab })}
-          onUndoArchive={() => onUndoArchive?.()}
+          onUnarchiveThread={(threadId) => onUnarchiveThread?.(threadId)}
+          onViewChange={(view) => {
+            setThreadActionsOpen(false);
+            setThreadListView(view);
+            if (
+              view === "archived" &&
+              archivedThreadListPhase === "error"
+            ) {
+              onLoadArchivedThreads?.();
+            }
+          }}
           pendingThreadIds={pendingThreadIds}
           pendingResultThreadIds={pendingResultThreadIds}
           removingThreadIds={removingThreadIds}
-          phase={threadListPhase}
+          phase={displayedThreadListPhase}
           readOnly={offline}
-          threads={threads}
+          threads={displayedThreads}
+          view={threadListView}
         />
 
         <div className={styles.serverArea}>

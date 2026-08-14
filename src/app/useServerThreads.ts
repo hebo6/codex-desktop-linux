@@ -47,7 +47,6 @@ export interface ServerThreadsState {
   readonly pendingThreadIds: readonly string[];
   readonly removingThreadIds: readonly string[];
   readonly currentThreadDeleted: boolean;
-  readonly archivedThread: ThreadSummary | null;
   readonly threadListError: string | null;
   readonly threadRestoreError: string | null;
   readonly offline: boolean;
@@ -55,15 +54,26 @@ export interface ServerThreadsState {
 }
 
 export interface ServerThreadsControls extends ServerThreadsState {
+  readonly archiveNotices: readonly ThreadSummary[];
+  readonly archivedThreadListError: string | null;
+  readonly archivedThreadListPhase: ServerThreadsPhase;
+  readonly archivedThreads: readonly ThreadSummary[];
+  readonly loadingMoreArchivedThreads: boolean;
+  readonly nextArchivedThreadCursor: string | null;
+  readonly refreshingArchivedThreads: boolean;
   readonly prepareStartedThread: (response: ThreadStartResponse) => () => void;
+  readonly dismissArchiveNotice: (threadId: string) => void;
+  readonly loadArchivedThreads: () => Promise<void>;
+  readonly loadMoreArchivedThreads: () => Promise<void>;
   readonly loadMoreThreads: () => Promise<void>;
   readonly loadProjectThreads: (
     cwd: string,
     limit: number,
   ) => Promise<ProjectThreadPage>;
+  readonly refreshArchivedThreads: () => Promise<void>;
   readonly refreshThreads: () => Promise<void>;
   readonly archiveThread: (threadId: string) => Promise<boolean>;
-  readonly undoArchive: () => Promise<boolean>;
+  readonly unarchiveThread: (threadId: string) => Promise<boolean>;
   readonly deleteThread: (threadId: string) => Promise<boolean>;
 }
 
@@ -116,17 +126,37 @@ const IDLE_STATE = Object.freeze({
   pendingThreadIds: Object.freeze([]),
   removingThreadIds: Object.freeze([]),
   currentThreadDeleted: false,
-  archivedThread: null,
   threadListError: null,
   threadRestoreError: null,
   offline: false,
   lastSyncedAt: null,
 }) satisfies ServerThreadsState;
 
+interface ArchivedThreadListState {
+  readonly archivedThreadListError: string | null;
+  readonly archivedThreadListPhase: ServerThreadsPhase;
+  readonly archivedThreads: readonly ThreadSummary[];
+  readonly loadingMoreArchivedThreads: boolean;
+  readonly nextArchivedThreadCursor: string | null;
+  readonly refreshingArchivedThreads: boolean;
+}
+
+const IDLE_ARCHIVED_THREAD_LIST_STATE = Object.freeze({
+  archivedThreadListError: null,
+  archivedThreadListPhase: "idle",
+  archivedThreads: Object.freeze([]),
+  loadingMoreArchivedThreads: false,
+  nextArchivedThreadCursor: null,
+  refreshingArchivedThreads: false,
+}) satisfies ArchivedThreadListState;
+
 const THREAD_LIST_FAILED = "无法加载最近会话";
 const THREAD_RESTORE_FAILED = "无法恢复当前会话";
 const THREAD_PAGE_FAILED = "无法加载更多会话";
 const THREAD_REFRESH_FAILED = "无法刷新最近会话";
+const ARCHIVED_THREAD_LIST_FAILED = "无法加载已归档会话";
+const ARCHIVED_THREAD_PAGE_FAILED = "无法加载更多已归档会话";
+const ARCHIVED_THREAD_REFRESH_FAILED = "无法刷新已归档会话";
 const THREAD_ARCHIVE_FAILED = "无法归档会话";
 const THREAD_UNARCHIVE_FAILED = "无法撤销归档";
 const THREAD_DELETE_FAILED = "无法删除会话";
@@ -159,12 +189,65 @@ export function useServerThreads(
   serverId: ServerId | null = null,
 ): ServerThreadsControls {
   const [state, setState] = useState<ServerThreadsState>(IDLE_STATE);
+  const [archivedState, setArchivedState] = useState<ArchivedThreadListState>(
+    IDLE_ARCHIVED_THREAD_LIST_STATE,
+  );
+  const [archiveNotices, setArchiveNotices] = useState<readonly ThreadSummary[]>(
+    Object.freeze([]),
+  );
   const sourceRef = useRef<ActiveSource | null>(null);
+  const currentClientRef = useRef(client);
+  currentClientRef.current = client;
   const loadingThreadsRef = useRef<ActiveSource | null>(null);
   const refreshingThreadsRef = useRef<ActiveSource | null>(null);
+  const loadingArchivedThreadsRef = useRef<ServerThreadsClient | null>(null);
+  const refreshingArchivedThreadsRef = useRef<ServerThreadsClient | null>(null);
+  const archivedListClientRef = useRef<ServerThreadsClient | null>(null);
+  const archivedListServerIdRef = useRef<ServerId | null>(serverId);
+  const archiveNoticesClientRef = useRef(client);
+  const threadsRef = useRef(state.threads);
+  threadsRef.current = state.threads;
   const preparedStartedThreadRef = useRef<PreparedStartedThread | null>(null);
   const retainedSelectionRef = useRef<RetainedSelection | null>(null);
   const retainedThreadListRef = useRef<RetainedThreadList | null>(null);
+
+  useEffect(() => {
+    loadingArchivedThreadsRef.current = null;
+    refreshingArchivedThreadsRef.current = null;
+
+    if (archiveNoticesClientRef.current !== client) {
+      archiveNoticesClientRef.current = client;
+      setArchiveNotices(Object.freeze([]));
+    }
+
+    if (archivedListServerIdRef.current !== serverId) {
+      archivedListServerIdRef.current = serverId;
+      archivedListClientRef.current = null;
+      setArchivedState(IDLE_ARCHIVED_THREAD_LIST_STATE);
+      return;
+    }
+
+    if (client === null) {
+      setArchivedState((current) => ({
+        ...current,
+        archivedThreadListPhase:
+          archivedListClientRef.current === null ? "idle" : "ready",
+        loadingMoreArchivedThreads: false,
+        refreshingArchivedThreads: false,
+      }));
+      return;
+    }
+
+    if (archivedListClientRef.current !== client) {
+      setArchivedState((current) => ({
+        ...current,
+        archivedThreadListError: null,
+        archivedThreadListPhase: "idle",
+        loadingMoreArchivedThreads: false,
+        refreshingArchivedThreads: false,
+      }));
+    }
+  }, [client, serverId]);
 
   const prepareStartedThread = useCallback((response: ThreadStartResponse) => {
     if (client === null) {
@@ -349,6 +432,16 @@ export function useServerThreads(
                 }),
               ),
             );
+            setArchivedState((current) =>
+              updateArchivedThreadMetadata(
+                current,
+                notification.params.threadId,
+                (thread) => ({
+                  ...thread,
+                  name: notification.params.threadName ?? null,
+                }),
+              ),
+            );
             break;
           case "item/started": {
             const preview = userMessagePreview(notification.params.item);
@@ -400,12 +493,34 @@ export function useServerThreads(
             });
             break;
           case "thread/archived":
+            {
+              const thread = threadsRef.current.find(
+                ({ id }) => id === notification.params.threadId,
+              );
+              if (thread !== undefined) {
+                setArchivedState((current) =>
+                  insertLoadedArchivedThread(current, thread),
+                );
+              }
+            }
             removeExternalThread(notification.params.threadId, false);
             break;
           case "thread/deleted":
+            setArchivedState((current) =>
+              removeArchivedThread(current, notification.params.threadId),
+            );
+            setArchiveNotices((current) =>
+              removeThreadById(current, notification.params.threadId),
+            );
             removeExternalThread(notification.params.threadId, true);
             break;
           case "thread/unarchived":
+            setArchivedState((current) =>
+              removeArchivedThread(current, notification.params.threadId),
+            );
+            setArchiveNotices((current) =>
+              removeThreadById(current, notification.params.threadId),
+            );
             void restoreExternalThread(notification.params.threadId);
             break;
         }
@@ -575,6 +690,145 @@ export function useServerThreads(
     };
   }, [client, currentThreadId, serverId]);
 
+  const loadArchivedThreads = useCallback(async (): Promise<void> => {
+    const requestClient = client;
+    if (
+      requestClient === null ||
+      state.offline ||
+      loadingArchivedThreadsRef.current !== null
+    ) {
+      return;
+    }
+    loadingArchivedThreadsRef.current = requestClient;
+    setArchivedState((current) => ({
+      ...current,
+      archivedThreadListError: null,
+      archivedThreadListPhase: "loading",
+      loadingMoreArchivedThreads: false,
+    }));
+    try {
+      const page = await requestClient.listRecentThreads({ archived: true }).result;
+      if (currentClientRef.current !== requestClient) {
+        return;
+      }
+      archivedListClientRef.current = requestClient;
+      setArchivedState((current) => ({
+        ...current,
+        archivedThreadListError: null,
+        archivedThreadListPhase: "ready",
+        archivedThreads: Object.freeze(page.data),
+        nextArchivedThreadCursor: page.nextCursor ?? null,
+      }));
+    } catch {
+      if (currentClientRef.current === requestClient) {
+        setArchivedState((current) => ({
+          ...current,
+          archivedThreadListError: ARCHIVED_THREAD_LIST_FAILED,
+          archivedThreadListPhase:
+            current.archivedThreads.length === 0 ? "error" : "ready",
+        }));
+      }
+    } finally {
+      if (loadingArchivedThreadsRef.current === requestClient) {
+        loadingArchivedThreadsRef.current = null;
+      }
+    }
+  }, [client, state.offline]);
+
+  const loadMoreArchivedThreads = useCallback(async (): Promise<void> => {
+    const requestClient = client;
+    const cursor = archivedState.nextArchivedThreadCursor;
+    if (
+      requestClient === null ||
+      state.offline ||
+      archivedState.archivedThreadListPhase !== "ready" ||
+      loadingArchivedThreadsRef.current !== null ||
+      cursor === null
+    ) {
+      return;
+    }
+    loadingArchivedThreadsRef.current = requestClient;
+    setArchivedState((current) => ({
+      ...current,
+      archivedThreadListError: null,
+      loadingMoreArchivedThreads: true,
+    }));
+    try {
+      const page = await requestClient.listRecentThreads({
+        archived: true,
+        cursor,
+      }).result;
+      if (currentClientRef.current !== requestClient) {
+        return;
+      }
+      setArchivedState((current) => ({
+        ...current,
+        archivedThreads: mergeUniqueById(current.archivedThreads, page.data),
+        loadingMoreArchivedThreads: false,
+        nextArchivedThreadCursor: page.nextCursor ?? null,
+      }));
+    } catch {
+      if (currentClientRef.current === requestClient) {
+        setArchivedState((current) => ({
+          ...current,
+          archivedThreadListError: ARCHIVED_THREAD_PAGE_FAILED,
+          loadingMoreArchivedThreads: false,
+        }));
+      }
+    } finally {
+      if (loadingArchivedThreadsRef.current === requestClient) {
+        loadingArchivedThreadsRef.current = null;
+      }
+    }
+  }, [
+    archivedState.archivedThreadListPhase,
+    archivedState.nextArchivedThreadCursor,
+    client,
+    state.offline,
+  ]);
+
+  const refreshArchivedThreads = useCallback(async (): Promise<void> => {
+    const requestClient = client;
+    if (
+      requestClient === null ||
+      state.offline ||
+      archivedState.archivedThreadListPhase !== "ready" ||
+      refreshingArchivedThreadsRef.current !== null
+    ) {
+      return;
+    }
+    refreshingArchivedThreadsRef.current = requestClient;
+    setArchivedState((current) => ({
+      ...current,
+      archivedThreadListError: null,
+      refreshingArchivedThreads: true,
+    }));
+    try {
+      const page = await requestClient.listRecentThreads({ archived: true }).result;
+      if (currentClientRef.current !== requestClient) {
+        return;
+      }
+      setArchivedState((current) => ({
+        ...current,
+        archivedThreads: mergeUniqueById(page.data, current.archivedThreads),
+        nextArchivedThreadCursor: page.nextCursor ?? null,
+        refreshingArchivedThreads: false,
+      }));
+    } catch {
+      if (currentClientRef.current === requestClient) {
+        setArchivedState((current) => ({
+          ...current,
+          archivedThreadListError: ARCHIVED_THREAD_REFRESH_FAILED,
+          refreshingArchivedThreads: false,
+        }));
+      }
+    } finally {
+      if (refreshingArchivedThreadsRef.current === requestClient) {
+        refreshingArchivedThreadsRef.current = null;
+      }
+    }
+  }, [archivedState.archivedThreadListPhase, client, state.offline]);
+
   const loadMoreThreads = useCallback(async (): Promise<void> => {
     const source = sourceRef.current;
     if (
@@ -727,8 +981,16 @@ export function useServerThreads(
             current.removingThreadIds,
             threadId,
           ),
-          archivedThread: thread,
         }));
+        setArchivedState((current) =>
+          insertLoadedArchivedThread(current, thread),
+        );
+        setArchiveNotices((current) =>
+          Object.freeze([
+            ...current.filter(({ id }) => id !== thread.id),
+            thread,
+          ]),
+        );
         return true;
       } catch {
         if (sourceRef.current === source) {
@@ -748,47 +1010,63 @@ export function useServerThreads(
     [state.offline, state.pendingThreadIds, state.threadListPhase, state.threads],
   );
 
-  const undoArchive = useCallback(async (): Promise<boolean> => {
+  const dismissArchiveNotice = useCallback((threadId: string): void => {
+    setArchiveNotices((current) => removeThreadById(current, threadId));
+  }, []);
+
+  const unarchiveThread = useCallback(async (threadId: string): Promise<boolean> => {
     const source = sourceRef.current;
-    const thread = state.archivedThread;
     if (
       source === null ||
       state.threadListPhase !== "ready" ||
       state.offline ||
-      thread === null ||
-      state.pendingThreadIds.includes(thread.id)
+      state.pendingThreadIds.includes(threadId) ||
+      (
+        !archiveNotices.some(({ id }) => id === threadId) &&
+        !archivedState.archivedThreads.some(({ id }) => id === threadId)
+      )
     ) {
       return false;
     }
     setState((current) => ({
       ...current,
-      pendingThreadIds: addPendingThread(current.pendingThreadIds, thread.id),
+      pendingThreadIds: addPendingThread(current.pendingThreadIds, threadId),
       threadListError: null,
     }));
+    setArchivedState((current) => ({
+      ...current,
+      archivedThreadListError: null,
+    }));
     try {
-      const response = await source.client.unarchiveThread(thread.id).result;
+      const response = await source.client.unarchiveThread(threadId).result;
       if (sourceRef.current !== source) {
         return false;
       }
       setState((current) => ({
         ...current,
         threads: insertThreadByRecency(current.threads, response.thread),
-        pendingThreadIds: removePendingThread(current.pendingThreadIds, thread.id),
-        archivedThread: null,
+        pendingThreadIds: removePendingThread(current.pendingThreadIds, threadId),
       }));
+      setArchivedState((current) => removeArchivedThread(current, threadId));
+      setArchiveNotices((current) => removeThreadById(current, threadId));
       return true;
     } catch {
       if (sourceRef.current === source) {
         setState((current) => ({
           ...current,
-          pendingThreadIds: removePendingThread(current.pendingThreadIds, thread.id),
+          pendingThreadIds: removePendingThread(current.pendingThreadIds, threadId),
           threadListError: THREAD_UNARCHIVE_FAILED,
+        }));
+        setArchivedState((current) => ({
+          ...current,
+          archivedThreadListError: THREAD_UNARCHIVE_FAILED,
         }));
       }
       return false;
     }
   }, [
-    state.archivedThread,
+    archiveNotices,
+    archivedState.archivedThreads,
     state.offline,
     state.pendingThreadIds,
     state.threadListPhase,
@@ -835,8 +1113,6 @@ export function useServerThreads(
             current.removingThreadIds,
             threadId,
           ),
-          archivedThread:
-            current.archivedThread?.id === threadId ? null : current.archivedThread,
         }));
         return true;
       } catch {
@@ -859,12 +1135,18 @@ export function useServerThreads(
 
   return {
     ...state,
+    ...archivedState,
+    archiveNotices,
     prepareStartedThread,
+    dismissArchiveNotice,
+    loadArchivedThreads,
+    loadMoreArchivedThreads,
     loadMoreThreads,
     loadProjectThreads,
+    refreshArchivedThreads,
     refreshThreads,
     archiveThread,
-    undoArchive,
+    unarchiveThread,
     deleteThread,
   };
 }
@@ -898,6 +1180,50 @@ function updateThreadMetadata(
     threads: changed ? Object.freeze(threads) : state.threads,
     restoredThread,
   };
+}
+
+function updateArchivedThreadMetadata(
+  state: ArchivedThreadListState,
+  threadId: string,
+  update: (thread: ThreadSummary) => ThreadSummary,
+): ArchivedThreadListState {
+  const threads = state.archivedThreads.map((thread) =>
+    thread.id === threadId ? update(thread) : thread,
+  );
+  return threads.every((thread, index) => thread === state.archivedThreads[index])
+    ? state
+    : { ...state, archivedThreads: Object.freeze(threads) };
+}
+
+function insertLoadedArchivedThread(
+  state: ArchivedThreadListState,
+  thread: ThreadSummary,
+): ArchivedThreadListState {
+  return state.archivedThreadListPhase !== "ready"
+    ? state
+    : {
+        ...state,
+        archivedThreads: insertThreadByRecency(state.archivedThreads, thread),
+      };
+}
+
+function removeArchivedThread(
+  state: ArchivedThreadListState,
+  threadId: string,
+): ArchivedThreadListState {
+  const threads = removeThreadById(state.archivedThreads, threadId);
+  return threads === state.archivedThreads
+    ? state
+    : { ...state, archivedThreads: threads };
+}
+
+function removeThreadById(
+  threads: readonly ThreadSummary[],
+  threadId: string,
+): readonly ThreadSummary[] {
+  return threads.some(({ id }) => id === threadId)
+    ? Object.freeze(threads.filter(({ id }) => id !== threadId))
+    : threads;
 }
 
 function userMessagePreview(

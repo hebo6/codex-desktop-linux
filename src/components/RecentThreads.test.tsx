@@ -70,9 +70,11 @@ function renderThreads(
   const onNewTaskInProject = vi.fn();
   const onArchiveThread = vi.fn();
   const onDeleteThread = vi.fn();
-  const onUndoArchive = vi.fn();
+  const onDismissArchiveNotice = vi.fn();
+  const onUnarchiveThread = vi.fn();
+  const onViewChange = vi.fn();
   const props: ComponentProps<typeof RecentThreads> = {
-    archivedThread: null,
+    archiveNotices: [],
     currentThreadId: THREAD_ONE.id,
     draftThreadIds: new Set(),
     error: null,
@@ -81,28 +83,33 @@ function renderThreads(
     loadingMore: false,
     onArchiveThread,
     onDeleteThread,
+    onDismissArchiveNotice,
     onLoadMore,
     onLoadProjectThreads,
     onNewTaskInProject,
     onOpenThread,
     onOpenThreadInNewTab,
-    onUndoArchive,
+    onUnarchiveThread,
+    onViewChange,
     pendingThreadIds: [],
     removingThreadIds: [],
     phase: "ready",
     threads: [THREAD_ONE, THREAD_TWO],
+    view: "recent",
     ...overrides,
   };
   const rendered = render(<RecentThreads {...props} />);
   return {
     onArchiveThread,
     onDeleteThread,
+    onDismissArchiveNotice,
     onLoadMore,
     onLoadProjectThreads,
     onNewTaskInProject,
     onOpenThread,
     onOpenThreadInNewTab,
-    onUndoArchive,
+    onUnarchiveThread,
+    onViewChange,
     rerenderThreads(next: Partial<ComponentProps<typeof RecentThreads>>) {
       rendered.rerender(<RecentThreads {...props} {...next} />);
     },
@@ -499,8 +506,8 @@ describe("RecentThreads", () => {
   });
 
   it("提供归档、删除和撤销操作且进行中禁用整行", () => {
-    const { onArchiveThread, onDeleteThread, onUndoArchive } = renderThreads({
-      archivedThread: THREAD_TWO,
+    const { onArchiveThread, onDeleteThread, onUnarchiveThread } = renderThreads({
+      archiveNotices: [THREAD_TWO],
       pendingThreadIds: [THREAD_TWO.id],
     });
 
@@ -513,8 +520,57 @@ describe("RecentThreads", () => {
     expect(onDeleteThread).toHaveBeenCalledWith(THREAD_ONE.id);
 
     expect(getThreadRow("预览标题")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "撤销" })).toBeDisabled();
-    expect(onUndoArchive).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "正在撤销" })).toBeDisabled();
+    expect(onUnarchiveThread).not.toHaveBeenCalled();
+  });
+
+  it("每条归档提示独立显示八秒", () => {
+    vi.useFakeTimers();
+    const { onDismissArchiveNotice } = renderThreads({
+      archiveNotices: [THREAD_ONE, THREAD_TWO],
+    });
+
+    act(() => vi.advanceTimersByTime(7_999));
+    expect(onDismissArchiveNotice).not.toHaveBeenCalled();
+
+    act(() => vi.advanceTimersByTime(1));
+    expect(onDismissArchiveNotice).toHaveBeenCalledTimes(2);
+    expect(onDismissArchiveNotice).toHaveBeenCalledWith(THREAD_ONE.id);
+    expect(onDismissArchiveNotice).toHaveBeenCalledWith(THREAD_TWO.id);
+  });
+
+  it("与提示栈交互时暂停全部归档提示", () => {
+    vi.useFakeTimers();
+    const { onDismissArchiveNotice } = renderThreads({
+      archiveNotices: [THREAD_ONE],
+    });
+    const notices = screen.getByLabelText("归档操作");
+
+    act(() => vi.advanceTimersByTime(3_000));
+    fireEvent.mouseEnter(notices);
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(onDismissArchiveNotice).not.toHaveBeenCalled();
+
+    fireEvent.mouseLeave(notices);
+    act(() => vi.advanceTimersByTime(4_999));
+    expect(onDismissArchiveNotice).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
+    expect(onDismissArchiveNotice).toHaveBeenCalledWith(THREAD_ONE.id);
+  });
+
+  it("展示已归档会话并提供单条恢复", () => {
+    const { onUnarchiveThread, onViewChange } = renderThreads({
+      currentThreadId: null,
+      threads: [THREAD_TWO],
+      view: "archived",
+    });
+
+    expect(screen.getByRole("list", { name: "已归档会话" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: `恢复“预览标题”` }));
+    expect(onUnarchiveThread).toHaveBeenCalledWith(THREAD_TWO.id);
+
+    fireEvent.click(screen.getByRole("button", { name: "最近" }));
+    expect(onViewChange).toHaveBeenCalledWith("recent");
   });
 
   it("离线只读时仍可打开会话但禁用服务端修改", () => {

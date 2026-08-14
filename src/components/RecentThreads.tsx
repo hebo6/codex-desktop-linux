@@ -20,12 +20,14 @@ import {
   ArchiveIcon,
   DeleteIcon,
   DraftIcon,
+  RestoreIcon,
   TerminalIcon,
 } from "./SidebarIcons";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import styles from "./RecentThreads.module.css";
 
 export interface RecentThreadsProps {
+  readonly archiveNotices: readonly ThreadSummary[];
   readonly currentThreadId: string | null;
   readonly draftThreadIds: ReadonlySet<string>;
   readonly error: string | null;
@@ -37,10 +39,10 @@ export interface RecentThreadsProps {
   readonly pendingThreadIds: readonly string[];
   readonly pendingResultThreadIds?: ReadonlySet<string>;
   readonly removingThreadIds: readonly string[];
-  readonly archivedThread: ThreadSummary | null;
   readonly backgroundCommandCounts?: ReadonlyMap<string, number>;
   readonly onArchiveThread: (threadId: string) => void;
   readonly onDeleteThread: (threadId: string) => void;
+  readonly onDismissArchiveNotice: (threadId: string) => void;
   readonly onLoadMore: () => void;
   readonly onLoadProjectThreads?: (
     cwd: string,
@@ -49,11 +51,15 @@ export interface RecentThreadsProps {
   readonly onNewTaskInProject?: (cwd: string) => void;
   readonly onOpenThread: (threadId: string) => void;
   readonly onOpenThreadInNewTab?: (threadId: string) => void;
-  readonly onUndoArchive: () => void;
+  readonly onUnarchiveThread: (threadId: string) => void;
+  readonly onViewChange: (view: ThreadListView) => void;
   readonly phase: ServerThreadsPhase;
   readonly threads: readonly ThreadSummary[];
   readonly readOnly?: boolean;
+  readonly view: ThreadListView;
 }
+
+export type ThreadListView = "recent" | "archived";
 
 interface ThreadGroup {
   readonly key: string;
@@ -104,6 +110,7 @@ const ACTION_ROW_HEIGHT = 40;
 const INITIAL_GROUP_THREAD_COUNT = 3;
 const GROUP_THREAD_PAGE_SIZE = 3;
 const RELATIVE_TIME_REFRESH_MS = 30_000;
+const ARCHIVE_NOTICE_DURATION_MS = 8_000;
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
@@ -116,6 +123,7 @@ const RELATIVE_TIME_FORMATTER = new Intl.RelativeTimeFormat("zh-CN", {
 const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();
 
 export function RecentThreads({
+  archiveNotices,
   currentThreadId,
   draftThreadIds,
   error,
@@ -127,19 +135,21 @@ export function RecentThreads({
   pendingThreadIds,
   pendingResultThreadIds = EMPTY_THREAD_IDS,
   removingThreadIds,
-  archivedThread,
   backgroundCommandCounts = EMPTY_COMMAND_COUNTS,
   onArchiveThread,
   onDeleteThread,
+  onDismissArchiveNotice,
   onLoadMore,
   onLoadProjectThreads,
   onNewTaskInProject,
   onOpenThread,
   onOpenThreadInNewTab,
-  onUndoArchive,
+  onUnarchiveThread,
+  onViewChange,
   phase,
   threads,
   readOnly = false,
+  view,
 }: RecentThreadsProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<ReadonlySet<string>>(
@@ -349,6 +359,10 @@ export function RecentThreads({
     };
   }, [contextMenu]);
 
+  useEffect(() => {
+    setContextMenu(null);
+  }, [view]);
+
   const navigate = (threadId: string, direction: 1 | -1) => {
     const threadEntries = entries.filter(
       (entry): entry is Extract<RecentThreadEntry, { type: "thread" }> =>
@@ -396,11 +410,26 @@ export function RecentThreads({
   };
 
   return (
-    <section aria-labelledby="recent-threads-title" className={styles.section}>
+    <section aria-label="会话" className={styles.section}>
       <header className={styles.sectionHeader}>
         <div className={styles.titleGroup}>
           {sidebarToggle}
-          <h2 id="recent-threads-title">最近会话</h2>
+          <div aria-label="会话范围" className={styles.viewSwitch} role="group">
+            <button
+              aria-pressed={view === "recent"}
+              onClick={() => onViewChange("recent")}
+              type="button"
+            >
+              最近
+            </button>
+            <button
+              aria-pressed={view === "archived"}
+              onClick={() => onViewChange("archived")}
+              type="button"
+            >
+              已归档
+            </button>
+          </div>
         </div>
         {headerActions}
       </header>
@@ -410,20 +439,30 @@ export function RecentThreads({
         </div>
       )}
       {phase === "idle" ? (
-        <p className={styles.empty}>连接完成后加载会话</p>
+        <p className={styles.empty}>
+          {view === "recent" ? "连接完成后加载会话" : "打开后加载已归档会话"}
+        </p>
       ) : phase === "loading" && threads.length === 0 ? (
-        <div aria-label="正在加载最近会话" className={styles.skeleton} role="status">
+        <div
+          aria-label={view === "recent" ? "正在加载最近会话" : "正在加载已归档会话"}
+          className={styles.skeleton}
+          role="status"
+        >
           <span />
           <span />
           <span />
         </div>
       ) : phase === "error" && threads.length === 0 ? (
-        <p className={styles.empty}>最近会话暂时不可用</p>
+        <p className={styles.empty}>
+          {view === "recent" ? "最近会话暂时不可用" : "已归档会话暂时不可用"}
+        </p>
       ) : threads.length === 0 ? (
-        <p className={styles.empty}>尚无最近会话，可新建任务开始</p>
+        <p className={styles.empty}>
+          {view === "recent" ? "尚无最近会话，可新建任务开始" : "尚无已归档会话"}
+        </p>
       ) : (
         <div
-          aria-label="最近会话"
+          aria-label={view === "recent" ? "最近会话" : "已归档会话"}
           className={styles.scroller}
           onScroll={handleScroll}
           ref={listRef}
@@ -464,6 +503,7 @@ export function RecentThreads({
                     />
                   ) : entry.type === "thread" ? (
                     <ThreadRow
+                      archived={view === "archived"}
                       backgroundCommandCount={
                         backgroundCommandCounts.get(entry.thread.id) ?? 0
                       }
@@ -474,14 +514,26 @@ export function RecentThreads({
                         readOnly || pendingThreadIds.includes(entry.thread.id)
                       }
                       resultPending={pendingResultThreadIds.has(entry.thread.id)}
-                      onArchive={() => onArchiveThread(entry.thread.id)}
-                      onDelete={() => onDeleteThread(entry.thread.id)}
+                      {...(view === "recent"
+                        ? {
+                            onArchive: () => onArchiveThread(entry.thread.id),
+                            onDelete: () => onDeleteThread(entry.thread.id),
+                          }
+                        : {
+                            onRestore: () => onUnarchiveThread(entry.thread.id),
+                          })}
                       onNavigate={(direction) =>
                         navigate(entry.thread.id, direction)
                       }
-                      onOpen={() => onOpenThread(entry.thread.id)}
+                      onOpen={() => {
+                        if (view === "recent") {
+                          onOpenThread(entry.thread.id);
+                        } else {
+                          onUnarchiveThread(entry.thread.id);
+                        }
+                      }}
                       nowMs={nowMs}
-                      {...(onOpenThreadInNewTab === undefined
+                      {...(view === "archived" || onOpenThreadInNewTab === undefined
                         ? {}
                         : {
                             onOpenContextMenu: (x: number, y: number) =>
@@ -537,18 +589,13 @@ export function RecentThreads({
           </div>
         </div>
       )}
-      {archivedThread === null ? null : (
-        <div className={styles.undoNotice} role="status">
-          <span>已归档“{threadTitle(archivedThread)}”</span>
-          <button
-            disabled={readOnly || pendingThreadIds.includes(archivedThread.id)}
-            onClick={onUndoArchive}
-            type="button"
-          >
-            撤销
-          </button>
-        </div>
-      )}
+      <ArchiveUndoNotices
+        notices={archiveNotices}
+        onDismiss={onDismissArchiveNotice}
+        onUndo={onUnarchiveThread}
+        pendingThreadIds={pendingThreadIds}
+        readOnly={readOnly}
+      />
       {contextMenu === null || onOpenThreadInNewTab === undefined
         ? null
         : createPortal(
@@ -574,6 +621,120 @@ export function RecentThreads({
             document.body,
           )}
     </section>
+  );
+}
+
+function ArchiveUndoNotices({
+  notices,
+  onDismiss,
+  onUndo,
+  pendingThreadIds,
+  readOnly,
+}: {
+  readonly notices: readonly ThreadSummary[];
+  readonly onDismiss: (threadId: string) => void;
+  readonly onUndo: (threadId: string) => void;
+  readonly pendingThreadIds: readonly string[];
+  readonly readOnly: boolean;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (notices.length === 0) {
+      setHovered(false);
+      setFocused(false);
+    }
+  }, [notices.length]);
+  if (notices.length === 0) {
+    return null;
+  }
+  const paused = hovered || focused;
+  return (
+    <div
+      aria-label="归档操作"
+      className={styles.undoNotices}
+      onBlurCapture={(event) => {
+        const nextTarget = event.relatedTarget;
+        if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+          return;
+        }
+        setFocused(false);
+      }}
+      onFocusCapture={() => setFocused(true)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {notices.map((thread) => (
+        <ArchiveUndoNotice
+          key={thread.id}
+          onDismiss={onDismiss}
+          onUndo={onUndo}
+          paused={paused}
+          pending={pendingThreadIds.includes(thread.id)}
+          readOnly={readOnly}
+          thread={thread}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ArchiveUndoNotice({
+  onDismiss,
+  onUndo,
+  paused,
+  pending,
+  readOnly,
+  thread,
+}: {
+  readonly onDismiss: (threadId: string) => void;
+  readonly onUndo: (threadId: string) => void;
+  readonly paused: boolean;
+  readonly pending: boolean;
+  readonly readOnly: boolean;
+  readonly thread: ThreadSummary;
+}) {
+  const remainingMsRef = useRef(ARCHIVE_NOTICE_DURATION_MS);
+  const previousPendingRef = useRef(pending);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+
+  useEffect(() => {
+    if (previousPendingRef.current && !pending) {
+      remainingMsRef.current = ARCHIVE_NOTICE_DURATION_MS;
+    }
+    previousPendingRef.current = pending;
+  }, [pending]);
+
+  useEffect(() => {
+    if (paused || pending) {
+      return;
+    }
+    const startedAt = Date.now();
+    const timeout = window.setTimeout(() => {
+      remainingMsRef.current = 0;
+      onDismissRef.current(thread.id);
+    }, remainingMsRef.current);
+    return () => {
+      window.clearTimeout(timeout);
+      remainingMsRef.current = Math.max(
+        0,
+        remainingMsRef.current - (Date.now() - startedAt),
+      );
+    };
+  }, [paused, pending, thread.id]);
+
+  return (
+    <div className={styles.undoNotice} role="status">
+      <span>已归档“{threadTitle(thread)}”</span>
+      <button
+        disabled={readOnly || pending}
+        onClick={() => onUndo(thread.id)}
+        type="button"
+      >
+        {pending ? "正在撤销" : "撤销"}
+      </button>
+    </div>
   );
 }
 
@@ -620,6 +781,7 @@ function GroupHeading({
 }
 
 function ThreadRow({
+  archived,
   backgroundCommandCount,
   current,
   disabled,
@@ -632,21 +794,24 @@ function ThreadRow({
   onOpen,
   onOpenContextMenu,
   onOpenInNewTab,
+  onRestore,
   nowMs,
   thread,
 }: {
+  readonly archived: boolean;
   readonly backgroundCommandCount: number;
   readonly current: boolean;
   readonly disabled: boolean;
   readonly hasDraft: boolean;
   readonly operationDisabled: boolean;
   readonly resultPending: boolean;
-  readonly onArchive: () => void;
-  readonly onDelete: () => void;
+  readonly onArchive?: () => void;
+  readonly onDelete?: () => void;
   readonly onNavigate: (direction: 1 | -1) => void;
   readonly onOpen: () => void;
   readonly onOpenContextMenu?: (x: number, y: number) => void;
   readonly onOpenInNewTab?: () => void;
+  readonly onRestore?: () => void;
   readonly nowMs: number;
   readonly thread: ThreadSummary;
 }) {
@@ -661,6 +826,7 @@ function ThreadRow({
     : [];
   const accessibleLabel = [
     title,
+    ...(archived ? ["已归档，按 Enter 恢复"] : []),
     ...(resultPending ? ["任务已完成，等待查看"] : []),
     ...(hasDraft ? ["存在未发送草稿"] : []),
     ...(threadStatus === null ? [] : [threadStatus.label]),
@@ -672,7 +838,12 @@ function ThreadRow({
     `${relativeUpdatedAt}更新`,
   ].join("，");
   return (
-    <div className={styles.threadRowContainer} data-pending={disabled} role="listitem">
+    <div
+      className={styles.threadRowContainer}
+      data-pending={disabled}
+      data-single-action={archived}
+      role="listitem"
+    >
       <button
         aria-label={accessibleLabel}
         aria-current={current ? "page" : undefined}
@@ -703,7 +874,7 @@ function ThreadRow({
             event.preventDefault();
             const bounds = event.currentTarget.getBoundingClientRect();
             onOpenContextMenu(bounds.left + 24, bounds.top + 24);
-          } else if (event.key === "Delete") {
+          } else if (event.key === "Delete" && onDelete !== undefined) {
             event.preventDefault();
             onDelete();
           } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -795,24 +966,38 @@ function ThreadRow({
         </span>
       </button>
       <span className={styles.rowActions}>
-        <button
-          aria-label={`归档“${title}”`}
-          disabled={operationDisabled}
-          onClick={onArchive}
-          title="归档"
-          type="button"
-        >
-          <ArchiveIcon />
-        </button>
-        <button
-          aria-label={`删除“${title}”`}
-          disabled={operationDisabled}
-          onClick={onDelete}
-          title="删除"
-          type="button"
-        >
-          <DeleteIcon />
-        </button>
+        {archived ? (
+          <button
+            aria-label={`恢复“${title}”`}
+            disabled={operationDisabled}
+            onClick={onRestore}
+            title="恢复"
+            type="button"
+          >
+            <RestoreIcon />
+          </button>
+        ) : (
+          <>
+            <button
+              aria-label={`归档“${title}”`}
+              disabled={operationDisabled}
+              onClick={onArchive}
+              title="归档"
+              type="button"
+            >
+              <ArchiveIcon />
+            </button>
+            <button
+              aria-label={`删除“${title}”`}
+              disabled={operationDisabled}
+              onClick={onDelete}
+              title="删除"
+              type="button"
+            >
+              <DeleteIcon />
+            </button>
+          </>
+        )}
       </span>
     </div>
   );

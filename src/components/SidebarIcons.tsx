@@ -200,6 +200,25 @@ export function ArchiveIcon() {
   );
 }
 
+export function RestoreIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height="18"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+      width="18"
+    >
+      <path d="M4 7v5h5" />
+      <path d="M5.8 16.2A8 8 0 1 0 6 7.8L4 10" />
+    </svg>
+  );
+}
+
 export function DeleteIcon() {
   return (
     <svg
