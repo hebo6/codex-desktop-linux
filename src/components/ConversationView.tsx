@@ -1838,7 +1838,7 @@ function UserShellActivity({ item }: { readonly item: CommandExecutionItem }) {
   const output = item.aggregatedOutput?.trim().length === 0
     ? null
     : item.aggregatedOutput ?? null;
-  const transition = useCollapsibleContent(item.status === "inProgress");
+  const transition = useCollapsibleContent(true);
   const hasOutput = output !== null;
   const status = userShellStatus(item);
   const toggle = () => {
@@ -2322,11 +2322,16 @@ function conversationRows(
       turn.status === "inProgress" && !finalAnswerStarted,
     )];
     const page = turnItemPages.get(turn.id);
+    const standaloneUserShellProjection =
+      turn.itemsView === "notLoaded" &&
+      turn.items.length > 0 &&
+      turn.items.every(isUserShellCommand);
     const canLoadTurnDetails =
       turnDetailsEnabled &&
       turn.status !== "inProgress" &&
       turn.itemsView !== "full" &&
-      page?.complete !== true;
+      page?.complete !== true &&
+      !standaloneUserShellProjection;
     const firstUserSegment = segments.findIndex(
       (segment) => segment.type === "item" && segment.item.type === "userMessage",
     );
@@ -2479,7 +2484,7 @@ function isWorkActivity(item: ThreadItem): boolean {
   if (item.type === "agentMessage") {
     return item.phase === "commentary";
   }
-  if (item.type === "commandExecution" && item.source === "userShell") {
+  if (isUserShellCommand(item)) {
     return false;
   }
   return [
@@ -2497,6 +2502,12 @@ function isWorkActivity(item: ThreadItem): boolean {
     "sleep",
     "imageGeneration",
   ].includes(item.type);
+}
+
+function isUserShellCommand(
+  item: ThreadItem,
+): item is CommandExecutionItem & { readonly source: "userShell" } {
+  return item.type === "commandExecution" && item.source === "userShell";
 }
 
 function isFinalAnswer(

@@ -677,10 +677,49 @@ describe("ConversationView", () => {
     expect(shellRecord).not.toHaveAttribute("data-activity-group");
     expect(within(shellRecord!).getByText("pnpm test -- --runInBand")).toBeVisible();
     expect(screen.queryByText("Read package.json")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Test Files\s+73 passed/u)).not.toBeInTheDocument();
+    expect(shellHeader).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/Test Files\s+73 passed/u)).toBeVisible();
 
     fireEvent.click(shellHeader);
-    await waitFor(() => expect(screen.getByText(/Test Files\s+73 passed/u)).toBeVisible());
+    expect(shellHeader).toHaveAttribute("aria-expanded", "false");
+    await waitFor(() => {
+      expect(screen.queryByText(/Test Files\s+73 passed/u)).not.toBeInTheDocument();
+    });
+  });
+
+  it("已完成的独立用户 Shell 不显示空活动组并默认展开", () => {
+    const shellTurn = {
+      durationMs: 480,
+      id: "turn-completed-user-shell",
+      items: [
+        {
+          aggregatedOutput: "/workspace/project",
+          command: "pwd",
+          commandActions: [],
+          cwd: "/workspace/project",
+          durationMs: 480,
+          exitCode: 0,
+          id: "command-completed-user-shell",
+          source: "userShell" as const,
+          status: "completed" as const,
+          type: "commandExecution" as const,
+        },
+      ],
+      itemsView: "notLoaded" as const,
+      status: "completed" as const,
+    } satisfies ThreadTurn;
+    render(
+      <ConversationView
+        restoredThread={{ ...RESTORED, turns: [shellTurn] }}
+      />,
+    );
+
+    expect(document.querySelector("[data-activity-group]")).toBeNull();
+    const shellHeader = screen.getByRole("button", {
+      name: "你执行的 Shell：pwd，已完成 · 480 毫秒",
+    });
+    expect(shellHeader).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("/workspace/project")).toBeVisible();
   });
 
   it("运行中的用户 Shell 默认展开并显示运行状态", () => {
