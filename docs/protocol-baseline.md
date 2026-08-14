@@ -5,9 +5,9 @@
 | 项目 | 值 |
 | --- | --- |
 | 上游仓库 | [openai/codex](https://github.com/openai/codex) |
-| 上游提交 | `a4535884169be8da2f81b8a4debecbd4dc11aa97` |
+| 上游提交 | `8630bb3caecaff6abc6add450a88035d9f6d3f8c` |
 | 上游生成命令 | `codex app-server generate-json-schema --experimental` |
-| 本项目导出器 | `codex-app-server-protocol` 的 `export` 二进制 |
+| 上游固化产物 | `codex-app-server-protocol` 的实验版预计算协议归档 |
 | 固化目录 | `protocol/schema` |
 
 本基线只固化上游 JSON Schema，不复制上游 `ts-rs` 生成的 TypeScript 类型
@@ -34,24 +34,24 @@
 CODEX_SOURCE_DIR=/path/to/codex ./scripts/generate-protocol-schema.sh --check
 ```
 
-脚本会拒绝提交号不匹配或存在未提交变更的上游检出，并使用 `cargo run --locked` 只构建该提交的 `codex-app-server-protocol` 导出二进制
+脚本会拒绝提交号不匹配或存在未提交变更的上游检出，并读取该提交中 `codex-app-server-protocol` 固化的实验版预计算协议归档
 
-该导出二进制与 `codex app-server generate-json-schema` 调用相同的 `generate_json_with_experimental` 实现，但还会生成上游 TypeScript 文件，脚本只从临时目录筛选 JSON 并丢弃 TypeScript
+上游 `codex app-server generate-json-schema --experimental` 也从同一归档导出 `json_schema`，本项目使用 Node.js 内置 Zstandard 解压后只固化其中的 JSON Schema
 
-原始生成目录位于 `/tmp`，Cargo 构建缓存位于本项目已忽略的 `.cache/protocol-schema-target`，脚本会在构建前后拒绝超过 4 GiB 的缓存
+原始生成目录位于 `/tmp`
 
 `--update` 只把最终 JSON Schema、来源提交和校验清单同步到本项目
 
 ## 固化产物
 
-`protocol/schema/UPSTREAM_COMMIT` 记录上游完整提交号，`protocol/schema/SHA256SUMS` 记录全部 349 个 JSON 文件按相对路径排序后的 SHA256
+`protocol/schema/UPSTREAM_COMMIT` 记录上游完整提交号，`protocol/schema/SHA256SUMS` 记录全部 380 个 JSON 文件按相对路径排序后的 SHA256
 
 两个聚合入口的校验值如下
 
 | 文件 | SHA256 |
 | --- | --- |
-| `codex_app_server_protocol.schemas.json` | `88bcda93daca473b790c0089b28910275a947de601d9de4cec7e01dc65771fc2` |
-| `codex_app_server_protocol.v2.schemas.json` | `3d7098928a08e2cbe60de7588f0de890598de947cfc82d3c9a01fccd85752630` |
+| `codex_app_server_protocol.schemas.json` | `e190e3ac1918ee7ccb2c6b3e8d93dd8521d8a47b235903630f95266e1716b965` |
+| `codex_app_server_protocol.v2.schemas.json` | `b4e8157096dd054c008a4f1b538fb6cd8f1f2cb9577a97a4afef59c2296ed608` |
 
 `codex_app_server_protocol.schemas.json` 是完整命名空间聚合包，`codex_app_server_protocol.v2.schemas.json` 是扁平化 v2 聚合包，目录内其余 JSON 文件是请求、响应、通知及共享负载的独立 Schema
 

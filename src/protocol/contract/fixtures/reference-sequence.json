@@ -1,5 +1,5 @@
 {
-  "schemaCommit": "a4535884169be8da2f81b8a4debecbd4dc11aa97",
+  "schemaCommit": "8630bb3caecaff6abc6add450a88035d9f6d3f8c",
   "recordingSource": "controlled-app-server",
   "deidentified": true,
   "clientRequests": [
@@ -330,6 +330,7 @@
       "method": "item/tool/requestUserInput",
       "params": {
         "itemId": "question-redacted",
+        "isBlocking": true,
         "questions": [
           {
             "header": "选择",

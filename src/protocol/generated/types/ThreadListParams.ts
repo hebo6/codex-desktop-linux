@@ -1,9 +1,9 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
+// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
 
 export type ThreadListCwdFilter = string | string[];
 export type SortDirection = "asc" | "desc";
-export type ThreadSortKey = "created_at" | "updated_at" | "recency_at";
+export type ThreadSortKey = "created_at" | "updated_at" | "recency_at" | "section_position";
 export type ThreadSourceKind =
   | "cli"
   | "vscode"
@@ -34,10 +34,6 @@ export interface ThreadListParams {
    */
   cwd?: ThreadListCwdFilter | null;
   /**
-   * Optional pinned filter; when set, only threads matching this value are returned.
-   */
-  isPinned?: boolean | null;
-  /**
    * Optional page size; defaults to a reasonable server-side value.
    */
   limit?: number | null;
@@ -53,6 +49,10 @@ export interface ThreadListParams {
    * Optional substring filter for the extracted thread title.
    */
   searchTerm?: string | null;
+  /**
+   * Omit to include every section, set to `null` for unsectioned threads, or provide a section ID to return only threads in that section.
+   */
+  sectionId?: string | null;
   /**
    * Optional sort direction; defaults to descending (newest first).
    */

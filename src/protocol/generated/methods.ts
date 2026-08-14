@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
+// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
 export const KNOWN_SERVER_REQUEST_METHODS = [
   "account/chatgptAuthTokens/refresh",
   "applyPatchApproval",
@@ -72,6 +72,7 @@ export const KNOWN_SERVER_NOTIFICATION_METHODS = [
   "thread/goal/cleared",
   "thread/goal/updated",
   "thread/name/updated",
+  "thread/queue/changed",
   "thread/realtime/closed",
   "thread/realtime/error",
   "thread/realtime/itemAdded",
@@ -80,6 +81,7 @@ export const KNOWN_SERVER_NOTIFICATION_METHODS = [
   "thread/realtime/started",
   "thread/realtime/transcript/delta",
   "thread/realtime/transcript/done",
+  "thread/reverted",
   "thread/settings/updated",
   "thread/started",
   "thread/status/changed",

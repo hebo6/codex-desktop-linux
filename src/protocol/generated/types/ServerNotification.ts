@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
+// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
 
 /**
  * Notification sent from the server to the client.
@@ -18,10 +18,12 @@ export type ServerNotification = {
   | ThreadDeletedNotification
   | ThreadUnarchivedNotification
   | ThreadClosedNotification
+  | ThreadRevertedNotification
   | SkillsChangedNotification
   | ThreadNameUpdatedNotification
   | ThreadGoalUpdatedNotification
   | ThreadGoalClearedNotification
+  | ThreadQueueChangedNotification
   | ThreadEnvironmentConnectedNotification
   | ThreadEnvironmentDisconnectedNotification
   | ThreadSettingsUpdatedNotification
@@ -180,11 +182,11 @@ export type PlanThreadItemType = "plan";
 export type ReasoningThreadItemType = "reasoning";
 export type CommandAction =
   ReadCommandAction | ListFilesCommandAction | SearchCommandAction | UnknownCommandAction;
+export type LegacyAppPathString = string;
 export type ReadCommandActionType = "read";
 export type ListFilesCommandActionType = "listFiles";
 export type SearchCommandActionType = "search";
 export type UnknownCommandActionType = "unknown";
-export type LegacyAppPathString = string;
 export type CommandExecutionSource =
   "agent" | "userShell" | "unifiedExecStartup" | "unifiedExecInteraction";
 export type CommandExecutionStatus = "inProgress" | "completed" | "failed" | "declined";
@@ -229,6 +231,8 @@ export type OtherWebSearchActionType = "other";
 export type WebSearchThreadItemType = "webSearch";
 export type ImageViewThreadItemType = "imageView";
 export type SleepThreadItemType = "sleep";
+export type ImageGenerationFailure = UsageLimitExceededImageGenerationFailure;
+export type UsageLimitExceededImageGenerationFailureType = "usageLimitExceeded";
 export type ImageGenerationThreadItemType = "imageGeneration";
 export type EnteredReviewModeThreadItemType = "enteredReviewMode";
 export type ExitedReviewModeThreadItemType = "exitedReviewMode";
@@ -240,12 +244,14 @@ export type ThreadArchivedNotificationMethod = "thread/archived";
 export type ThreadDeletedNotificationMethod = "thread/deleted";
 export type ThreadUnarchivedNotificationMethod = "thread/unarchived";
 export type ThreadClosedNotificationMethod = "thread/closed";
+export type ThreadRevertedNotificationMethod = "thread/reverted";
 export type SkillsChangedNotificationMethod = "skills/changed";
 export type ThreadNameUpdatedNotificationMethod = "thread/name/updated";
 export type ThreadGoalUpdatedNotificationMethod = "thread/goal/updated";
 export type ThreadGoalStatus =
   "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
 export type ThreadGoalClearedNotificationMethod = "thread/goal/cleared";
+export type ThreadQueueChangedNotificationMethod = "thread/queue/changed";
 export type ThreadEnvironmentConnectedNotificationMethod = "thread/environment/connected";
 export type ThreadEnvironmentDisconnectedNotificationMethod = "thread/environment/disconnected";
 export type ThreadSettingsUpdatedNotificationMethod = "thread/settings/updated";
@@ -411,9 +417,11 @@ export type PlanType =
   | "pro"
   | "prolite"
   | "team"
+  | "self_serve_business_prolite"
   | "self_serve_business_usage_based"
   | "business"
   | "ent26"
+  | "enterprise_cbp_automation"
   | "enterprise_cbp_usage_based"
   | "enterprise"
   | "edu"
@@ -474,6 +482,7 @@ export type WindowsWorldWritableWarningNotificationMethod = "windows/worldWritab
 export type WindowsSandboxSetupCompletedNotificationMethod = "windowsSandbox/setupCompleted";
 export type WindowsSandboxSetupMode = "elevated" | "unelevated";
 export type AccountLoginCompletedNotificationMethod = "account/login/completed";
+export type DesktopOnboardingEntrypoint = "life_sciences";
 
 /**
  * NEW NOTIFICATIONS
@@ -597,10 +606,6 @@ export interface Thread {
    */
   id: string;
   /**
-   * Whether the thread has been pinned by the user.
-   */
-  isPinned?: boolean;
-  /**
    * Model provider used for this thread (for example, 'openai').
    */
   modelProvider: string;
@@ -624,6 +629,14 @@ export interface Thread {
    * Unix timestamp (in seconds) used for thread recency ordering.
    */
   recencyAt?: number | null;
+  /**
+   * The independently persisted section selected for this thread, if any.
+   */
+  section?: ThreadSection | null;
+  /**
+   * Unix timestamp in seconds when the thread entered its current section.
+   */
+  sectionEnteredAt?: number | null;
   /**
    * Session id shared by threads that belong to the same session tree.
    */
@@ -660,6 +673,32 @@ export interface GitInfo {
   branch?: string | null;
   originUrl?: string | null;
   sha?: string | null;
+  [k: string]: unknown | undefined;
+}
+/**
+ * An independently persisted, user-visible thread section.
+ */
+export interface ThreadSection {
+  /**
+   * Optional appearance synchronized across clients.
+   */
+  appearance?: ThreadSectionAppearance | null;
+  /**
+   * Opaque UUIDv7 identity that remains stable when the section is renamed.
+   */
+  id: string;
+  /**
+   * The current user-visible section name.
+   */
+  name: string;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Extensible visual presentation for a custom thread section.
+ */
+export interface ThreadSectionAppearance {
+  color?: string | null;
+  icon?: string | null;
   [k: string]: unknown | undefined;
 }
 export interface CustomSessionSource {
@@ -889,7 +928,7 @@ export interface CommandExecutionThreadItem {
 export interface ReadCommandAction {
   command: string;
   name: string;
-  path: AbsolutePathBuf;
+  path: LegacyAppPathString;
   type: ReadCommandActionType;
   [k: string]: unknown | undefined;
 }
@@ -951,6 +990,7 @@ export interface McpToolCallThreadItem {
    */
   mcpAppResourceUri?: string | null;
   pluginId?: string | null;
+  readOnlyHint?: boolean | null;
   result?: McpToolCallResult | null;
   server: string;
   status: McpToolCallStatus;
@@ -1111,12 +1151,20 @@ export interface SleepThreadItem {
   [k: string]: unknown | undefined;
 }
 export interface ImageGenerationThreadItem {
+  failure?: ImageGenerationFailure | null;
   id: string;
   result: string;
   revisedPrompt?: string | null;
   savedPath?: AbsolutePathBuf | null;
   status: string;
+  transparentBackground?: boolean | null;
   type: ImageGenerationThreadItemType;
+  [k: string]: unknown | undefined;
+}
+export interface UsageLimitExceededImageGenerationFailure {
+  limitId: string;
+  resetsAt?: number | null;
+  type: UsageLimitExceededImageGenerationFailureType;
   [k: string]: unknown | undefined;
 }
 export interface EnteredReviewModeThreadItem {
@@ -1182,6 +1230,15 @@ export interface ThreadClosedNotification1 {
   threadId: string;
   [k: string]: unknown | undefined;
 }
+export interface ThreadRevertedNotification {
+  method: ThreadRevertedNotificationMethod;
+  params: ThreadRevertedNotification1;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadRevertedNotification1 {
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
 export interface SkillsChangedNotification {
   method: SkillsChangedNotificationMethod;
   params: SkillsChangedNotification1;
@@ -1233,6 +1290,15 @@ export interface ThreadGoalClearedNotification {
   [k: string]: unknown | undefined;
 }
 export interface ThreadGoalClearedNotification1 {
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadQueueChangedNotification {
+  method: ThreadQueueChangedNotificationMethod;
+  params: ThreadQueueChangedNotification1;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadQueueChangedNotification1 {
   threadId: string;
   [k: string]: unknown | undefined;
 }
@@ -2101,6 +2167,10 @@ export interface ExternalAgentConfigImportItemTypeSuccess {
   itemType: ExternalAgentConfigMigrationItemType;
   source?: string | null;
   target?: string | null;
+  /**
+   * Original title for an imported session; null for other item types.
+   */
+  title?: string | null;
   [k: string]: unknown | undefined;
 }
 export interface ExternalAgentConfigImportCompletedNotification {
@@ -2513,6 +2583,7 @@ export interface AccountLoginCompletedNotification {
 export interface AccountLoginCompletedNotification1 {
   error?: string | null;
   loginId?: string | null;
+  onboardingEntrypoint?: DesktopOnboardingEntrypoint | null;
   success: boolean;
   [k: string]: unknown | undefined;
 }

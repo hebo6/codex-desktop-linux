@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
+// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
 
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
 /**
@@ -11,8 +11,12 @@ export type WebSearchMode = "disabled" | "cached" | "indexed" | "live";
 export type WindowsSandboxSetupMode = "elevated" | "unelevated";
 export type ResidencyRequirement = "us";
 export type ConfiguredHookHandler =
-  CommandConfiguredHookHandler | PromptConfiguredHookHandler | AgentConfiguredHookHandler;
+  | CommandConfiguredHookHandler
+  | McpToolConfiguredHookHandler
+  | PromptConfiguredHookHandler
+  | AgentConfiguredHookHandler;
 export type CommandConfiguredHookHandlerType = "command";
+export type McpToolConfiguredHookHandlerType = "mcp_tool";
 export type PromptConfiguredHookHandlerType = "prompt";
 export type AgentConfiguredHookHandlerType = "agent";
 /**
@@ -42,6 +46,7 @@ export interface ConfigRequirements {
   allowedSandboxModes?: SandboxMode[] | null;
   allowedWebSearchModes?: WebSearchMode[] | null;
   allowedWindowsSandboxImplementations?: WindowsSandboxSetupMode[] | null;
+  autoReview?: AutoReviewRequirements | null;
   browserUse?: BrowserUseRequirements | null;
   checkForUpdateOnStartup?: boolean | null;
   computerUse?: ComputerUseRequirements | null;
@@ -69,6 +74,11 @@ export interface GranularAskForApproval {
     skill_approval?: boolean;
     [k: string]: unknown | undefined;
   };
+}
+export interface AutoReviewRequirements {
+  ignoreRules?: string[] | null;
+  requiredOnModels?: string[] | null;
+  [k: string]: unknown | undefined;
 }
 export interface BrowserUseRequirements {
   disableAutoReview?: boolean | null;
@@ -114,6 +124,17 @@ export interface CommandConfiguredHookHandler {
   statusMessage?: string | null;
   timeoutSec?: number | null;
   type: CommandConfiguredHookHandlerType;
+  [k: string]: unknown | undefined;
+}
+export interface McpToolConfiguredHookHandler {
+  input: {
+    [k: string]: unknown | undefined;
+  };
+  server: string;
+  statusMessage?: string | null;
+  timeoutSec?: number | null;
+  tool: string;
+  type: McpToolConfiguredHookHandlerType;
   [k: string]: unknown | undefined;
 }
 export interface PromptConfiguredHookHandler {

@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
+// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
 
 /**
  * Request initiated from the server and sent to the client.
@@ -47,12 +47,6 @@ export type CommandExecutionApprovalDecision =
 export type NetworkPolicyRuleAction = "allow" | "deny";
 export type CommandAction =
   ReadCommandAction | ListFilesCommandAction | SearchCommandAction | UnknownCommandAction;
-/**
- * A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).
- *
- * IMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.
- */
-export type AbsolutePathBuf = string;
 export type ReadCommandActionType = "read";
 export type ListFilesCommandActionType = "listFiles";
 export type SearchCommandActionType = "search";
@@ -118,6 +112,12 @@ export type McpElicitationNumberType = "number" | "integer";
 export type McpElicitationBooleanType = "boolean";
 export type McpElicitationObjectType = "object";
 export type ItemPermissionsRequestApprovalRequestMethod = "item/permissions/requestApproval";
+/**
+ * A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).
+ *
+ * IMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.
+ */
+export type AbsolutePathBuf = string;
 export type ItemToolCallRequestMethod = "item/tool/call";
 export type AccountChatgptAuthTokensRefreshRequestMethod = "account/chatgptAuthTokens/refresh";
 export type ChatgptAuthTokensRefreshReason = "unauthorized";
@@ -296,7 +296,7 @@ export interface NetworkPolicyAmendment {
 export interface ReadCommandAction {
   command: string;
   name: string;
-  path: AbsolutePathBuf;
+  path: LegacyAppPathString;
   type: ReadCommandActionType;
   [k: string]: unknown | undefined;
 }
@@ -363,7 +363,11 @@ export interface ItemToolRequestUserInputRequest {
  * EXPERIMENTAL. Params sent with a request_user_input event.
  */
 export interface ToolRequestUserInputParams {
+  /**
+   * @deprecated Use `isBlocking` to decide whether the request should block.
+   */
   autoResolutionMs?: number | null;
+  isBlocking: boolean;
   itemId: string;
   questions: ToolRequestUserInputQuestion[];
   threadId: string;

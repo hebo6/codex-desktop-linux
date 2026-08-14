@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
+// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
 
 /**
  * User's decision in response to an ExecApprovalRequest.
@@ -8,6 +8,7 @@ export type ReviewDecision =
   | "approved"
   | ApprovedExecpolicyAmendmentReviewDecision
   | "approved_for_session"
+  | "approved_mcp_policy_amendment"
   | NetworkPolicyAmendmentReviewDecision
   | DeniedReviewDecision
   | "timed_out"

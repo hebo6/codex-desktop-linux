@@ -95,6 +95,7 @@ describe("ApprovalPanel", () => {
       method: "item/tool/requestUserInput",
       params: {
         itemId: "item-1",
+        isBlocking: true,
         questions: [{
           header: "方案",
           id: "choice",

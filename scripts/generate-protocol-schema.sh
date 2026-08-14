@@ -2,7 +2,7 @@
 
 set -eu
 
-readonly expected_commit="a4535884169be8da2f81b8a4debecbd4dc11aa97"
+readonly expected_commit="8630bb3caecaff6abc6add450a88035d9f6d3f8c"
 
 project_dir=$(realpath "$(dirname "$0")/..")
 schema_dir="$project_dir/protocol/schema"
@@ -48,39 +48,21 @@ fi
 temporary_dir=$(mktemp -d /tmp/codex-app-server-schema.XXXXXX)
 raw_generated_dir="$temporary_dir/raw"
 generated_dir="$temporary_dir/schema"
-readonly cargo_target_dir="$project_dir/.cache/protocol-schema-target"
-readonly maximum_cache_size_kib=4194304
+precomputed_archive="$codex_source_dir/codex-rs/app-server-protocol/schema/precomputed/app-server-exports-experimental.json.zst"
 
 cleanup() {
     rm -rf "$temporary_dir"
 }
 trap cleanup EXIT HUP INT TERM
 
-check_cache_size() {
-    if [ ! -d "$cargo_target_dir" ]; then
-        return
-    fi
+if [ ! -f "$precomputed_archive" ]; then
+    printf '%s\n' "Codex 源码缺少实验版预计算协议归档: $precomputed_archive" >&2
+    exit 1
+fi
 
-    cache_size_kib=$(du -sk "$cargo_target_dir" | awk '{print $1}')
-    if [ "$cache_size_kib" -gt "$maximum_cache_size_kib" ]; then
-        printf '%s\n' "协议 Schema 构建缓存超过 4 GiB，请先检查 $cargo_target_dir" >&2
-        exit 1
-    fi
-}
-
-check_cache_size
-
-env CARGO_INCREMENTAL=0 CARGO_TARGET_DIR="$cargo_target_dir" \
-    cargo run \
-    --locked \
-    --manifest-path "$codex_source_dir/codex-rs/Cargo.toml" \
-    --package codex-app-server-protocol \
-    --bin export \
-    -- \
-    --experimental \
-    --out "$raw_generated_dir"
-
-check_cache_size
+node "$project_dir/scripts/extract-precomputed-protocol-schema.mjs" \
+    "$precomputed_archive" \
+    "$raw_generated_dir"
 
 mkdir -p "$generated_dir"
 find "$raw_generated_dir" -type f -name '*.json' -printf '%P\n' \

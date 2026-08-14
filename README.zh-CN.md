@@ -100,7 +100,7 @@ codex app-server \
 
 ## 协议兼容性
 
-协议类型和运行时校验器从上游 Codex 提交 `a4535884169be8da2f81b8a4debecbd4dc11aa97` 的实验版 JSON Schema 生成
+协议类型和运行时校验器从上游 Codex 提交 `8630bb3caecaff6abc6add450a88035d9f6d3f8c` 的实验版 JSON Schema 生成
 
 项目不承诺兼容更早或更新的 Codex 构建，生成、校验和 wire envelope 细节见[协议基线](docs/protocol-baseline.md)
 

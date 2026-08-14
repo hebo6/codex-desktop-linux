@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
+// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
 
 /**
  * This translation layer make sure that we expose codex error code in camel case.
@@ -74,17 +74,11 @@ export type PlanThreadItemType = "plan";
 export type ReasoningThreadItemType = "reasoning";
 export type CommandAction =
   ReadCommandAction | ListFilesCommandAction | SearchCommandAction | UnknownCommandAction;
-/**
- * A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).
- *
- * IMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.
- */
-export type AbsolutePathBuf = string;
+export type LegacyAppPathString = string;
 export type ReadCommandActionType = "read";
 export type ListFilesCommandActionType = "listFiles";
 export type SearchCommandActionType = "search";
 export type UnknownCommandActionType = "unknown";
-export type LegacyAppPathString = string;
 export type CommandExecutionSource =
   "agent" | "userShell" | "unifiedExecStartup" | "unifiedExecInteraction";
 export type CommandExecutionStatus = "inProgress" | "completed" | "failed" | "declined";
@@ -129,6 +123,14 @@ export type OtherWebSearchActionType = "other";
 export type WebSearchThreadItemType = "webSearch";
 export type ImageViewThreadItemType = "imageView";
 export type SleepThreadItemType = "sleep";
+export type ImageGenerationFailure = UsageLimitExceededImageGenerationFailure;
+export type UsageLimitExceededImageGenerationFailureType = "usageLimitExceeded";
+/**
+ * A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).
+ *
+ * IMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.
+ */
+export type AbsolutePathBuf = string;
 export type ImageGenerationThreadItemType = "imageGeneration";
 export type EnteredReviewModeThreadItemType = "enteredReviewMode";
 export type ExitedReviewModeThreadItemType = "exitedReviewMode";
@@ -379,7 +381,7 @@ export interface CommandExecutionThreadItem {
 export interface ReadCommandAction {
   command: string;
   name: string;
-  path: AbsolutePathBuf;
+  path: LegacyAppPathString;
   type: ReadCommandActionType;
   [k: string]: unknown | undefined;
 }
@@ -441,6 +443,7 @@ export interface McpToolCallThreadItem {
    */
   mcpAppResourceUri?: string | null;
   pluginId?: string | null;
+  readOnlyHint?: boolean | null;
   result?: McpToolCallResult | null;
   server: string;
   status: McpToolCallStatus;
@@ -601,12 +604,20 @@ export interface SleepThreadItem {
   [k: string]: unknown | undefined;
 }
 export interface ImageGenerationThreadItem {
+  failure?: ImageGenerationFailure | null;
   id: string;
   result: string;
   revisedPrompt?: string | null;
   savedPath?: AbsolutePathBuf | null;
   status: string;
+  transparentBackground?: boolean | null;
   type: ImageGenerationThreadItemType;
+  [k: string]: unknown | undefined;
+}
+export interface UsageLimitExceededImageGenerationFailure {
+  limitId: string;
+  resetsAt?: number | null;
+  type: UsageLimitExceededImageGenerationFailureType;
   [k: string]: unknown | undefined;
 }
 export interface EnteredReviewModeThreadItem {

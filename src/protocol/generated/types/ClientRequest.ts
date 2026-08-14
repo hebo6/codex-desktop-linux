@@ -1,11 +1,12 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
+// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
 
 /**
  * Request from the client to the server.
  */
 export type ClientRequest =
   | InitializeRequest
+  | ServerDiagnosticsRequest
   | ThreadStartRequest
   | ThreadResumeRequest
   | ThreadForkRequest
@@ -18,7 +19,14 @@ export type ClientRequest =
   | ThreadGoalSetRequest
   | ThreadGoalGetRequest
   | ThreadGoalClearRequest
+  | ThreadQueueAddRequest
+  | ThreadQueueListRequest
+  | ThreadQueueUpdateRequest
+  | ThreadQueueDeleteRequest
+  | ThreadQueueReorderRequest
+  | ThreadQueueStartRequest
   | ThreadMetadataUpdateRequest
+  | ThreadSectionMoveRequest
   | ThreadSettingsUpdateRequest
   | ThreadMemoryModeSetRequest
   | MemoryResetRequest
@@ -30,7 +38,12 @@ export type ClientRequest =
   | ThreadBackgroundTerminalsListRequest
   | ThreadBackgroundTerminalsTerminateRequest
   | ThreadRollbackRequest
+  | ThreadRevertRequest
   | ThreadListRequest
+  | ThreadSectionListRequest
+  | ThreadSectionCreateRequest
+  | ThreadSectionUpdateRequest
+  | ThreadSectionDeleteRequest
   | ThreadSearchRequest
   | ThreadSearchOccurrencesRequest
   | ThreadLoadedListRequest
@@ -45,6 +58,7 @@ export type ClientRequest =
   | MarketplaceRemoveRequest
   | MarketplaceUpgradeRequest
   | PluginListRequest
+  | PluginSearchRequest
   | PluginInstalledRequest
   | PluginReadRequest
   | PluginSkillReadRequest
@@ -134,6 +148,7 @@ export type ClientRequest =
   | FuzzyFileSearchSessionStopRequest;
 export type RequestId = string | number;
 export type InitializeRequestMethod = "initialize";
+export type ServerDiagnosticsRequestMethod = "server/diagnostics";
 export type ThreadStartRequestMethod = "thread/start";
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
 /**
@@ -261,7 +276,29 @@ export type ThreadGoalStatus =
   "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
 export type ThreadGoalGetRequestMethod = "thread/goal/get";
 export type ThreadGoalClearRequestMethod = "thread/goal/clear";
+export type ThreadQueueAddRequestMethod = "thread/queue/add";
+export type UserInput =
+  | TextUserInput
+  | ImageUserInput
+  | LocalImageUserInput
+  | AudioUserInput
+  | LocalAudioUserInput
+  | SkillUserInput
+  | MentionUserInput;
+export type TextUserInputType = "text";
+export type ImageUserInputType = "image";
+export type LocalImageUserInputType = "localImage";
+export type AudioUserInputType = "audio";
+export type LocalAudioUserInputType = "localAudio";
+export type SkillUserInputType = "skill";
+export type MentionUserInputType = "mention";
+export type ThreadQueueListRequestMethod = "thread/queue/list";
+export type ThreadQueueUpdateRequestMethod = "thread/queue/update";
+export type ThreadQueueDeleteRequestMethod = "thread/queue/delete";
+export type ThreadQueueReorderRequestMethod = "thread/queue/reorder";
+export type ThreadQueueStartRequestMethod = "thread/queue/start";
 export type ThreadMetadataUpdateRequestMethod = "thread/metadata/update";
+export type ThreadSectionMoveRequestMethod = "thread/section/move";
 export type ThreadSettingsUpdateRequestMethod = "thread/settings/update";
 /**
  * Initial collaboration mode to use when the TUI starts.
@@ -297,9 +334,10 @@ export type ThreadBackgroundTerminalsListRequestMethod = "thread/backgroundTermi
 export type ThreadBackgroundTerminalsTerminateRequestMethod =
   "thread/backgroundTerminals/terminate";
 export type ThreadRollbackRequestMethod = "thread/rollback";
+export type ThreadRevertRequestMethod = "thread/revert";
 export type ThreadListRequestMethod = "thread/list";
 export type ThreadListCwdFilter = string | string[];
-export type ThreadSortKey = "created_at" | "updated_at" | "recency_at";
+export type ThreadSortKey = "created_at" | "updated_at" | "recency_at" | "section_position";
 export type ThreadSourceKind =
   | "cli"
   | "vscode"
@@ -311,7 +349,12 @@ export type ThreadSourceKind =
   | "subAgentThreadSpawn"
   | "subAgentOther"
   | "unknown";
+export type ThreadSectionListRequestMethod = "threadSection/list";
+export type ThreadSectionCreateRequestMethod = "threadSection/create";
+export type ThreadSectionUpdateRequestMethod = "threadSection/update";
+export type ThreadSectionDeleteRequestMethod = "threadSection/delete";
 export type ThreadSearchRequestMethod = "thread/search";
+export type ThreadSearchSortKey = "created_at" | "updated_at" | "recency_at";
 export type ThreadSearchOccurrencesRequestMethod = "thread/searchOccurrences";
 export type ThreadLoadedListRequestMethod = "thread/loaded/list";
 export type ThreadReadRequestMethod = "thread/read";
@@ -327,6 +370,8 @@ export type MarketplaceUpgradeRequestMethod = "marketplace/upgrade";
 export type PluginListRequestMethod = "plugin/list";
 export type PluginListMarketplaceKind =
   "local" | "vertical" | "workspace-directory" | "shared-with-me" | "created-by-me-remote";
+export type PluginSearchRequestMethod = "plugin/search";
+export type PluginSearchScope = "global" | "workspace" | "personal";
 export type PluginInstalledRequestMethod = "plugin/installed";
 export type PluginReadRequestMethod = "plugin/read";
 export type PluginSkillReadRequestMethod = "plugin/skill/read";
@@ -356,21 +401,6 @@ export type PluginInstallRequestMethod = "plugin/install";
 export type PluginUninstallRequestMethod = "plugin/uninstall";
 export type TurnStartRequestMethod = "turn/start";
 export type AdditionalContextKind = "untrusted" | "application";
-export type UserInput =
-  | TextUserInput
-  | ImageUserInput
-  | LocalImageUserInput
-  | AudioUserInput
-  | LocalAudioUserInput
-  | SkillUserInput
-  | MentionUserInput;
-export type TextUserInputType = "text";
-export type ImageUserInputType = "image";
-export type LocalImageUserInputType = "localImage";
-export type AudioUserInputType = "audio";
-export type LocalAudioUserInputType = "localAudio";
-export type SkillUserInputType = "skill";
-export type MentionUserInputType = "mention";
 export type TurnSteerRequestMethod = "turn/steer";
 export type TurnInterruptRequestMethod = "turn/interrupt";
 export type ThreadRealtimeStartRequestMethod = "thread/realtime/start";
@@ -437,6 +467,7 @@ export type EnvironmentAddRequestMethod = "environment/add";
 export type EnvironmentInfoRequestMethod = "environment/info";
 export type EnvironmentStatusRequestMethod = "environment/status";
 export type McpServerOauthLoginRequestMethod = "mcpServer/oauth/login";
+export type McpServerOauthClientRegistration = "auto" | "cimd" | "dcr";
 export type ConfigMcpServerReloadRequestMethod = "config/mcpServer/reload";
 export type McpServerStatusListRequestMethod = "mcpServerStatus/list";
 export type McpServerStatusDetail = "full" | "toolsAndAuthOnly";
@@ -524,7 +555,15 @@ export interface InitializeCapabilities {
    */
   experimentalApi?: boolean;
   /**
-   * Allow downstream MCP servers to request OpenAI extended form elicitations.
+   * MCP extension settings declared by the app-server client.
+   */
+  extensions?: {
+    [k: string]: unknown | undefined;
+  } | null;
+  /**
+   * Legacy opt-in for the `openai/form` MCP extension.
+   *
+   * New clients should declare `openai/form` in [`Self::extensions`].
    */
   mcpServerOpenaiFormElicitation?: boolean;
   /**
@@ -541,6 +580,18 @@ export interface ClientInfo {
   name: string;
   title?: string | null;
   version: string;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Read content-free, process-local diagnostics.
+ */
+export interface ServerDiagnosticsRequest {
+  id: RequestId;
+  method: ServerDiagnosticsRequestMethod;
+  params: ServerDiagnosticsParams;
+  [k: string]: unknown | undefined;
+}
+export interface ServerDiagnosticsParams {
   [k: string]: unknown | undefined;
 }
 /**
@@ -861,6 +912,7 @@ export interface ExecLocalShellAction {
 export interface FunctionCallResponseItem {
   arguments: string;
   call_id: string;
+  encrypted_function_args?: string[] | null;
   id?: string | null;
   internal_chat_message_metadata_passthrough?: InternalChatMessageMetadataPassthrough | null;
   name: string;
@@ -1198,6 +1250,140 @@ export interface ThreadGoalClearParams {
   threadId: string;
   [k: string]: unknown | undefined;
 }
+export interface ThreadQueueAddRequest {
+  id: RequestId;
+  method: ThreadQueueAddRequestMethod;
+  params: ThreadQueueAddParams;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadQueueAddParams {
+  clientUserMessageId: string;
+  input: UserInput[];
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
+export interface TextUserInput {
+  text: string;
+  /**
+   * UI-defined spans within `text` used to render or persist special elements.
+   */
+  text_elements?: TextElement[];
+  type: TextUserInputType;
+  [k: string]: unknown | undefined;
+}
+export interface TextElement {
+  /**
+   * Byte range in the parent `text` buffer that this element occupies.
+   */
+  byteRange: ByteRange;
+  /**
+   * Optional human-readable placeholder for the element, displayed in the UI.
+   */
+  placeholder?: string | null;
+  [k: string]: unknown | undefined;
+}
+export interface ByteRange {
+  end: number;
+  start: number;
+  [k: string]: unknown | undefined;
+}
+export interface ImageUserInput {
+  detail?: ImageDetail | null;
+  type: ImageUserInputType;
+  url: string;
+  [k: string]: unknown | undefined;
+}
+export interface LocalImageUserInput {
+  detail?: ImageDetail | null;
+  path: string;
+  type: LocalImageUserInputType;
+  [k: string]: unknown | undefined;
+}
+export interface AudioUserInput {
+  type: AudioUserInputType;
+  url: string;
+  [k: string]: unknown | undefined;
+}
+export interface LocalAudioUserInput {
+  path: string;
+  type: LocalAudioUserInputType;
+  [k: string]: unknown | undefined;
+}
+export interface SkillUserInput {
+  name: string;
+  path: string;
+  type: SkillUserInputType;
+  [k: string]: unknown | undefined;
+}
+export interface MentionUserInput {
+  name: string;
+  path: string;
+  type: MentionUserInputType;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadQueueListRequest {
+  id: RequestId;
+  method: ThreadQueueListRequestMethod;
+  params: ThreadQueueListParams;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadQueueListParams {
+  /**
+   * Opaque pagination cursor returned by a previous call.
+   */
+  cursor?: string | null;
+  /**
+   * Optional page size; defaults to the standard thread-list page size.
+   */
+  limit?: number | null;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadQueueUpdateRequest {
+  id: RequestId;
+  method: ThreadQueueUpdateRequestMethod;
+  params: ThreadQueueUpdateParams;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadQueueUpdateParams {
+  input: UserInput[];
+  queuedSubmissionId: string;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadQueueDeleteRequest {
+  id: RequestId;
+  method: ThreadQueueDeleteRequestMethod;
+  params: ThreadQueueDeleteParams;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadQueueDeleteParams {
+  queuedSubmissionId: string;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadQueueReorderRequest {
+  id: RequestId;
+  method: ThreadQueueReorderRequestMethod;
+  params: ThreadQueueReorderParams;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadQueueReorderParams {
+  queuedSubmissionIds: string[];
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadQueueStartRequest {
+  id: RequestId;
+  method: ThreadQueueStartRequestMethod;
+  params: ThreadQueueStartParams;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadQueueStartParams {
+  queuedSubmissionId?: string | null;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
 export interface ThreadMetadataUpdateRequest {
   id: RequestId;
   method: ThreadMetadataUpdateRequestMethod;
@@ -1209,10 +1395,6 @@ export interface ThreadMetadataUpdateParams {
    * Patch the stored Git metadata for this thread. Omit a field to leave it unchanged, set it to `null` to clear it, or provide a string to replace the stored value.
    */
   gitInfo?: ThreadMetadataGitInfoUpdateParams | null;
-  /**
-   * Patch whether this thread is pinned. Omit to leave the stored value unchanged.
-   */
-  isPinned?: boolean | null;
   threadId: string;
   [k: string]: unknown | undefined;
 }
@@ -1229,6 +1411,30 @@ export interface ThreadMetadataGitInfoUpdateParams {
    * Omit to leave the stored commit unchanged, set to `null` to clear it, or provide a non-empty string to replace it.
    */
   sha?: string | null;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadSectionMoveRequest {
+  id: RequestId;
+  method: ThreadSectionMoveRequestMethod;
+  params: ThreadSectionMoveParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Parameters for moving a thread within a server-owned section ordering.
+ */
+export interface ThreadSectionMoveParams {
+  /**
+   * Existing thread to insert before; omission or null appends to the section.
+   */
+  beforeThreadId?: string | null;
+  /**
+   * Destination section, or `null` to remove the thread from its section.
+   */
+  sectionId: string | null;
+  /**
+   * Thread to move into, within, or out of a section.
+   */
+  threadId: string;
   [k: string]: unknown | undefined;
 }
 export interface ThreadSettingsUpdateRequest {
@@ -1455,6 +1661,25 @@ export interface ThreadRollbackParams {
   threadId: string;
   [k: string]: unknown | undefined;
 }
+export interface ThreadRevertRequest {
+  id: RequestId;
+  method: ThreadRevertRequestMethod;
+  params: ThreadRevertParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Replace a paginated thread's durable history with the prefix before one turn.
+ *
+ * This only changes persisted conversation history. It does not revert local file changes.
+ */
+export interface ThreadRevertParams {
+  /**
+   * Turn excluded from the replacement history, together with every later turn.
+   */
+  beforeTurnId: string;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
 export interface ThreadListRequest {
   id: RequestId;
   method: ThreadListRequestMethod;
@@ -1479,10 +1704,6 @@ export interface ThreadListParams {
    */
   cwd?: ThreadListCwdFilter | null;
   /**
-   * Optional pinned filter; when set, only threads matching this value are returned.
-   */
-  isPinned?: boolean | null;
-  /**
    * Optional page size; defaults to a reasonable server-side value.
    */
   limit?: number | null;
@@ -1499,6 +1720,10 @@ export interface ThreadListParams {
    */
   searchTerm?: string | null;
   /**
+   * Omit to include every section, set to `null` for unsectioned threads, or provide a section ID to return only threads in that section.
+   */
+  sectionId?: string | null;
+  /**
    * Optional sort direction; defaults to descending (newest first).
    */
   sortDirection?: SortDirection | null;
@@ -1514,6 +1739,91 @@ export interface ThreadListParams {
    * If true, return from the state DB without scanning JSONL rollouts to repair thread metadata. Omitted or false preserves scan-and-repair behavior.
    */
   useStateDbOnly?: boolean;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadSectionListRequest {
+  id: RequestId;
+  method: ThreadSectionListRequestMethod;
+  params: ThreadSectionListParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Parameters for listing independently persisted thread sections.
+ */
+export interface ThreadSectionListParams {
+  /**
+   * Opaque pagination cursor returned by a previous call.
+   */
+  cursor?: string | null;
+  /**
+   * Maximum number of sections to return.
+   */
+  limit?: number | null;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadSectionCreateRequest {
+  id: RequestId;
+  method: ThreadSectionCreateRequestMethod;
+  params: ThreadSectionCreateParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Parameters for creating an independently persisted thread section.
+ */
+export interface ThreadSectionCreateParams {
+  appearance?: ThreadSectionAppearance | null;
+  /**
+   * The user-visible name of the section.
+   */
+  name: string;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Extensible visual presentation for a custom thread section.
+ */
+export interface ThreadSectionAppearance {
+  color?: string | null;
+  icon?: string | null;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadSectionUpdateRequest {
+  id: RequestId;
+  method: ThreadSectionUpdateRequestMethod;
+  params: ThreadSectionUpdateParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Parameters for updating an independently persisted thread section.
+ */
+export interface ThreadSectionUpdateParams {
+  /**
+   * Omit to preserve appearance, use `null` to clear it, or provide a replacement.
+   */
+  appearance?: ThreadSectionAppearance | null;
+  /**
+   * The updated user-visible name of the section.
+   */
+  name: string;
+  /**
+   * The stable, server-generated identity of the section to update.
+   */
+  sectionId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadSectionDeleteRequest {
+  id: RequestId;
+  method: ThreadSectionDeleteRequestMethod;
+  params: ThreadSectionDeleteParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Parameters for deleting an independently persisted thread section.
+ */
+export interface ThreadSectionDeleteParams {
+  /**
+   * The stable, server-generated identity of the section to delete.
+   */
+  sectionId: string;
   [k: string]: unknown | undefined;
 }
 export interface ThreadSearchRequest {
@@ -1546,7 +1856,7 @@ export interface ThreadSearchParams {
   /**
    * Optional sort key; defaults to created_at.
    */
-  sortKey?: ThreadSortKey | null;
+  sortKey?: ThreadSearchSortKey | null;
   /**
    * Optional source filter; when set, only sessions from these source kinds are returned. When omitted or empty, defaults to interactive sources.
    */
@@ -1771,6 +2081,20 @@ export interface PluginListParams {
   marketplaceKinds?: PluginListMarketplaceKind[] | null;
   [k: string]: unknown | undefined;
 }
+export interface PluginSearchRequest {
+  id: RequestId;
+  method: PluginSearchRequestMethod;
+  params: PluginSearchParams;
+  [k: string]: unknown | undefined;
+}
+export interface PluginSearchParams {
+  cursor?: string | null;
+  cwds?: AbsolutePathBuf[] | null;
+  limit?: number | null;
+  scope?: PluginSearchScope | null;
+  searchTerm: string;
+  [k: string]: unknown | undefined;
+}
 export interface PluginInstalledRequest {
   id: RequestId;
   method: PluginInstalledRequestMethod;
@@ -1890,6 +2214,10 @@ export interface AppsReadParams {
    * When true, include display-only public tool summaries in the returned metadata.
    */
   includeTools?: boolean;
+  /**
+   * Optional loaded thread id used to evaluate effective app configuration.
+   */
+  threadId?: string | null;
   [k: string]: unknown | undefined;
 }
 export interface AppListRequest {
@@ -2137,6 +2465,10 @@ export interface PluginInstallRequest {
   [k: string]: unknown | undefined;
 }
 export interface PluginInstallParams {
+  /**
+   * Client-generated identifier used to correlate one installation attempt.
+   */
+  installAttemptId?: string | null;
   marketplacePath?: AbsolutePathBuf | null;
   pluginName: string;
   remoteMarketplaceName?: string | null;
@@ -2251,65 +2583,6 @@ export interface AdditionalContextEntry {
   value: string;
   [k: string]: unknown | undefined;
 }
-export interface TextUserInput {
-  text: string;
-  /**
-   * UI-defined spans within `text` used to render or persist special elements.
-   */
-  text_elements?: TextElement[];
-  type: TextUserInputType;
-  [k: string]: unknown | undefined;
-}
-export interface TextElement {
-  /**
-   * Byte range in the parent `text` buffer that this element occupies.
-   */
-  byteRange: ByteRange;
-  /**
-   * Optional human-readable placeholder for the element, displayed in the UI.
-   */
-  placeholder?: string | null;
-  [k: string]: unknown | undefined;
-}
-export interface ByteRange {
-  end: number;
-  start: number;
-  [k: string]: unknown | undefined;
-}
-export interface ImageUserInput {
-  detail?: ImageDetail | null;
-  type: ImageUserInputType;
-  url: string;
-  [k: string]: unknown | undefined;
-}
-export interface LocalImageUserInput {
-  detail?: ImageDetail | null;
-  path: string;
-  type: LocalImageUserInputType;
-  [k: string]: unknown | undefined;
-}
-export interface AudioUserInput {
-  type: AudioUserInputType;
-  url: string;
-  [k: string]: unknown | undefined;
-}
-export interface LocalAudioUserInput {
-  path: string;
-  type: LocalAudioUserInputType;
-  [k: string]: unknown | undefined;
-}
-export interface SkillUserInput {
-  name: string;
-  path: string;
-  type: SkillUserInputType;
-  [k: string]: unknown | undefined;
-}
-export interface MentionUserInput {
-  name: string;
-  path: string;
-  type: MentionUserInputType;
-  [k: string]: unknown | undefined;
-}
 export interface TurnSteerRequest {
   id: RequestId;
   method: TurnSteerRequestMethod;
@@ -2386,6 +2659,10 @@ export interface ThreadRealtimeStartParams {
    */
   codexResponsesAsItems?: boolean | null;
   /**
+   * Controls whether a realtime V3 delegation produces an acknowledgement filler. Omitted values preserve the Realtime API's default behavior.
+   */
+  delegationAckFiller?: boolean | null;
+  /**
    * Routes any transcript tail remaining at session end through Codex. Defaults to false. TODO: Remove this rollout knob once transcript-tail flushing is always enabled.
    */
   flushTranscriptTailOnSessionEnd?: boolean | null;
@@ -2406,7 +2683,15 @@ export interface ThreadRealtimeStartParams {
    */
   outputModality: RealtimeOutputModality;
   prompt?: string | null;
+  /**
+   * Developer instructions given to the backing Codex model when this realtime session ends.
+   */
+  realtimeEndInstructions?: string | null;
   realtimeSessionId?: string | null;
+  /**
+   * Developer instructions given to the backing Codex model when this realtime session starts.
+   */
+  realtimeStartInstructions?: string | null;
   threadId: string;
   transport?: ThreadRealtimeStartTransport | null;
   /**
@@ -2813,6 +3098,10 @@ export interface McpServerOauthLoginRequest {
   [k: string]: unknown | undefined;
 }
 export interface McpServerOauthLoginParams {
+  /**
+   * Registration strategy for this login only; omission selects automatic discovery.
+   */
+  clientRegistration?: McpServerOauthClientRegistration | null;
   name: string;
   scopes?: string[] | null;
   threadId?: string | null;
@@ -2984,7 +3273,14 @@ export interface ConsumeAccountRateLimitResetCreditParams {
 export interface AccountUsageReadRequest {
   id: RequestId;
   method: AccountUsageReadRequestMethod;
-  params?: null;
+  params?: GetAccountTokenUsageParams | null;
+  [k: string]: unknown | undefined;
+}
+export interface GetAccountTokenUsageParams {
+  /**
+   * When present, read estimated usage for this thread instead of account-wide token activity.
+   */
+  threadId?: string | null;
   [k: string]: unknown | undefined;
 }
 export interface AccountWorkspaceMessagesReadRequest {
@@ -3485,17 +3781,17 @@ export interface ExternalAgentConfigImportHistoryRecordParams {
   /**
    * Completed results grouped by imported item type.
    */
-  itemTypeResults: ExternalAgentConfigImportTypeResult[];
+  itemTypeResults: ExternalAgentConfigImportHistoryRecordTypeResultParams[];
   /**
    * Opaque provider identifier for the externally completed import.
    */
   providerId: string;
   [k: string]: unknown | undefined;
 }
-export interface ExternalAgentConfigImportTypeResult {
+export interface ExternalAgentConfigImportHistoryRecordTypeResultParams {
   failures: ExternalAgentConfigImportItemTypeFailure[];
   itemType: ExternalAgentConfigMigrationItemType;
-  successes: ExternalAgentConfigImportItemTypeSuccess[];
+  successes: ExternalAgentConfigImportHistoryRecordSuccessParams[];
   [k: string]: unknown | undefined;
 }
 export interface ExternalAgentConfigImportItemTypeFailure {
@@ -3508,11 +3804,15 @@ export interface ExternalAgentConfigImportItemTypeFailure {
   subErrorType?: string | null;
   [k: string]: unknown | undefined;
 }
-export interface ExternalAgentConfigImportItemTypeSuccess {
+export interface ExternalAgentConfigImportHistoryRecordSuccessParams {
   cwd?: string | null;
   itemType: ExternalAgentConfigMigrationItemType;
   source?: string | null;
   target?: string | null;
+  /**
+   * Original title for an imported session, when available.
+   */
+  title?: string | null;
   [k: string]: unknown | undefined;
 }
 export interface ExternalAgentConfigImportReadHistoriesRequest {

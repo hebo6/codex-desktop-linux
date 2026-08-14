@@ -100,7 +100,7 @@ The command above runs in the foreground. To let remote turns continue after clo
 
 ## Protocol compatibility
 
-Protocol types and runtime validators are generated from the experimental JSON Schema at upstream Codex commit `a4535884169be8da2f81b8a4debecbd4dc11aa97`
+Protocol types and runtime validators are generated from the experimental JSON Schema at upstream Codex commit `8630bb3caecaff6abc6add450a88035d9f6d3f8c`
 
 Compatibility with older or newer Codex builds is not implied. See the [protocol baseline](docs/protocol-baseline.md) for generation, validation, and wire-envelope details
 

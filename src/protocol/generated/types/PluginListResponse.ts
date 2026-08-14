@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
+// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
 
 /**
  * A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).
@@ -9,6 +9,8 @@
 export type AbsolutePathBuf = string;
 export type PluginAuthPolicy = "ON_INSTALL" | "ON_USE";
 export type PluginAvailability = "DISABLED_BY_ADMIN" | "AVAILABLE";
+export type PluginDisabledReason =
+  "disabled_by_admin" | "plan_not_eligible" | "required_app_unavailable" | "unknown";
 export type PluginInstallPolicy = "NOT_AVAILABLE" | "AVAILABLE" | "INSTALLED_BY_DEFAULT";
 export type PluginInstallPolicySource = "WORKSPACE_SETTING" | "IMPLICIT_CANONICAL_APP";
 export type PluginShareDiscoverability = "LISTED" | "UNLISTED" | "PRIVATE";
@@ -52,11 +54,23 @@ export interface PluginSummary {
    * Availability state for installing and using the plugin.
    */
   availability?: PluginAvailability & string;
+  /**
+   * Why the remote plugin is unavailable, when provided by plugin-service.
+   */
+  disabledReason?: PluginDisabledReason | null;
+  /**
+   * Raw plugin-service plan identifiers eligible to install the plugin.
+   */
+  eligiblePlanTypes?: string[] | null;
   enabled: boolean;
   id: string;
   installPolicy: PluginInstallPolicy;
   installPolicySource?: PluginInstallPolicySource | null;
   installed: boolean;
+  /**
+   * Unix timestamp in seconds when the remote plugin was installed, when available.
+   */
+  installedAt?: number | null;
   interface?: PluginInterface | null;
   keywords?: string[];
   /**

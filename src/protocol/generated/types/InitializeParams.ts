@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：a4535884169be8da2f81b8a4debecbd4dc11aa97
+// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
 
 export interface InitializeParams {
   capabilities?: InitializeCapabilities | null;
@@ -15,7 +15,15 @@ export interface InitializeCapabilities {
    */
   experimentalApi?: boolean;
   /**
-   * Allow downstream MCP servers to request OpenAI extended form elicitations.
+   * MCP extension settings declared by the app-server client.
+   */
+  extensions?: {
+    [k: string]: unknown | undefined;
+  } | null;
+  /**
+   * Legacy opt-in for the `openai/form` MCP extension.
+   *
+   * New clients should declare `openai/form` in [`Self::extensions`].
    */
   mcpServerOpenaiFormElicitation?: boolean;
   /**
