@@ -2,12 +2,6 @@
 
 基于 Tauri 2、React、TypeScript 和 Rust 构建的独立 Linux Codex app-server 协议桌面客户端
 
-> [!IMPORTANT]
-> 这是非官方社区项目，与 OpenAI 不存在隶属、赞助或背书关系。Codex 和 OpenAI 是 OpenAI 的商标
-
-> [!WARNING]
-> 项目仍在积极开发，0.x 版本中的协议和用户界面可能继续变化
-
 ![Codex Desktop Linux 会话界面](tests/visual/baselines/1440x900-dark-conversation.png)
 
 截图由项目的确定性视觉回归场景生成，不包含账户或 app-server 数据
@@ -32,16 +26,6 @@
 - **客户端与服务端可运行在不同电脑上** — 桌面界面留在 Linux 工作站，app-server、源代码和工具链留在实际执行工作的主机
 
 本项目更适合需要 Linux 原生界面、自主管理 app-server 或复杂远程网络路径的开发者。需要官方云端任务、ChatGPT、浏览器、插件及平台集成时，应使用官方桌面应用
-
-## 项目状态
-
-首个 P0 版本可从 [GitHub Releases](https://github.com/hebo6/codex-desktop-linux/releases) 下载
-
-界面当前仅提供简体中文，尚未实现国际化
-
-远程 WebSocket 传输和部分 app-server 方法在上游仍属于实验能力。请仅连接受信任且使用 TLS 保护的端点，并在启动任务前检查审批与沙箱策略
-
-计划发布范围见[产品范围](docs/product-scope.md)、[实施计划](docs/implementation-plan.md)和[发布要求](docs/release-requirements.md)
 
 ## 运行要求
 
@@ -95,12 +79,6 @@ codex app-server \
 不要向不受信任的网络暴露无认证的 app-server。app-server WebSocket 传输仍属于实验能力，并且监听地址使用 `ws://`，公网所需的 TLS 终止需要单独提供
 
 上面的命令以前台方式运行。若要在关闭桌面客户端后继续执行远程任务，需要使用服务端已有且受信任的进程管理方式独立托管 app-server。关闭 Codex Desktop Linux 只会断开 WebSocket，不会停止该远程进程；等待审批或用户输入的任务需要客户端重新连接后才能继续
-
-## 协议兼容性
-
-协议类型和运行时校验器从上游 Codex 提交 `8630bb3caecaff6abc6add450a88035d9f6d3f8c` 的实验版 JSON Schema 生成
-
-项目不承诺兼容更早或更新的 Codex 构建，生成、校验和 wire envelope 细节见[协议基线](docs/protocol-baseline.md)
 
 ## 开发
 
@@ -158,19 +136,6 @@ devcontainer exec --workspace-folder . pnpm build:appimage
 产物位于 `src-tauri/target/<Rust 目标>/release/bundle/appimage`
 
 协议生成和视觉回归流程见[协议基线](docs/protocol-baseline.md)与[视觉回归](docs/visual-regression.md)
-
-## 文档
-
-- [产品需求文档](docs/prd/README.md)
-- [技术设计](docs/technical-design.md)
-- [测试计划](docs/test-plan.md)
-- [发布要求](docs/release-requirements.md)
-
-## 贡献与安全
-
-提交 pull request 前请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)
-
-请勿通过公开 issue 报告漏洞，应按 [SECURITY.md](SECURITY.md) 提交
 
 ## 许可证
 
