@@ -14,7 +14,7 @@ describe("useThemePreference", () => {
   it("应用加载的主题并在卸载时停止监听", async () => {
     const release = vi.fn();
     const source: ThemePreferenceSource = {
-      load: vi.fn(async () => "dark"),
+      load: vi.fn(async (): Promise<ThemePreference> => "dark"),
       subscribe: vi.fn(async () => release),
     };
 
@@ -31,7 +31,7 @@ describe("useThemePreference", () => {
     let notify!: (theme: ThemePreference) => void;
     let resolveLoad!: (theme: ThemePreference) => void;
     const source: ThemePreferenceSource = {
-      load: vi.fn(() => new Promise((resolve) => {
+      load: vi.fn(() => new Promise<ThemePreference>((resolve) => {
         resolveLoad = resolve;
       })),
       subscribe: vi.fn(async (onChange) => {
