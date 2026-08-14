@@ -467,6 +467,7 @@
   bottom: var(--space-3);
   left: var(--space-3);
   display: grid;
+  min-width: 0;
   max-height: min(50%, 240px);
   gap: var(--space-2);
   overflow-y: auto;
@@ -476,6 +477,8 @@
 
 .undoNotice {
   display: flex;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
@@ -497,6 +500,7 @@
 }
 
 .undoNotice button {
+  flex: 0 0 auto;
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   color: var(--color-text-primary);
