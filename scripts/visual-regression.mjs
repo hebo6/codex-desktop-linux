@@ -58,7 +58,11 @@ try {
     const url = `http://127.0.0.1:1420/?visualFixture=${visualCase.state}&theme=${visualCase.theme}`;
     await runChrome("navigate_page", ["--type", "url", "--url", url]);
     await runChrome("resize_page", [String(visualCase.width), String(visualCase.height)]);
-    await runChrome("evaluate_script", [waitUntilReadyScript()]);
+    const readinessOutput = await runChrome("evaluate_script", [
+      waitUntilReadyScript(),
+      "--output-format", "json",
+    ]);
+    assertEvaluationSucceeded(readinessOutput);
     await runChrome("take_screenshot", ["--filePath", currentPath]);
     await assertScreenshotDimensions(currentPath, visualCase.width, visualCase.height);
     if (mode === "update") {
@@ -102,6 +106,30 @@ async function runChrome(command, arguments_) {
     maxBuffer: 8 * 1024 * 1024,
   });
   if (stdout.trim().length > 0) console.log(stdout.trim());
+  return stdout.trim();
+}
+
+function assertEvaluationSucceeded(output) {
+  let response;
+  try {
+    response = JSON.parse(output);
+  } catch {
+    throw new Error(`chrome-devtools 返回了无效的求值结果：${output}`);
+  }
+  if (Array.isArray(response)) {
+    const detail = response
+      .map((item) => item?.text)
+      .filter((text) => typeof text === "string")
+      .join("\n");
+    throw new Error(detail || "视觉场景未就绪");
+  }
+  if (
+    typeof response !== "object" ||
+    response === null ||
+    typeof response.message !== "string"
+  ) {
+    throw new Error(`chrome-devtools 返回了未知的求值结果：${output}`);
+  }
 }
 
 async function assertScreenshotDimensions(filePath, expectedWidth, expectedHeight) {

@@ -160,7 +160,7 @@ export function VisualRegressionFixture({ state, theme }: VisualRegressionQuery)
       settings: "设置分区",
     }[state];
     let frame = 0;
-    let readyTimer = 0;
+    let cancelled = false;
     const reveal = () => {
       if (state === "model") {
         const button = document.querySelector<HTMLButtonElement>('button[aria-label="模型"]');
@@ -170,10 +170,24 @@ export function VisualRegressionFixture({ state, theme }: VisualRegressionQuery)
       }
       if (document.querySelector(`[aria-label="${landmark}"]`) !== null) {
         if (state === "conversation") {
-          document
-            .querySelector<HTMLButtonElement>('button[aria-label^="跳转到问题"]')
-            ?.focus({ preventScroll: true });
-          readyTimer = window.setTimeout(() => setReady(true), 240);
+          const question = document.querySelector<HTMLButtonElement>(
+            'button[aria-label^="跳转到问题"]',
+          );
+          if (question === null) {
+            frame = requestAnimationFrame(reveal);
+            return;
+          }
+          question.focus({ preventScroll: true });
+          frame = requestAnimationFrame(() => {
+            const finished = question
+              .getAnimations({ subtree: true })
+              .map((animation) => animation.finished);
+            void Promise.allSettled(finished).then(() => {
+              if (!cancelled) {
+                frame = requestAnimationFrame(() => setReady(true));
+              }
+            });
+          });
           return;
         }
         setReady(true);
@@ -183,8 +197,8 @@ export function VisualRegressionFixture({ state, theme }: VisualRegressionQuery)
     };
     frame = requestAnimationFrame(reveal);
     return () => {
+      cancelled = true;
       cancelAnimationFrame(frame);
-      window.clearTimeout(readyTimer);
     };
   }, [state]);
 

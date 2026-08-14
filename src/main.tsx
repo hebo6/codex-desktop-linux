@@ -31,23 +31,32 @@ const visualRegressionQuery = import.meta.env.DEV
 const protocolDebug =
   new URLSearchParams(window.location.search).get("view") === "protocol-debug";
 
-createRoot(rootElement).render(
-  <StrictMode>
-    <ApplicationContextMenus />
-    <ApplicationShortcuts />
-    <Suspense fallback={<StartupShell />}>
-      {protocolDebug
-        ? <ProtocolDebugView />
-        : (
-          <Provider store={store}>
-            {visualRegressionQuery === null || VisualRegressionFixture === null
-              ? <App />
-              : <VisualRegressionFixture {...visualRegressionQuery} />}
-          </Provider>
-        )}
-    </Suspense>
-  </StrictMode>,
-);
+void renderApplication(rootElement);
+
+async function renderApplication(container: HTMLElement) {
+  if (visualRegressionQuery !== null) {
+    const { installVisualTauriMocks } = await import("./visual/installVisualTauriMocks");
+    installVisualTauriMocks();
+  }
+
+  createRoot(container).render(
+    <StrictMode>
+      <ApplicationContextMenus />
+      <ApplicationShortcuts />
+      <Suspense fallback={<StartupShell />}>
+        {protocolDebug
+          ? <ProtocolDebugView />
+          : (
+            <Provider store={store}>
+              {visualRegressionQuery === null || VisualRegressionFixture === null
+                ? <App />
+                : <VisualRegressionFixture {...visualRegressionQuery} />}
+            </Provider>
+          )}
+      </Suspense>
+    </StrictMode>,
+  );
+}
 
 function StartupShell() {
   return (
