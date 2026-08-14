@@ -13,7 +13,7 @@ Security vulnerabilities must follow [SECURITY.md](SECURITY.md) and must not be 
 
 ## Development setup
 
-Follow the [development instructions](README.md#development) in the main README
+Follow the [development instructions](README.md#开发) in the main README
 
 The project pins JavaScript and Rust dependencies. Use the committed lockfiles and do not update dependencies unless the change requires it
 

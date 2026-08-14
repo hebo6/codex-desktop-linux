@@ -1,82 +1,80 @@
 # Codex Desktop Linux
 
-[简体中文](README.zh-CN.md)
-
-An independent Linux desktop client for the Codex app-server protocol, built with Tauri 2, React, TypeScript, and Rust
+基于 Tauri 2、React、TypeScript 和 Rust 构建的独立 Linux Codex app-server 协议桌面客户端
 
 > [!IMPORTANT]
-> This is an unofficial community project. It is not affiliated with, sponsored by, or endorsed by OpenAI. Codex and OpenAI are trademarks of OpenAI
+> 这是非官方社区项目，与 OpenAI 不存在隶属、赞助或背书关系。Codex 和 OpenAI 是 OpenAI 的商标
 
 > [!WARNING]
-> The project is under active development. Expect protocol and user-interface changes throughout the 0.x releases
+> 项目仍在积极开发，0.x 版本中的协议和用户界面可能继续变化
 
-![Codex Desktop Linux conversation view](tests/visual/baselines/1440x900-dark-conversation.png)
+![Codex Desktop Linux 会话界面](tests/visual/baselines/1440x900-dark-conversation.png)
 
-The screenshot is generated from the project's deterministic visual-regression fixture and contains no account or app-server data
+截图由项目的确定性视觉回归场景生成，不包含账户或 app-server 数据
 
-## Features
+## 功能
 
-- Local stdio connections to a Codex app-server process
-- Experimental remote WebSocket connections over direct TLS, HTTP CONNECT, SOCKS5, or SSH direct-tcpip paths
-- Reusable server and proxy profiles with credentials stored in Linux Secret Service when available and, after explicit confirmation, permission-restricted plaintext files otherwise
-- Restorable conversations, streaming responses, tool activity, approvals, steering, interruption, and forking
-- Model, reasoning effort, working directory, approval policy, and sandbox configuration
-- Safe Markdown rendering and previews for common local and remote file references
-- Native multi-window behavior, single-instance deep links, desktop notifications, and rate-limit visibility
+- 通过本机 stdio 连接 Codex app-server 进程
+- 通过直连 TLS、HTTP CONNECT、SOCKS5 或 SSH direct-tcpip 实验性连接远程 WebSocket app-server
+- 保存服务器和代理配置，凭据优先存入 Linux Secret Service，不可用时经用户确认改用权限受限的明文文件
+- 恢复会话，展示流式回答和工具活动，处理审批、追加、停止和分叉
+- 配置模型、思考程度、工作目录、审批策略和沙箱策略
+- 安全渲染 Markdown，并预览常见的本机与远程文件引用
+- 支持原生多窗口、单实例深链、桌面通知和账户剩余限额展示
 
-## Why Codex Desktop Linux
+## 为什么选择 Codex Desktop Linux
 
-The [official desktop app](https://learn.chatgpt.com/docs/app) supports macOS and Windows and can use [remote projects over SSH](https://learn.chatgpt.com/docs/remote-connections). This project does not aim to reproduce every official capability. It focuses on native Linux desktop workflows and self-managed Codex infrastructure
+[官方桌面应用](https://learn.chatgpt.com/docs/app)已经支持 macOS、Windows 和[通过 SSH 使用远程项目](https://learn.chatgpt.com/docs/remote-connections)。本项目并不以复刻全部官方能力为目标，而是面向 Linux 桌面和自主管理 Codex 基础设施的使用场景
 
-- **Codex only on the server** — the server host only runs Codex app-server; no companion agent, desktop environment, or other backend from this project is required
-- **Headless by design** — app-server does not require a graphical session, making it suitable for development hosts, containers, and private networks
-- **No OpenAI relay between client and server** — protocol traffic follows the direct, proxy, or SSH path you configure and is never relayed through OpenAI. app-server still connects separately to OpenAI or the configured model provider
-- **Client and server can run on different computers** — keep the desktop interface on the Linux workstation while app-server, source code, and toolchains remain on the machine where the work happens
+- **服务端只需 Codex** — 服务端只运行 Codex app-server，无需安装本项目的配套代理、桌面环境或其他后端服务
+- **服务端采用无头设计** — app-server 不依赖图形会话，适合运行在开发机、容器或私有网络中
+- **客户端与服务端之间不经 OpenAI 中转** — 协议数据通过用户配置的直连、代理或 SSH 路径传输，不经过 OpenAI 中继，app-server 仍会单独连接 OpenAI 或配置的模型服务
+- **客户端与服务端可运行在不同电脑上** — 桌面界面留在 Linux 工作站，app-server、源代码和工具链留在实际执行工作的主机
 
-This project is best suited to developers who need a native Linux interface, self-managed app-server processes, or flexible remote network paths. Use the official desktop app for first-party cloud tasks, ChatGPT, browser, plugin, and platform-integration capabilities
+本项目更适合需要 Linux 原生界面、自主管理 app-server 或复杂远程网络路径的开发者。需要官方云端任务、ChatGPT、浏览器、插件及平台集成时，应使用官方桌面应用
 
-## Project status
+## 项目状态
 
-The first P0 release is available from [GitHub Releases](https://github.com/hebo6/codex-desktop-linux/releases)
+首个 P0 版本可从 [GitHub Releases](https://github.com/hebo6/codex-desktop-linux/releases) 下载
 
-The interface is currently available in Simplified Chinese. Internationalization is not implemented yet
+界面当前仅提供简体中文，尚未实现国际化
 
-Remote WebSocket transport and several app-server methods are experimental upstream. Only connect to trusted TLS-protected endpoints and review the configured approval and sandbox policies before starting a task
+远程 WebSocket 传输和部分 app-server 方法在上游仍属于实验能力。请仅连接受信任且使用 TLS 保护的端点，并在启动任务前检查审批与沙箱策略
 
-See the [product scope](docs/product-scope.md), [implementation plan](docs/implementation-plan.md), and [release requirements](docs/release-requirements.md) for the planned release boundary
+计划发布范围见[产品范围](docs/product-scope.md)、[实施计划](docs/implementation-plan.md)和[发布要求](docs/release-requirements.md)
 
-## Requirements
+## 运行要求
 
-Running the application requires
+运行应用需要
 
-- x86_64 or aarch64 Linux with glibc 2.35 or newer
-- An X11 or Wayland desktop session
-- Linux Secret Service is recommended; without it, the app requires confirmation before persisting credentials in plaintext protected only by local file permissions
-- A compatible [Codex CLI](https://developers.openai.com/codex/cli) installation for local stdio connections, already authenticated for the intended account
+- 使用 glibc 2.35 或更高版本的 x86_64 或 aarch64 Linux
+- X11 或 Wayland 桌面会话
+- 建议提供 Linux Secret Service；缺失时应用会在保存凭据前要求确认仅受本机文件权限保护的明文存储
+- 本机 stdio 连接需要安装兼容的 [Codex CLI](https://developers.openai.com/codex/cli)，并提前完成目标账户认证
 
-deb and rpm packages use GTK 3 and WebKitGTK 4.1 from the distribution. The AppImage carries its WebKit and GStreamer runtime dependencies
+deb 和 rpm 安装包使用发行版提供的 GTK 3 与 WebKitGTK 4.1。AppImage 会携带 WebKit 和 GStreamer 运行时依赖
 
-## First connection
+## 首次连接
 
-### Local stdio
+### 本机 stdio
 
-For a local Codex connection
+连接本机 Codex
 
-1. Verify that the Codex CLI starts and is authenticated
-2. Resolve its absolute executable path with `command -v codex`
-3. In Codex Desktop Linux, create a **Local stdio** server
-4. Set the executable path to the absolute path from the previous step
-5. Add `app-server` as the first argument and optionally select a default working directory
-6. Test the connection, save the server, and choose a project directory before starting a thread
+1. 确认 Codex CLI 可以启动且已完成认证
+2. 执行 `command -v codex` 获取可执行文件绝对路径
+3. 在 Codex Desktop Linux 中新建“本机 stdio”服务器
+4. 将可执行文件路径设置为上一步得到的绝对路径
+5. 将 `app-server` 添加为第一个参数，并按需选择默认工作目录
+6. 测试并保存连接，选择项目目录后再新建会话
 
-### Remote WebSocket
+### 远程 WebSocket
 
-A remote connection requires a compatible Codex CLI on the server host, an authenticated Codex account there, and an app-server process managed independently from the desktop client
+远程连接需要在服务端安装兼容的 Codex CLI、完成 Codex 账户认证，并让 app-server 进程独立于桌面客户端运行
 
-The recommended first setup uses an SSH connection path and keeps the app-server listener on the remote loopback interface
+首次配置推荐使用 SSH 连接路径，并让 app-server 只监听远程主机的回环地址
 
-1. Create a cryptographically random capability token on the server, store it in a file readable only by the app-server account, and note the file's absolute path
-2. Start the compatible app-server on the remote host
+1. 在服务端生成具有足够随机性的 capability token，将其保存到只有 app-server 账户可以读取的文件，并记录文件绝对路径
+2. 在远程主机启动兼容的 app-server
 
 ```bash
 codex app-server \
@@ -85,97 +83,97 @@ codex app-server \
   --ws-token-file /absolute/path/to/codex-app-server.token
 ```
 
-3. In **Settings → Proxies**, create an SSH proxy for the remote host and verify its host key fingerprint
-4. Create a **Remote WebSocket** server with URL `ws://127.0.0.1:4500`
-5. Select **Bearer token** authentication and enter the capability token stored in the server-side token file
-6. Select the saved SSH proxy as the connection path, acknowledge the `ws://` warning, and test the connection before saving
+3. 在“设置 → 代理”中新建指向远程主机的 SSH 代理，并核对主机密钥指纹
+4. 新建“远程 WebSocket”服务器，将 URL 设置为 `ws://127.0.0.1:4500`
+5. 认证方式选择“Bearer 令牌”，填写服务端 token 文件中的 capability token
+6. 连接路径选择已保存的 SSH 代理，确认 `ws://` 提示，测试通过后保存
 
-The WebSocket leg in this layout is carried inside the encrypted SSH connection. The client still shows the plaintext warning because the configured target URL itself uses `ws://`
+此方案中的 WebSocket 连接由加密的 SSH 通道承载。由于目标 URL 本身仍是 `ws://`，客户端依然会显示明文连接确认
 
-For a direct Internet-facing connection, keep app-server on a private or loopback `ws://` listener and place a trusted TLS reverse proxy in front of it. Configure the client with the public `wss://` URL, strict certificate validation, and the matching bearer token. The reverse proxy must support WebSocket upgrades and forward the `Authorization` header
+需要通过公网直连时，应让 app-server 继续监听私有地址或回环地址，并在前方配置可信的 TLS 反向代理。客户端填写公开的 `wss://` URL，保持严格证书校验，并配置匹配的 Bearer 令牌。反向代理必须支持 WebSocket 升级并转发 `Authorization` 请求头
 
-Do not expose an unauthenticated app-server listener to an untrusted network. app-server WebSocket transport is experimental and accepts `ws://` listen URLs, so public TLS termination must be provided separately
+不要向不受信任的网络暴露无认证的 app-server。app-server WebSocket 传输仍属于实验能力，并且监听地址使用 `ws://`，公网所需的 TLS 终止需要单独提供
 
-The command above runs in the foreground. To let remote turns continue after closing the desktop client, run app-server with an independently managed process supervisor already trusted on the server. Closing Codex Desktop Linux disconnects its WebSocket but does not stop that remote process. A turn waiting for approval or user input cannot progress until a client reconnects
+上面的命令以前台方式运行。若要在关闭桌面客户端后继续执行远程任务，需要使用服务端已有且受信任的进程管理方式独立托管 app-server。关闭 Codex Desktop Linux 只会断开 WebSocket，不会停止该远程进程；等待审批或用户输入的任务需要客户端重新连接后才能继续
 
-## Protocol compatibility
+## 协议兼容性
 
-Protocol types and runtime validators are generated from the experimental JSON Schema at upstream Codex commit `8630bb3caecaff6abc6add450a88035d9f6d3f8c`
+协议类型和运行时校验器从上游 Codex 提交 `8630bb3caecaff6abc6add450a88035d9f6d3f8c` 的实验版 JSON Schema 生成
 
-Compatibility with older or newer Codex builds is not implied. See the [protocol baseline](docs/protocol-baseline.md) for generation, validation, and wire-envelope details
+项目不承诺兼容更早或更新的 Codex 构建，生成、校验和 wire envelope 细节见[协议基线](docs/protocol-baseline.md)
 
-## Development
+## 开发
 
-### Prerequisites
+### 环境要求
 
-- Node.js 24 or newer
-- pnpm 11.3.0 through Corepack
-- Rust 1.88 or newer
-- The [Tauri 2 Linux system dependencies](https://v2.tauri.app/start/prerequisites/#linux)
+- Node.js 24 或更高版本
+- 通过 Corepack 使用 pnpm 11.3.0
+- Rust 1.88 或更高版本
+- [Tauri 2 Linux 系统依赖](https://v2.tauri.app/start/prerequisites/#linux)
 
-Install the locked JavaScript dependencies
+安装锁定的 JavaScript 依赖
 
 ```bash
 corepack enable
 pnpm install --frozen-lockfile
 ```
 
-Run the desktop application in development mode
+以开发模式运行桌面应用
 
 ```bash
 pnpm tauri dev
 ```
 
-Run the frontend and protocol tests
+运行前端和协议测试
 
 ```bash
 pnpm test
 ```
 
-Run the Rust tests
+运行 Rust 测试
 
 ```bash
 cargo test --locked --manifest-path src-tauri/Cargo.toml
 ```
 
-Build the frontend
+构建前端
 
 ```bash
 pnpm build
 ```
 
-Build the current architecture without creating an installer
+构建当前架构且不生成安装包
 
 ```bash
 pnpm tauri build --debug --no-bundle
 ```
 
-Build an AppImage for the current architecture in the development container
+使用 Dev Container 构建当前架构的 AppImage
 
 ```bash
 devcontainer up --workspace-folder .
 devcontainer exec --workspace-folder . pnpm build:appimage
 ```
 
-The artifact is written to `src-tauri/target/<Rust target>/release/bundle/appimage`
+产物位于 `src-tauri/target/<Rust 目标>/release/bundle/appimage`
 
-Protocol generation and visual-regression workflows are documented in [protocol baseline](docs/protocol-baseline.md) and [visual regression](docs/visual-regression.md)
+协议生成和视觉回归流程见[协议基线](docs/protocol-baseline.md)与[视觉回归](docs/visual-regression.md)
 
-## Documentation
+## 文档
 
-- [Product requirements](docs/prd/README.md)
-- [Technical design](docs/technical-design.md)
-- [Test plan](docs/test-plan.md)
-- [Release requirements](docs/release-requirements.md)
+- [产品需求文档](docs/prd/README.md)
+- [技术设计](docs/technical-design.md)
+- [测试计划](docs/test-plan.md)
+- [发布要求](docs/release-requirements.md)
 
-## Contributing and security
+## 贡献与安全
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request
+提交 pull request 前请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)
 
-Do not report vulnerabilities in public issues. Follow [SECURITY.md](SECURITY.md) instead
+请勿通过公开 issue 报告漏洞，应按 [SECURITY.md](SECURITY.md) 提交
 
-## License
+## 许可证
 
-The project is licensed under the [Apache License 2.0](LICENSE)
+项目采用 [Apache License 2.0](LICENSE)
 
-Protocol schemas generated from OpenAI Codex and other third-party material retain their respective notices as described in [NOTICE](NOTICE)
+从 OpenAI Codex 生成的协议 Schema 和其他第三方内容保留各自声明，详见 [NOTICE](NOTICE)
