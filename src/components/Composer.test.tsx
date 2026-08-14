@@ -774,7 +774,7 @@ describe("Composer", () => {
 
     fireEvent.keyDown(window, { ctrlKey: true, key: "o" });
     expect(screen.getByRole("dialog", { name: "项目设置" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "项目" })).toHaveFocus();
+    expect(screen.getByRole("searchbox", { name: "搜索项目" })).toHaveFocus();
 
     view.unmount();
     renderComposer({ showProjectPicker: false });
@@ -796,12 +796,69 @@ describe("Composer", () => {
     if (otherProject === null) throw new Error("缺少项目选项容器");
     otherProject.scrollIntoView = scrollIntoView;
 
-    fireEvent.keyDown(projectPicker, { key: "ArrowDown" });
+    fireEvent.keyDown(screen.getByRole("searchbox", { name: "搜索项目" }), {
+      key: "ArrowDown",
+    });
 
     expect(scrollIntoView).toHaveBeenCalledWith({
       block: "nearest",
       inline: "nearest",
     });
+  });
+
+  it("按项目名称或完整路径搜索并保留目录入口", async () => {
+    const user = userEvent.setup();
+    renderComposer({
+      onCwdChange: vi.fn(),
+      onPickCwd: vi.fn(async () => null),
+      projectCwds: [
+        "/workspace/AlphaProject",
+        "/clients/team/BetaProject",
+      ],
+    });
+
+    await user.click(screen.getByRole("button", { name: "项目" }));
+    const search = screen.getByRole("searchbox", { name: "搜索项目" });
+    expect(search).toHaveFocus();
+
+    await user.type(search, "ALPHA");
+    expect(screen.getByRole("option", { name: /AlphaProject/u })).toBeVisible();
+    expect(screen.queryByRole("option", { name: /BetaProject/u })).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, "clients/team");
+    expect(screen.getByRole("option", { name: /BetaProject/u })).toBeVisible();
+    expect(screen.queryByRole("option", { name: /AlphaProject/u })).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, "missing");
+    expect(screen.getByText("未找到匹配项目")).toBeVisible();
+    expect(screen.getByRole("button", { name: "输入自定义目录…" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "浏览本地目录…" })).toBeVisible();
+  });
+
+  it("通过搜索框键盘选择项目并在重新打开时清空搜索", async () => {
+    const user = userEvent.setup();
+    const onCwdChange = vi.fn();
+    renderComposer({
+      onCwdChange,
+      projectCwds: ["/workspace/project", "/workspace/other"],
+    });
+
+    const trigger = screen.getByRole("button", { name: "项目" });
+    await user.click(trigger);
+    const search = screen.getByRole("searchbox", { name: "搜索项目" });
+    await user.type(search, "other");
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(onCwdChange).toHaveBeenCalledWith("/workspace/other");
+    expect(screen.queryByRole("dialog", { name: "项目设置" })).not.toBeInTheDocument();
+
+    await user.click(trigger);
+    expect(screen.getByRole("searchbox", { name: "搜索项目" })).toHaveValue("");
+    fireEvent.keyDown(screen.getByRole("searchbox", { name: "搜索项目" }), {
+      key: "Escape",
+    });
+    expect(trigger).toHaveFocus();
   });
 
   it("项目名溢出时渐隐并在悬浮或键盘聚焦时显示全文", async () => {

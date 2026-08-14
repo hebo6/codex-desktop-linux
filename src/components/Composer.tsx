@@ -1876,12 +1876,19 @@ function ProjectPicker({
   readonly onSelect: (directory: string) => void;
   readonly picking: boolean;
 }) {
+  const menuId = useId();
   const listboxId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const focusedOptionRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const selectedIndex = cwd === null ? -1 : directories.indexOf(cwd);
+  const [query, setQuery] = useState("");
+  const filteredDirectories = useMemo(
+    () => filterProjectDirectories(directories, query),
+    [directories, query],
+  );
+  const selectedIndex = cwd === null ? -1 : filteredDirectories.indexOf(cwd);
   const [focusedIndex, setFocusedIndex] = useState(Math.max(0, selectedIndex));
 
   useEffect(() => {
@@ -1893,6 +1900,7 @@ function ProjectPicker({
     const close = (event: PointerEvent) => {
       if (event.target instanceof Node && !containerRef.current?.contains(event.target)) {
         setOpen(false);
+        setQuery("");
       }
     };
     document.addEventListener("pointerdown", close);
@@ -1900,8 +1908,16 @@ function ProjectPicker({
   }, [open]);
 
   useEffect(() => {
-    if (disabled) setOpen(false);
+    if (disabled) {
+      setOpen(false);
+      setQuery("");
+    }
   }, [disabled]);
+
+  useEffect(() => {
+    if (!open) return;
+    searchRef.current?.focus();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -1925,49 +1941,62 @@ function ProjectPicker({
         document.querySelector('[aria-modal="true"]') === null
       ) {
         event.preventDefault();
-        setFocusedIndex(Math.max(0, selectedIndex));
+        setQuery("");
+        setFocusedIndex(Math.max(0, cwd === null ? -1 : directories.indexOf(cwd)));
         setOpen(true);
-        triggerRef.current?.focus();
       }
     };
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [disabled, selectedIndex]);
+  }, [cwd, directories, disabled]);
+
+  const close = (restoreFocus = false) => {
+    setOpen(false);
+    setQuery("");
+    if (restoreFocus) triggerRef.current?.focus();
+  };
+  const openMenu = () => {
+    setQuery("");
+    setFocusedIndex(Math.max(0, cwd === null ? -1 : directories.indexOf(cwd)));
+    setOpen(true);
+  };
 
   const choose = (index: number) => {
-    const directory = directories[index];
+    const directory = filteredDirectories[index];
     if (directory === undefined) return;
     onSelect(directory);
-    setFocusedIndex(index);
-    setOpen(false);
+    close();
   };
   const move = (direction: 1 | -1) => {
-    if (directories.length === 0) return;
+    if (filteredDirectories.length === 0) return;
     setFocusedIndex((current) =>
-      (current + direction + directories.length) % directories.length,
+      (current + direction + filteredDirectories.length) % filteredDirectories.length,
     );
   };
 
   return (
     <div className={styles.projectPicker} ref={containerRef}>
       <button
-        aria-controls={open ? listboxId : undefined}
+        aria-controls={open ? menuId : undefined}
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-label="项目"
         disabled={disabled}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (open) close();
+          else openMenu();
+        }}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
-            if (!open) setOpen(true);
+            if (!open) openMenu();
             else move(event.key === "ArrowDown" ? 1 : -1);
           } else if (event.key === "Enter" && open) {
             event.preventDefault();
             choose(focusedIndex);
           } else if (event.key === "Escape" && open) {
             event.preventDefault();
-            setOpen(false);
+            close(true);
           }
         }}
         title={cwd ?? "选择服务器工作目录"}
@@ -1981,12 +2010,46 @@ function ProjectPicker({
         <span aria-hidden="true" className={styles.projectChevron}>⌄</span>
       </button>
       {open ? (
-        <div aria-label="项目设置" className={styles.projectMenu} id={listboxId} role="dialog">
+        <div aria-label="项目设置" className={styles.projectMenu} id={menuId} role="dialog">
+          <label className={styles.projectSearch}>
+            <span aria-hidden="true">⌕</span>
+            <input
+              aria-controls={filteredDirectories.length === 0 ? undefined : listboxId}
+              aria-label="搜索项目"
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setFocusedIndex(0);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                  event.preventDefault();
+                  move(event.key === "ArrowDown" ? 1 : -1);
+                } else if (event.key === "Enter") {
+                  event.preventDefault();
+                  choose(focusedIndex);
+                } else if (event.key === "Escape") {
+                  event.preventDefault();
+                  close(true);
+                }
+              }}
+              placeholder="搜索项目名称或路径"
+              ref={searchRef}
+              type="search"
+              value={query}
+            />
+          </label>
           {directories.length === 0 ? (
             <p>尚无配置项目</p>
+          ) : filteredDirectories.length === 0 ? (
+            <p>未找到匹配项目</p>
           ) : (
-            <div aria-label="选择项目" className={styles.projectOptions} role="listbox">
-              {directories.map((directory, index) => (
+            <div
+              aria-label="选择项目"
+              className={styles.projectOptions}
+              id={listboxId}
+              role="listbox"
+            >
+              {filteredDirectories.map((directory, index) => (
                 <ProjectOption
                   directory={directory}
                   focused={index === focusedIndex}
@@ -1994,7 +2057,7 @@ function ProjectPicker({
                   onDelete={onDelete === undefined
                     ? undefined
                     : () => {
-                        setOpen(false);
+                        close();
                         onDelete(directory);
                       }}
                   onFocus={() => setFocusedIndex(index)}
@@ -2007,9 +2070,9 @@ function ProjectPicker({
             </div>
           )}
           <div className={styles.projectActions}>
-            <button onClick={() => { setOpen(false); onCustom(); }} type="button">输入自定义目录…</button>
+            <button onClick={() => { close(); onCustom(); }} type="button">输入自定义目录…</button>
             {onBrowse === undefined ? null : (
-              <button disabled={picking} onClick={() => { setOpen(false); onBrowse(); }} type="button">
+              <button disabled={picking} onClick={() => { close(); onBrowse(); }} type="button">
                 {picking ? "正在选择…" : "浏览本地目录…"}
               </button>
             )}
@@ -2489,6 +2552,20 @@ function modelCapabilities(model: Model): readonly string[] {
 function projectName(path: string): string {
   const normalized = path.replace(/[\\/]+$/u, "");
   return normalized.split(/[\\/]/u).at(-1) || path;
+}
+
+function filterProjectDirectories(
+  directories: readonly string[],
+  query: string,
+): readonly string[] {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (normalizedQuery.length === 0) return directories;
+  return directories.filter((directory) => {
+    const normalizedDirectory = directory.toLocaleLowerCase();
+    const normalizedName = projectName(directory).toLocaleLowerCase();
+    return normalizedName.includes(normalizedQuery) ||
+      normalizedDirectory.includes(normalizedQuery);
+  });
 }
 
 function permissionTitle(id: string | null): string {
