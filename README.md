@@ -4,19 +4,9 @@
 
 ![Codex Desktop Linux 会话界面](tests/visual/baselines/1440x900-dark-conversation.png)
 
-截图由项目的确定性视觉回归场景生成，不包含账户或 app-server 数据
+更多界面截图见[视觉回归基线目录](tests/visual/baselines)
 
-## 功能
-
-- 通过本机 stdio 连接 Codex app-server 进程
-- 通过直连 TLS、HTTP CONNECT、SOCKS5 或 SSH direct-tcpip 实验性连接远程 WebSocket app-server
-- 保存服务器和代理配置，凭据优先存入 Linux Secret Service，不可用时经用户确认改用权限受限的明文文件
-- 恢复会话，展示流式回答和工具活动，处理审批、追加、停止和分叉
-- 配置模型、思考程度、工作目录、审批策略和沙箱策略
-- 安全渲染 Markdown，并预览常见的本机与远程文件引用
-- 支持原生多窗口、单实例深链、桌面通知和账户剩余限额展示
-
-## 为什么选择 Codex Desktop Linux
+## 适用场景
 
 [官方桌面应用](https://learn.chatgpt.com/docs/app)已经支持 macOS、Windows 和[通过 SSH 使用远程项目](https://learn.chatgpt.com/docs/remote-connections)。本项目并不以复刻全部官方能力为目标，而是面向 Linux 桌面和自主管理 Codex 基础设施的使用场景
 
@@ -36,49 +26,37 @@
 - 建议提供 Linux Secret Service；缺失时应用会在保存凭据前要求确认仅受本机文件权限保护的明文存储
 - 本机 stdio 连接需要安装兼容的 [Codex CLI](https://developers.openai.com/codex/cli)，并提前完成目标账户认证
 
-deb 和 rpm 安装包使用发行版提供的 GTK 3 与 WebKitGTK 4.1。AppImage 会携带 WebKit 和 GStreamer 运行时依赖
+## 快速开始
 
-## 首次连接
+### 连接本机
 
-### 本机 stdio
-
-连接本机 Codex
-
-1. 确认 Codex CLI 可以启动且已完成认证
+1. 安装并登录 Codex CLI
 2. 执行 `command -v codex` 获取可执行文件绝对路径
-3. 在 Codex Desktop Linux 中新建“本机 stdio”服务器
-4. 将可执行文件路径设置为上一步得到的绝对路径
-5. 将 `app-server` 添加为第一个参数，并按需选择默认工作目录
-6. 测试并保存连接，选择项目目录后再新建会话
+3. 新建“本机 stdio”服务器，填写可执行文件路径，并将 `app-server` 添加为第一个参数
+4. 测试并保存连接，选择项目目录后新建会话
 
-### 远程 WebSocket
+### 连接远程主机
 
-远程连接需要在服务端安装兼容的 Codex CLI、完成 Codex 账户认证，并让 app-server 进程独立于桌面客户端运行
+在远程主机安装并登录 Codex CLI，然后生成 capability token
 
-首次配置推荐使用 SSH 连接路径，并让 app-server 只监听远程主机的回环地址
+```bash
+openssl rand -base64 32 > ~/.codex/app-server-token
+```
 
-1. 在服务端生成具有足够随机性的 capability token，将其保存到只有 app-server 账户可以读取的文件，并记录文件绝对路径
-2. 在远程主机启动兼容的 app-server
+使用相同的 token 文件路径启动服务
 
 ```bash
 codex app-server \
-  --listen ws://127.0.0.1:4500 \
+  --listen ws://0.0.0.0:4500 \
   --ws-auth capability-token \
-  --ws-token-file /absolute/path/to/codex-app-server.token
+  --ws-token-file ~/.codex/app-server-token
 ```
 
-3. 在“设置 → 代理”中新建指向远程主机的 SSH 代理，并核对主机密钥指纹
-4. 新建“远程 WebSocket”服务器，将 URL 设置为 `ws://127.0.0.1:4500`
-5. 认证方式选择“Bearer 令牌”，填写服务端 token 文件中的 capability token
-6. 连接路径选择已保存的 SSH 代理，确认 `ws://` 提示，测试通过后保存
+1. 在“设置 → 代理”中添加 SSH 代理并核对主机密钥指纹
+2. 新建“远程 WebSocket”服务器，将 URL 设为 `ws://127.0.0.1:4500`
+3. 选择“Bearer 令牌”认证并填写 capability token，再选择 SSH 代理，测试并保存连接
 
-此方案中的 WebSocket 连接由加密的 SSH 通道承载。由于目标 URL 本身仍是 `ws://`，客户端依然会显示明文连接确认
-
-需要通过公网直连时，应让 app-server 继续监听私有地址或回环地址，并在前方配置可信的 TLS 反向代理。客户端填写公开的 `wss://` URL，保持严格证书校验，并配置匹配的 Bearer 令牌。反向代理必须支持 WebSocket 升级并转发 `Authorization` 请求头
-
-不要向不受信任的网络暴露无认证的 app-server。app-server WebSocket 传输仍属于实验能力，并且监听地址使用 `ws://`，公网所需的 TLS 终止需要单独提供
-
-上面的命令以前台方式运行。若要在关闭桌面客户端后继续执行远程任务，需要使用服务端已有且受信任的进程管理方式独立托管 app-server。关闭 Codex Desktop Linux 只会断开 WebSocket，不会停止该远程进程；等待审批或用户输入的任务需要客户端重新连接后才能继续
+SSH 会加密上述 `ws://` 连接。公网直连必须使用 `wss://`、严格校验证书并启用认证，切勿暴露无认证的 app-server
 
 ## 开发
 
@@ -89,48 +67,35 @@ codex app-server \
 - Rust 1.88 或更高版本
 - [Tauri 2 Linux 系统依赖](https://v2.tauri.app/start/prerequisites/#linux)
 
-安装锁定的 JavaScript 依赖
+### 开发与测试
+
+安装依赖并启动
 
 ```bash
 corepack enable
 pnpm install --frozen-lockfile
-```
-
-以开发模式运行桌面应用
-
-```bash
 pnpm tauri dev
 ```
 
-运行前端和协议测试
+运行测试
 
 ```bash
 pnpm test
-```
-
-运行 Rust 测试
-
-```bash
 cargo test --locked --manifest-path src-tauri/Cargo.toml
 ```
 
-构建前端
+### 构建 AppImage
+
+使用本机环境构建
 
 ```bash
-pnpm build
+just build-appimage
 ```
 
-构建当前架构且不生成安装包
+使用 Dev Container 构建
 
 ```bash
-pnpm tauri build --debug --no-bundle
-```
-
-使用 Dev Container 构建当前架构的 AppImage
-
-```bash
-devcontainer up --workspace-folder .
-devcontainer exec --workspace-folder . pnpm build:appimage
+just build-appimage-devcontainer
 ```
 
 产物位于 `src-tauri/target/<Rust 目标>/release/bundle/appimage`
