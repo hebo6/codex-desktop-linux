@@ -138,10 +138,10 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   width: 100%;
-  min-height: 36px;
+  min-height: 44px;
   align-items: center;
   gap: var(--space-2);
-  padding: 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border: 0;
   color: var(--color-text-secondary);
   background: transparent;
@@ -158,12 +158,14 @@ button.userShellHeader:hover {
   background: var(--color-fill-hover);
 }
 
-.userShellHeader strong {
-  overflow: hidden;
+.userShellHeader code {
+  min-width: 0;
   color: var(--color-text-primary);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .userShellIcon {
@@ -188,28 +190,6 @@ button.userShellHeader:hover {
 
 .userShell[data-expanded="true"] .userShellChevron {
   transform: rotate(90deg);
-}
-
-.userShellCommand {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3) var(--space-3);
-  border-top: 1px solid var(--color-divider-subtle);
-  color: var(--color-text-primary);
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.userShellCommand > span {
-  color: var(--color-text-tertiary);
-  user-select: none;
-}
-
-.userShellCommand code {
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
 }
 
 .userShellOutputSize {

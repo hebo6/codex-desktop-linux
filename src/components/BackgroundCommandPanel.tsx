@@ -9,6 +9,7 @@ import {
 import type { ObservedBackgroundTerminal } from "../app/useBackgroundTerminals";
 import type { ThreadTurn } from "../app/useServerThreads";
 import { AnsiCommandOutput } from "./AnsiCommandOutput";
+import { commandDisplayText } from "./commandDisplay";
 import { ComposerAccessoryDisclosure } from "./ComposerAccessoryPanel";
 import styles from "./BackgroundCommandPanel.module.css";
 
@@ -329,7 +330,7 @@ function commandPresentation(
   now: number,
 ): RunningCommand {
   return {
-    command: displayCommand(command, item),
+    command: commandDisplayText(command, item?.commandActions),
     cwd,
     durationMs: Math.max(
       0,
@@ -340,16 +341,6 @@ function commandPresentation(
     output: commandOutput(item?.aggregatedOutput),
     processId,
   };
-}
-
-function displayCommand(
-  command: string,
-  item: CommandExecutionItem | undefined,
-): string {
-  const parsedCommands = item?.commandActions
-    .map((action) => action.command.trim())
-    .filter((parsedCommand) => parsedCommand.length > 0) ?? [];
-  return parsedCommands.length === 0 ? command : parsedCommands.join(" · ");
 }
 
 function commandOutput(output: string | null | undefined): string | null {

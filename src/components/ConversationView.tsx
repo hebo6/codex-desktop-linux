@@ -24,6 +24,7 @@ import {
 } from "../content/useBlobUrl";
 import { recordConversationFirstCommit } from "../diagnostics/conversationLoadDiagnostics";
 import { AnsiCommandOutput } from "./AnsiCommandOutput";
+import { commandDisplayText } from "./commandDisplay";
 import { markdownToPlainText, SafeMarkdown } from "./SafeMarkdown";
 import { TerminalIcon } from "./SidebarIcons";
 import styles from "./ConversationView.module.css";
@@ -1843,13 +1844,14 @@ function UserShellActivity({ item }: { readonly item: CommandExecutionItem }) {
   const transition = useCollapsibleContent(true);
   const hasOutput = output !== null;
   const status = userShellStatus(item);
+  const command = commandDisplayText(item.command, item.commandActions);
   const toggle = () => {
     transition.setOpen(!transition.targetExpandedRef.current);
   };
   const header = (
     <>
       <span className={styles.userShellIcon}><TerminalIcon /></span>
-      <strong>你执行的 Shell</strong>
+      <code>{command}</code>
       <span className={styles.userShellStatus}>{status}</span>
       {hasOutput ? (
         <span aria-hidden="true" className={styles.userShellChevron}>›</span>
@@ -1867,7 +1869,7 @@ function UserShellActivity({ item }: { readonly item: CommandExecutionItem }) {
       {hasOutput ? (
         <button
           aria-expanded={transition.targetExpanded}
-          aria-label={`你执行的 Shell：${item.command}，${status}`}
+          aria-label={`${command}，${status}`}
           className={styles.userShellHeader}
           onClick={toggle}
           type="button"
@@ -1877,10 +1879,6 @@ function UserShellActivity({ item }: { readonly item: CommandExecutionItem }) {
       ) : (
         <div className={styles.userShellHeader} tabIndex={0}>{header}</div>
       )}
-      <div className={styles.userShellCommand}>
-        <span aria-hidden="true">$</span>
-        <code>{item.command}</code>
-      </div>
       {hasOutput && transition.contentMounted ? (
         <div className={styles.userShellOutputSize}>
           <div className={styles.userShellOutputClip}>

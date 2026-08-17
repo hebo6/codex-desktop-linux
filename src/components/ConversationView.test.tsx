@@ -627,7 +627,7 @@ describe("ConversationView", () => {
         },
         {
           aggregatedOutput: "Test Files  73 passed",
-          command: "pnpm test -- --runInBand",
+          command: "/usr/bin/zsh -lc 'pnpm test -- --runInBand'",
           commandActions: [
             {
               command: "pnpm test -- --runInBand",
@@ -670,12 +670,14 @@ describe("ConversationView", () => {
 
     expect(screen.getAllByRole("button", { name: /已运行/u })).toHaveLength(2);
     const shellHeader = screen.getByRole("button", {
-      name: "你执行的 Shell：pnpm test -- --runInBand，已完成 · 1.5 秒",
+      name: "pnpm test -- --runInBand，已完成 · 1.5 秒",
     });
     const shellRecord = shellHeader.closest("section");
     expect(shellRecord).not.toBeNull();
     expect(shellRecord).not.toHaveAttribute("data-activity-group");
     expect(within(shellRecord!).getByText("pnpm test -- --runInBand")).toBeVisible();
+    expect(within(shellRecord!).queryByText(/你执行的 Shell/u)).not.toBeInTheDocument();
+    expect(within(shellRecord!).queryByText(/\/usr\/bin\/zsh/u)).not.toBeInTheDocument();
     expect(screen.queryByText("Read package.json")).not.toBeInTheDocument();
     expect(shellHeader).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText(/Test Files\s+73 passed/u)).toBeVisible();
@@ -716,7 +718,7 @@ describe("ConversationView", () => {
 
     expect(document.querySelector("[data-activity-group]")).toBeNull();
     const shellHeader = screen.getByRole("button", {
-      name: "你执行的 Shell：pwd，已完成 · 480 毫秒",
+      name: "pwd，已完成 · 480 毫秒",
     });
     expect(shellHeader).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("/workspace/project")).toBeVisible();
@@ -749,7 +751,7 @@ describe("ConversationView", () => {
 
     expect(document.querySelector("[data-activity-group]")).toBeNull();
     const shellHeader = screen.getByRole("button", {
-      name: "你执行的 Shell：pnpm build，正在运行 · 12 秒",
+      name: "pnpm build，正在运行 · 12 秒",
     });
     expect(shellHeader).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("正在编译")).toBeVisible();
