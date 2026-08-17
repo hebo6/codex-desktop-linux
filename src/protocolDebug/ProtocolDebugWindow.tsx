@@ -1,4 +1,5 @@
 import {
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -6,8 +7,14 @@ import {
   useState,
 } from "react";
 
+import syntaxTokenStyles from "../components/SyntaxToken.module.css";
 import { WindowControls } from "../components/WindowControls";
 import { useVirtualRows } from "../components/useVirtualRows";
+import {
+  syntaxHighlighter as sharedSyntaxHighlighter,
+  type HighlightedLines,
+  type SyntaxHighlighter,
+} from "../content/syntaxHighlighting";
 import {
   clearProtocolTrace,
   subscribeProtocolTrace,
@@ -31,7 +38,11 @@ const EMPTY_SUMMARY: TraceSummary = {
   evictedCount: 0,
 };
 
-export function ProtocolDebugWindow() {
+export function ProtocolDebugWindow({
+  syntaxHighlighter = sharedSyntaxHighlighter,
+}: {
+  readonly syntaxHighlighter?: SyntaxHighlighter;
+}) {
   const [entries, setEntries] = useState<readonly ProtocolTraceEntry[]>([]);
   const [summary, setSummary] = useState<TraceSummary>(EMPTY_SUMMARY);
   const [selectedSequence, setSelectedSequence] = useState<number | null>(null);
@@ -369,13 +380,78 @@ export function ProtocolDebugWindow() {
                   }`}
                 />
               </dl>
-              <pre className={styles.payload}>{prettyPayload(selected)}</pre>
+              <JsonPayload
+                entry={selected}
+                syntaxHighlighter={syntaxHighlighter}
+              />
             </>
           )}
         </aside>
       </main>
     </div>
   );
+}
+
+function JsonPayload({ entry, syntaxHighlighter }: {
+  readonly entry: ProtocolTraceEntry;
+  readonly syntaxHighlighter: SyntaxHighlighter;
+}) {
+  const source = prettyPayload(entry);
+  const [highlightedSource, setHighlightedSource] = useState<{
+    readonly lines: HighlightedLines;
+    readonly source: string;
+  } | null>(null);
+
+  useEffect(() => {
+    setHighlightedSource(null);
+    let disposed = false;
+    void syntaxHighlighter.highlight(source, "json").then(
+      (lines) => {
+        if (!disposed && highlightedText(lines) === source) {
+          setHighlightedSource({ lines, source });
+        }
+      },
+      () => {},
+    );
+    return () => {
+      disposed = true;
+    };
+  }, [source, syntaxHighlighter]);
+
+  return (
+    <pre className={styles.payload}>
+      <code>
+        {highlightedSource?.source === source
+          ? renderHighlightedLines(highlightedSource.lines)
+          : source}
+      </code>
+    </pre>
+  );
+}
+
+function highlightedText(lines: HighlightedLines): string {
+  return lines
+    .map((line) => line.map((token) => token.content).join(""))
+    .join("\n");
+}
+
+function renderHighlightedLines(lines: HighlightedLines): readonly ReactNode[] {
+  const nodes: ReactNode[] = [];
+  for (const [lineIndex, line] of lines.entries()) {
+    for (const [tokenIndex, token] of line.entries()) {
+      nodes.push(
+        <span
+          className={syntaxTokenStyles.token}
+          key={`${lineIndex}:${tokenIndex}`}
+          style={token.style}
+        >
+          {token.content}
+        </span>,
+      );
+    }
+    if (lineIndex < lines.length - 1) nodes.push("\n");
+  }
+  return nodes;
 }
 
 function Metadata({ label, value }: {

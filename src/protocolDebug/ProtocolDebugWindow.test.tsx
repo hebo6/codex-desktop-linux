@@ -1,6 +1,11 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { CSSProperties } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type {
+  HighlightedLines,
+  SyntaxHighlighter,
+} from "../content/syntaxHighlighting";
 import type { ProtocolTraceBatch } from "../transport/protocolTrace";
 import { ProtocolDebugWindow } from "./ProtocolDebugWindow";
 
@@ -59,6 +64,74 @@ describe("ProtocolDebugWindow", () => {
     expect(screen.getByText(/2 条 ·/u)).toBeVisible();
   });
 
+  it("使用 Worker 高亮选中的格式化 JSON", async () => {
+    const syntaxHighlighter: SyntaxHighlighter = {
+      highlight: vi.fn(async (source, language) => {
+        expect(language).toBe("json");
+        return highlightedLines(source);
+      }),
+    };
+    const { container } = render(
+      <ProtocolDebugWindow syntaxHighlighter={syntaxHighlighter} />,
+    );
+    await waitFor(() => expect(traceMocks.subscribe).toHaveBeenCalledTimes(1));
+
+    act(() => deliver(batch()));
+    fireEvent.click(screen.getByRole("button", { name: /turn\/start/u }));
+
+    await waitFor(() => {
+      expect(syntaxHighlighter.highlight).toHaveBeenCalledWith(
+        [
+          "{",
+          '  "id": "request-1",',
+          '  "method": "turn/start",',
+          '  "token": "[已脱敏]"',
+          "}",
+        ].join("\n"),
+        "json",
+      );
+      expect(container.querySelector("pre code span")).toHaveStyle(
+        "--shiki-light: #123456",
+      );
+    });
+  });
+
+  it("切换消息后忽略上一条消息延迟返回的高亮结果", async () => {
+    const pending = new Map<string, (lines: HighlightedLines) => void>();
+    const syntaxHighlighter: SyntaxHighlighter = {
+      highlight: vi.fn((source) =>
+        new Promise((resolve) => pending.set(source, resolve))
+      ),
+    };
+    const { container } = render(
+      <ProtocolDebugWindow syntaxHighlighter={syntaxHighlighter} />,
+    );
+    await waitFor(() => expect(traceMocks.subscribe).toHaveBeenCalledTimes(1));
+
+    act(() => deliver(batch()));
+    const responseSource = prettyJson(batch().entries[1]!.payload);
+    await waitFor(() => expect(pending.has(responseSource)).toBe(true));
+
+    fireEvent.click(screen.getByRole("button", { name: /turn\/start/u }));
+    const requestSource = prettyJson(batch().entries[0]!.payload);
+    await waitFor(() => expect(pending.has(requestSource)).toBe(true));
+    act(() => pending.get(requestSource)!(highlightedLines(requestSource)));
+    await waitFor(() => {
+      expect(container.querySelector("pre code")?.textContent).toContain(
+        "turn/start",
+      );
+      expect(container.querySelector("pre code span")).not.toBeNull();
+    });
+
+    act(() => pending.get(responseSource)!(highlightedLines(responseSource)));
+    expect(container.querySelector("pre code")?.textContent).toContain(
+      "turn/start",
+    );
+    expect(container.querySelector("pre code")?.textContent).not.toContain(
+      "thread/list",
+    );
+  });
+
   it("过滤方向并通过后端清空内存追踪", async () => {
     render(<ProtocolDebugWindow />);
     await waitFor(() => expect(traceMocks.subscribe).toHaveBeenCalledTimes(1));
@@ -75,6 +148,22 @@ describe("ProtocolDebugWindow", () => {
     expect(screen.getByText("等待 app-server 协议消息")).toBeVisible();
   });
 });
+
+const TOKEN_STYLE = {
+  "--shiki-light": "#123456",
+  "--shiki-dark": "#abcdef",
+} as CSSProperties;
+
+function highlightedLines(source: string): HighlightedLines {
+  return source.split("\n").map((line) => [{
+    content: line,
+    style: TOKEN_STYLE,
+  }]);
+}
+
+function prettyJson(source: string): string {
+  return JSON.stringify(JSON.parse(source) as unknown, null, 2);
+}
 
 function batch(): ProtocolTraceBatch {
   return {

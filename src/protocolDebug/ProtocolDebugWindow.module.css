@@ -269,6 +269,11 @@
   word-break: break-word;
 }
 
+.payload code {
+  color: inherit;
+  font: inherit;
+}
+
 .empty {
   display: grid;
   min-height: 100%;
