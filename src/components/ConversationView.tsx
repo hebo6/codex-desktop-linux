@@ -228,6 +228,7 @@ export function ConversationView({
   } | null>(null);
   const historyLoadRef = useRef<Promise<boolean> | null>(null);
   const followBottomRef = useRef(true);
+  const lockedFinalAnswerTurnIdRef = useRef<string | null>(null);
   const scrollbarDragRef = useRef(false);
   const touchPositionRef = useRef<{ x: number; y: number } | null>(null);
   const observedThreadIdRef = useRef(restoredThread.metadata.id);
@@ -330,7 +331,9 @@ export function ConversationView({
         scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <=
           BOTTOM_THRESHOLD;
       if (atBottom) {
-        followBottomRef.current = true;
+        if (lockedFinalAnswerTurnIdRef.current === null) {
+          followBottomRef.current = true;
+        }
         setShowJumpToBottom(false);
       } else if (allowExitFollowing || !followBottomRef.current) {
         followBottomRef.current = false;
@@ -364,7 +367,7 @@ export function ConversationView({
       0,
       scroller.scrollHeight - scroller.clientHeight,
     );
-    followBottomRef.current = true;
+    followBottomRef.current = lockedFinalAnswerTurnIdRef.current === null;
     setShowJumpToBottom(false);
   }, []);
 
@@ -397,7 +400,6 @@ export function ConversationView({
         return true;
       }
       const contentRect = content.getBoundingClientRect();
-      const scrollerRect = scroller.getBoundingClientRect();
       const floorHeight = targetTop + scroller.clientHeight;
       if (
         Math.abs(runningTurnFloor.floorHeight - floorHeight) >
@@ -419,23 +421,10 @@ export function ConversationView({
         return true;
       }
       scroller.scrollTop = targetTop;
-      followBottomRef.current = true;
       setShowJumpToBottom(false);
       if (!turnHasMountedActivityContent(scroller, pending.turnId)) {
         pendingFinalAnswerQuestionPositionRef.current = null;
-        if (contentRect.bottom >= scrollerRect.bottom - BOTTOM_THRESHOLD) {
-          const naturalBottom =
-            scroller.scrollTop + contentRect.bottom - scrollerRect.top;
-          setRunningTurnFloor({
-            contentHeight: contentRect.height,
-            floorHeight:
-              naturalBottom +
-              scroller.clientHeight * RUNNING_TURN_RESERVE_RATIO,
-            kind: "page",
-            turnId: pending.turnId,
-            viewportHeight: scroller.clientHeight,
-          });
-        }
+        updateBottomState(scroller, false);
       }
       return true;
     },
@@ -444,6 +433,7 @@ export function ConversationView({
       questionTargetTop,
       runningTurnFloor,
       runningTurnFloorVisible,
+      updateBottomState,
     ],
   );
 
@@ -494,6 +484,13 @@ export function ConversationView({
         return;
       }
       if (pendingQuestionPositionRef.current !== null) {
+        return;
+      }
+      if (
+        runningTurnId !== null &&
+        lockedFinalAnswerTurnIdRef.current === runningTurnId
+      ) {
+        updateBottomState(scroller, false);
         return;
       }
       if (runningTurnId === null && followBottomRef.current) {
@@ -576,6 +573,7 @@ export function ConversationView({
       runningTurnFloorVisible,
       positionPendingFinalAnswerQuestion,
       scrollToBottom,
+      updateBottomState,
     ],
   );
 
@@ -594,6 +592,7 @@ export function ConversationView({
     if (historyQuestions.length <= previousQuestionCount) {
       return;
     }
+    lockedFinalAnswerTurnIdRef.current = null;
     const scroller = scrollerRef.current;
     const content = contentRef.current;
     const latestQuestion = historyQuestions.at(-1);
@@ -712,6 +711,9 @@ export function ConversationView({
     ) {
       return;
     }
+    const wasFollowing = followBottomRef.current;
+    lockedFinalAnswerTurnIdRef.current = runningTurnId;
+    followBottomRef.current = false;
     const scroller = scrollerRef.current;
     const content = contentRef.current;
     const finalAnswer = scroller === null
@@ -722,7 +724,7 @@ export function ConversationView({
       content === null ||
       finalAnswer === null ||
       (
-        !followBottomRef.current &&
+        !wasFollowing &&
         !turnActivityHeaderIsAboveViewport(scroller, runningTurnId)
       )
     ) {
@@ -737,7 +739,6 @@ export function ConversationView({
       questionItemId: runningQuestion.itemId,
       turnId: runningTurnId,
     };
-    followBottomRef.current = true;
     setShowJumpToBottom(false);
     setRunningTurnFloor({
       contentHeight: content.getBoundingClientRect().height,
@@ -809,6 +810,7 @@ export function ConversationView({
     pendingQuestionPositionRef.current = null;
     pendingFinalAnswerQuestionPositionRef.current = null;
     setRunningTurnFloor(null);
+    lockedFinalAnswerTurnIdRef.current = null;
     followBottomRef.current = true;
     setShowJumpToBottom(false);
     if (scroller === null) {

@@ -1014,7 +1014,7 @@ describe("ConversationView", () => {
     );
   });
 
-  it("最终回答开始时将当前问题重新定位到首问位置并恢复自动跟随", async () => {
+  it("最终回答开始时恢复问题位置并停止自动跟随", async () => {
     const viewportHeight = 600;
     let contentHeight = 1_800;
     let finalAnswerDocumentTop = 1_700;
@@ -1224,6 +1224,32 @@ describe("ConversationView", () => {
     expect(scroller.scrollTop).toBe(
       scroller.scrollHeight - scroller.clientHeight,
     );
+    await waitFor(() =>
+      expect(scroller.querySelector("[data-activity-group]"))
+        .toHaveAttribute("data-content-mounted", "false")
+    );
+    act(() => contentResize?.());
+
+    contentHeight = 1_000;
+    finalAnswerDocumentTop = 900;
+    act(() => contentResize?.());
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible()
+    );
+    expect(scroller.scrollTop).toBe(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "回到底部" }));
+    expect(scroller.scrollTop).toBe(428);
+
+    contentHeight = 1_200;
+    finalAnswerDocumentTop = 1_100;
+    act(() => contentResize?.());
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible()
+    );
+    expect(scroller.scrollTop).toBe(428);
   });
 
   it("位于底部时内容增长后继续跟随底部", () => {
