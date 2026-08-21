@@ -112,6 +112,15 @@ const schemaDeclarations = [
     validatorName: "validateThreadStartResponse",
   },
   {
+    typeName: "ThreadQueueAddParams",
+    schemaPath: "v2/ThreadQueueAddParams.json",
+  },
+  {
+    typeName: "ThreadQueueAddResponse",
+    schemaPath: "v2/ThreadQueueAddResponse.json",
+    validatorName: "validateThreadQueueAddResponse",
+  },
+  {
     typeName: "ThreadSettingsUpdateParams",
     schemaPath: "v2/ThreadSettingsUpdateParams.json",
   },

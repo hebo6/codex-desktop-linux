@@ -427,7 +427,7 @@ describe("App", () => {
     expect(protocolDebugWindowOpener).toHaveBeenCalledTimes(1);
   });
 
-  it("新建线程首次发送直接采用创建响应", async () => {
+  it("新建线程首次发送直接采用创建响应并可排队后续消息", async () => {
     const user = userEvent.setup();
     const startedThread = {
       cliVersion: "1.0.0",
@@ -438,6 +438,7 @@ describe("App", () => {
       id: "thread-new",
       modelProvider: "openai",
       preview: "新任务",
+      projectId: null,
       sessionId: "session-new",
       source: "appServer",
       status: { type: "idle" },
@@ -476,6 +477,14 @@ describe("App", () => {
                       status: "inProgress",
                     },
                   }
+                : request.method === "thread/queue/add"
+                  ? {
+                      queuedSubmission: {
+                        clientUserMessageId: "message-queued",
+                        id: "queued-1",
+                        input: [{ type: "text", text: "下一回合处理" }],
+                      },
+                    }
                 : request.method === "thread/unsubscribe"
                   ? { status: "unsubscribed" }
                   : {};
@@ -544,6 +553,12 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "项目" })).not.toBeInTheDocument();
     expect(screen.queryByText("这个会话还没有回合")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert", { name: /无法恢复会话/u })).not.toBeInTheDocument();
+
+    const composer = screen.getByRole("textbox", { name: "任务输入" });
+    await user.type(composer, "下一回合处理");
+    await user.click(screen.getByRole("button", { name: "排队发送" }));
+    await waitFor(() => expect(requestMethods).toContain("thread/queue/add"));
+    await waitFor(() => expect(composer).toHaveValue(""));
 
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(requestMethods).toContain("turn/interrupt"));

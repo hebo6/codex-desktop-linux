@@ -2246,6 +2246,7 @@ export function App({
                   onRunImmediateCommand={conversation.runImmediateCommand}
                   onRunShellCommand={conversation.runShellCommand}
                   onOpenSettings={() => setSettingsSection("appearance")}
+                  onQueue={conversation.queueInput}
                   onSearchFiles={composerCapabilities.searchFiles}
                   onServiceTierChange={conversation.setServiceTier}
                   onSend={conversation.sendInput}

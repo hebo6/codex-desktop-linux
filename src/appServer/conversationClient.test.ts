@@ -37,6 +37,10 @@ describe("AppServerConversationClient", () => {
       input,
       serviceTier: "priority",
     });
+    client.queueTurn("thread-1", {
+      clientUserMessageId: "message-queued",
+      input,
+    });
     client.setServiceTier("thread-1", "priority");
     client.steerTurn("thread-1", "turn-1", {
       clientUserMessageId: "message-2",
@@ -60,6 +64,14 @@ describe("AppServerConversationClient", () => {
         },
       },
       {
+        method: "thread/queue/add",
+        params: {
+          threadId: "thread-1",
+          clientUserMessageId: "message-queued",
+          input,
+        },
+      },
+      {
         method: "thread/settings/update",
         params: { threadId: "thread-1", serviceTier: "priority" },
       },
@@ -80,6 +92,16 @@ describe("AppServerConversationClient", () => {
     for (const request of session.requests) {
       expect(request.validateResult(null).ok).toBe(false);
     }
+    const queueRequest = session.requests.find(
+      ({ method }) => method === "thread/queue/add",
+    );
+    expect(queueRequest?.validateResult({
+      queuedSubmission: {
+        clientUserMessageId: "message-queued",
+        id: "queued-1",
+        input,
+      },
+    }).ok).toBe(true);
   });
 
   it("透传已校验的服务端通知订阅", () => {

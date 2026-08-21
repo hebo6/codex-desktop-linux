@@ -22,6 +22,7 @@ export interface ConversationControls extends ConversationState {
     input: TurnStartParams["input"],
     configuration?: ConversationTurnConfiguration,
   ) => Promise<boolean>;
+  readonly queueInput: (input: TurnStartParams["input"]) => Promise<boolean>;
   readonly sendText: (text: string) => Promise<boolean>;
   readonly runShellCommand: (
     command: string,
@@ -345,6 +346,61 @@ export function useConversation({
     [sendInput],
   );
 
+  const queueInput = useCallback(async (
+    input: TurnStartParams["input"],
+  ): Promise<boolean> => {
+    const threadId = currentThreadIdRef.current;
+    if (
+      client === null ||
+      threadId === null ||
+      input.length === 0 ||
+      state.activeTurnId === null ||
+      state.submitting ||
+      state.stopping ||
+      shellCommandActive
+    ) {
+      return false;
+    }
+    const operation = Symbol("conversation-queue");
+    submissionRef.current = operation;
+    setState((current) => ({ ...current, submitting: true, error: null }));
+    try {
+      stateSourceRef.current = { client, threadId };
+      await client.queueTurn(threadId, {
+        clientUserMessageId: crypto.randomUUID(),
+        input,
+      }).result;
+      if (
+        submissionRef.current !== operation ||
+        clientRef.current !== client ||
+        currentThreadIdRef.current !== threadId
+      ) {
+        return false;
+      }
+      setState((current) => ({ ...current, submitting: false, error: null }));
+      return true;
+    } catch {
+      if (submissionRef.current === operation) {
+        setState((current) => ({
+          ...current,
+          submitting: false,
+          error: "排队结果不确定，请确认后续回合是否开始再决定是否重试",
+        }));
+      }
+      return false;
+    } finally {
+      if (submissionRef.current === operation) {
+        submissionRef.current = null;
+      }
+    }
+  }, [
+    client,
+    shellCommandActive,
+    state.activeTurnId,
+    state.stopping,
+    state.submitting,
+  ]);
+
   const runShellCommand = useCallback(async (
     command: string,
     configuration: ConversationTurnConfiguration = {},
@@ -536,6 +592,7 @@ export function useConversation({
     ...state,
     shellCommandActive,
     sendInput,
+    queueInput,
     sendText,
     runShellCommand,
     setServiceTier,

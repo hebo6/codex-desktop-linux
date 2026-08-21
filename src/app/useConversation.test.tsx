@@ -1,9 +1,14 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ConversationClient, StartTurnOptions } from "../appServer";
+import type {
+  ConversationClient,
+  QueueTurnOptions,
+  StartTurnOptions,
+} from "../appServer";
 import type {
   ServerNotification,
+  ThreadQueueAddResponse,
   ThreadStartParams,
   ThreadStartResponse,
   ThreadShellCommandResponse,
@@ -29,6 +34,7 @@ class FakeConversationClient implements ConversationClient {
   readonly startThreadCalls: ThreadStartParams[] = [];
   readonly shellCommandCalls: Array<{ threadId: string; command: string }> = [];
   readonly startTurnCalls: Array<{ threadId: string; options: StartTurnOptions }> = [];
+  readonly queueTurnCalls: Array<{ threadId: string; options: QueueTurnOptions }> = [];
   readonly steerCalls: Array<{
     threadId: string;
     turnId: string;
@@ -48,6 +54,17 @@ class FakeConversationClient implements ConversationClient {
   startTurn(threadId: string, options: StartTurnOptions) {
     this.startTurnCalls.push({ threadId, options });
     return handle(Promise.resolve(this.turnStartResponse));
+  }
+
+  queueTurn(threadId: string, options: QueueTurnOptions) {
+    this.queueTurnCalls.push({ threadId, options });
+    return handle(Promise.resolve({
+      queuedSubmission: {
+        id: "queued-1",
+        clientUserMessageId: options.clientUserMessageId,
+        input: options.input,
+      },
+    } satisfies ThreadQueueAddResponse));
   }
 
   runShellCommand(threadId: string, command: string) {
@@ -100,6 +117,7 @@ function restored(turns: readonly ThreadTurn[]): RestoredThread {
       id: "thread-1",
       modelProvider: "openai",
       preview: "任务",
+      projectId: null,
       sessionId: "session-1",
       source: "appServer",
       status: { type: "active", activeFlags: [] },
@@ -605,6 +623,39 @@ describe("useConversation", () => {
     expect(client.interruptCalls).toEqual([
       { threadId: "thread-1", turnId: RUNNING_TURN.id },
     ]);
+  });
+
+  it("运行中把输入排到下一回合且不触发 steer", async () => {
+    const client = new FakeConversationClient();
+    const snapshot = restored([RUNNING_TURN]);
+    const { result } = renderHook(() =>
+      useConversation({
+        client,
+        currentThreadId: "thread-1",
+        restoredThread: snapshot,
+        onThreadCreated: vi.fn(async () => undefined),
+      }),
+    );
+    await waitFor(() => expect(result.current.activeTurnId).toBe(RUNNING_TURN.id));
+
+    await act(async () => {
+      expect(await result.current.queueInput([
+        { type: "text", text: "下一回合处理" },
+      ])).toBe(true);
+    });
+
+    expect(client.queueTurnCalls).toHaveLength(1);
+    expect(client.queueTurnCalls[0]).toMatchObject({
+      threadId: "thread-1",
+      options: {
+        input: [{ type: "text", text: "下一回合处理" }],
+      },
+    });
+    expect(client.queueTurnCalls[0]?.options.clientUserMessageId).toEqual(
+      expect.any(String),
+    );
+    expect(client.steerCalls).toHaveLength(0);
+    expect(client.startTurnCalls).toHaveLength(0);
   });
 
   it("独立 Shell 回合阻止普通消息但允许继续执行 Shell 命令", async () => {

@@ -18,6 +18,7 @@ import type {
   ThreadUnarchiveResponse,
   ThreadDeleteResponse,
   ThreadStartResponse,
+  ThreadQueueAddResponse,
   ThreadSettingsUpdateResponse,
   ThreadBackgroundTerminalsListResponse,
   ThreadBackgroundTerminalsTerminateResponse,
@@ -60,6 +61,7 @@ import {
   validateThreadUnarchiveResponse as validateThreadUnarchiveResponseSchema,
   validateThreadDeleteResponse as validateThreadDeleteResponseSchema,
   validateThreadStartResponse as validateThreadStartResponseSchema,
+  validateThreadQueueAddResponse as validateThreadQueueAddResponseSchema,
   validateThreadSettingsUpdateResponse as validateThreadSettingsUpdateResponseSchema,
   validateThreadBackgroundTerminalsListResponse as validateThreadBackgroundTerminalsListResponseSchema,
   validateThreadBackgroundTerminalsTerminateResponse as validateThreadBackgroundTerminalsTerminateResponseSchema,
@@ -321,6 +323,18 @@ export function validateThreadStartResponse(
   value: unknown,
 ): ProtocolValidationResult<ThreadStartResponse> {
   return validateWithSchema(value, validateThreadStartResponseSchema, "invalid_params", "params", "thread/start 响应校验失败");
+}
+
+export function validateThreadQueueAddResponse(
+  value: unknown,
+): ProtocolValidationResult<ThreadQueueAddResponse> {
+  return validateWithSchema(
+    value,
+    validateThreadQueueAddResponseSchema,
+    "invalid_params",
+    "params",
+    "thread/queue/add 响应校验失败",
+  );
 }
 
 export function validateThreadSettingsUpdateResponse(

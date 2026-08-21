@@ -31,6 +31,7 @@ import type {
   ThreadForkResponse,
   ThreadItemsListResponse,
   ThreadListResponse,
+  ThreadQueueAddResponse,
   ThreadReadResponse,
   ThreadResumeResponse,
   ThreadSectionMoveResponse,
@@ -64,6 +65,7 @@ export const validateThreadArchiveResponse: StandaloneValidateFunction<ThreadArc
 export const validateThreadUnarchiveResponse: StandaloneValidateFunction<ThreadUnarchiveResponse>;
 export const validateThreadDeleteResponse: StandaloneValidateFunction<ThreadDeleteResponse>;
 export const validateThreadStartResponse: StandaloneValidateFunction<ThreadStartResponse>;
+export const validateThreadQueueAddResponse: StandaloneValidateFunction<ThreadQueueAddResponse>;
 export const validateThreadSettingsUpdateResponse: StandaloneValidateFunction<ThreadSettingsUpdateResponse>;
 export const validateTurnStartResponse: StandaloneValidateFunction<TurnStartResponse>;
 export const validateTurnSteerResponse: StandaloneValidateFunction<TurnSteerResponse>;

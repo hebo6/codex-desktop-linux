@@ -167,6 +167,7 @@ export interface ComposerProps {
     configuration?: ConversationTurnConfiguration,
   ) => Promise<boolean>;
   readonly onOpenSettings?: () => void;
+  readonly onQueue: (input: TurnStartParams["input"]) => Promise<boolean>;
   readonly onSearchFiles?: (query: string) => Promise<readonly FuzzyFileSearchResult[]>;
   readonly onServiceTierChange?: (serviceTier: string) => Promise<boolean>;
   readonly onSend: (
@@ -220,6 +221,7 @@ export function Composer({
   onRunImmediateCommand,
   onRunShellCommand,
   onOpenSettings,
+  onQueue,
   onSearchFiles,
   onServiceTierChange,
   onSend,
@@ -710,7 +712,7 @@ export function Composer({
     setMarkdownPreview(false);
   };
 
-  const send = async () => {
+  const send = async (target: "current" | "queue" = "current") => {
     if (!canSend || sendingRef.current) {
       return;
     }
@@ -718,6 +720,10 @@ export function Composer({
     preserveDraftForNextKeyRef.current = false;
     sendingRef.current = true;
     if (shellMode) {
+      if (target === "queue") {
+        sendingRef.current = false;
+        return;
+      }
       if (showProjectPicker) preserveDraftForNextKeyRef.current = true;
       try {
         if (await onRunShellCommand(shellCommand, turnConfiguration())) {
@@ -770,10 +776,15 @@ export function Composer({
         ),
       ];
       if (showProjectPicker) preserveDraftForNextKeyRef.current = true;
-      if (await onSend(input, turnConfiguration())) {
+      const accepted = target === "queue"
+        ? await onQueue(input)
+        : await onSend(input, turnConfiguration());
+      if (accepted) {
         await clearSubmittedDraft(
           sourceDraftKey,
-          "消息已发送，但草稿清理失败",
+          target === "queue"
+            ? "消息已排队，但草稿清理失败"
+            : "消息已发送，但草稿清理失败",
         );
       } else if (showProjectPicker) {
         releaseDraftPreservationIfUnchanged();
@@ -1758,6 +1769,21 @@ export function Composer({
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24">
                   <rect x="7" y="7" width="10" height="10" rx="1.5" />
+                </svg>
+              </button>
+            ) : null}
+            {activeTurn && hasSubmittableContent && !shellMode ? (
+              <button
+                aria-label="排队发送"
+                className={styles.queueButton}
+                disabled={!canSend}
+                onClick={() => void send("queue")}
+                title="排到后续回合"
+                type="button"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M5 7h9M5 12h7M5 17h5" />
+                  <path d="m15 14 4 4-4 4M19 18h-6" />
                 </svg>
               </button>
             ) : null}

@@ -4,6 +4,8 @@ import type {
   ThreadShellCommandResponse,
   ThreadStartParams,
   ThreadStartResponse,
+  ThreadQueueAddParams,
+  ThreadQueueAddResponse,
   ThreadSettingsUpdateParams,
   ThreadSettingsUpdateResponse,
   ThreadBackgroundTerminalsListParams,
@@ -27,6 +29,7 @@ import type {
 import {
   validateThreadShellCommandResponse,
   validateThreadStartResponse,
+  validateThreadQueueAddResponse,
   validateThreadSettingsUpdateResponse,
   validateThreadBackgroundTerminalsListResponse,
   validateThreadBackgroundTerminalsTerminateResponse,
@@ -53,6 +56,11 @@ export interface StartTurnOptions {
   readonly serviceTier?: TurnStartParams["serviceTier"];
 }
 
+export type QueueTurnOptions = Pick<
+  StartTurnOptions,
+  "clientUserMessageId" | "input"
+>;
+
 export interface ConversationClient {
   startThread(params?: ThreadStartParams): RequestHandle<ThreadStartResponse>;
   runShellCommand(
@@ -60,6 +68,10 @@ export interface ConversationClient {
     command: string,
   ): RequestHandle<ThreadShellCommandResponse>;
   startTurn(threadId: string, options: StartTurnOptions): RequestHandle<TurnStartResponse>;
+  queueTurn(
+    threadId: string,
+    options: QueueTurnOptions,
+  ): RequestHandle<ThreadQueueAddResponse>;
   setServiceTier(
     threadId: string,
     serviceTier: string,
@@ -126,6 +138,22 @@ export class AppServerConversationClient
       method: "turn/start",
       params,
       validateResult: turnStartResponseValidator,
+    });
+  }
+
+  queueTurn(
+    threadId: string,
+    options: QueueTurnOptions,
+  ): RequestHandle<ThreadQueueAddResponse> {
+    const params: ThreadQueueAddParams = {
+      threadId,
+      clientUserMessageId: options.clientUserMessageId,
+      input: options.input,
+    };
+    return this.session.sendRequest({
+      method: "thread/queue/add",
+      params,
+      validateResult: threadQueueAddResponseValidator,
     });
   }
 
@@ -223,6 +251,8 @@ export class AppServerConversationClient
 
 const threadStartResponseValidator: ResultValidator<ThreadStartResponse> =
   validateThreadStartResponse;
+const threadQueueAddResponseValidator: ResultValidator<ThreadQueueAddResponse> =
+  validateThreadQueueAddResponse;
 const threadShellCommandResponseValidator: ResultValidator<ThreadShellCommandResponse> =
   validateThreadShellCommandResponse;
 const threadSettingsUpdateResponseValidator: ResultValidator<ThreadSettingsUpdateResponse> =

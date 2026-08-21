@@ -74,6 +74,7 @@ function imageFile(
 }
 
 function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}) {
+  const onQueue = vi.fn(async () => true);
   const onRunShellCommand = vi.fn(async () => true);
   const onSend = vi.fn(async () => true);
   const onStop = vi.fn(async () => true);
@@ -89,6 +90,7 @@ function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}
       cwd="/workspace/project"
       error={null}
       imageValidator={async () => undefined}
+      onQueue={onQueue}
       onRunShellCommand={onRunShellCommand}
       onSend={onSend}
       onStop={onStop}
@@ -100,6 +102,7 @@ function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}
   );
   return {
     blobUrlFactory,
+    onQueue,
     onRunShellCommand,
     onSend,
     onStop,
@@ -167,6 +170,7 @@ describe("Composer", () => {
             draftKey={draftKey}
             draftStore={draftStore}
             error={null}
+            onQueue={async () => true}
             onRunShellCommand={async () => true}
             onSend={async () => true}
             onStop={async () => true}
@@ -355,6 +359,7 @@ describe("Composer", () => {
           draftKey={draftKey}
           draftStore={draftStore}
           error={null}
+          onQueue={async () => true}
           onRunShellCommand={async () => true}
           onSend={async () => {
             setDraftKey("window:server:thread");
@@ -453,6 +458,7 @@ describe("Composer", () => {
             draftKey={draftKey}
             draftStore={draftStore}
             error={null}
+            onQueue={async () => true}
             onRunShellCommand={async () => true}
             onSend={async () => {
               setDraftKey("window:server:thread");
@@ -678,6 +684,7 @@ describe("Composer", () => {
           draftKey={draftKey}
           draftStore={draftStore}
           error={null}
+          onQueue={async () => true}
           onRunShellCommand={async () => true}
           onSend={async (...arguments_) => {
             setDraftKey("window:server:thread");
@@ -1194,14 +1201,26 @@ describe("Composer", () => {
     ));
   });
 
-  it("运行中根据输入区分停止和追加", async () => {
+  it("运行中区分停止、追加和排队发送", async () => {
     const user = userEvent.setup();
-    const { onSend, onStop } = renderComposer({ activeTurn: true, showProjectPicker: false });
+    const { onQueue, onSend, onStop } = renderComposer({
+      activeTurn: true,
+      showProjectPicker: false,
+    });
     expect(screen.queryByText("Codex 正在处理当前回合")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "停止" }));
     expect(onStop).toHaveBeenCalledTimes(1);
 
-    await user.type(screen.getByRole("textbox"), "补充条件");
+    const editor = screen.getByRole("textbox");
+    await user.type(editor, "稍后处理");
+    expect(screen.getByRole("button", { name: "排队发送" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "排队发送" }));
+    await waitFor(() => expect(onQueue).toHaveBeenCalledWith([
+      { type: "text", text: "稍后处理" },
+    ]));
+    await waitFor(() => expect(editor).toHaveValue(""));
+
+    await user.type(editor, "补充条件");
     expect(screen.getByRole("button", { name: "追加" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "停止当前回合" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "追加" }));
@@ -1209,6 +1228,25 @@ describe("Composer", () => {
       [{ type: "text", text: "补充条件" }],
       { cwd: "/workspace/project" },
     ));
+  });
+
+  it("排队发送失败时保留完整草稿", async () => {
+    const user = userEvent.setup();
+    const onQueue = vi.fn(async () => false);
+    renderComposer({
+      activeTurn: true,
+      onQueue,
+      showProjectPicker: false,
+    });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    await user.type(editor, "不要丢失这条后续任务");
+
+    await user.click(screen.getByRole("button", { name: "排队发送" }));
+
+    await waitFor(() => expect(onQueue).toHaveBeenCalledWith([
+      { type: "text", text: "不要丢失这条后续任务" },
+    ]));
+    expect(editor).toHaveValue("不要丢失这条后续任务");
   });
 
   it("从服务端技能菜单插入结构化令牌", async () => {
