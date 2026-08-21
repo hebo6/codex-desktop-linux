@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
+// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
 
 export type RateLimitResetType = "codexRateLimits" | "unknown";
 export type RateLimitResetCreditStatus = "available" | "redeeming" | "redeemed" | "unknown";
@@ -18,6 +18,8 @@ export type PlanType =
   | "enterprise_cbp_usage_based"
   | "enterprise"
   | "edu"
+  | "edu_plus"
+  | "edu_pro"
   | "unknown";
 export type RateLimitReachedType =
   | "rate_limit_reached"

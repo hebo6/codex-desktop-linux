@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
+// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
 
 export type ThreadItem =
   | UserMessageThreadItem
@@ -38,6 +38,7 @@ export type SkillUserInputType = "skill";
 export type MentionUserInputType = "mention";
 export type UserMessageThreadItemType = "userMessage";
 export type HookPromptThreadItemType = "hookPrompt";
+export type AgentMessageDelivery = "async";
 /**
  * Classifies an assistant message as interim commentary or final answer text.
  *
@@ -209,6 +210,7 @@ export interface HookPromptFragment {
   [k: string]: unknown | undefined;
 }
 export interface AgentMessageThreadItem {
+  delivery?: AgentMessageDelivery | null;
   id: string;
   memoryCitation?: MemoryCitation | null;
   phase?: MessagePhase | null;

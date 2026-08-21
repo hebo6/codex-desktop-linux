@@ -4,7 +4,7 @@
 
 客户端负责桌面窗口、连接、凭据、文件访问、本地偏好和用户界面，不实现模型推理、工具执行沙箱或服务端会话语义
 
-app-server 协议定义以 `CODEX_SOURCE_DIR` 指向的只读 Codex 仓库和项目固化的[协议基线](protocol-baseline.md)为准
+app-server 协议定义以固定 Codex CLI 版本生成并由项目固化的[协议基线](protocol-baseline.md)为准
 
 远程 WebSocket 传输仍是上游实验能力，技术设计必须保留多服务器和远程连接能力，并在用户界面中呈现实验性质
 

@@ -5,9 +5,9 @@
 | 项目 | 值 |
 | --- | --- |
 | 上游仓库 | [openai/codex](https://github.com/openai/codex) |
-| 上游提交 | `8630bb3caecaff6abc6add450a88035d9f6d3f8c` |
-| 上游生成命令 | `codex app-server generate-json-schema --experimental` |
-| 上游固化产物 | `codex-app-server-protocol` 的实验版预计算协议归档 |
+| 上游提交 | `657bd889ae28edcbf5395c103b479bf8b328704e` |
+| Codex CLI 版本 | `codex-cli 0.149.0` |
+| 上游生成命令 | `codex app-server generate-json-schema --experimental --out <目录>` |
 | 固化目录 | `protocol/schema` |
 
 本基线只固化上游 JSON Schema，不复制上游 `ts-rs` 生成的 TypeScript 类型
@@ -22,21 +22,15 @@
 ./scripts/generate-protocol-schema.sh --update
 ```
 
-验证工作树中的基线可由固定提交复现时执行
+验证工作树中的基线可由固定 Codex CLI 版本复现时执行
 
 ```bash
 ./scripts/generate-protocol-schema.sh --check
 ```
 
-脚本通过 `CODEX_SOURCE_DIR` 读取同一固定提交的干净 Codex 检出，路径必须是绝对路径
+脚本要求 `codex --version` 为表中固定版本，并执行上游 `codex app-server generate-json-schema --experimental --out <临时目录>` 生成 JSON Schema
 
-```bash
-CODEX_SOURCE_DIR=/path/to/codex ./scripts/generate-protocol-schema.sh --check
-```
-
-脚本会拒绝提交号不匹配或存在未提交变更的上游检出，并读取该提交中 `codex-app-server-protocol` 固化的实验版预计算协议归档
-
-上游 `codex app-server generate-json-schema --experimental` 也从同一归档导出 `json_schema`，本项目使用 Node.js 内置 Zstandard 解压后只固化其中的 JSON Schema
+该 CLI 版本的生成结果与表中上游提交的实验版预计算协议归档一致
 
 原始生成目录位于 `/tmp`
 
@@ -44,14 +38,14 @@ CODEX_SOURCE_DIR=/path/to/codex ./scripts/generate-protocol-schema.sh --check
 
 ## 固化产物
 
-`protocol/schema/UPSTREAM_COMMIT` 记录上游完整提交号，`protocol/schema/SHA256SUMS` 记录全部 380 个 JSON 文件按相对路径排序后的 SHA256
+`protocol/schema/UPSTREAM_COMMIT` 记录上游完整提交号，`protocol/schema/SHA256SUMS` 记录全部 401 个 JSON 文件按相对路径排序后的 SHA256
 
 两个聚合入口的校验值如下
 
 | 文件 | SHA256 |
 | --- | --- |
-| `codex_app_server_protocol.schemas.json` | `e190e3ac1918ee7ccb2c6b3e8d93dd8521d8a47b235903630f95266e1716b965` |
-| `codex_app_server_protocol.v2.schemas.json` | `b4e8157096dd054c008a4f1b538fb6cd8f1f2cb9577a97a4afef59c2296ed608` |
+| `codex_app_server_protocol.schemas.json` | `4f4a8d8f53f971b97f818639f58c8d26bb68bfcdfa2d2f20572cb97e6761ab91` |
+| `codex_app_server_protocol.v2.schemas.json` | `6f76cce25156d405f1da54f205751e38f7b9eb42246ac0742b9958dd60275350` |
 
 `codex_app_server_protocol.schemas.json` 是完整命名空间聚合包，`codex_app_server_protocol.v2.schemas.json` 是扁平化 v2 聚合包，目录内其余 JSON 文件是请求、响应、通知及共享负载的独立 Schema
 

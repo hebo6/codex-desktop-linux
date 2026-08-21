@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
+// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
 
 /**
  * Request from the client to the server.
@@ -40,6 +40,13 @@ export type ClientRequest =
   | ThreadRollbackRequest
   | ThreadRevertRequest
   | ThreadListRequest
+  | ProjectListRequest
+  | ProjectReadRequest
+  | ProjectCreateRequest
+  | ProjectImportRequest
+  | ProjectUpdateRequest
+  | ProjectMoveRequest
+  | ProjectDeleteRequest
   | ThreadSectionListRequest
   | ThreadSectionCreateRequest
   | ThreadSectionUpdateRequest
@@ -117,6 +124,8 @@ export type ClientRequest =
   | WindowsSandboxSetupStartRequest
   | WindowsSandboxReadinessRequest
   | AccountLoginStartRequest
+  | AccountBedrockDiscoverRequest
+  | AccountBedrockSetupRequest
   | AccountLoginCancelRequest
   | AccountLogoutRequest
   | AccountRateLimitsReadRequest
@@ -349,6 +358,13 @@ export type ThreadSourceKind =
   | "subAgentThreadSpawn"
   | "subAgentOther"
   | "unknown";
+export type ProjectListRequestMethod = "project/list";
+export type ProjectReadRequestMethod = "project/read";
+export type ProjectCreateRequestMethod = "project/create";
+export type ProjectImportRequestMethod = "project/import";
+export type ProjectUpdateRequestMethod = "project/update";
+export type ProjectMoveRequestMethod = "project/move";
+export type ProjectDeleteRequestMethod = "project/delete";
 export type ThreadSectionListRequestMethod = "threadSection/list";
 export type ThreadSectionCreateRequestMethod = "threadSection/create";
 export type ThreadSectionUpdateRequestMethod = "threadSection/update";
@@ -489,6 +505,14 @@ export type ChatgptLoginAccountParamsType = "chatgpt";
 export type ChatgptDeviceCodeLoginAccountParamsType = "chatgptDeviceCode";
 export type ChatgptAuthTokensLoginAccountParamsType = "chatgptAuthTokens";
 export type AmazonBedrockLoginAccountParamsType = "amazonBedrock";
+export type AccountBedrockDiscoverRequestMethod = "account/bedrock/discover";
+export type AccountBedrockSetupRequestMethod = "account/bedrock/setup";
+export type BedrockSetupParams =
+  ProfileBedrockSetupParams | EnvironmentBedrockSetupParams | AccessKeysBedrockSetupParams;
+export type ProfileBedrockSetupParamsType = "profile";
+export type AwsCredentialType = "accessKeys" | "bedrockApiKey";
+export type EnvironmentBedrockSetupParamsType = "environment";
+export type AccessKeysBedrockSetupParamsType = "accessKeys";
 export type AccountLoginCancelRequestMethod = "account/login/cancel";
 export type AccountLogoutRequestMethod = "account/logout";
 export type AccountRateLimitsReadRequestMethod = "account/rateLimits/read";
@@ -650,6 +674,10 @@ export interface ThreadStartParams {
    */
   permissions?: string | null;
   personality?: Personality | null;
+  /**
+   * Optional project identity for this new thread. Durable threads persist the assignment; ephemeral threads expose it only in live responses.
+   */
+  projectId?: string | null;
   /**
    * Replace the thread's runtime workspace roots. Paths must be absolute.
    */
@@ -1395,6 +1423,10 @@ export interface ThreadMetadataUpdateParams {
    * Patch the stored Git metadata for this thread. Omit a field to leave it unchanged, set it to `null` to clear it, or provide a string to replace the stored value.
    */
   gitInfo?: ThreadMetadataGitInfoUpdateParams | null;
+  /**
+   * Omit to leave the project unchanged, use an empty string to clear it, or provide an existing project ID to assign it.
+   */
+  projectId?: string | null;
   threadId: string;
   [k: string]: unknown | undefined;
 }
@@ -1716,6 +1748,10 @@ export interface ThreadListParams {
    */
   parentThreadId?: string | null;
   /**
+   * Omit to include every project, set to null for unassigned threads, or provide a project ID to return only threads in that project.
+   */
+  projectId?: string | null;
+  /**
    * Optional substring filter for the extracted thread title.
    */
   searchTerm?: string | null;
@@ -1739,6 +1775,98 @@ export interface ThreadListParams {
    * If true, return from the state DB without scanning JSONL rollouts to repair thread metadata. Omitted or false preserves scan-and-repair behavior.
    */
   useStateDbOnly?: boolean;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectListRequest {
+  id: RequestId;
+  method: ProjectListRequestMethod;
+  params: ProjectListParams;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectListParams {
+  cursor?: string | null;
+  limit?: number | null;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectReadRequest {
+  id: RequestId;
+  method: ProjectReadRequestMethod;
+  params: ProjectReadParams;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectReadParams {
+  projectId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectCreateRequest {
+  id: RequestId;
+  method: ProjectCreateRequestMethod;
+  params: ProjectCreateParams;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectCreateParams {
+  idempotencyKey: string;
+  metadata?: {
+    [k: string]: string | undefined;
+  } | null;
+  name: string;
+  roots: ProjectRoot[];
+  [k: string]: unknown | undefined;
+}
+export interface ProjectRoot {
+  path: AbsolutePathBuf;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectImportRequest {
+  id: RequestId;
+  method: ProjectImportRequestMethod;
+  params: ProjectImportParams;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectImportParams {
+  idempotencyKey: string;
+  metadata?: {
+    [k: string]: string | undefined;
+  } | null;
+  name: string;
+  roots: ProjectRoot[];
+  threads?: string[] | null;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectUpdateRequest {
+  id: RequestId;
+  method: ProjectUpdateRequestMethod;
+  params: ProjectUpdateParams;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectUpdateParams {
+  metadata?: {
+    [k: string]: string | undefined;
+  } | null;
+  name?: string | null;
+  projectId: string;
+  roots?: ProjectRoot[] | null;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectMoveRequest {
+  id: RequestId;
+  method: ProjectMoveRequestMethod;
+  params: ProjectMoveParams;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectMoveParams {
+  beforeProjectId?: string | null;
+  projectId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectDeleteRequest {
+  id: RequestId;
+  method: ProjectDeleteRequestMethod;
+  params: ProjectDeleteParams;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectDeleteParams {
+  projectId: string;
   [k: string]: unknown | undefined;
 }
 export interface ThreadSectionListRequest {
@@ -3143,6 +3271,11 @@ export interface McpServerResourceReadRequest {
   [k: string]: unknown | undefined;
 }
 export interface McpResourceReadParams {
+  connectorId?: string | null;
+  /**
+   * Originating MCP tool call used to select the resource's app.
+   */
+  originCallId?: string | null;
   server: string;
   threadId?: string | null;
   uri: string;
@@ -3229,6 +3362,41 @@ export interface AmazonBedrockLoginAccountParams {
   apiKey: string;
   region: string;
   type: AmazonBedrockLoginAccountParamsType;
+  [k: string]: unknown | undefined;
+}
+export interface AccountBedrockDiscoverRequest {
+  id: RequestId;
+  method: AccountBedrockDiscoverRequestMethod;
+  params: BedrockDiscoverParams;
+  [k: string]: unknown | undefined;
+}
+export interface BedrockDiscoverParams {
+  [k: string]: unknown | undefined;
+}
+export interface AccountBedrockSetupRequest {
+  id: RequestId;
+  method: AccountBedrockSetupRequestMethod;
+  params: BedrockSetupParams;
+  [k: string]: unknown | undefined;
+}
+export interface ProfileBedrockSetupParams {
+  profile: string;
+  region: string;
+  type: ProfileBedrockSetupParamsType;
+  [k: string]: unknown | undefined;
+}
+export interface EnvironmentBedrockSetupParams {
+  credentialType: AwsCredentialType;
+  region: string;
+  type: EnvironmentBedrockSetupParamsType;
+  [k: string]: unknown | undefined;
+}
+export interface AccessKeysBedrockSetupParams {
+  accessKeyId: string;
+  region: string;
+  secretAccessKey: string;
+  sessionToken?: string | null;
+  type: AccessKeysBedrockSetupParamsType;
   [k: string]: unknown | undefined;
 }
 export interface AccountLoginCancelRequest {

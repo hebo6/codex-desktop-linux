@@ -213,6 +213,102 @@
         }
       ]
     },
+    "AwsCredentialType": {
+      "enum": [
+        "accessKeys",
+        "bedrockApiKey"
+      ],
+      "type": "string"
+    },
+    "BedrockDiscoverParams": {
+      "type": "object"
+    },
+    "BedrockSetupParams": {
+      "oneOf": [
+        {
+          "properties": {
+            "profile": {
+              "type": "string"
+            },
+            "region": {
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "profile"
+              ],
+              "title": "ProfileBedrockSetupParamsType",
+              "type": "string"
+            }
+          },
+          "required": [
+            "profile",
+            "region",
+            "type"
+          ],
+          "title": "ProfileBedrockSetupParams",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "credentialType": {
+              "$ref": "#/definitions/AwsCredentialType"
+            },
+            "region": {
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "environment"
+              ],
+              "title": "EnvironmentBedrockSetupParamsType",
+              "type": "string"
+            }
+          },
+          "required": [
+            "credentialType",
+            "region",
+            "type"
+          ],
+          "title": "EnvironmentBedrockSetupParams",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "accessKeyId": {
+              "type": "string"
+            },
+            "region": {
+              "type": "string"
+            },
+            "secretAccessKey": {
+              "type": "string"
+            },
+            "sessionToken": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "enum": [
+                "accessKeys"
+              ],
+              "title": "AccessKeysBedrockSetupParamsType",
+              "type": "string"
+            }
+          },
+          "required": [
+            "accessKeyId",
+            "region",
+            "secretAccessKey",
+            "type"
+          ],
+          "title": "AccessKeysBedrockSetupParams",
+          "type": "object"
+        }
+      ]
+    },
     "ByteRange": {
       "properties": {
         "end": {
@@ -2015,6 +2111,19 @@
     },
     "McpResourceReadParams": {
       "properties": {
+        "connectorId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "originCallId": {
+          "description": "Originating MCP tool call used to select the resource's app.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "server": {
           "type": "string"
         },
@@ -2849,6 +2958,181 @@
       },
       "required": [
         "processHandle"
+      ],
+      "type": "object"
+    },
+    "ProjectCreateParams": {
+      "properties": {
+        "idempotencyKey": {
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "roots": {
+          "items": {
+            "$ref": "#/definitions/ProjectRoot"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "idempotencyKey",
+        "name",
+        "roots"
+      ],
+      "type": "object"
+    },
+    "ProjectDeleteParams": {
+      "properties": {
+        "projectId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectId"
+      ],
+      "type": "object"
+    },
+    "ProjectImportParams": {
+      "properties": {
+        "idempotencyKey": {
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "roots": {
+          "items": {
+            "$ref": "#/definitions/ProjectRoot"
+          },
+          "type": "array"
+        },
+        "threads": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "idempotencyKey",
+        "name",
+        "roots"
+      ],
+      "type": "object"
+    },
+    "ProjectListParams": {
+      "properties": {
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "ProjectMoveParams": {
+      "properties": {
+        "beforeProjectId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectId"
+      ],
+      "type": "object"
+    },
+    "ProjectReadParams": {
+      "properties": {
+        "projectId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectId"
+      ],
+      "type": "object"
+    },
+    "ProjectRoot": {
+      "properties": {
+        "path": {
+          "$ref": "#/definitions/AbsolutePathBuf"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "ProjectUpdateParams": {
+      "properties": {
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "roots": {
+          "items": {
+            "$ref": "#/definitions/ProjectRoot"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "projectId"
       ],
       "type": "object"
     },
@@ -4815,6 +5099,13 @@
             "null"
           ]
         },
+        "projectId": {
+          "description": "Omit to include every project, set to null for unassigned threads, or provide a project ID to return only threads in that project.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "searchTerm": {
           "description": "Optional substring filter for the extracted thread title.",
           "type": [
@@ -4949,6 +5240,13 @@
             }
           ],
           "description": "Patch the stored Git metadata for this thread. Omit a field to leave it unchanged, set it to `null` to clear it, or provide a string to replace the stored value."
+        },
+        "projectId": {
+          "description": "Omit to leave the project unchanged, use an empty string to clear it, or provide an existing project ID to assign it.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "threadId": {
           "type": "string"
@@ -6208,6 +6506,13 @@
             {
               "type": "null"
             }
+          ]
+        },
+        "projectId": {
+          "description": "Optional project identity for this new thread. Durable threads persist the assignment; ephemeral threads expose it only in live responses.",
+          "type": [
+            "string",
+            "null"
           ]
         },
         "runtimeWorkspaceRoots": {
@@ -7705,6 +8010,174 @@
         "params"
       ],
       "title": "Thread/listRequest",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "method": {
+          "enum": [
+            "project/list"
+          ],
+          "title": "Project/listRequestMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/ProjectListParams"
+        }
+      },
+      "required": [
+        "id",
+        "method",
+        "params"
+      ],
+      "title": "Project/listRequest",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "method": {
+          "enum": [
+            "project/read"
+          ],
+          "title": "Project/readRequestMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/ProjectReadParams"
+        }
+      },
+      "required": [
+        "id",
+        "method",
+        "params"
+      ],
+      "title": "Project/readRequest",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "method": {
+          "enum": [
+            "project/create"
+          ],
+          "title": "Project/createRequestMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/ProjectCreateParams"
+        }
+      },
+      "required": [
+        "id",
+        "method",
+        "params"
+      ],
+      "title": "Project/createRequest",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "method": {
+          "enum": [
+            "project/import"
+          ],
+          "title": "Project/importRequestMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/ProjectImportParams"
+        }
+      },
+      "required": [
+        "id",
+        "method",
+        "params"
+      ],
+      "title": "Project/importRequest",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "method": {
+          "enum": [
+            "project/update"
+          ],
+          "title": "Project/updateRequestMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/ProjectUpdateParams"
+        }
+      },
+      "required": [
+        "id",
+        "method",
+        "params"
+      ],
+      "title": "Project/updateRequest",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "method": {
+          "enum": [
+            "project/move"
+          ],
+          "title": "Project/moveRequestMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/ProjectMoveParams"
+        }
+      },
+      "required": [
+        "id",
+        "method",
+        "params"
+      ],
+      "title": "Project/moveRequest",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "method": {
+          "enum": [
+            "project/delete"
+          ],
+          "title": "Project/deleteRequestMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/ProjectDeleteParams"
+        }
+      },
+      "required": [
+        "id",
+        "method",
+        "params"
+      ],
+      "title": "Project/deleteRequest",
       "type": "object"
     },
     {
@@ -9568,6 +10041,54 @@
         "params"
       ],
       "title": "Account/login/startRequest",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "method": {
+          "enum": [
+            "account/bedrock/discover"
+          ],
+          "title": "Account/bedrock/discoverRequestMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/BedrockDiscoverParams"
+        }
+      },
+      "required": [
+        "id",
+        "method",
+        "params"
+      ],
+      "title": "Account/bedrock/discoverRequest",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "method": {
+          "enum": [
+            "account/bedrock/setup"
+          ],
+          "title": "Account/bedrock/setupRequestMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/BedrockSetupParams"
+        }
+      },
+      "required": [
+        "id",
+        "method",
+        "params"
+      ],
+      "title": "Account/bedrock/setupRequest",
       "type": "object"
     },
     {

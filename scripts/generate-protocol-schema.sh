@@ -2,11 +2,11 @@
 
 set -eu
 
-readonly expected_commit="8630bb3caecaff6abc6add450a88035d9f6d3f8c"
+readonly expected_commit="657bd889ae28edcbf5395c103b479bf8b328704e"
+readonly expected_codex_version="codex-cli 0.149.0"
 
 project_dir=$(realpath "$(dirname "$0")/..")
 schema_dir="$project_dir/protocol/schema"
-codex_source_dir=${CODEX_SOURCE_DIR:-}
 mode=${1:---check}
 
 usage() {
@@ -22,47 +22,26 @@ case "$mode" in
         ;;
 esac
 
-if [ -z "$codex_source_dir" ]; then
-    printf '%s\n' "请通过 CODEX_SOURCE_DIR 指定 Codex 源码仓库绝对路径" >&2
-    exit 1
-fi
-
-if ! git -C "$codex_source_dir" rev-parse --git-dir >/dev/null 2>&1; then
-    printf '%s\n' "Codex 源码目录不是 Git 仓库: $codex_source_dir" >&2
-    exit 1
-fi
-
-actual_commit=$(git -C "$codex_source_dir" rev-parse HEAD)
-if [ "$actual_commit" != "$expected_commit" ]; then
-    printf '%s\n' "Codex 源码提交不匹配" >&2
-    printf '%s\n' "期望: $expected_commit" >&2
-    printf '%s\n' "实际: $actual_commit" >&2
-    exit 1
-fi
-
-if [ -n "$(git -C "$codex_source_dir" status --porcelain --untracked-files=all)" ]; then
-    printf '%s\n' "Codex 源码仓库存在未提交变更，无法生成可复现基线" >&2
+actual_codex_version=$(codex --version)
+if [ "$actual_codex_version" != "$expected_codex_version" ]; then
+    printf '%s\n' "Codex CLI 版本不匹配" >&2
+    printf '%s\n' "期望: $expected_codex_version" >&2
+    printf '%s\n' "实际: $actual_codex_version" >&2
     exit 1
 fi
 
 temporary_dir=$(mktemp -d /tmp/codex-app-server-schema.XXXXXX)
 raw_generated_dir="$temporary_dir/raw"
 generated_dir="$temporary_dir/schema"
-precomputed_archive="$codex_source_dir/codex-rs/app-server-protocol/schema/precomputed/app-server-exports-experimental.json.zst"
 
 cleanup() {
     rm -rf "$temporary_dir"
 }
 trap cleanup EXIT HUP INT TERM
 
-if [ ! -f "$precomputed_archive" ]; then
-    printf '%s\n' "Codex 源码缺少实验版预计算协议归档: $precomputed_archive" >&2
-    exit 1
-fi
-
-node "$project_dir/scripts/extract-precomputed-protocol-schema.mjs" \
-    "$precomputed_archive" \
-    "$raw_generated_dir"
+codex app-server generate-json-schema \
+    --experimental \
+    --out "$raw_generated_dir"
 
 mkdir -p "$generated_dir"
 find "$raw_generated_dir" -type f -name '*.json' -printf '%P\n' \
@@ -90,7 +69,7 @@ if [ "$mode" = "--check" ]; then
     fi
 
     diff -ru "$schema_dir" "$generated_dir"
-    printf '%s\n' "协议 Schema 与固定提交一致"
+    printf '%s\n' "协议 Schema 与固定 Codex CLI 版本一致"
     exit 0
 fi
 

@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
+// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
 
 export type ThreadListCwdFilter = string | string[];
 export type SortDirection = "asc" | "desc";
@@ -45,6 +45,10 @@ export interface ThreadListParams {
    * Optional direct parent thread filter. Mutually exclusive with `ancestorThreadId`.
    */
   parentThreadId?: string | null;
+  /**
+   * Omit to include every project, set to null for unassigned threads, or provide a project ID to return only threads in that project.
+   */
+  projectId?: string | null;
   /**
    * Optional substring filter for the extracted thread title.
    */

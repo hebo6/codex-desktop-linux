@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
+// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
 
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
 /**
@@ -80,6 +80,10 @@ export interface ThreadStartParams {
    */
   permissions?: string | null;
   personality?: Personality | null;
+  /**
+   * Optional project identity for this new thread. Durable threads persist the assignment; ephemeral threads expose it only in live responses.
+   */
+  projectId?: string | null;
   /**
    * Replace the thread's runtime workspace roots. Paths must be absolute.
    */

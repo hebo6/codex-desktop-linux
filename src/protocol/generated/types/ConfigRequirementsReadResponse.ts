@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
+// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
 
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
 /**
@@ -9,6 +9,7 @@ export type ApprovalsReviewer = "user" | "auto_review" | "guardian_subagent";
 export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access";
 export type WebSearchMode = "disabled" | "cached" | "indexed" | "live";
 export type WindowsSandboxSetupMode = "elevated" | "unelevated";
+export type CliAuthCredentialsStoreMode = "file" | "keyring" | "auto" | "ephemeral";
 export type ResidencyRequirement = "us";
 export type ConfiguredHookHandler =
   | CommandConfiguredHookHandler
@@ -48,7 +49,9 @@ export interface ConfigRequirements {
   allowedWindowsSandboxImplementations?: WindowsSandboxSetupMode[] | null;
   autoReview?: AutoReviewRequirements | null;
   browserUse?: BrowserUseRequirements | null;
+  chatgptBaseUrl?: string | null;
   checkForUpdateOnStartup?: boolean | null;
+  cliAuthCredentialsStore?: CliAuthCredentialsStoreMode | null;
   computerUse?: ComputerUseRequirements | null;
   defaultPermissions?: string | null;
   enforceResidency?: ResidencyRequirement | null;

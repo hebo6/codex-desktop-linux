@@ -1,6 +1,6 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
-export const APP_SERVER_SCHEMA_COMMIT = "8630bb3caecaff6abc6add450a88035d9f6d3f8c" as const;
+// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+export const APP_SERVER_SCHEMA_COMMIT = "657bd889ae28edcbf5395c103b479bf8b328704e" as const;
 
 export type { JSONRPCMessage } from "./types/JSONRPCMessage";
 export type { ClientRequest } from "./types/ClientRequest";

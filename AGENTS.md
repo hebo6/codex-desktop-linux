@@ -4,6 +4,11 @@
 - 需要了解 Codex 或 `app-server` 的协议与实现细节时，优先参考该仓库源码
 - Codex 源码仓库仅供只读参考，禁止修改
 
+# app-server 协议
+
+- 更新协议基线时执行 `./scripts/generate-protocol-schema.sh --update`，脚本使用 `codex app-server generate-json-schema --experimental --out <临时目录>` 生成 JSON Schema
+- 更新协议基线后执行 `pnpm protocol:generate`，同步生成 TypeScript 类型与运行时校验器
+
 # Just 命令
 
 - `just`：显示所有可用命令

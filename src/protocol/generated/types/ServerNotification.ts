@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
+// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
 
 /**
  * Notification sent from the server to the client.
@@ -24,6 +24,8 @@ export type ServerNotification = {
   | ThreadGoalUpdatedNotification
   | ThreadGoalClearedNotification
   | ThreadQueueChangedNotification
+  | ProjectChangedNotification
+  | ThreadProjectUpdatedNotification
   | ThreadEnvironmentConnectedNotification
   | ThreadEnvironmentDisconnectedNotification
   | ThreadSettingsUpdatedNotification
@@ -37,6 +39,7 @@ export type ServerNotification = {
   | ItemStartedNotification
   | ItemAutoApprovalReviewStartedNotification
   | ItemAutoApprovalReviewCompletedNotification
+  | AutoApprovalReviewStrictReviewRequiredNotification
   | ItemCompletedNotification
   | ItemAgentMessageDeltaNotification
   | ItemPlanDeltaNotification
@@ -97,6 +100,7 @@ export type CodexErrorInfo =
       | "usageLimitExceeded"
       | "serverOverloaded"
       | "cyberPolicy"
+      | "misalignmentPolicyViolation"
       | "internalServerError"
       | "unauthorized"
       | "badRequest"
@@ -171,6 +175,7 @@ export type SkillUserInputType = "skill";
 export type MentionUserInputType = "mention";
 export type UserMessageThreadItemType = "userMessage";
 export type HookPromptThreadItemType = "hookPrompt";
+export type AgentMessageDelivery = "async";
 /**
  * Classifies an assistant message as interim commentary or final answer text.
  *
@@ -252,6 +257,9 @@ export type ThreadGoalStatus =
   "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
 export type ThreadGoalClearedNotificationMethod = "thread/goal/cleared";
 export type ThreadQueueChangedNotificationMethod = "thread/queue/changed";
+export type ProjectChangedNotificationMethod = "project/changed";
+export type ProjectChangeType = "created" | "updated" | "deleted";
+export type ThreadProjectUpdatedNotificationMethod = "thread/project/updated";
 export type ThreadEnvironmentConnectedNotificationMethod = "thread/environment/connected";
 export type ThreadEnvironmentDisconnectedNotificationMethod = "thread/environment/disconnected";
 export type ThreadSettingsUpdatedNotificationMethod = "thread/settings/updated";
@@ -300,7 +308,7 @@ export type HookEventName =
   | "subagentStop"
   | "stop";
 export type HookExecutionMode = "sync" | "async";
-export type HookHandlerType = "command" | "prompt" | "agent";
+export type HookHandlerType = "command" | "mcpTool" | "prompt" | "agent";
 export type HookScope = "thread" | "turn";
 export type HookSource =
   | "system"
@@ -372,6 +380,8 @@ export type ItemAutoApprovalReviewCompletedNotificationMethod = "item/autoApprov
  * [UNSTABLE] Source that produced a terminal approval auto-review decision.
  */
 export type AutoReviewDecisionSource = "agent";
+export type AutoApprovalReviewStrictReviewRequiredNotificationMethod =
+  "autoApprovalReview/strictReviewRequired";
 export type ItemCompletedNotificationMethod = "item/completed";
 export type ItemAgentMessageDeltaNotificationMethod = "item/agentMessage/delta";
 export type ItemPlanDeltaNotificationMethod = "item/plan/delta";
@@ -425,6 +435,8 @@ export type PlanType =
   | "enterprise_cbp_usage_based"
   | "enterprise"
   | "edu"
+  | "edu_plus"
+  | "edu_pro"
   | "unknown";
 export type AccountRateLimitsUpdatedNotificationMethod = "account/rateLimits/updated";
 export type RateLimitReachedType =
@@ -625,6 +637,10 @@ export interface Thread {
    * Usually the first user message in the thread, if available.
    */
   preview: string;
+  /**
+   * Canonical project assignment owned by app-server, if any.
+   */
+  projectId: string | null;
   /**
    * Unix timestamp (in seconds) used for thread recency ordering.
    */
@@ -847,6 +863,7 @@ export interface HookPromptFragment {
   [k: string]: unknown | undefined;
 }
 export interface AgentMessageThreadItem {
+  delivery?: AgentMessageDelivery | null;
   id: string;
   memoryCitation?: MemoryCitation | null;
   phase?: MessagePhase | null;
@@ -1302,6 +1319,26 @@ export interface ThreadQueueChangedNotification1 {
   threadId: string;
   [k: string]: unknown | undefined;
 }
+export interface ProjectChangedNotification {
+  method: ProjectChangedNotificationMethod;
+  params: ProjectChangedNotification1;
+  [k: string]: unknown | undefined;
+}
+export interface ProjectChangedNotification1 {
+  changeType: ProjectChangeType;
+  projectId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadProjectUpdatedNotification {
+  method: ThreadProjectUpdatedNotificationMethod;
+  params: ThreadProjectUpdatedNotification1;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadProjectUpdatedNotification1 {
+  projectId: string | null;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
 export interface ThreadEnvironmentConnectedNotification {
   method: ThreadEnvironmentConnectedNotificationMethod;
   params: EnvironmentConnectionNotification;
@@ -1724,6 +1761,20 @@ export interface ItemGuardianApprovalReviewCompletedNotification {
    * A network call is triggered by a CommandExecution item, so having a target_item_id set to the CommandExecution item would be misleading because the review is about the network call, not the command execution. Therefore, target_item_id is set to None for network policy reviews.
    */
   targetItemId?: string | null;
+  threadId: string;
+  turnId: string;
+  [k: string]: unknown | undefined;
+}
+export interface AutoApprovalReviewStrictReviewRequiredNotification {
+  method: AutoApprovalReviewStrictReviewRequiredNotificationMethod;
+  params: StrictReviewRequiredNotification;
+  [k: string]: unknown | undefined;
+}
+export interface StrictReviewRequiredNotification {
+  /**
+   * Unix timestamp (in milliseconds) when this review started.
+   */
+  startedAtMs: number;
   threadId: string;
   turnId: string;
   [k: string]: unknown | undefined;

@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：8630bb3caecaff6abc6add450a88035d9f6d3f8c
+// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
 export const KNOWN_SERVER_REQUEST_METHODS = [
   "account/chatgptAuthTokens/refresh",
   "applyPatchApproval",
@@ -27,6 +27,7 @@ export const KNOWN_SERVER_NOTIFICATION_METHODS = [
   "account/rateLimits/updated",
   "account/updated",
   "app/list/updated",
+  "autoApprovalReview/strictReviewRequired",
   "command/exec/outputDelta",
   "configWarning",
   "deprecationNotice",
@@ -60,6 +61,7 @@ export const KNOWN_SERVER_NOTIFICATION_METHODS = [
   "model/verification",
   "process/exited",
   "process/outputDelta",
+  "project/changed",
   "remoteControl/status/changed",
   "serverRequest/resolved",
   "skills/changed",
@@ -72,6 +74,7 @@ export const KNOWN_SERVER_NOTIFICATION_METHODS = [
   "thread/goal/cleared",
   "thread/goal/updated",
   "thread/name/updated",
+  "thread/project/updated",
   "thread/queue/changed",
   "thread/realtime/closed",
   "thread/realtime/error",
