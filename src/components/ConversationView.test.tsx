@@ -251,6 +251,72 @@ describe("ConversationView", () => {
       .not.toBeInTheDocument();
   });
 
+  it("加载回合详情时只展开承载入口的活动组", async () => {
+    const user = TURN.items[0]!;
+    const answer = TURN.items.at(-1)!;
+    const firstReasoning = {
+      id: "first-reasoning",
+      summary: ["检查实现"],
+      type: "reasoning" as const,
+    };
+    const compaction = {
+      id: "compaction-between-groups",
+      type: "contextCompaction" as const,
+    };
+    const secondReasoning = {
+      id: "second-reasoning",
+      summary: ["验证行为"],
+      type: "reasoning" as const,
+    };
+    const summaryTurn = {
+      ...TURN,
+      items: [
+        user,
+        firstReasoning,
+        compaction,
+        secondReasoning,
+        answer,
+      ],
+      itemsView: "summary" as const,
+    } satisfies ThreadTurn;
+    const onLoadTurnItemPage = vi.fn(async () => true);
+    const { rerender } = render(
+      <ConversationView
+        onLoadTurnItemPage={onLoadTurnItemPage}
+        restoredThread={{ ...RESTORED, turns: [summaryTurn] }}
+      />,
+    );
+
+    const collapsedGroups = screen.getAllByRole("button", { name: /已运行/u });
+    expect(collapsedGroups).toHaveLength(2);
+    fireEvent.click(collapsedGroups[0]!);
+    expect(onLoadTurnItemPage).toHaveBeenCalledWith("turn-1");
+
+    const completePage = {
+      items: summaryTurn.items,
+      nextCursor: null,
+      complete: true,
+      loading: false,
+      error: false,
+    } satisfies TurnItemPageState;
+    rerender(
+      <ConversationView
+        onLoadTurnItemPage={onLoadTurnItemPage}
+        restoredThread={{
+          ...RESTORED,
+          turns: [{ ...summaryTurn, itemsView: "full" as const }],
+        }}
+        turnItemPages={new Map([["turn-1", completePage]])}
+      />,
+    );
+
+    await waitFor(() => {
+      const groups = screen.getAllByRole("button", { name: /已运行/u });
+      expect(groups[0]).toHaveAttribute("aria-expanded", "true");
+      expect(groups[1]).toHaveAttribute("aria-expanded", "false");
+    });
+  });
+
   it("在活动组标题反馈首次加载状态并支持失败重试", () => {
     const user = TURN.items[0]!;
     const answer = TURN.items.at(-1)!;

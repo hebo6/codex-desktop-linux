@@ -193,8 +193,8 @@ type ConversationRow =
       readonly key: string;
       readonly type: "segment";
       readonly firstInTurn: boolean;
+      readonly hostsTurnDetails: boolean;
       readonly isLatestTurn: boolean;
-      readonly loadsTurnDetails: boolean;
       readonly segment: TurnSegment;
       readonly turn: ThreadTurn;
     };
@@ -1181,9 +1181,13 @@ function ConversationRowView({
       commandLocationRequest={commandLocationRequest}
       items={row.segment.items}
       turn={row.turn}
-      {...(turnItemPage === undefined ? {} : { detailsPage: turnItemPage })}
       {...(
-        !row.loadsTurnDetails || onLoadTurnItemPage === undefined
+        !row.hostsTurnDetails || turnItemPage === undefined
+          ? {}
+          : { detailsPage: turnItemPage }
+      )}
+      {...(
+        !row.hostsTurnDetails || onLoadTurnItemPage === undefined
           ? {}
           : { onLoadDetails: () => onLoadTurnItemPage(row.turn.id) }
       )}
@@ -2326,19 +2330,22 @@ function conversationRows(
       turn.itemsView === "notLoaded" &&
       turn.items.length > 0 &&
       turn.items.every(isUserShellCommand);
-    const canLoadTurnDetails =
+    const hostsTurnDetails =
       turnDetailsEnabled &&
       turn.status !== "inProgress" &&
+      !standaloneUserShellProjection &&
+      (turn.itemsView !== "full" || page !== undefined);
+    const canLoadTurnDetails =
+      hostsTurnDetails &&
       turn.itemsView !== "full" &&
-      page?.complete !== true &&
-      !standaloneUserShellProjection;
+      page?.complete !== true;
     const firstUserSegment = segments.findIndex(
       (segment) => segment.type === "item" && segment.item.type === "userMessage",
     );
     const deferredActivitiesIndex = canLoadTurnDetails
       ? firstUserSegment < 0 ? 0 : firstUserSegment + 1
       : -1;
-    let detailsHostIndex = canLoadTurnDetails
+    let detailsHostIndex = hostsTurnDetails
       ? segments.findIndex((segment) => segment.type === "activities")
       : -1;
     if (canLoadTurnDetails && detailsHostIndex < 0) {
@@ -2357,8 +2364,8 @@ function conversationRows(
         key: `${turn.id}:segment:${identity}`,
         type: "segment",
         firstInTurn: segmentIndex === 0,
+        hostsTurnDetails: segmentIndex === detailsHostIndex,
         isLatestTurn: turnIndex === turns.length - 1,
-        loadsTurnDetails: segmentIndex === detailsHostIndex,
         segment,
         turn,
       });
