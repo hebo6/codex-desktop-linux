@@ -63,6 +63,82 @@ function mockOverflowingTitle(text: string) {
   });
 }
 
+function observeConversationContentResize() {
+  let notify: (() => void) | null = null;
+
+  class FakeResizeObserver {
+    readonly callback: ResizeObserverCallback;
+
+    constructor(callback: ResizeObserverCallback) {
+      this.callback = callback;
+    }
+
+    disconnect() {}
+
+    observe(target: Element) {
+      if (target.matches("[data-conversation-list]")) {
+        notify = () => this.callback([], this as unknown as ResizeObserver);
+      }
+    }
+
+    unobserve() {}
+  }
+
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    configurable: true,
+    value: FakeResizeObserver,
+  });
+  return () => notify?.();
+}
+
+function mockConversationContentBottom(
+  contentDocumentBottom: () => number,
+  viewportBottom: number,
+) {
+  const originalBoundingRect = HTMLElement.prototype.getBoundingClientRect;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: HTMLElement) {
+      const scroller = this.closest<HTMLElement>('[aria-label="会话消息"]');
+      if (this.getAttribute("aria-label") === "会话消息") {
+        return {
+          bottom: viewportBottom,
+          height: viewportBottom,
+          left: 0,
+          right: 880,
+          top: 0,
+          width: 880,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        };
+      }
+      if (this.matches("[data-conversation-list]")) {
+        const height = contentDocumentBottom();
+        const bottom = height - (scroller?.scrollTop ?? 0);
+        return {
+          bottom,
+          height,
+          left: 0,
+          right: 880,
+          top: bottom - height,
+          width: 880,
+          x: 0,
+          y: bottom - height,
+          toJSON: () => ({}),
+        };
+      }
+      return originalBoundingRect.call(this);
+    });
+}
+
+async function finishAnimationFrame() {
+  await act(async () => {
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  });
+}
+
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -1357,6 +1433,75 @@ describe("ConversationView", () => {
     );
 
     expect(scroller.scrollTop).toBe(1_200);
+    expect(screen.queryByRole("button", { name: "回到底部" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("主动展开将内容底部推出视口时保持标题位置", async () => {
+    let contentDocumentBottom = 880;
+    const contentResize = observeConversationContentResize();
+    mockConversationContentBottom(() => contentDocumentBottom, 200);
+    render(
+      <ConversationView
+        restoredThread={RESTORED}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    let scrollHeight = 1_000;
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 200 },
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+    });
+    await finishAnimationFrame();
+    scroller.scrollTop = 800;
+    fireEvent.scroll(scroller);
+
+    fireEvent.click(screen.getByRole("button", { name: /已运行/u }));
+    scrollHeight = 1_400;
+    contentDocumentBottom = 1_200;
+    act(() => contentResize());
+
+    expect(scroller.scrollTop).toBe(800);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible()
+    );
+
+    scrollHeight = 1_500;
+    act(() => contentResize());
+    expect(scroller.scrollTop).toBe(800);
+  });
+
+  it("主动展开后内容底部仍可见时保留自动跟随", async () => {
+    let contentDocumentBottom = 880;
+    const contentResize = observeConversationContentResize();
+    mockConversationContentBottom(() => contentDocumentBottom, 200);
+    render(
+      <ConversationView
+        restoredThread={RESTORED}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    let scrollHeight = 1_000;
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 200 },
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+    });
+    await finishAnimationFrame();
+    scroller.scrollTop = 800;
+    fireEvent.scroll(scroller);
+
+    fireEvent.click(screen.getByRole("button", { name: /已运行/u }));
+    scrollHeight = 1_080;
+    contentDocumentBottom = 950;
+    act(() => contentResize());
+    expect(scroller.scrollTop).toBe(800);
+    await waitFor(() =>
+      expect(screen.getByText("Ran pnpm test")).toBeVisible()
+    );
+
+    scrollHeight = 1_100;
+    act(() => contentResize());
+    expect(scroller.scrollTop).toBe(900);
     expect(screen.queryByRole("button", { name: "回到底部" }))
       .not.toBeInTheDocument();
   });

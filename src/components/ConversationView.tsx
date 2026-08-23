@@ -230,6 +230,8 @@ export function ConversationView({
   const historyLoadRef = useRef<Promise<boolean> | null>(null);
   const followBottomRef = useRef(true);
   const lockedFinalAnswerTurnIdRef = useRef<string | null>(null);
+  const completedUserActivityExpansionRef = useRef(false);
+  const userActivityExpansionCountRef = useRef(0);
   const scrollbarDragRef = useRef(false);
   const touchPositionRef = useRef<{ x: number; y: number } | null>(null);
   const observedThreadIdRef = useRef(restoredThread.metadata.id);
@@ -372,6 +374,37 @@ export function ConversationView({
     setShowJumpToBottom(false);
   }, []);
 
+  const startUserActivityExpansion = useCallback(() => {
+    userActivityExpansionCountRef.current += 1;
+  }, []);
+
+  const finishUserActivityExpansion = useCallback((expanded: boolean) => {
+    if (userActivityExpansionCountRef.current === 0) {
+      return;
+    }
+    userActivityExpansionCountRef.current -= 1;
+    completedUserActivityExpansionRef.current ||= expanded;
+    if (userActivityExpansionCountRef.current > 0) {
+      return;
+    }
+    const expansionCompleted = completedUserActivityExpansionRef.current;
+    completedUserActivityExpansionRef.current = false;
+    if (!expansionCompleted) {
+      return;
+    }
+    const content = contentRef.current;
+    const scroller = scrollerRef.current;
+    if (
+      content !== null &&
+      scroller !== null &&
+      content.getBoundingClientRect().bottom >
+        scroller.getBoundingClientRect().bottom + BOTTOM_THRESHOLD
+    ) {
+      followBottomRef.current = false;
+      setShowJumpToBottom(true);
+    }
+  }, []);
+
   const positionPendingFinalAnswerQuestion = useCallback(
     (scroller: HTMLDivElement) => {
       const pending = pendingFinalAnswerQuestionPositionRef.current;
@@ -485,6 +518,9 @@ export function ConversationView({
         return;
       }
       if (pendingQuestionPositionRef.current !== null) {
+        return;
+      }
+      if (userActivityExpansionCountRef.current > 0) {
         return;
       }
       if (
@@ -812,6 +848,8 @@ export function ConversationView({
     pendingFinalAnswerQuestionPositionRef.current = null;
     setRunningTurnFloor(null);
     lockedFinalAnswerTurnIdRef.current = null;
+    completedUserActivityExpansionRef.current = false;
+    userActivityExpansionCountRef.current = 0;
     followBottomRef.current = true;
     setShowJumpToBottom(false);
     if (scroller === null) {
@@ -1049,6 +1087,8 @@ export function ConversationView({
                   actionError={actionError}
                   blobUrlFactory={blobUrlFactory}
                   commandLocationRequest={commandLocationRequest}
+                  onUserActivityExpansionFinish={finishUserActivityExpansion}
+                  onUserActivityExpansionStart={startUserActivityExpansion}
                   {...(onLoadTurnItemPage === undefined
                     ? {}
                     : { onLoadTurnItemPage })}
@@ -1129,6 +1169,8 @@ function ConversationRowView({
   onOpenDiff,
   onOpenImage,
   onRunShellCommand,
+  onUserActivityExpansionFinish,
+  onUserActivityExpansionStart,
   row,
   shellCommandDisabled,
   turnItemPage,
@@ -1142,6 +1184,8 @@ function ConversationRowView({
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenImage?: (url: string, name: string) => void;
   readonly onRunShellCommand?: (command: string) => Promise<boolean>;
+  readonly onUserActivityExpansionFinish: (expanded: boolean) => void;
+  readonly onUserActivityExpansionStart: () => void;
   readonly row: ConversationRow;
   readonly shellCommandDisabled: boolean;
   readonly turnItemPage?: TurnItemPageState;
@@ -1180,6 +1224,8 @@ function ConversationRowView({
     <ActivityGroup
       commandLocationRequest={commandLocationRequest}
       items={row.segment.items}
+      onUserExpansionFinish={onUserActivityExpansionFinish}
+      onUserExpansionStart={onUserActivityExpansionStart}
       turn={row.turn}
       {...(
         !row.hostsTurnDetails || turnItemPage === undefined
@@ -1657,6 +1703,8 @@ function ActivityGroup({
   onLoadDetails,
   onOpenDiff,
   onOpenLink,
+  onUserExpansionFinish,
+  onUserExpansionStart,
   turn,
 }: {
   readonly commandLocationRequest: CommandLocationRequest | null;
@@ -1665,6 +1713,8 @@ function ActivityGroup({
   readonly onLoadDetails?: () => Promise<boolean>;
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenLink?: (link: string) => void;
+  readonly onUserExpansionFinish: (expanded: boolean) => void;
+  readonly onUserExpansionStart: () => void;
   readonly turn: ThreadTurn;
 }) {
   const finalAnswerStarted = turn.items.some(isFinalAnswer);
@@ -1684,6 +1734,8 @@ function ActivityGroup({
   const transition = useCollapsibleContent(initiallyExpanded);
   const previousAutomaticallyExpandedRef = useRef(automaticallyExpanded);
   const previousDetailsHydratedRef = useRef(detailsHydrated);
+  const userExpansionActiveRef = useRef(false);
+  const userExpansionPendingRef = useRef(false);
   const duration = useTurnDuration(turn, turnWorkRunning);
   const visibleItems = items;
   const setGroupOpen = transition.setOpen;
@@ -1714,9 +1766,29 @@ function ActivityGroup({
     const wasHydrated = previousDetailsHydratedRef.current;
     previousDetailsHydratedRef.current = detailsHydrated;
     if (!wasHydrated && detailsHydrated) {
+      if (userExpansionPendingRef.current) {
+        userExpansionPendingRef.current = false;
+        userExpansionActiveRef.current = true;
+        onUserExpansionStart();
+      }
       setGroupOpen(true);
     }
-  }, [detailsHydrated, setGroupOpen]);
+  }, [detailsHydrated, onUserExpansionStart, setGroupOpen]);
+
+  useEffect(() => {
+    if (!transition.contentVisible || !userExpansionActiveRef.current) {
+      return;
+    }
+    userExpansionActiveRef.current = false;
+    onUserExpansionFinish(true);
+  }, [onUserExpansionFinish, transition.contentVisible]);
+
+  useEffect(() => () => {
+    if (userExpansionActiveRef.current) {
+      userExpansionActiveRef.current = false;
+      onUserExpansionFinish(false);
+    }
+  }, [onUserExpansionFinish]);
 
   useEffect(() => {
     if (
@@ -1730,8 +1802,17 @@ function ActivityGroup({
   const toggle = () => {
     const nextExpanded = !transition.targetExpandedRef.current;
     if (nextExpanded && canLoadDetails && !detailsHydrated) {
+      userExpansionPendingRef.current = true;
       void onLoadDetails();
       return;
+    }
+    userExpansionPendingRef.current = false;
+    if (nextExpanded) {
+      userExpansionActiveRef.current = true;
+      onUserExpansionStart();
+    } else if (userExpansionActiveRef.current) {
+      userExpansionActiveRef.current = false;
+      onUserExpansionFinish(false);
     }
     transition.setOpen(nextExpanded);
   };
