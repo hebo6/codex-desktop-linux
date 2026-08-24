@@ -192,6 +192,7 @@ describe("协议运行时边界", () => {
       id: "thread-1",
       modelProvider: "openai",
       preview: "实现会话恢复",
+      projectId: null,
       sessionId: "session-1",
       source: "appServer",
       status: { type: "idle" },

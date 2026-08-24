@@ -251,6 +251,7 @@ function makeThread(id) {
     id,
     modelProvider: "openai",
     preview: "受控端到端会话",
+    projectId: null,
     sessionId: `session-${id}`,
     source: "appServer",
     status: { type: "idle" },
