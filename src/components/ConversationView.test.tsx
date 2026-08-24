@@ -232,6 +232,7 @@ const RESTORED = {
     id: "thread-1",
     modelProvider: "openai",
     preview: "检查项目",
+    projectId: null,
     sessionId: "session-1",
     source: "appServer",
     status: { type: "idle" },

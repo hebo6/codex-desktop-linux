@@ -43,6 +43,7 @@ const THREAD_ONE = {
   modelProvider: "openai",
   name: "服务端标题",
   preview: "第一条输入",
+  projectId: null,
   sessionId: "session-1",
   source: "appServer",
   status: { activeFlags: [], type: "active" },

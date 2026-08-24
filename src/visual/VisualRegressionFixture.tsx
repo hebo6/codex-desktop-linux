@@ -319,6 +319,7 @@ function createThread(
     id,
     modelProvider: "openai",
     preview,
+    projectId: null,
     sessionId: `session-visual-${recencyIndex}`,
     source: "appServer",
     status: { type: "idle" },

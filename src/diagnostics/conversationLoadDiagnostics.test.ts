@@ -27,6 +27,7 @@ describe("conversation load diagnostics", () => {
       id: "private-thread-id",
       modelProvider: "openai",
       preview: "private message",
+      projectId: null,
       sessionId: "private-session-id",
       source: "appServer" as const,
       status: { type: "idle" as const },

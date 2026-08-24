@@ -13,6 +13,7 @@ const firstThread = {
   modelProvider: "openai",
   name: "实现设置",
   preview: "设置",
+  projectId: null,
   sessionId: "session-one",
   source: "appServer",
   status: { type: "idle" },

@@ -26,6 +26,7 @@ const THREAD_ONE = {
   id: "thread-1",
   modelProvider: "openai",
   preview: "第一个会话",
+  projectId: null,
   sessionId: "session-1",
   source: "appServer",
   status: { type: "idle" },

@@ -19,6 +19,7 @@ const THREAD = {
   modelProvider: "openai",
   name: "会话 A",
   preview: "任务 A",
+  projectId: null,
   sessionId: "session-a",
   source: "appServer",
   status: { type: "idle" },
