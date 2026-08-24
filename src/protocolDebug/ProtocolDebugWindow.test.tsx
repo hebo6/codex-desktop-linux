@@ -100,7 +100,7 @@ describe("ProtocolDebugWindow", () => {
     const pending = new Map<string, (lines: HighlightedLines) => void>();
     const syntaxHighlighter: SyntaxHighlighter = {
       highlight: vi.fn((source) =>
-        new Promise((resolve) => pending.set(source, resolve))
+        new Promise<HighlightedLines>((resolve) => pending.set(source, resolve))
       ),
     };
     const { container } = render(
