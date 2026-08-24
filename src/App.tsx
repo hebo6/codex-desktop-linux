@@ -151,6 +151,7 @@ import {
   windowFocusSource as defaultWindowFocusSource,
   type WindowFocusSource,
 } from "./transport/windowFocus";
+import { setWindowTitle } from "./transport/windowTitle";
 
 export type AppWindowOpener = typeof openAppWindow;
 export type ExternalUrlOpener = typeof openExternalUrl;
@@ -912,12 +913,8 @@ export function App({
     boundServerId !== null && connection.currentServerId !== boundServerId;
 
   useEffect(() => {
-    document.title = currentThreadDeleted
-      ? `会话已删除 — ${boundServerName}`
-      : restoredThread === null
-        ? `Codex Desktop Linux — ${boundServerName}`
-        : `${threadDisplayTitle(restoredThread.metadata)} — ${boundServerName}`;
-  }, [boundServerName, currentThreadDeleted, restoredThread]);
+    void setWindowTitle(boundServer?.name ?? "Codex Desktop");
+  }, [boundServer?.name]);
 
   useEffect(() => {
     if (shortcutStatus === null) return;

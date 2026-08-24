@@ -1,4 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Provider } from "react-redux";
 import {
   act,
@@ -404,6 +405,42 @@ function renderSidebarThreadScenario(existingThreadTab = false) {
 }
 
 describe("App", () => {
+  it("未绑定服务器时窗口标题显示产品名称", async () => {
+    const setTitle = vi.mocked(getCurrentWindow().setTitle);
+    setTitle.mockClear();
+
+    renderApp(() => ({ servers: [], proxies: [] }));
+
+    await screen.findByRole("button", {
+      name: "选择服务器，未连接，打开服务器选择器",
+    });
+    expect(setTitle).toHaveBeenLastCalledWith("Codex Desktop");
+    expect(document.title).toBe("Codex Desktop");
+  });
+
+  it("绑定服务器后窗口标题只显示服务器名称", async () => {
+    const setTitle = vi.mocked(getCurrentWindow().setTitle);
+    setTitle.mockClear();
+
+    renderApp(() => ({ servers: [localServer()], proxies: [] }), {
+      windowStateOptions: {
+        loader: vi.fn(async () => ({
+          windowId: "main",
+          version: 1,
+          serverId: SERVER_ID,
+          tabs: [{ id: "tab-new", threadId: null }],
+          activeTabId: "tab-new",
+          updatedAtMs: 1,
+        })),
+      },
+    });
+
+    await waitFor(() => {
+      expect(setTitle).toHaveBeenLastCalledWith("本机开发");
+    });
+    expect(document.title).toBe("本机开发");
+  });
+
   it("通过 Ctrl+/ 打开并关闭键盘快捷键列表", async () => {
     renderApp(() => ({ servers: [], proxies: [] }));
 
