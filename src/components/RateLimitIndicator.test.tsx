@@ -51,6 +51,43 @@ describe("RateLimitIndicator", () => {
     expect(onRefresh).toHaveBeenCalledOnce();
   });
 
+  it("补齐最近 14 个自然日并将无消耗日期记为 0", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 7, 24, 12));
+
+    try {
+      const { container } = render(
+        <RateLimitIndicator
+          data={{ rateLimits: { planType: "plus", primary: { usedPercent: 20 } } }}
+          error={null}
+          loading={false}
+          onRefresh={vi.fn()}
+          refreshing={false}
+          tokenUsageData={{
+            dailyUsageBuckets: [
+              { startDate: "2026-08-22", tokens: 200 },
+              { startDate: "2026-08-24", tokens: 400 },
+            ],
+            summary: {},
+          }}
+          updatedAt={null}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /账户剩余限额/u }));
+
+      const days = container.querySelectorAll('svg[viewBox="0 0 320 85"] > g');
+      expect(days).toHaveLength(14);
+      expect(screen.getByText("08-23")).toBeVisible();
+
+      fireEvent.mouseEnter(days[12]!);
+      expect(screen.getByText("0 tokens")).toBeVisible();
+      expect(days[12]!.querySelectorAll("rect")[1]).toHaveAttribute("height", "0");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("可用重置次数大于 0 时支持折叠展开，并在无详情时显示快速重置", () => {
     const onConsumeResetCredit = vi.fn(() => Promise.resolve());
     const originalConfirm = window.confirm;

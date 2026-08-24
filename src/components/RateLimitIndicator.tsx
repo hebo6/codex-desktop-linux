@@ -261,11 +261,12 @@ interface TokenUsageChartProps {
   readonly buckets: readonly AccountTokenUsageDailyBucket[];
 }
 
+const DISPLAYED_USAGE_DAY_COUNT = 14;
+
 function TokenUsageChart({ buckets }: TokenUsageChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  // 限制最多展示最近 14 天的数据以保证宽度合适
-  const displayBuckets = buckets.slice(-14);
+  const displayBuckets = recentDailyUsageBuckets(buckets);
 
   const maxTokens = Math.max(...displayBuckets.map((b) => b.tokens), 0) || 1;
 
@@ -318,7 +319,7 @@ function TokenUsageChart({ buckets }: TokenUsageChartProps) {
               {/* 实际的柱子 */}
               <rect
                 className={`${styles.chartBar} ${hoveredIndex === index ? styles.chartBarActive : ""}`}
-                height={Math.max(h, 2)}
+                height={h === 0 ? 0 : Math.max(h, 2)}
                 rx="1.5"
                 width={barWidth}
                 x={x}
@@ -342,6 +343,37 @@ function TokenUsageChart({ buckets }: TokenUsageChartProps) {
       </svg>
     </div>
   );
+}
+
+function recentDailyUsageBuckets(
+  buckets: readonly AccountTokenUsageDailyBucket[],
+  today = new Date(),
+): AccountTokenUsageDailyBucket[] {
+  const tokensByDate = new Map(buckets.map((bucket) => [bucket.startDate, bucket.tokens]));
+  const latestDate = new Date(Date.UTC(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  ));
+
+  return Array.from({ length: DISPLAYED_USAGE_DAY_COUNT }, (_, index) => {
+    const date = new Date(latestDate);
+    date.setUTCDate(
+      latestDate.getUTCDate() - (DISPLAYED_USAGE_DAY_COUNT - index - 1),
+    );
+    const startDate = formatDateKey(date);
+    return {
+      startDate,
+      tokens: tokensByDate.get(startDate) ?? 0,
+    };
+  });
+}
+
+function formatDateKey(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatChartDate(dateStr: string): string {
