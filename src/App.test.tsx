@@ -27,11 +27,11 @@ import {
 } from "./appServer";
 import {
   App,
-  collectHighRiskServerIds,
   type AppWindowOpener,
   type CredentialStorageStatusLoader,
   type ExternalUrlOpener,
 } from "./App";
+import { collectHighRiskServerIds } from "./app/highRiskServerIds";
 import {
   ConfigurationCommandError,
   type ConfigurationSnapshot,

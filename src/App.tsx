@@ -45,6 +45,7 @@ import { useAccountRateLimits } from "./app/useAccountRateLimits";
 import { useAccountTokenUsage } from "./app/useAccountTokenUsage";
 import { usePreferences } from "./app/usePreferences";
 import { usePendingThreadResults } from "./app/usePendingThreadResults";
+import { collectHighRiskServerIds } from "./app/highRiskServerIds";
 import { threadIndicatorStatus } from "./app/threadIndicatorStatus";
 import {
   useServerConnectionTest,
@@ -236,34 +237,6 @@ function matchesPersistedProxyDraft(
         draftHostKey.port === storedHostKey.port &&
         draftHostKey.algorithm === storedHostKey.algorithm &&
         draftHostKey.sha256Fingerprint === storedHostKey.sha256Fingerprint;
-}
-
-export function collectHighRiskServerIds(
-  servers: readonly ServerProfile[],
-  proxies: readonly ProxyProfile[],
-): ReadonlySet<ServerId> {
-  const proxiesById = new Map(proxies.map((proxy) => [proxy.proxyId, proxy]));
-  const serverIds = new Set<ServerId>();
-  for (const server of servers) {
-    const configuration = server.configuration;
-    if (configuration.type !== "remoteWebSocket") {
-      continue;
-    }
-    const proxy =
-      configuration.proxyId === undefined
-        ? undefined
-        : proxiesById.get(configuration.proxyId);
-    const proxyAllowsInvalidCertificate =
-      proxy?.configuration.type === "httpConnect" &&
-      proxy.configuration.tlsCertificatePolicy === "allowInvalidCertificate";
-    if (
-      configuration.tlsCertificatePolicy === "allowInvalidCertificate" ||
-      proxyAllowsInvalidCertificate
-    ) {
-      serverIds.add(server.serverId);
-    }
-  }
-  return serverIds;
 }
 
 export function App({
@@ -2690,7 +2663,7 @@ function threadDisplayTitle(thread: ThreadSummary): string {
   return preview === undefined || preview.length === 0 ? "未命名会话" : preview;
 }
 
-export function latestAgentMarkdown(thread: RestoredThread | null): string | null {
+function latestAgentMarkdown(thread: RestoredThread | null): string | null {
   if (thread === null) {
     return null;
   }
@@ -2709,7 +2682,7 @@ export function latestAgentMarkdown(thread: RestoredThread | null): string | nul
   return null;
 }
 
-export function disableRequestedNotifications(
+function disableRequestedNotifications(
   patch: Partial<AppPreferences>,
 ): Partial<AppPreferences> {
   return {
