@@ -246,7 +246,7 @@ function AppearanceSection({ disabled, preferences, update }: PreferenceSectionP
 }
 
 function GeneralSection({ disabled, preferences, update }: PreferenceSectionProps) {
-  return <><Section title="编辑器" description="Enter 发送，Shift+Enter 换行"><Toggle checked={preferences.codeWrap} disabled={disabled} label="代码和文本预览默认折行" onChange={(codeWrap) => update({ codeWrap })} /></Section><Section title="连接恢复" description="非主动断线会按 1、2、5、10、20、30 秒退避自动重连，可在连接错误页停止" /></>;
+  return <><Section title="编辑器" description="Enter 发送或追加，运行中 Ctrl+Enter 排队发送，Shift+Enter 换行"><Toggle checked={preferences.codeWrap} disabled={disabled} label="代码和文本预览默认折行" onChange={(codeWrap) => update({ codeWrap })} /></Section><Section title="连接恢复" description="非主动断线会按 1、2、5、10、20、30 秒退避自动重连，可在连接错误页停止" /></>;
 }
 
 function NotificationsSection({ disabled, preferences, update, permission }: PreferenceSectionProps & { readonly permission: DesktopNotificationPermission }) {
@@ -286,10 +286,7 @@ function PrivacySection({ clearData, setState, state }: { readonly clearData: (k
 }
 
 function ShortcutsSection() {
-  const shortcuts = [
-    ...KEYBOARD_SHORTCUT_GROUPS.flatMap(({ shortcuts }) => shortcuts),
-    { label: "打开协议检查器", keys: ["Ctrl+Shift+D"] as const },
-  ];
+  const shortcuts = KEYBOARD_SHORTCUT_GROUPS.flatMap(({ shortcuts }) => shortcuts);
   return <Section title="默认快捷键" description="文本编辑器中的常见编辑操作保持不变"><dl className={styles.shortcuts}>{shortcuts.map(({ keys, label }) => <div key={label}><dt>{keys.map((key) => <kbd key={key}>{key}</kbd>)}</dt><dd>{label}</dd></div>)}</dl></Section>;
 }
 

@@ -950,6 +950,16 @@ export function Composer({
       }
       return;
     }
+    if (
+      event.key === "Enter" &&
+      event.ctrlKey &&
+      !event.shiftKey &&
+      activeTurn
+    ) {
+      event.preventDefault();
+      void send("queue");
+      return;
+    }
     if (trigger !== null && suggestions.length > 0) {
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
@@ -1778,7 +1788,7 @@ export function Composer({
                 className={styles.queueButton}
                 disabled={!canSend}
                 onClick={() => void send("queue")}
-                title="排到后续回合"
+                title="排到后续回合 Ctrl+Enter"
                 type="button"
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -1816,7 +1826,7 @@ export function Composer({
                 className={styles.sendButton}
                 disabled={!canSend}
                 onClick={() => void send()}
-                title={shellMode ? "执行 Shell 命令" : activeTurn ? "追加" : "发送"}
+                title={shellMode ? "执行 Shell 命令 Enter" : activeTurn ? "追加 Enter" : "发送 Enter"}
                 type="button"
               >
                 {shellMode ? (

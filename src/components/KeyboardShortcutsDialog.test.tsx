@@ -13,6 +13,12 @@ describe("KeyboardShortcutsDialog", () => {
     expect(screen.getByText("切换到上一个标签")).toBeVisible();
     expect(screen.getByText("Ctrl+PageUp")).toBeVisible();
     expect(screen.getByText("停止正在进行中的会话")).toBeVisible();
+    expect(screen.getByText("发送或追加")).toBeVisible();
+    expect(screen.getByText("排队发送（仅运行中）")).toBeVisible();
+    expect(screen.getByText("Ctrl+Enter")).toBeVisible();
+    expect(screen.getByText("Shift+Enter")).toBeVisible();
+    expect(screen.getByText("打开协议检查器")).toBeVisible();
+    expect(screen.getByText("Ctrl+Shift+D")).toBeVisible();
     expect(screen.getByText("打开项目选择器（仅新会话）")).toBeVisible();
     expect(screen.getByText("显示或隐藏侧边栏")).toBeVisible();
     expect(screen.getByText("关闭当前窗口")).toBeVisible();

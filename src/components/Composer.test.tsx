@@ -1201,7 +1201,7 @@ describe("Composer", () => {
     ));
   });
 
-  it("运行中区分停止、追加和排队发送", async () => {
+  it("运行中区分停止、Enter 追加和 Ctrl+Enter 排队发送", async () => {
     const user = userEvent.setup();
     const { onQueue, onSend, onStop } = renderComposer({
       activeTurn: true,
@@ -1213,17 +1213,23 @@ describe("Composer", () => {
 
     const editor = screen.getByRole("textbox");
     await user.type(editor, "稍后处理");
-    expect(screen.getByRole("button", { name: "排队发送" })).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: "排队发送" }));
+    expect(screen.getByRole("button", { name: "排队发送" })).toHaveAttribute(
+      "title",
+      "排到后续回合 Ctrl+Enter",
+    );
+    fireEvent.keyDown(editor, { ctrlKey: true, key: "Enter" });
     await waitFor(() => expect(onQueue).toHaveBeenCalledWith([
       { type: "text", text: "稍后处理" },
     ]));
     await waitFor(() => expect(editor).toHaveValue(""));
 
     await user.type(editor, "补充条件");
-    expect(screen.getByRole("button", { name: "追加" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "追加" })).toHaveAttribute(
+      "title",
+      "追加 Enter",
+    );
     expect(screen.getByRole("button", { name: "停止当前回合" })).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "追加" }));
+    fireEvent.keyDown(editor, { key: "Enter" });
     await waitFor(() => expect(onSend).toHaveBeenCalledWith(
       [{ type: "text", text: "补充条件" }],
       { cwd: "/workspace/project" },

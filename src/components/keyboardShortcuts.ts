@@ -33,7 +33,9 @@ export const KEYBOARD_SHORTCUT_GROUPS: readonly KeyboardShortcutGroup[] = [
     title: "编辑器",
     shortcuts: [
       { label: "聚焦输入框", keys: ["Ctrl+L"] },
-      { label: "发送", keys: ["Ctrl+Enter"] },
+      { label: "发送或追加", keys: ["Enter"] },
+      { label: "排队发送（仅运行中）", keys: ["Ctrl+Enter"] },
+      { label: "换行", keys: ["Shift+Enter"] },
       { label: "复制当前 AI 回答 Markdown", keys: ["Ctrl+Shift+C"] },
     ],
   },
@@ -54,6 +56,7 @@ export const KEYBOARD_SHORTCUT_GROUPS: readonly KeyboardShortcutGroup[] = [
     shortcuts: [
       { label: "打开设置", keys: ["Ctrl+,"] },
       { label: "显示键盘快捷键", keys: ["Ctrl+/"] },
+      { label: "打开协议检查器", keys: ["Ctrl+Shift+D"] },
       { label: "关闭当前窗口", keys: ["Ctrl+Shift+W"] },
       { label: "退出程序", keys: ["Ctrl+Q"] },
       { label: "关闭最上层浮层", keys: ["Esc"] },
