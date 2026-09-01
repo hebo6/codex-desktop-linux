@@ -5,7 +5,7 @@ import "../styles/tokens.css";
 import { RateLimitIndicator } from "./RateLimitIndicator";
 
 describe("RateLimitIndicator", () => {
-  it("圆环和详情都展示最紧迫窗口的剩余量", () => {
+  it("圆环展示时间窗口最短的限额，详情展示所有窗口", () => {
     render(
       <RateLimitIndicator
         accountEmail="alice@example.com"
@@ -29,8 +29,9 @@ describe("RateLimitIndicator", () => {
       />,
     );
 
-    const trigger = screen.getByRole("button", { name: "账户剩余限额 8%" });
-    expect(trigger).toHaveAttribute("data-attention", "danger");
+    const trigger = screen.getByRole("button", { name: "账户剩余限额 85%" });
+    expect(trigger).toHaveAttribute("data-attention", "normal");
+    expect(trigger).toHaveAttribute("title", "Codex · 5 小时窗口剩余 85%");
     fireEvent.click(trigger);
     expect(
       getComputedStyle(document.documentElement)

@@ -20,17 +20,20 @@ export function collectRemainingLimitWindows(
   const buckets = response.rateLimitsByLimitId === null || response.rateLimitsByLimitId === undefined || Object.keys(response.rateLimitsByLimitId).length === 0
     ? [[response.rateLimits.limitId ?? "default", response.rateLimits] as const]
     : Object.entries(response.rateLimitsByLimitId);
-  const windows = buckets.flatMap(([bucketId, snapshot]) => snapshotWindows(bucketId, snapshot));
-  return windows.sort((left, right) => left.remainingPercent - right.remainingPercent);
+  return buckets.flatMap(([bucketId, snapshot]) => snapshotWindows(bucketId, snapshot));
 }
 
-export function mostUrgentLimitWindow(
+export function shortestLimitWindow(
   windows: readonly RemainingLimitWindow[],
 ): RemainingLimitWindow | null {
-  return windows.reduce<RemainingLimitWindow | null>(
-    (lowest, window) => lowest === null || window.remainingPercent < lowest.remainingPercent ? window : lowest,
-    null,
-  );
+  return windows.reduce<RemainingLimitWindow | null>((shortest, window) => {
+    if (shortest === null) return window;
+    if (window.windowDurationMins === null) return shortest;
+    if (shortest.windowDurationMins === null || window.windowDurationMins < shortest.windowDurationMins) {
+      return window;
+    }
+    return shortest;
+  }, null);
 }
 
 export function mergeRateLimitUpdate(

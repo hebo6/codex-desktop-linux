@@ -7,8 +7,8 @@ import type {
 import type { AccountTokenUsageDailyBucket } from "../protocol/generated/types/GetAccountTokenUsageResponse";
 import {
   collectRemainingLimitWindows,
-  mostUrgentLimitWindow,
   rateLimitAttention,
+  shortestLimitWindow,
 } from "../app/rateLimits";
 import styles from "./RateLimitIndicator.module.css";
 
@@ -47,8 +47,8 @@ export function RateLimitIndicator({
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const windows = collectRemainingLimitWindows(data);
-  const urgent = mostUrgentLimitWindow(windows);
-  const percent = urgent?.remainingPercent ?? null;
+  const indicatorWindow = shortestLimitWindow(windows);
+  const percent = indicatorWindow?.remainingPercent ?? null;
   const attention = rateLimitAttention(percent);
 
   useEffect(() => {
@@ -82,7 +82,7 @@ export function RateLimitIndicator({
         data-attention={attention}
         onClick={() => setOpen((current) => !current)}
         ref={buttonRef}
-        title={percent === null ? "剩余限额未知" : `${urgent?.name}剩余 ${percent}%`}
+        title={percent === null ? "剩余限额未知" : `${indicatorWindow?.name}剩余 ${percent}%`}
         type="button"
       >
         <svg aria-hidden="true" className={styles.ring} viewBox="0 0 42 42">

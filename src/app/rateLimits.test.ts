@@ -4,9 +4,9 @@ import type { GetAccountRateLimitsResponse } from "../protocol/generated";
 import {
   collectRemainingLimitWindows,
   mergeRateLimitUpdate,
-  mostUrgentLimitWindow,
   rateLimitAttention,
   remainingPercent,
+  shortestLimitWindow,
 } from "./rateLimits";
 
 describe("rateLimits", () => {
@@ -16,7 +16,7 @@ describe("rateLimits", () => {
     expect(remainingPercent(-10)).toBe(100);
   });
 
-  it("从多限额窗口选择剩余最少的一项", () => {
+  it("按服务端顺序收集多限额窗口", () => {
     const data = {
       rateLimits: { primary: { usedPercent: 1 } },
       rateLimitsByLimitId: {
@@ -30,8 +30,19 @@ describe("rateLimits", () => {
     } satisfies GetAccountRateLimitsResponse;
     const windows = collectRemainingLimitWindows(data);
 
-    expect(windows.map(({ remainingPercent: value }) => value)).toEqual([8, 80]);
-    expect(mostUrgentLimitWindow(windows)?.id).toBe("codex:secondary");
+    expect(windows.map(({ remainingPercent: value }) => value)).toEqual([80, 8]);
+  });
+
+  it("限额圆环选择时间窗口最短的一项且不比较剩余量", () => {
+    const windows = collectRemainingLimitWindows({
+      rateLimits: {
+        limitId: "codex",
+        primary: { usedPercent: 20, windowDurationMins: 300 },
+        secondary: { usedPercent: 92, windowDurationMins: 10_080 },
+      },
+    });
+
+    expect(shortestLimitWindow(windows)?.id).toBe("codex:primary");
   });
 
   it("稀疏通知只覆盖非空字段并更新对应限额桶", () => {
