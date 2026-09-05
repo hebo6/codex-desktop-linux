@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import "../styles/tokens.css";
@@ -90,6 +90,86 @@ describe("RateLimitIndicator", () => {
     expect(screen.getByText("无法读取账户限额")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "刷新" }));
     expect(onRefresh).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    [0, "刚刚"],
+    [1_500, "1秒前"],
+    [59_999, "59秒前"],
+    [60_000, "1分钟前"],
+    [3_599_999, "59分钟前"],
+    [3_600_000, "1小时前"],
+    [86_399_999, "23小时前"],
+    [86_400_000, "1天前"],
+    [3 * 86_400_000, "3天前"],
+  ])("经过 %i 毫秒时显示更新时间 %s", (elapsedMs, expected) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-05T12:00:00Z"));
+
+    try {
+      const updatedAt = Date.now() - elapsedMs;
+      const { unmount } = render(
+        <RateLimitIndicator
+          data={null}
+          error={null}
+          loading={false}
+          onRefresh={vi.fn()}
+          refreshing={false}
+          updatedAt={updatedAt}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "账户剩余限额未知" }));
+
+      const time = screen.getByText(expected, { selector: "time" });
+      expect(time.closest("footer")).toHaveTextContent(`更新于 ${expected}`);
+      expect(time).toHaveAttribute("dateTime", new Date(updatedAt).toISOString());
+      expect(time).toHaveAttribute("title", new Date(updatedAt).toLocaleString());
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("打开时自动更新相对时间，关闭时停止计时，再次打开和收到新数据时重新计算", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-05T12:00:00Z"));
+
+    try {
+      const props = {
+        data: null,
+        error: null,
+        loading: false,
+        onRefresh: vi.fn(),
+        refreshing: false,
+        updatedAt: Date.now() - 59_000,
+      };
+      const { rerender, unmount } = render(<RateLimitIndicator {...props} />);
+      const trigger = screen.getByRole("button", { name: "账户剩余限额未知" });
+      expect(vi.getTimerCount()).toBe(0);
+
+      fireEvent.click(trigger);
+      expect(screen.getByText("59秒前")).toBeVisible();
+
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(screen.getByText("1分钟前")).toBeVisible();
+
+      fireEvent.click(trigger);
+      expect(vi.getTimerCount()).toBe(0);
+      act(() => vi.advanceTimersByTime(60_000));
+      fireEvent.click(trigger);
+      expect(screen.getByText("2分钟前")).toBeVisible();
+
+      rerender(<RateLimitIndicator {...props} updatedAt={Date.now()} />);
+      expect(screen.getByText("刚刚")).toBeVisible();
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(screen.getByText("1秒前")).toBeVisible();
+
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("补齐最近 14 个自然日并将无消耗日期记为 0", () => {

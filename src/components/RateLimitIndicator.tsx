@@ -213,11 +213,39 @@ export function RateLimitIndicator({
             </div>
           ) : null}
           {error === null || windows.length === 0 ? null : <p className={styles.stale} role="status">{error}，当前保留上次成功数据</p>}
-          {updatedAt === null ? null : <footer>更新于 {new Date(updatedAt).toLocaleString()}</footer>}
+          {updatedAt === null ? null : <RateLimitUpdatedAt updatedAt={updatedAt} />}
         </section>
       ) : null}
     </div>
   );
+}
+
+function RateLimitUpdatedAt({ updatedAt }: { readonly updatedAt: number }) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    setNowMs(Date.now());
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [updatedAt]);
+
+  const updated = new Date(updatedAt);
+  return (
+    <footer>
+      更新于 <time dateTime={updated.toISOString()} title={updated.toLocaleString()}>
+        {formatUpdatedAt(updatedAt, nowMs)}
+      </time>
+    </footer>
+  );
+}
+
+function formatUpdatedAt(updatedAt: number, nowMs: number): string {
+  const seconds = Math.max(0, Math.floor((nowMs - updatedAt) / 1_000));
+  if (seconds === 0) return "刚刚";
+  if (seconds < 60) return `${seconds}秒前`;
+  if (seconds < 3_600) return `${Math.floor(seconds / 60)}分钟前`;
+  if (seconds < 86_400) return `${Math.floor(seconds / 3_600)}小时前`;
+  return `${Math.floor(seconds / 86_400)}天前`;
 }
 
 function accountSummary(
