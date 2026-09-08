@@ -5,7 +5,7 @@ import "../styles/tokens.css";
 import { RateLimitIndicator } from "./RateLimitIndicator";
 
 describe("RateLimitIndicator", () => {
-  it("圆环展示时间窗口最短的限额，详情展示所有窗口", () => {
+  it("圆环优先展示 5 小时限额，详情展示所有窗口", () => {
     render(
       <RateLimitIndicator
         accountEmail="alice@example.com"
@@ -40,6 +40,38 @@ describe("RateLimitIndicator", () => {
     ).toBe("40");
     expect(screen.getByRole("progressbar", { name: /剩余 8%/u })).toHaveAttribute("aria-valuenow", "8");
     expect(screen.getByText("alice@example.com · 套餐 plus")).toBeVisible();
+  });
+
+  it.each([false, true])("普通周限额优先于 Spark 周限额，普通限额先返回：%s", (codexFirst) => {
+    const codex = {
+      limitName: "Codex",
+      secondary: { usedPercent: 35, windowDurationMins: 10_080 },
+    };
+    const spark = {
+      limitName: "GPT-5.3-Codex-Spark",
+      secondary: { usedPercent: 5, windowDurationMins: 10_080 },
+    };
+    const { container } = render(
+      <RateLimitIndicator
+        data={{
+          rateLimits: codex,
+          rateLimitsByLimitId: codexFirst ? { codex, spark } : { spark, codex },
+        }}
+        error={null}
+        loading={false}
+        onRefresh={vi.fn()}
+        refreshing={false}
+        updatedAt={null}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "账户剩余限额 65%" });
+    expect(trigger).toHaveTextContent("65");
+    expect(trigger).toHaveAttribute("title", "Codex · 7 天窗口剩余 65%");
+    expect(container.querySelector('circle[pathLength="100"]')).toHaveAttribute("stroke-dasharray", "65 35");
+    fireEvent.click(trigger);
+    expect(screen.getByRole("progressbar", { name: "Codex · 7 天窗口剩余 65%" })).toBeVisible();
+    expect(screen.getByRole("progressbar", { name: "GPT-5.3-Codex-Spark · 7 天窗口剩余 95%" })).toBeVisible();
   });
 
   it("读取失败时展示未知圆环和刷新入口", () => {

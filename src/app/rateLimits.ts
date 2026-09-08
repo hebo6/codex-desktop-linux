@@ -3,6 +3,7 @@ import type { RateLimitSnapshot } from "../protocol/generated/types/GetAccountRa
 
 export interface RemainingLimitWindow {
   readonly id: string;
+  readonly limitId: string;
   readonly name: string;
   readonly remainingPercent: number;
   readonly resetsAt: number | null;
@@ -23,9 +24,17 @@ export function collectRemainingLimitWindows(
   return buckets.flatMap(([bucketId, snapshot]) => snapshotWindows(bucketId, snapshot));
 }
 
-export function shortestLimitWindow(
+export function selectIndicatorLimitWindow(
   windows: readonly RemainingLimitWindow[],
 ): RemainingLimitWindow | null {
+  const fiveHourWindow = windows.find((window) => window.windowDurationMins === 5 * 60);
+  if (fiveHourWindow !== undefined) return fiveHourWindow;
+
+  const weeklyWindow = windows.find((window) => (
+    window.limitId === "codex" && window.windowDurationMins === 7 * 24 * 60
+  ));
+  if (weeklyWindow !== undefined) return weeklyWindow;
+
   return windows.reduce<RemainingLimitWindow | null>((shortest, window) => {
     if (shortest === null) return window;
     if (window.windowDurationMins === null) return shortest;
@@ -99,6 +108,7 @@ function snapshotWindows(
   if (snapshot.primary !== null && snapshot.primary !== undefined) {
     windows.push({
       id: `${bucketId}:primary`,
+      limitId: bucketId,
       name: `${bucketName} · ${durationLabel(snapshot.primary.windowDurationMins, "主要窗口")}`,
       remainingPercent: remainingPercent(snapshot.primary.usedPercent),
       resetsAt: snapshot.primary.resetsAt ?? null,
@@ -108,6 +118,7 @@ function snapshotWindows(
   if (snapshot.secondary !== null && snapshot.secondary !== undefined) {
     windows.push({
       id: `${bucketId}:secondary`,
+      limitId: bucketId,
       name: `${bucketName} · ${durationLabel(snapshot.secondary.windowDurationMins, "次要窗口")}`,
       remainingPercent: remainingPercent(snapshot.secondary.usedPercent),
       resetsAt: snapshot.secondary.resetsAt ?? null,
@@ -117,6 +128,7 @@ function snapshotWindows(
   if (snapshot.individualLimit !== null && snapshot.individualLimit !== undefined) {
     windows.push({
       id: `${bucketId}:individual`,
+      limitId: bucketId,
       name: `${bucketName} · 个人用量`,
       remainingPercent: clampPercent(snapshot.individualLimit.remainingPercent),
       resetsAt: snapshot.individualLimit.resetsAt,

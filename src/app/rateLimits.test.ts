@@ -6,7 +6,7 @@ import {
   mergeRateLimitUpdate,
   rateLimitAttention,
   remainingPercent,
-  shortestLimitWindow,
+  selectIndicatorLimitWindow,
 } from "./rateLimits";
 
 describe("rateLimits", () => {
@@ -33,16 +33,58 @@ describe("rateLimits", () => {
     expect(windows.map(({ remainingPercent: value }) => value)).toEqual([80, 8]);
   });
 
-  it("限额圆环选择时间窗口最短的一项且不比较剩余量", () => {
+  it("限额圆环优先选择 5 小时窗口且不比较剩余量", () => {
     const windows = collectRemainingLimitWindows({
-      rateLimits: {
-        limitId: "codex",
-        primary: { usedPercent: 20, windowDurationMins: 300 },
-        secondary: { usedPercent: 92, windowDurationMins: 10_080 },
+      rateLimits: {},
+      rateLimitsByLimitId: {
+        other: { primary: { usedPercent: 99, windowDurationMins: 60 } },
+        codex: {
+          primary: { usedPercent: 20, windowDurationMins: 300 },
+          secondary: { usedPercent: 92, windowDurationMins: 10_080 },
+        },
       },
     });
 
-    expect(shortestLimitWindow(windows)?.id).toBe("codex:primary");
+    expect(selectIndicatorLimitWindow(windows)?.id).toBe("codex:primary");
+  });
+
+  it("没有 5 小时窗口时普通周限额优先于其他限额", () => {
+    const windows = collectRemainingLimitWindows({
+      rateLimits: {},
+      rateLimitsByLimitId: {
+        spark: { secondary: { usedPercent: 5, windowDurationMins: 10_080 } },
+        other: { primary: { usedPercent: 99, windowDurationMins: 60 } },
+        codex: { secondary: { usedPercent: 35, windowDurationMins: 10_080 } },
+      },
+    });
+
+    expect(selectIndicatorLimitWindow(windows)?.id).toBe("codex:secondary");
+  });
+
+  it("仅有其他限额时选择已知时长最短的窗口", () => {
+    const windows = collectRemainingLimitWindows({
+      rateLimits: {},
+      rateLimitsByLimitId: {
+        unknown: { primary: { usedPercent: 99 } },
+        spark: { secondary: { usedPercent: 5, windowDurationMins: 10_080 } },
+        other: { primary: { usedPercent: 20, windowDurationMins: 60 } },
+      },
+    });
+
+    expect(selectIndicatorLimitWindow(windows)?.id).toBe("other:primary");
+  });
+
+  it("窗口时长均未知时选择首项，没有限额时返回空值", () => {
+    const windows = collectRemainingLimitWindows({
+      rateLimits: {
+        limitId: "codex",
+        primary: { usedPercent: 20 },
+        secondary: { usedPercent: 92 },
+      },
+    });
+
+    expect(selectIndicatorLimitWindow(windows)?.id).toBe("codex:primary");
+    expect(selectIndicatorLimitWindow(collectRemainingLimitWindows(null))).toBeNull();
   });
 
   it("稀疏通知只覆盖非空字段并更新对应限额桶", () => {

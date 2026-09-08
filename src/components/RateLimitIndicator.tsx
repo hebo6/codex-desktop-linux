@@ -8,7 +8,7 @@ import type { AccountTokenUsageDailyBucket } from "../protocol/generated/types/G
 import {
   collectRemainingLimitWindows,
   rateLimitAttention,
-  shortestLimitWindow,
+  selectIndicatorLimitWindow,
 } from "../app/rateLimits";
 import styles from "./RateLimitIndicator.module.css";
 
@@ -47,7 +47,7 @@ export function RateLimitIndicator({
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const windows = collectRemainingLimitWindows(data);
-  const indicatorWindow = shortestLimitWindow(windows);
+  const indicatorWindow = selectIndicatorLimitWindow(windows);
   const percent = indicatorWindow?.remainingPercent ?? null;
   const attention = rateLimitAttention(percent);
 
