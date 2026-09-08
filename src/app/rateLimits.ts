@@ -27,7 +27,9 @@ export function collectRemainingLimitWindows(
 export function selectIndicatorLimitWindow(
   windows: readonly RemainingLimitWindow[],
 ): RemainingLimitWindow | null {
-  const fiveHourWindow = windows.find((window) => window.windowDurationMins === 5 * 60);
+  const fiveHourWindow = windows.find((window) => (
+    window.limitId === "codex" && window.windowDurationMins === 5 * 60
+  ));
   if (fiveHourWindow !== undefined) return fiveHourWindow;
 
   const weeklyWindow = windows.find((window) => (

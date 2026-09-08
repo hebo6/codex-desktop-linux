@@ -5,13 +5,18 @@ import "../styles/tokens.css";
 import { RateLimitIndicator } from "./RateLimitIndicator";
 
 describe("RateLimitIndicator", () => {
-  it("圆环优先展示 5 小时限额，详情展示所有窗口", () => {
+  it("圆环优先展示普通 5 小时限额，详情展示所有窗口", () => {
     render(
       <RateLimitIndicator
         accountEmail="alice@example.com"
         data={{
           rateLimits: { planType: "plus", primary: { usedPercent: 20 } },
           rateLimitsByLimitId: {
+            spark: {
+              limitName: "GPT-5.3-Codex-Spark",
+              planType: "plus",
+              primary: { usedPercent: 10, windowDurationMins: 300 },
+            },
             codex: {
               limitId: "codex",
               limitName: "Codex",
@@ -39,16 +44,18 @@ describe("RateLimitIndicator", () => {
         .trim(),
     ).toBe("40");
     expect(screen.getByRole("progressbar", { name: /剩余 8%/u })).toHaveAttribute("aria-valuenow", "8");
+    expect(screen.getByRole("progressbar", { name: "GPT-5.3-Codex-Spark · 5 小时窗口剩余 90%" })).toBeVisible();
     expect(screen.getByText("alice@example.com · 套餐 plus")).toBeVisible();
   });
 
-  it.each([false, true])("普通周限额优先于 Spark 周限额，普通限额先返回：%s", (codexFirst) => {
+  it.each([false, true])("普通周限额优先于 Spark 5 小时和周限额，普通限额先返回：%s", (codexFirst) => {
     const codex = {
       limitName: "Codex",
       secondary: { usedPercent: 35, windowDurationMins: 10_080 },
     };
     const spark = {
       limitName: "GPT-5.3-Codex-Spark",
+      primary: { usedPercent: 10, windowDurationMins: 300 },
       secondary: { usedPercent: 5, windowDurationMins: 10_080 },
     };
     const { container } = render(
@@ -71,6 +78,7 @@ describe("RateLimitIndicator", () => {
     expect(container.querySelector('circle[pathLength="100"]')).toHaveAttribute("stroke-dasharray", "65 35");
     fireEvent.click(trigger);
     expect(screen.getByRole("progressbar", { name: "Codex · 7 天窗口剩余 65%" })).toBeVisible();
+    expect(screen.getByRole("progressbar", { name: "GPT-5.3-Codex-Spark · 5 小时窗口剩余 90%" })).toBeVisible();
     expect(screen.getByRole("progressbar", { name: "GPT-5.3-Codex-Spark · 7 天窗口剩余 95%" })).toBeVisible();
   });
 

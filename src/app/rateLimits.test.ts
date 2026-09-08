@@ -33,10 +33,11 @@ describe("rateLimits", () => {
     expect(windows.map(({ remainingPercent: value }) => value)).toEqual([80, 8]);
   });
 
-  it("限额圆环优先选择 5 小时窗口且不比较剩余量", () => {
+  it("普通 5 小时窗口优先于 Spark 5 小时窗口且不比较剩余量", () => {
     const windows = collectRemainingLimitWindows({
       rateLimits: {},
       rateLimitsByLimitId: {
+        spark: { primary: { usedPercent: 5, windowDurationMins: 300 } },
         other: { primary: { usedPercent: 99, windowDurationMins: 60 } },
         codex: {
           primary: { usedPercent: 20, windowDurationMins: 300 },
@@ -48,11 +49,14 @@ describe("rateLimits", () => {
     expect(selectIndicatorLimitWindow(windows)?.id).toBe("codex:primary");
   });
 
-  it("没有 5 小时窗口时普通周限额优先于其他限额", () => {
+  it("没有普通 5 小时窗口时普通周限额优先于 Spark 5 小时及其他限额", () => {
     const windows = collectRemainingLimitWindows({
       rateLimits: {},
       rateLimitsByLimitId: {
-        spark: { secondary: { usedPercent: 5, windowDurationMins: 10_080 } },
+        spark: {
+          primary: { usedPercent: 10, windowDurationMins: 300 },
+          secondary: { usedPercent: 5, windowDurationMins: 10_080 },
+        },
         other: { primary: { usedPercent: 99, windowDurationMins: 60 } },
         codex: { secondary: { usedPercent: 35, windowDurationMins: 10_080 } },
       },
@@ -66,7 +70,10 @@ describe("rateLimits", () => {
       rateLimits: {},
       rateLimitsByLimitId: {
         unknown: { primary: { usedPercent: 99 } },
-        spark: { secondary: { usedPercent: 5, windowDurationMins: 10_080 } },
+        spark: {
+          primary: { usedPercent: 10, windowDurationMins: 300 },
+          secondary: { usedPercent: 5, windowDurationMins: 10_080 },
+        },
         other: { primary: { usedPercent: 20, windowDurationMins: 60 } },
       },
     });
