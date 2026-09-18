@@ -1,0 +1,97 @@
+.content {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) 0;
+}
+
+.agents {
+  display: grid;
+  gap: var(--space-1);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.agents li {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+  padding: 5px var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.identity {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+}
+
+.name,
+.role {
+  overflow-wrap: anywhere;
+}
+
+.role {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.status {
+  white-space: nowrap;
+}
+
+.agents .status {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.status[data-status="waitingOnApproval"],
+.status[data-status="waitingOnUserInput"] {
+  color: var(--color-status-warning);
+}
+
+.status[data-status="errored"] {
+  color: var(--color-status-danger);
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-2);
+}
+
+.error p {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-status-danger);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.error button {
+  min-height: 30px;
+  flex-shrink: 0;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-content-bg);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.error button:hover,
+.error button:focus-visible {
+  color: var(--color-text-primary);
+  background: var(--color-fill-hover);
+}

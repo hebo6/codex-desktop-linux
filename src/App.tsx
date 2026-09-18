@@ -19,6 +19,7 @@ import {
   type PendingPlaintextCredentialConfirmation,
 } from "./app/usePlaintextCredentialConfirmation";
 import { useTurnPlan } from "./app/useTurnPlan";
+import { useSubAgents } from "./app/useSubAgents";
 import {
   useServerProfileMutations,
   type ServerProfileMutationCommands,
@@ -67,6 +68,7 @@ import { Composer } from "./components/Composer";
 import { ApprovalPanel } from "./components/ApprovalPanel";
 import { BackgroundCommandPanel } from "./components/BackgroundCommandPanel";
 import { TaskPlanPanel } from "./components/TaskPlanPanel";
+import { SubAgentPanel } from "./components/SubAgentPanel";
 import { RateLimitIndicator } from "./components/RateLimitIndicator";
 import { ExternalLinkDialog } from "./components/ExternalLinkDialog";
 import { FilePreviewDialog, type FilePreviewRequest } from "./components/FilePreviewDialog";
@@ -366,6 +368,10 @@ export function App({
     connection.conversationClient,
     currentThreadId,
     subscribedThreadIds,
+  );
+  const subAgents = useSubAgents(
+    connection.threadClient,
+    restoredThread?.metadata ?? null,
   );
   const [draftCwds, setDraftCwds] = useState<ReadonlyMap<string, string | null>>(
     () => new Map(),
@@ -2156,6 +2162,12 @@ export function App({
                   accessoryPanel={
                     <>
                       <TaskPlanPanel plan={turnPlan} />
+                      <SubAgentPanel
+                        agents={subAgents.agents}
+                        error={subAgents.error}
+                        key={currentThreadId}
+                        onRetry={subAgents.refresh}
+                      />
                       <BackgroundCommandPanel
                         error={backgroundTerminals.error}
                         loaded={backgroundTerminals.loaded}

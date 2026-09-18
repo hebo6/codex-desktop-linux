@@ -41,6 +41,23 @@ class RecordingSession {
 }
 
 describe("AppServerThreadClient", () => {
+  it("按祖先查询子 agent，并只读取最近回合的状态", () => {
+    const session = new RecordingSession();
+    const client = new AppServerThreadClient(session);
+    client.listSubAgentThreads("parent", "next");
+    client.listLatestThreadTurn("child");
+    expect(session.requests.map(({ method, params }) => ({ method, params })))
+      .toEqual([
+        { method: "thread/list", params: {
+          ancestorThreadId: "parent", cursor: "next", limit: RECENT_THREAD_PAGE_SIZE,
+          sourceKinds: ["subAgentThreadSpawn"], sortKey: "created_at", sortDirection: "asc",
+        } },
+        { method: "thread/turns/list", params: {
+          threadId: "child", limit: 1, itemsView: "notLoaded", sortDirection: "desc",
+        } },
+      ]);
+  });
+
   it("转发服务端会话事实通知并支持退订", () => {
     const session = new RecordingSession();
     const client = new AppServerThreadClient(session);

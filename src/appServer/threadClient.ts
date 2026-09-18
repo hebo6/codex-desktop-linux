@@ -106,6 +106,37 @@ export class AppServerThreadClient {
     });
   }
 
+  listSubAgentThreads(
+    ancestorThreadId: string,
+    cursor: string | null = null,
+  ): RequestHandle<ThreadListResponse> {
+    return this.session.sendRequest({
+      method: "thread/list",
+      params: {
+        ancestorThreadId,
+        cursor,
+        limit: RECENT_THREAD_PAGE_SIZE,
+        sourceKinds: ["subAgentThreadSpawn"],
+        sortKey: "created_at",
+        sortDirection: "asc",
+      } satisfies ThreadListParams,
+      validateResult: threadListResponseValidator,
+    });
+  }
+
+  listLatestThreadTurn(threadId: string): RequestHandle<ThreadTurnsListResponse> {
+    return this.session.sendRequest({
+      method: "thread/turns/list",
+      params: {
+        threadId,
+        limit: 1,
+        itemsView: "notLoaded",
+        sortDirection: "desc",
+      } satisfies ThreadTurnsListParams,
+      validateResult: threadTurnsListResponseValidator,
+    });
+  }
+
   readThread(
     threadId: string,
     includeTurns = false,

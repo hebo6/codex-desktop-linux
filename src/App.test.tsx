@@ -1056,6 +1056,179 @@ describe("App", () => {
     )).toBe(false);
   });
 
+  it("恢复子 agent 面板并实时更新状态，主回合完成后继续保留", async () => {
+    const user = userEvent.setup();
+    const parentTurn = {
+      id: "turn-parent",
+      items: [],
+      itemsView: "full",
+      status: "inProgress",
+    } as const;
+    const thread = {
+      ...SIDEBAR_THREAD,
+      id: "thread-with-sub-agents",
+      name: "协作会话",
+      status: { type: "active", activeFlags: [] },
+      turns: [parentTurn],
+    } as const;
+    const children = [
+      {
+        ...SIDEBAR_THREAD,
+        id: "child-ui",
+        agentNickname: "界面实现",
+        agentRole: "worker",
+        parentThreadId: thread.id,
+        source: { subAgent: { thread_spawn: {
+          parent_thread_id: thread.id, depth: 1, agent_path: "/root/ui",
+        } } },
+        status: { type: "active", activeFlags: [] },
+      },
+      {
+        ...SIDEBAR_THREAD,
+        id: "child-review",
+        agentNickname: "协议检查",
+        agentRole: "reviewer",
+        parentThreadId: thread.id,
+        source: { subAgent: { thread_spawn: {
+          parent_thread_id: thread.id, depth: 1, agent_path: "/root/review",
+        } } },
+      },
+    ] as const;
+    const requests: Array<{
+      readonly method: string;
+      readonly params?: {
+        readonly ancestorThreadId?: string;
+        readonly threadId?: string;
+      };
+    }> = [];
+    const notificationHandlers = new Set<
+      (notification: ServerNotification) => void
+    >();
+    const requestSession = {
+      sendRequest(request: (typeof requests)[number]) {
+        requests.push(request);
+        const result = request.method === "thread/list"
+          ? {
+              data: request.params?.ancestorThreadId === thread.id
+                ? children
+                : [thread],
+              nextCursor: null,
+            }
+          : request.method === "thread/resume"
+            ? {
+                approvalPolicy: "on-request",
+                approvalsReviewer: "user",
+                cwd: thread.cwd,
+                model: "gpt-5",
+                modelProvider: "openai",
+                sandbox: { type: "readOnly" },
+                initialTurnsPage: { data: thread.turns, nextCursor: null },
+                thread,
+              }
+            : request.method === "thread/turns/list"
+              ? {
+                  data: [{
+                    id: "turn-child-review",
+                    items: [],
+                    itemsView: "notLoaded",
+                    status: "completed",
+                  }],
+                  nextCursor: null,
+                }
+              : request.method === "thread/backgroundTerminals/list" ||
+                  request.method === "thread/items/list"
+                ? { data: [], nextCursor: null }
+                : {};
+        return {
+          cancel: () => undefined,
+          id: `request:${request.method}`,
+          result: Promise.resolve(result),
+        };
+      },
+      subscribeNotifications(handler: (notification: ServerNotification) => void) {
+        notificationHandlers.add(handler);
+        return () => notificationHandlers.delete(handler);
+      },
+    };
+    const sessionFactory: ConfiguredServerSessionFactory = (options) => ({
+      threadClient: new AppServerThreadClient(requestSession as never),
+      conversationClient: new AppServerConversationClient(requestSession as never),
+      async start() {
+        options.onStateChange({
+          phase: "ready",
+          connectionStage: null,
+          initializeResponse: null,
+          errorCode: null,
+        });
+      },
+      async close() {},
+    });
+
+    renderApp(() => ({ servers: [localServer()], proxies: [] }), {
+      sessionFactory,
+      windowStateOptions: {
+        loader: vi.fn(async () => ({
+          windowId: "main",
+          version: 1,
+          serverId: SERVER_ID,
+          tabs: [{ id: "tab-agents", threadId: thread.id }],
+          activeTabId: "tab-agents",
+          updatedAtMs: 1,
+        })),
+      },
+    });
+
+    const composer = await screen.findByRole("textbox", { name: "任务输入" });
+    const panel = await screen.findByRole("region", { name: "子 agent" });
+    const summary = await within(panel).findByRole("button", {
+      name: "子 agent · 1 个运行中 · 1 个已完成",
+    });
+    expect(panel.closest("[data-composer-accessory-panel]")).not.toBeNull();
+    expect(panel.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+    expect(requests).toContainEqual(expect.objectContaining({
+      method: "thread/turns/list",
+      params: expect.objectContaining({ threadId: "child-review" }),
+    }));
+    await user.click(summary);
+    expect(within(panel).getByText("/root/ui")).toBeVisible();
+    expect(within(panel).getByText("/root/review")).toBeVisible();
+
+    act(() => {
+      for (const handler of notificationHandlers) {
+        handler({ method: "thread/status/changed", params: {
+          threadId: "child-ui",
+          status: { type: "active", activeFlags: ["waitingOnApproval"] },
+        } });
+      }
+    });
+    expect(within(panel).getByRole("button", {
+      name: "子 agent · 1 个等待审批 · 1 个已完成",
+    })).toHaveAttribute("aria-expanded", "true");
+    expect(within(panel).getByText("等待审批")).toBeVisible();
+    expect(screen.queryAllByRole("button", { name: /停止/u }).length)
+      .toBeGreaterThan(0);
+
+    act(() => {
+      for (const handler of notificationHandlers) {
+        handler({ method: "turn/completed", params: {
+          threadId: thread.id,
+          turn: { ...parentTurn, items: [], status: "completed" },
+        } });
+        handler({ method: "thread/status/changed", params: {
+          threadId: thread.id, status: { type: "idle" },
+        } });
+      }
+    });
+
+    await waitFor(() => expect(
+      screen.queryByRole("button", { name: /停止/u }),
+    ).not.toBeInTheDocument());
+    expect(screen.getByRole("region", { name: "子 agent" })).toBeVisible();
+    expect(within(panel).getByText("等待审批")).toBeVisible();
+    expect(within(panel).getByText("已完成")).toBeVisible();
+  });
+
   it("已完成回合终止后台命令时不显示停止按钮", async () => {
     const user = userEvent.setup();
     const commandItem = {
