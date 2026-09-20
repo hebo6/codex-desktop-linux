@@ -100,6 +100,24 @@ export function GroupIcon() {
   );
 }
 
+export function PinIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height="14"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+      width="14"
+    >
+      <path d="M16 9V3H8v6l-3 4v2h14v-2l-3-4ZM12 15v6" />
+    </svg>
+  );
+}
+
 export function RefreshIcon() {
   return (
     <svg

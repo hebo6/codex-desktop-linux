@@ -20,6 +20,7 @@ import {
   ArchiveIcon,
   DeleteIcon,
   DraftIcon,
+  PinIcon,
   RestoreIcon,
   TerminalIcon,
 } from "./SidebarIcons";
@@ -85,9 +86,19 @@ type RecentThreadEntry =
   | {
       readonly key: string;
       readonly type: "group";
+      readonly kind: "pinned" | "project";
       readonly label: string;
       readonly path: string | null;
       readonly collapsed: boolean;
+    }
+  | {
+      readonly key: string;
+      readonly type: "sectionHeading";
+      readonly label: string;
+    }
+  | {
+      readonly key: string;
+      readonly type: "sectionDivider";
     }
   | {
       readonly key: string;
@@ -115,6 +126,7 @@ type RecentThreadEntry =
 type RecentThreadGroupEntry = Extract<RecentThreadEntry, { type: "group" }>;
 
 const GROUP_HEADING_HEIGHT = 32;
+const SECTION_DIVIDER_HEIGHT = 16;
 const THREAD_ROW_HEIGHT = 56;
 const ACTION_ROW_HEIGHT = 40;
 const INITIAL_GROUP_THREAD_COUNT = 3;
@@ -201,6 +213,7 @@ export function RecentThreads({
       hasMorePinnedThreads,
       loadingProjectGroupKeys,
       projectGroupHasMore,
+      view,
       visibleGroupThreadCounts,
     }),
     [
@@ -212,6 +225,7 @@ export function RecentThreads({
       hasMorePinnedThreads,
       loadingProjectGroupKeys,
       projectGroupHasMore,
+      view,
       visibleGroupThreadCounts,
     ],
   );
@@ -235,11 +249,17 @@ export function RecentThreads({
   const estimateEntrySize = useCallback(
     (index: number) => {
       const entry = entries[index];
-      return entry?.type === "group"
-        ? GROUP_HEADING_HEIGHT
-        : entry?.type === "thread"
-          ? THREAD_ROW_HEIGHT
-          : ACTION_ROW_HEIGHT;
+      switch (entry?.type) {
+        case "group":
+        case "sectionHeading":
+          return GROUP_HEADING_HEIGHT;
+        case "sectionDivider":
+          return SECTION_DIVIDER_HEIGHT;
+        case "thread":
+          return THREAD_ROW_HEIGHT;
+        default:
+          return ACTION_ROW_HEIGHT;
+      }
     },
     [entries],
   );
@@ -513,6 +533,10 @@ export function RecentThreads({
                         : { onNewTaskInProject })}
                       onToggle={() => toggleGroup(entry.key)}
                     />
+                  ) : entry.type === "sectionHeading" ? (
+                    <h3 className={styles.sectionHeading}>{entry.label}</h3>
+                  ) : entry.type === "sectionDivider" ? (
+                    <div className={styles.sectionDivider} role="separator" />
                   ) : entry.type === "thread" ? (
                     <ThreadRow
                       archived={view === "archived"}
@@ -808,6 +832,7 @@ function GroupHeading({
         type="button"
       >
         <span aria-hidden="true" className={styles.groupArrow} />
+        {entry.kind === "pinned" ? <PinIcon /> : null}
         <span>{entry.label}</span>
       </button>
       {projectPath === null || onNewTaskInProject === undefined ? null : (
@@ -1201,6 +1226,7 @@ function recentThreadEntries({
   hasMorePinnedThreads,
   loadingProjectGroupKeys,
   projectGroupHasMore,
+  view,
   visibleGroupThreadCounts,
 }: {
   readonly collapsedGroupKeys: ReadonlySet<string>;
@@ -1211,40 +1237,50 @@ function recentThreadEntries({
   readonly hasMorePinnedThreads: boolean;
   readonly loadingProjectGroupKeys: ReadonlySet<string>;
   readonly projectGroupHasMore: ReadonlyMap<string, boolean>;
+  readonly view: ThreadListView;
   readonly visibleGroupThreadCounts: ReadonlyMap<string, number>;
 }): readonly RecentThreadEntry[] {
   const entries: RecentThreadEntry[] = [];
+  const hasUnpinnedContent = hasMore || groups.some(
+    (group) => group.kind !== "pinned" && group.threads.length > 0,
+  );
   for (const group of groups) {
-    const hasHeading = group.kind !== "all";
-    if (hasHeading) {
-      const key = `group:${group.key}`;
-      const collapsed = collapsedGroupKeys.has(key);
+    const key = `group:${group.key}`;
+    const collapsed = group.kind !== "all" && collapsedGroupKeys.has(key);
+    if (group.kind !== "all") {
       entries.push({
         key,
         type: "group",
+        kind: group.kind,
         label: group.label,
         path: group.path,
         collapsed,
       });
-      if (collapsed) {
-        continue;
-      }
+    } else if (view === "recent" && hasUnpinnedContent) {
+      entries.push({
+        key: "heading:recent",
+        type: "sectionHeading",
+        label: "最近会话",
+      });
     }
     const currentIndex = currentThreadId === null
       ? -1
       : group.threads.findIndex(({ id }) => id === currentThreadId);
-    const visibleCount = group.kind === "project"
-      ? Math.max(
-          visibleGroupThreadCounts.get(group.key) ?? INITIAL_GROUP_THREAD_COUNT,
-          currentIndex + 1,
-        )
-      : group.threads.length;
+    const visibleCount = collapsed
+      ? 0
+      : group.kind === "project"
+        ? Math.max(
+            visibleGroupThreadCounts.get(group.key) ?? INITIAL_GROUP_THREAD_COUNT,
+            currentIndex + 1,
+          )
+        : group.threads.length;
     for (const thread of group.threads.slice(0, visibleCount)) {
       entries.push({ key: `thread:${thread.id}`, type: "thread", thread });
     }
     const projectHasMore = projectGroupHasMore.get(group.key)
       ?? (hasMore && group.threads.length >= INITIAL_GROUP_THREAD_COUNT);
     if (
+      !collapsed &&
       group.kind === "project" &&
       (group.threads.length > visibleCount || projectHasMore)
     ) {
@@ -1258,11 +1294,14 @@ function recentThreadEntries({
         loading: loadingProjectGroupKeys.has(group.key),
       });
     }
-    if (group.kind === "pinned" && hasMorePinnedThreads) {
+    if (!collapsed && group.kind === "pinned" && hasMorePinnedThreads) {
       entries.push({
         key: "load-more-pinned-threads",
         type: "loadMorePinnedThreads",
       });
+    }
+    if (group.kind === "pinned" && hasUnpinnedContent) {
+      entries.push({ key: "divider:pinned", type: "sectionDivider" });
     }
   }
   if (hasMore) {
