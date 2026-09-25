@@ -1227,6 +1227,7 @@ function ConversationRowView({
       onUserExpansionFinish={onUserActivityExpansionFinish}
       onUserExpansionStart={onUserActivityExpansionStart}
       turn={row.turn}
+      workRunning={row.segment.workRunning}
       {...(
         !row.hostsTurnDetails || turnItemPage === undefined
           ? {}
@@ -1706,6 +1707,7 @@ function ActivityGroup({
   onUserExpansionFinish,
   onUserExpansionStart,
   turn,
+  workRunning,
 }: {
   readonly commandLocationRequest: CommandLocationRequest | null;
   readonly detailsPage?: TurnItemPageState;
@@ -1716,15 +1718,16 @@ function ActivityGroup({
   readonly onUserExpansionFinish: (expanded: boolean) => void;
   readonly onUserExpansionStart: () => void;
   readonly turn: ThreadTurn;
+  readonly workRunning: boolean;
 }) {
-  const finalAnswerStarted = turn.items.some(isFinalAnswer);
   const runningCommandCount = items.filter(
     (item) =>
       item.type === "commandExecution" && item.status === "inProgress",
   ).length;
-  const turnWorkRunning =
-    turn.status === "inProgress" && !finalAnswerStarted;
-  const automaticallyExpanded = turnWorkRunning;
+  const groupStatus = turn.status === "inProgress" && !workRunning
+    ? "completed"
+    : turn.status;
+  const automaticallyExpanded = workRunning;
   const detailsHydrated = detailsPage !== undefined && (
     detailsPage.items.length > 0 ||
     detailsPage.nextCursor !== null ||
@@ -1736,7 +1739,7 @@ function ActivityGroup({
   const previousDetailsHydratedRef = useRef(detailsHydrated);
   const userExpansionActiveRef = useRef(false);
   const userExpansionPendingRef = useRef(false);
-  const duration = useTurnDuration(turn, turnWorkRunning);
+  const duration = useTurnDuration(turn, workRunning);
   const visibleItems = items;
   const setGroupOpen = transition.setOpen;
   const canLoadDetails = onLoadDetails !== undefined &&
@@ -1823,7 +1826,7 @@ function ActivityGroup({
       data-activity-group
       data-content-mounted={transition.contentMounted}
       data-expanded={transition.expanded}
-      data-status={runningCommandCount > 0 ? "inProgress" : turn.status}
+      data-status={runningCommandCount > 0 ? "inProgress" : groupStatus}
     >
       <button
         aria-expanded={transition.targetExpanded}
@@ -1836,9 +1839,8 @@ function ActivityGroup({
       >
         <span>
           {activityGroupLabel(
-            turn.status,
+            groupStatus,
             duration,
-            finalAnswerStarted,
             runningCommandCount,
           )}
           {initialDetailsLoading ? (
@@ -2241,7 +2243,6 @@ function useTurnDuration(turn: ThreadTurn, running: boolean): number | null {
 function activityGroupLabel(
   status: ThreadTurn["status"],
   duration: number | null,
-  finalAnswerStarted: boolean,
   runningCommandCount: number,
 ): string {
   if (runningCommandCount > 0) {
@@ -2253,7 +2254,7 @@ function activityGroupLabel(
   if (status === "failed") {
     return duration === null ? "工作失败" : `工作失败 ${formatDuration(duration)}`;
   }
-  const completed = status === "completed" || finalAnswerStarted;
+  const completed = status === "completed";
   if (duration === null) {
     return completed ? "已完成" : "正在运行";
   }
@@ -2384,7 +2385,11 @@ async function copyText(value: string): Promise<boolean> {
 
 type TurnSegment =
   | { readonly type: "item"; readonly item: ThreadItem }
-  | { readonly type: "activities"; readonly items: readonly ThreadItem[] };
+  | {
+      readonly type: "activities";
+      readonly items: readonly ThreadItem[];
+      readonly workRunning: boolean;
+    };
 
 function conversationRows(
   turns: readonly ThreadTurn[],
@@ -2401,10 +2406,9 @@ function conversationRows(
     return rows;
   }
   turns.forEach((turn, turnIndex) => {
-    const finalAnswerStarted = turn.items.some(isFinalAnswer);
     const segments = [...groupTurnItems(
       turn.items,
-      turn.status === "inProgress" && !finalAnswerStarted,
+      turn.status === "inProgress",
     )];
     const page = turnItemPages.get(turn.id);
     const standaloneUserShellProjection =
@@ -2433,6 +2437,7 @@ function conversationRows(
       segments.splice(deferredActivitiesIndex, 0, {
         type: "activities",
         items: [],
+        workRunning: false,
       });
       detailsHostIndex = deferredActivitiesIndex;
     }
@@ -2609,22 +2614,31 @@ function groupTurnItems(
   running: boolean,
 ): readonly TurnSegment[] {
   const segments: TurnSegment[] = [];
+  const lastFinalAnswerIndex = items.findLastIndex(isFinalAnswer);
+  const lastWorkActivityIndex = items.findLastIndex(isWorkActivity);
   let activities: ThreadItem[] = [];
+  let activitiesRunning = false;
   const flush = () => {
     if (activities.length > 0) {
-      segments.push({ type: "activities", items: activities });
+      segments.push({
+        type: "activities",
+        items: activities,
+        workRunning: activitiesRunning,
+      });
       activities = [];
     }
   };
   items.forEach((item, itemIndex) => {
     if (isWorkActivity(item)) {
-      const hasLaterWorkActivity = items
-        .slice(itemIndex + 1)
-        .some(isWorkActivity);
-      if (isEmptyReasoning(item) && (!running || hasLaterWorkActivity)) {
+      const workRunning = running && itemIndex > lastFinalAnswerIndex;
+      if (
+        isEmptyReasoning(item) &&
+        (!workRunning || itemIndex < lastWorkActivityIndex)
+      ) {
         return;
       }
       activities.push(item);
+      activitiesRunning = workRunning;
       return;
     }
     flush();

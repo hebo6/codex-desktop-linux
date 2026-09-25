@@ -1093,6 +1093,139 @@ describe("ConversationView", () => {
     );
   });
 
+  it.each(["最终回答", "回合完成"] as const)(
+    "最终回答后新增活动独立展开和计时，直到下一次%s才折叠",
+    async (ending) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-09-25T10:00:00Z"));
+      const answeringTurn = {
+        id: "turn-resumed-work",
+        items: [
+          { id: "user-resumed-work", type: "userMessage", content: [{ type: "text", text: "检查项目" }] },
+          { id: "progress-before-answer", type: "agentMessage", phase: "commentary", text: "检查已完成" },
+          { id: "first-answer", type: "agentMessage", phase: "final_answer", text: "第一阶段结果" },
+        ],
+        itemsView: "full",
+        startedAt: Date.now() / 1_000 - 5,
+        status: "inProgress",
+      } satisfies ThreadTurn;
+      const { rerender } = render(
+        <ConversationView restoredThread={{ ...RESTORED, turns: [answeringTurn] }} />,
+      );
+      const previousGroup = screen.getByRole("button", { name: "已运行 5.0 秒" });
+      expect(previousGroup).toHaveAttribute("aria-expanded", "false");
+
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+      const resumedTurn = {
+        ...answeringTurn,
+        items: [
+          ...answeringTurn.items,
+          { id: "progress-after-answer", type: "agentMessage", phase: "commentary", text: "继续验证结果" },
+        ],
+      } satisfies ThreadTurn;
+      rerender(
+        <ConversationView restoredThread={{ ...RESTORED, turns: [resumedTurn] }} />,
+      );
+
+      const resumedGroup = screen.getByRole("button", { name: "正在运行 6.0 秒" });
+      expect(resumedGroup).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByText("继续验证结果")).toBeVisible();
+      expect(previousGroup).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByText("检查已完成")).not.toBeInTheDocument();
+      expect(screen.getByText("第一阶段结果")).toBeVisible();
+
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+      expect(resumedGroup).toHaveAccessibleName("正在运行 7.0 秒");
+      expect(previousGroup).toHaveAccessibleName("已运行 5.0 秒");
+
+      const finishedTurn: ThreadTurn = ending === "最终回答"
+        ? {
+            ...resumedTurn,
+            items: [
+              ...resumedTurn.items,
+              { id: "second-answer", type: "agentMessage", phase: "final_answer", text: "验证结束" },
+            ],
+          }
+        : { ...resumedTurn, status: "completed", durationMs: 7_000 };
+      rerender(
+        <ConversationView restoredThread={{ ...RESTORED, turns: [finishedTurn] }} />,
+      );
+
+      expect(resumedGroup).toHaveAttribute("aria-expanded", "false");
+      expect(resumedGroup).toHaveAccessibleName("已运行 7.0 秒");
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+      expect(screen.queryByText("继续验证结果")).not.toBeInTheDocument();
+      expect(resumedGroup).toHaveAccessibleName("已运行 7.0 秒");
+      expect(screen.getByText("第一阶段结果")).toBeVisible();
+      if (ending === "最终回答") {
+        expect(screen.getByText("验证结束")).toBeVisible();
+      }
+    },
+  );
+
+  it("恢复最终回答后的空思考占位，工具到达后保留新活动组及用户收起选择", async () => {
+    const thinkingTurn = {
+      id: "turn-thinking-after-answer",
+      items: [
+        { id: "user-thinking-after-answer", type: "userMessage", content: [{ type: "text", text: "继续检查" }] },
+        { id: "thinking-before-answer", type: "reasoning" },
+        { id: "answer-before-thinking", type: "agentMessage", phase: "final_answer", delivery: "async", text: "阶段结果已发送" },
+        { id: "thinking-after-answer", type: "reasoning" },
+      ],
+      itemsView: "full",
+      status: "inProgress",
+    } satisfies ThreadTurn;
+    const { rerender } = render(
+      <ConversationView restoredThread={{ ...RESTORED, turns: [thinkingTurn] }} />,
+    );
+
+    const group = screen.getByRole("button", { name: "正在运行" });
+    expect(group).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByText("Thinking")).toHaveLength(1);
+    expect(screen.getByText("Thinking")).toBeVisible();
+    expect(screen.getByText("阶段结果已发送")).toBeVisible();
+
+    const commandTurn = {
+      ...thinkingTurn,
+      items: [
+        ...thinkingTurn.items,
+        {
+          id: "command-after-answer",
+          type: "commandExecution",
+          command: "pnpm test",
+          commandActions: [],
+          cwd: "/workspace/project",
+          status: "inProgress",
+        },
+      ],
+    } satisfies ThreadTurn;
+    rerender(
+      <ConversationView restoredThread={{ ...RESTORED, turns: [commandTurn] }} />,
+    );
+
+    expect(screen.queryByText("Thinking")).not.toBeInTheDocument();
+    expect(group).toHaveAccessibleName("1 个命令正在运行");
+    expect(group).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Running pnpm test")).toBeVisible();
+    fireEvent.click(group);
+    expect(group).toHaveAttribute("aria-expanded", "false");
+    await waitFor(() => expect(screen.queryByText("Running pnpm test")).not.toBeInTheDocument());
+
+    rerender(
+      <ConversationView restoredThread={{
+        ...RESTORED,
+        turns: [{
+          ...commandTurn,
+          items: commandTurn.items.map((item) => item.type === "commandExecution"
+            ? { ...item, status: "completed" as const }
+            : item),
+        }],
+      }} />,
+    );
+    expect(group).toHaveAccessibleName("正在运行");
+    expect(group).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("最终回答开始时自动折叠仍有运行中命令的活动组", async () => {
     const runningTurn = {
       id: "turn-running-command-collapse",
