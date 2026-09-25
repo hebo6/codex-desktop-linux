@@ -41,11 +41,12 @@ class RecordingSession {
 }
 
 describe("AppServerThreadClient", () => {
-  it("按祖先查询子 agent，并只读取最近回合的状态", () => {
+  it("按祖先查询子 agent，按需读取最近回合状态或摘要", () => {
     const session = new RecordingSession();
     const client = new AppServerThreadClient(session);
     client.listSubAgentThreads("parent", "next");
     client.listLatestThreadTurn("child");
+    client.listLatestThreadTurn("child", "summary");
     expect(session.requests.map(({ method, params }) => ({ method, params })))
       .toEqual([
         { method: "thread/list", params: {
@@ -54,6 +55,9 @@ describe("AppServerThreadClient", () => {
         } },
         { method: "thread/turns/list", params: {
           threadId: "child", limit: 1, itemsView: "notLoaded", sortDirection: "desc",
+        } },
+        { method: "thread/turns/list", params: {
+          threadId: "child", limit: 1, itemsView: "summary", sortDirection: "desc",
         } },
       ]);
   });

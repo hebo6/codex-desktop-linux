@@ -125,13 +125,16 @@ export class AppServerThreadClient {
     });
   }
 
-  listLatestThreadTurn(threadId: string): RequestHandle<ThreadTurnsListResponse> {
+  listLatestThreadTurn(
+    threadId: string,
+    itemsView: "notLoaded" | "summary" = "notLoaded",
+  ): RequestHandle<ThreadTurnsListResponse> {
     return this.session.sendRequest({
       method: "thread/turns/list",
       params: {
         threadId,
         limit: 1,
-        itemsView: "notLoaded",
+        itemsView,
         sortDirection: "desc",
       } satisfies ThreadTurnsListParams,
       validateResult: threadTurnsListResponseValidator,

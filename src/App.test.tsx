@@ -1083,6 +1083,7 @@ describe("App", () => {
 
   it("恢复子 agent 面板并实时更新状态，主回合完成后继续保留", async () => {
     const user = userEvent.setup();
+    let childFailed = false;
     const parentTurn = {
       id: "turn-parent",
       items: [],
@@ -1124,6 +1125,7 @@ describe("App", () => {
       readonly params?: {
         readonly ancestorThreadId?: string;
         readonly threadId?: string;
+        readonly itemsView?: string;
       };
     }> = [];
     const notificationHandlers = new Set<
@@ -1152,7 +1154,17 @@ describe("App", () => {
               }
             : request.method === "thread/turns/list"
               ? {
-                  data: [{
+                  data: [request.params?.threadId === "child-ui" ? {
+                    id: "turn-child-ui",
+                    items: request.params.itemsView === "summary" ? [{
+                      id: "child-progress", type: "agentMessage", phase: "commentary",
+                      text: "已检查输入框，正在核对状态面板",
+                    }] : [],
+                    itemsView: request.params.itemsView,
+                    status: childFailed ? "failed" : "inProgress",
+                    durationMs: childFailed ? 12_000 : null,
+                    error: childFailed ? { message: "服务暂不可用" } : null,
+                  } : {
                     id: "turn-child-review",
                     items: [],
                     itemsView: "notLoaded",
@@ -1218,6 +1230,10 @@ describe("App", () => {
     await user.click(summary);
     expect(within(panel).getByText("/root/ui")).toBeVisible();
     expect(within(panel).queryByText("/root/review")).not.toBeInTheDocument();
+    expect(requests.some(({ params }) => params?.itemsView === "summary" &&
+      params.threadId === "child-ui")).toBe(false);
+    await user.click(within(panel).getByRole("button", { name: /\/root\/ui/ }));
+    expect(await within(panel).findByText("已检查输入框，正在核对状态面板")).toBeVisible();
 
     act(() => {
       for (const handler of notificationHandlers) {
@@ -1252,6 +1268,20 @@ describe("App", () => {
     expect(screen.getByRole("region", { name: "子 agent" })).toBeVisible();
     expect(within(panel).getByText("等待审批")).toBeVisible();
     expect(within(panel).queryByText("已完成")).not.toBeInTheDocument();
+
+    childFailed = true;
+    act(() => {
+      for (const handler of notificationHandlers) {
+        handler({ method: "thread/status/changed", params: {
+          threadId: "child-ui", status: { type: "idle" },
+        } });
+      }
+    });
+    expect(await within(panel).findByText("服务暂不可用")).toBeVisible();
+    expect(within(panel).getByText("出错")).toBeVisible();
+    expect(within(panel).getByText(/耗时.*12.*秒/)).toBeVisible();
+    expect(requests.some(({ method, params }) => method === "thread/resume" &&
+      params?.threadId === "child-ui")).toBe(false);
   });
 
   it("已完成回合终止后台命令时不显示停止按钮", async () => {

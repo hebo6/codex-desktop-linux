@@ -2171,6 +2171,7 @@ export function App({
                       <TaskPlanPanel plan={turnPlan} />
                       <SubAgentPanel
                         agents={subAgents.agents}
+                        client={connection.threadClient}
                         error={subAgents.error}
                         key={currentThreadId}
                         onRetry={subAgents.refresh}
