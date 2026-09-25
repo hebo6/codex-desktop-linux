@@ -1331,6 +1331,55 @@ describe("Composer", () => {
     ));
   });
 
+  it.each([
+    ["ArrowDown", ["compact", "goal", "init", "mcp", "plan", "settings", "attach", "review"]],
+    ["ArrowUp", ["attach", "settings", "plan", "mcp", "init", "goal", "compact", "review"]],
+  ] as const)("命令菜单按 %s 移动和循环选择时滚动到高亮项并保持输入焦点", async (key, names) => {
+    const user = userEvent.setup();
+    renderComposer({
+      canRunImmediateCommands: true,
+      onRunImmediateCommand: vi.fn(async () => true),
+    });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    await user.type(editor, "/");
+    const menu = screen.getByRole("listbox", { name: "输入建议" });
+    const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView");
+
+    for (const name of names) {
+      scrollIntoView.mockClear();
+      fireEvent.keyDown(editor, { key });
+
+      const selected = within(menu).getByRole("option", { selected: true });
+      expect(selected).toHaveTextContent(`/${name}`);
+      expect(scrollIntoView).toHaveBeenLastCalledWith({
+        block: "nearest",
+        inline: "nearest",
+      });
+      expect(scrollIntoView.mock.contexts.at(-1)).toBe(selected);
+      expect(editor).toHaveFocus();
+    }
+  });
+
+  it("命令菜单筛选结果变化但选中索引不变时仍滚动到新选项", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    await user.type(editor, "/goal");
+    const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView");
+    scrollIntoView.mockClear();
+
+    fireEvent.change(editor, { target: { value: "/settings" } });
+
+    const selected = screen.getByRole("option", { selected: true });
+    expect(selected).toHaveTextContent("/settings");
+    expect(scrollIntoView).toHaveBeenLastCalledWith({
+      block: "nearest",
+      inline: "nearest",
+    });
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(selected);
+    expect(editor).toHaveFocus();
+  });
+
   it("立即命令调用协议动作且输入法合成期间不打开菜单", async () => {
     const user = userEvent.setup();
     const onRunImmediateCommand = vi.fn(async () => true);

@@ -2661,6 +2661,15 @@ function SuggestionMenu({
   readonly onHover: (index: number) => void;
   readonly selectedIndex: number;
 }) {
+  const selectedOptionRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    selectedOptionRef.current?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [items, selectedIndex]);
+
   return (
     <div aria-label="输入建议" className={styles.suggestionMenu} role="listbox">
       {items.length === 0 ? <div className={styles.emptySuggestion}>没有匹配结果</div> : items.map((item, index) => {
@@ -2681,6 +2690,7 @@ function SuggestionMenu({
               onClick={() => onChoose(item)}
               onMouseDown={(event) => event.preventDefault()}
               onMouseMove={() => onHover(index)}
+              ref={index === selectedIndex ? selectedOptionRef : null}
               role="option"
               type="button"
             >

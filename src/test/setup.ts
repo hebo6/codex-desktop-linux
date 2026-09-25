@@ -3,6 +3,9 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
+// jsdom 不实现滚动，由组件测试验证滚动目标与参数
+Element.prototype.scrollIntoView = vi.fn();
+
 afterEach(() => {
   cleanup();
 });
