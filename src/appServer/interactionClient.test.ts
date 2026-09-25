@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { ServerNotification, ServerRequest } from "../protocol/generated";
+import { KNOWN_SERVER_REQUEST_METHODS } from "../protocol/generated";
+import { RpcServerRequestError } from "../protocol/rpc";
 import { AppServerInteractionClient } from "./interactionClient";
 
 class FakeSession {
@@ -60,11 +62,47 @@ describe("AppServerInteractionClient", () => {
     expect(client.getSnapshot().resolvedElsewhereCount).toBe(1);
   });
 
-  it("自动回应时间和未知动态工具", async () => {
+  it("覆盖全部服务端请求并自动回应当前时间", () => {
     const session = new FakeSession();
     new AppServerInteractionClient(session);
-    await expect(Promise.resolve(session.handlers.get("currentTime/read")?.({} as ServerRequest))).resolves.toMatchObject({ currentTimeAt: expect.any(Number) });
-    await expect(Promise.resolve(session.handlers.get("item/tool/call")?.({} as ServerRequest))).resolves.toEqual({ contentItems: [], success: false });
+    expect([...session.handlers.keys()]).toEqual(KNOWN_SERVER_REQUEST_METHODS);
+    expect(session.handlers.get("currentTime/read")?.({
+      id: "clock", method: "currentTime/read", params: { threadId: "thread-1" },
+    })).toEqual({ currentTimeAt: expect.any(Number) });
+  });
+
+  it.each([
+    { request: { id: 1, method: "item/tool/call", params: { threadId: "thread-1", turnId: "turn-1", callId: "call-1", tool: "private_tool", arguments: { secret: "DO_NOT_KEEP" } } } as ServerRequest, reason: "dynamic_tool_unregistered", threadId: "thread-1" },
+    { request: { id: 2, method: "account/chatgptAuthTokens/refresh", params: { reason: "unauthorized", previousAccountId: "DO_NOT_KEEP" } } as ServerRequest, reason: "external_auth_unavailable", threadId: null },
+    { request: { id: 3, method: "attestation/generate", params: {} } as ServerRequest, reason: "attestation_unavailable", threadId: null },
+  ])("未实现能力显式响应并公开安全失败原因：$reason", ({ request, reason, threadId }) => {
+    const session = new FakeSession();
+    const client = new AppServerInteractionClient(session);
+    const listener = vi.fn();
+    client.subscribe(listener);
+
+    expect(() => session.handlers.get(request.method)?.(request)).toThrow(RpcServerRequestError);
+    expect(() => session.handlers.get(request.method)?.(request)).toThrow(expect.objectContaining({ code: -32601 }));
+    expect(client.getSnapshot().pending).toHaveLength(0);
+    expect(client.getSnapshot().failures[0]).toMatchObject({ method: request.method, reason, threadId, message: expect.any(String) });
+    expect(JSON.stringify(client.getSnapshot().failures)).not.toContain("DO_NOT_KEEP");
+    expect(JSON.stringify(client.getSnapshot().failures)).not.toContain("private_tool");
+    expect(listener).toHaveBeenCalled();
+  });
+
+  it("失败诊断有界且销毁时释放全部处理器", () => {
+    const session = new FakeSession();
+    const client = new AppServerInteractionClient(session);
+    for (let index = 0; index < 105; index += 1) {
+      expect(() => session.handlers.get("attestation/generate")?.({
+        id: index, method: "attestation/generate", params: {},
+      })).toThrow(RpcServerRequestError);
+    }
+    expect(client.getSnapshot().failures).toHaveLength(100);
+    expect(client.getSnapshot().failures[0]?.key).toBe("number:5");
+    client.dispose();
+    expect(client.getSnapshot().failures).toHaveLength(0);
+    expect(session.handlers.size).toBe(0);
   });
 
   it("销毁时使用当前 legacy 审批拒绝结构", async () => {

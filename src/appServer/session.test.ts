@@ -121,6 +121,28 @@ function respondToInitialize(transport: RecordingTransport): void {
 }
 
 describe("AppServerSession", () => {
+  it("等待服务端请求响应时继续消费推送，断线使瞬时状态失效", async () => {
+    const { session, transport } = createSessionHarness();
+    let respond!: (value: { currentTimeAt: number }) => void;
+    session.registerServerRequestHandler("currentTime/read", () => new Promise((resolve) => { respond = resolve; }));
+    const starting = session.start();
+    await vi.waitFor(() => expect(transport.messages).toHaveLength(1));
+    respondToInitialize(transport);
+    await starting;
+    transport.emit({ id: "pending", method: "currentTime/read", params: { threadId: "thread" } });
+    transport.emit({ method: "warning", params: { message: "审批期间仍可接收" } });
+    await vi.waitFor(() => expect(session.events.getSnapshot().records.some((record) => record.detail === "审批期间仍可接收")).toBe(true));
+    expect(transport.messages.some((message) => recordOf(message).id === "pending")).toBe(false);
+    respond({ currentTimeAt: 100 });
+    await vi.waitFor(() => expect(transport.messages.some((message) => recordOf(message).id === "pending")).toBe(true));
+    transport.emit({ method: "future/notification", params: { secret: "should-never-appear" } });
+    await vi.waitFor(() => expect(session.events.getSnapshot().records.some((record) => record.method === "protocol/diagnostic")).toBe(true));
+    expect(JSON.stringify(session.events.getSnapshot())).not.toContain("should-never-appear");
+    transport.terminate();
+    expect(session.events.getSnapshot().connected).toBe(false);
+    await session.close();
+  });
+
   it("使用发行构建版本初始化客户端信息", () => {
     const expectedVersion = process.env.CODEX_DESKTOP_VERSION ?? packageMetadata.version;
 

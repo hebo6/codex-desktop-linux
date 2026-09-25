@@ -4,6 +4,7 @@ import type { ErrorObject } from "ajv";
 
 import type {
   AppsListResponse,
+  CommandExecResponse,
   ConfigReadResponse,
   ConfigRequirementsReadResponse,
   ConfigWriteResponse,
@@ -19,6 +20,7 @@ import type {
   ModelListResponse,
   PermissionProfileListResponse,
   PluginListResponse,
+  ProjectListResponse,
   ReviewStartResponse,
   ServerNotification,
   ServerRequest,
@@ -29,9 +31,11 @@ import type {
   ThreadCompactStartResponse,
   ThreadDeleteResponse,
   ThreadForkResponse,
+  ThreadGoalGetResponse,
   ThreadItemsListResponse,
   ThreadListResponse,
   ThreadQueueAddResponse,
+  ThreadQueueListResponse,
   ThreadReadResponse,
   ThreadResumeResponse,
   ThreadSectionMoveResponse,
@@ -92,3 +96,7 @@ export const validateThreadBackgroundTerminalsListResponse: StandaloneValidateFu
 export const validateThreadBackgroundTerminalsTerminateResponse: StandaloneValidateFunction<ThreadBackgroundTerminalsTerminateResponse>;
 export const validateThreadShellCommandResponse: StandaloneValidateFunction<ThreadShellCommandResponse>;
 export const validateThreadSectionMoveResponse: StandaloneValidateFunction<ThreadSectionMoveResponse>;
+export const validateThreadQueueListResponse: StandaloneValidateFunction<ThreadQueueListResponse>;
+export const validateThreadGoalGetResponse: StandaloneValidateFunction<ThreadGoalGetResponse>;
+export const validateProjectListResponse: StandaloneValidateFunction<ProjectListResponse>;
+export const validateCommandExecResponse: StandaloneValidateFunction<CommandExecResponse>;

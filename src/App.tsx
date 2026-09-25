@@ -11,6 +11,7 @@ import {
 } from "./app/useConfiguredServerConnection";
 import { useConversation } from "./app/useConversation";
 import { useBackgroundTerminals } from "./app/useBackgroundTerminals";
+import { ServerActivityPanel } from "./components/ServerActivityPanel";
 import { useComposerCapabilities } from "./app/useComposerCapabilities";
 import { useConfiguredProjects } from "./app/useConfiguredProjects";
 import {
@@ -452,6 +453,7 @@ export function App({
   const composerCapabilities = useComposerCapabilities(
     connection.capabilityClient,
     composerCwd,
+    connection.conversationClient,
   );
   const composerThreadSettings = restoredThread?.modelSettings ?? null;
   const composerDefaultModel = composerThreadSettings?.model
@@ -2161,6 +2163,11 @@ export function App({
                   error={conversation.error}
                   accessoryPanel={
                     <>
+                      <ServerActivityPanel
+                        store={connection.serverEvents}
+                        threadId={currentThreadId}
+                        failures={serverInteractions.failures}
+                      />
                       <TaskPlanPanel plan={turnPlan} />
                       <SubAgentPanel
                         agents={subAgents.agents}

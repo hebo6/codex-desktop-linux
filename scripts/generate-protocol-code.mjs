@@ -327,6 +327,29 @@ const schemaDeclarations = [
     schemaPath: "v2/ThreadSectionMoveResponse.json",
     validatorName: "validateThreadSectionMoveResponse",
   },
+  { typeName: "ThreadQueueListParams", schemaPath: "v2/ThreadQueueListParams.json" },
+  {
+    typeName: "ThreadQueueListResponse",
+    schemaPath: "v2/ThreadQueueListResponse.json",
+    validatorName: "validateThreadQueueListResponse",
+  },
+  { typeName: "ThreadGoalGetParams", schemaPath: "v2/ThreadGoalGetParams.json" },
+  {
+    typeName: "ThreadGoalGetResponse",
+    schemaPath: "v2/ThreadGoalGetResponse.json",
+    validatorName: "validateThreadGoalGetResponse",
+  },
+  { typeName: "ProjectListParams", schemaPath: "v2/ProjectListParams.json" },
+  {
+    typeName: "ProjectListResponse",
+    schemaPath: "v2/ProjectListResponse.json",
+    validatorName: "validateProjectListResponse",
+  },
+  {
+    typeName: "CommandExecResponse",
+    schemaPath: "v2/CommandExecResponse.json",
+    validatorName: "validateCommandExecResponse",
+  },
 ];
 
 const validatorDeclarations = schemaDeclarations.filter(

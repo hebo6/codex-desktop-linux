@@ -1,0 +1,166 @@
+.content {
+  display: grid;
+  max-height: min(52vh, 520px);
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-2);
+  overflow: auto;
+  overscroll-behavior: contain;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.scope,
+.card {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.scope h3,
+.card h4,
+.card p,
+.detail p {
+  margin: 0;
+}
+
+.scope h3 {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.card {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-divider-subtle);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.card header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.card h4,
+.detail h4 {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.card header > span,
+.muted,
+.transcript > span {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.card[data-status="failed"],
+.card[data-status="warning"] {
+  border-color: color-mix(in srgb, var(--color-status-warning) 42%, var(--color-divider-subtle));
+}
+
+.records {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.records:empty {
+  display: none;
+}
+
+.metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.metrics dt {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.metrics dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.remaining {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--color-fill-subtle);
+}
+
+.fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-status-progress);
+}
+
+.detail summary {
+  padding: var(--space-1) 0;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.output {
+  max-height: 240px;
+  padding: var(--space-2);
+  margin: var(--space-1) 0 0;
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--color-fill-subtle);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.transcript p {
+  white-space: pre-wrap;
+}
+
+.queue {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.input {
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.audio {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.audio button {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-fill-subtle);
+  font: inherit;
+  cursor: pointer;
+}
+
+.audio audio {
+  width: 100%;
+  max-width: 360px;
+}

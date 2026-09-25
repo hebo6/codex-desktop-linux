@@ -86,6 +86,13 @@ export type { ThreadShellCommandParams } from "./types/ThreadShellCommandParams"
 export type { ThreadShellCommandResponse } from "./types/ThreadShellCommandResponse";
 export type { ThreadSectionMoveParams } from "./types/ThreadSectionMoveParams";
 export type { ThreadSectionMoveResponse } from "./types/ThreadSectionMoveResponse";
+export type { ThreadQueueListParams } from "./types/ThreadQueueListParams";
+export type { ThreadQueueListResponse } from "./types/ThreadQueueListResponse";
+export type { ThreadGoalGetParams } from "./types/ThreadGoalGetParams";
+export type { ThreadGoalGetResponse } from "./types/ThreadGoalGetResponse";
+export type { ProjectListParams } from "./types/ProjectListParams";
+export type { ProjectListResponse } from "./types/ProjectListResponse";
+export type { CommandExecResponse } from "./types/CommandExecResponse";
 
 export {
   KNOWN_SERVER_NOTIFICATION_METHODS,

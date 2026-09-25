@@ -12,6 +12,7 @@ import {
   RpcInvalidResultError,
   RpcQueueCapacityError,
   RpcRemoteError,
+  RpcServerRequestError,
   RpcWriteError,
 } from "./errors";
 import type {
@@ -33,8 +34,10 @@ import type {
 } from "./types";
 
 const METHOD_NOT_FOUND = -32601;
+const INVALID_REQUEST = -32600;
 const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32603;
+const SERVER_BUSY = -32000;
 
 let connectionEpochSequence = 0;
 const clientInstanceId = crypto.randomUUID();
@@ -71,6 +74,7 @@ interface ActiveConnection {
   initializationResponse: InitializeResponse | null;
   draining: boolean;
   nextRequestSequence: number;
+  readonly pendingServerRequestIds: Set<RpcRequestId>;
 }
 
 interface MutableDiagnosticCounts {
@@ -153,7 +157,9 @@ function notificationMessage(method: string, params: unknown): JSONRPCMessage {
 export class RpcRouter {
   private readonly boundary: RpcRouterOptions["boundary"];
   private readonly queueCapacity: number;
+  private readonly serverRequestCapacity: number;
   private readonly onDiagnostic: ((diagnostic: RpcDiagnostic) => void) | undefined;
+  private readonly onInboundTaskFailure: ((epoch: number) => void) | undefined;
   private readonly serverRequestHandlers = new Map<string, ServerRequestHandler>();
   private readonly notificationHandlers = new Set<ServerNotificationHandler>();
   private readonly counts: MutableDiagnosticCounts = {
@@ -171,7 +177,12 @@ export class RpcRouter {
 
     this.boundary = options.boundary;
     this.queueCapacity = options.queueCapacity;
+    this.serverRequestCapacity = options.serverRequestCapacity ?? options.queueCapacity;
+    if (!Number.isSafeInteger(this.serverRequestCapacity) || this.serverRequestCapacity < 0) {
+      throw new RangeError("serverRequestCapacity must be a non-negative safe integer");
+    }
     this.onDiagnostic = options.onDiagnostic;
+    this.onInboundTaskFailure = options.onInboundTaskFailure;
   }
 
   open(writer: RpcWriter): number {
@@ -190,6 +201,7 @@ export class RpcRouter {
       initializationResponse: null,
       draining: false,
       nextRequestSequence: 0,
+      pendingServerRequestIds: new Set(),
     };
     return epoch;
   }
@@ -369,7 +381,9 @@ export class RpcRouter {
 
     if (typeof record.method === "string") {
       if (hasOwn(record, "id")) {
-        await this.handleServerRequest(connection, envelope.value, record);
+        // An approval can wait for a human. Its response must not block later
+        // notifications, other approvals, or a serverRequest/resolved event
+        this.dispatchServerRequest(connection, envelope.value, record);
       } else {
         await this.handleServerNotification(connection, envelope.value, record.method);
       }
@@ -839,6 +853,39 @@ export class RpcRouter {
     }
   }
 
+  private dispatchServerRequest(
+    connection: ActiveConnection,
+    message: JSONRPCMessage,
+    record: MessageRecord,
+  ): void {
+    const id = requestIdOf(record);
+    if (id !== null && connection.pendingServerRequestIds.has(id)) {
+      // Two outstanding requests with one ID cannot receive distinct responses
+      this.emit({ code: "invalid_server_request", direction: "inbound", epoch: connection.epoch, errorCode: INVALID_REQUEST });
+      this.failInboundTask(connection);
+      return;
+    }
+    if (id !== null && connection.pendingServerRequestIds.size >= this.serverRequestCapacity) {
+      this.emit({ code: "server_request_handler_failed", direction: "inbound", epoch: connection.epoch, errorCode: SERVER_BUSY });
+      void this.writeServerError(connection, id, SERVER_BUSY, "Too many pending client requests")
+        .catch(() => this.failInboundTask(connection));
+      return;
+    }
+    if (id !== null) connection.pendingServerRequestIds.add(id);
+    void this.handleServerRequest(connection, message, record)
+      .catch(() => this.failInboundTask(connection))
+      .finally(() => { if (id !== null) connection.pendingServerRequestIds.delete(id); });
+  }
+
+  private failInboundTask(connection: ActiveConnection): void {
+    this.terminateConnection(connection, new RpcConnectionError("Server request response failed"));
+    try {
+      this.onInboundTaskFailure?.(connection.epoch);
+    } catch {
+      // The failed task is already contained and the router is closed
+    }
+  }
+
   private async handleServerRequest(
     connection: ActiveConnection,
     message: JSONRPCMessage,
@@ -904,15 +951,18 @@ export class RpcRouter {
       if (result === undefined) {
         throw new TypeError("Server request handlers must return a JSON value");
       }
-    } catch {
+    } catch (error) {
+      if (this.connection !== connection) return;
+      const errorCode = error instanceof RpcServerRequestError ? error.code : INTERNAL_ERROR;
+      const message = error instanceof RpcServerRequestError ? error.message : "Internal error";
       this.emit({
         code: "server_request_handler_failed",
         direction: "inbound",
         epoch: connection.epoch,
         method,
-        errorCode: INTERNAL_ERROR,
+        errorCode,
       });
-      await this.writeServerError(connection, id, INTERNAL_ERROR, "Internal error");
+      await this.writeServerError(connection, id, errorCode, message);
       return;
     }
 

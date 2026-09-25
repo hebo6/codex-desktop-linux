@@ -1,4 +1,6 @@
 import packageMetadata from "../../package.json";
+import { ServerEventStore } from "./serverEventState";
+import { validateCommandExecResponse } from "../protocol/validation";
 
 import type {
   InitializeParams,
@@ -120,6 +122,7 @@ export class AppServerSessionError extends Error {
 }
 
 export class AppServerSession {
+  readonly events = new ServerEventStore();
   private readonly router: RpcRouter;
   private readonly connectTransport: ProtocolTransportConnector;
   private readonly cancelTransportConnect: (() => Promise<void>) | undefined;
@@ -166,9 +169,19 @@ export class AppServerSession {
     this.router = new RpcRouter({
       boundary: schemaProtocolBoundary,
       queueCapacity: requestQueueCapacity,
+      serverRequestCapacity: inboundQueueCapacity,
+      onInboundTaskFailure: (epoch) => {
+        if (this.epoch === epoch) this.fail("inboundProcessingFailed");
+      },
       onDiagnostic: (diagnostic) => {
+        if (diagnostic.code === "unknown_notification" || diagnostic.code === "invalid_notification" || diagnostic.code === "notification_handler_failed") {
+          this.events.recordDiagnostic(diagnostic);
+        }
         this.emitDiagnostic({ source: "rpc", diagnostic });
       },
+    });
+    this.router.subscribeNotifications((notification) => {
+      this.events.consume(notification);
     });
   }
 
@@ -188,7 +201,25 @@ export class AppServerSession {
   }
 
   sendRequest<T>(options: SendRequestOptions<T>): RequestHandle<T> {
-    return this.router.sendRequest(options);
+    const request = this.router.sendRequest(options);
+    const params = options.params;
+    if (options.method === "command/exec" && typeof params === "object" && params !== null &&
+      "processId" in params && typeof params.processId === "string") {
+      const processId = params.processId;
+      this.events.startProcess("command", processId);
+      void request.result.then((result) => {
+        const parsed = validateCommandExecResponse(result);
+        if (parsed.ok) this.events.completeCommand(processId, parsed.value);
+      }, () => {
+        this.events.failCommand(processId);
+      });
+    } else if (options.method === "process/spawn" && typeof params === "object" && params !== null &&
+      "processHandle" in params && typeof params.processHandle === "string") {
+      const processHandle = params.processHandle;
+      this.events.startProcess("process", processHandle);
+      void request.result.catch(() => { this.events.failProcess("process", processHandle); });
+    }
+    return request;
   }
 
   sendNotification(method: string, params?: unknown): Promise<void> {
@@ -481,6 +512,9 @@ export class AppServerSession {
 
   private transition(phase: AppServerSessionPhase): void {
     this.phase = phase;
+    if (phase === "error" || phase === "closing" || phase === "closed") {
+      this.events.disconnect();
+    }
     try {
       this.onStateChange?.(this.snapshot());
     } catch {

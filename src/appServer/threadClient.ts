@@ -63,6 +63,7 @@ export class AppServerThreadClient {
       AppServerSession,
       "sendRequest" | "subscribeNotifications"
     >,
+    private readonly onThreadRestored?: (threadId: string) => void,
   ) {}
 
   subscribeNotifications(
@@ -168,7 +169,12 @@ export class AppServerThreadClient {
         onResponseTiming: measurement.recordResponseTiming,
       });
       void request.result.then(
-        measurement.recordResponse,
+        (response) => {
+          measurement.recordResponse(response);
+          if (!response.thread.ephemeral && response.thread.historyMode === "paginated") {
+            this.onThreadRestored?.(threadId);
+          }
+        },
         measurement.recordFailure,
       );
       return request;

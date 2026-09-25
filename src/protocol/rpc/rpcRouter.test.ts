@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { AppServerInteractionClient } from "../../appServer/interactionClient";
+
 import type {
   InitializeResponse,
   JSONRPCMessage,
@@ -15,7 +17,9 @@ import {
   RpcQueueCapacityError,
   RpcRemoteError,
   RpcRouter,
+  RpcServerRequestError,
   RpcWriteError,
+  schemaProtocolBoundary,
 } from ".";
 import type {
   MethodValidationResult,
@@ -862,6 +866,7 @@ describe("RpcRouter 入站路由", () => {
     const router = new RpcRouter({
       boundary: new StrictBoundary(),
       queueCapacity: 1,
+      serverRequestCapacity: 5,
       onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
     });
     const epoch = router.open(writer);
@@ -927,6 +932,35 @@ describe("RpcRouter 入站路由", () => {
     expect(JSON.stringify(diagnostics)).not.toContain("DO_NOT_LOG_REQUEST");
   });
 
+  it("明确的服务端请求错误保留错误码和说明，诊断不保存消息正文", async () => {
+    const writer = new RecordingWriter();
+    const diagnostics: RpcDiagnostic[] = [];
+    const router = new RpcRouter({
+      boundary: new StrictBoundary(),
+      queueCapacity: 1,
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const epoch = router.open(writer);
+    await establishConnection(router, writer, epoch);
+    writer.messages.length = 0;
+    router.registerServerRequestHandler("currentTime/read", () => {
+      throw new RpcServerRequestError(-32601, "客户端不支持该能力");
+    });
+
+    await router.handleIncoming(epoch, {
+      id: "safe-error", method: "currentTime/read", params: { threadId: "thread-1" },
+    });
+
+    expect(writer.messages).toEqual([{
+      id: "safe-error", error: { code: -32601, message: "客户端不支持该能力" },
+    }]);
+    expect(diagnostics).toContainEqual({
+      code: "server_request_handler_failed", direction: "inbound", epoch,
+      method: "currentTime/read", errorCode: -32601,
+    });
+    expect(JSON.stringify(diagnostics)).not.toContain("客户端不支持该能力");
+  });
+
   it("诊断回调异常不会阻止协议错误响应", async () => {
     const writer = new RecordingWriter();
     const router = new RpcRouter({
@@ -953,10 +987,13 @@ describe("RpcRouter 入站路由", () => {
   it("服务端成功响应写失败只尝试一次并终止连接", async () => {
     const diagnostics: RpcDiagnostic[] = [];
     const writer = new ServerResponseFailingWriter();
+    let reportFailure!: (epoch: number) => void;
+    const taskFailed = new Promise<number>((resolve) => { reportFailure = resolve; });
     const router = new RpcRouter({
       boundary: new StrictBoundary(),
       queueCapacity: 1,
       onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+      onInboundTaskFailure: reportFailure,
     });
     const epoch = router.open(writer);
     await establishConnection(router, writer, epoch);
@@ -973,7 +1010,8 @@ describe("RpcRouter 入站路由", () => {
       id: "external-id",
       method: "currentTime/read",
       params: { threadId: "thread-1" },
-    })).rejects.toBeInstanceOf(RpcWriteError);
+    })).resolves.toBeUndefined();
+    await expect(taskFailed).resolves.toBe(epoch);
     await pendingRejected;
     expect(writer.messages).toEqual([
       expect.objectContaining({ method: "thread/read" }),
@@ -990,6 +1028,123 @@ describe("RpcRouter 入站路由", () => {
     expect(() =>
       router.sendRequest({ method: "thread/list", validateResult: stringResult }),
     ).toThrow(RpcConnectionError);
+  });
+
+  it("待处理审批不阻塞入站队列，后续审批和其他窗口解决通知按顺序处理", async () => {
+    const writer = new RecordingWriter();
+    const router = new RpcRouter({ boundary: schemaProtocolBoundary, queueCapacity: 1, serverRequestCapacity: 2 });
+    const epoch = router.open(writer);
+    await establishConnection(router, writer, epoch);
+    writer.messages.length = 0;
+    const client = new AppServerInteractionClient({
+      registerServerRequestHandler: router.registerServerRequestHandler.bind(router),
+      subscribeNotifications: router.subscribeNotifications.bind(router),
+    });
+    let inbound = Promise.resolve();
+    const enqueue = (value: unknown) => {
+      inbound = inbound.then(() => router.handleIncoming(epoch, value));
+      return inbound;
+    };
+    for (const id of ["one", "two"]) {
+      await enqueue({
+        id, method: "item/fileChange/requestApproval",
+        params: { threadId: "thread-1", turnId: "turn-1", itemId: id, startedAtMs: 1 },
+      });
+    }
+    expect(client.getSnapshot().pending.map(({ request }) => request.id)).toEqual(["one", "two"]);
+    await enqueue({ method: "serverRequest/resolved", params: { requestId: "one", threadId: "thread-1" } });
+    expect(client.getSnapshot().pending.map(({ request }) => request.id)).toEqual(["two"]);
+    expect(client.getSnapshot().resolvedElsewhereCount).toBe(1);
+    client.respond(client.getSnapshot().pending[0]!.key, { decision: "accept" });
+    await flushMicrotasks();
+    expect(writer.messages).toEqual([
+      { id: "one", result: { decision: "decline" } },
+      { id: "two", result: { decision: "accept" } },
+    ]);
+    client.dispose();
+  });
+
+  it("旧连接关闭后异步审批完成或失败均不能写入新连接", async () => {
+    const firstWriter = new RecordingWriter();
+    const router = new RpcRouter({ boundary: new StrictBoundary(), queueCapacity: 1, serverRequestCapacity: 2 });
+    const firstEpoch = router.open(firstWriter);
+    await establishConnection(router, firstWriter, firstEpoch);
+    firstWriter.messages.length = 0;
+    let resolveApproval!: (result: unknown) => void;
+    let rejectApproval!: (error: Error) => void;
+    router.registerServerRequestHandler("currentTime/read", (request) => new Promise((resolve, reject) => {
+      if (request.id === "resolve") resolveApproval = resolve;
+      else rejectApproval = reject;
+    }));
+    await router.handleIncoming(firstEpoch, { id: "resolve", method: "currentTime/read", params: { threadId: "thread-1" } });
+    await router.handleIncoming(firstEpoch, { id: "reject", method: "currentTime/read", params: { threadId: "thread-1" } });
+    router.close(firstEpoch);
+    const secondWriter = new RecordingWriter();
+    const secondEpoch = router.open(secondWriter);
+    await establishConnection(router, secondWriter, secondEpoch);
+    secondWriter.messages.length = 0;
+
+    resolveApproval({ currentTimeAt: 1 });
+    rejectApproval(new Error("private old error"));
+    await flushMicrotasks();
+    expect(firstWriter.messages).toEqual([]);
+    expect(secondWriter.messages).toEqual([]);
+  });
+
+  it("待处理服务端请求达到容量后明确拒绝，完成后释放名额", async () => {
+    const writer = new RecordingWriter();
+    const diagnostics: RpcDiagnostic[] = [];
+    const router = new RpcRouter({ boundary: new StrictBoundary(), queueCapacity: 1, onDiagnostic: (event) => diagnostics.push(event) });
+    const epoch = router.open(writer);
+    await establishConnection(router, writer, epoch);
+    writer.messages.length = 0;
+    let release!: (result: unknown) => void;
+    const handled: Array<string | number> = [];
+    router.registerServerRequestHandler("currentTime/read", (request) => {
+      handled.push(request.id);
+      return new Promise((resolve) => { release = resolve; });
+    });
+    await router.handleIncoming(epoch, { id: 1, method: "currentTime/read", params: { threadId: "thread-1" } });
+    await router.handleIncoming(epoch, { id: 2, method: "currentTime/read", params: { threadId: "thread-1" } });
+    expect(handled).toEqual([1]);
+    expect(writer.messages).toEqual([{ id: 2, error: { code: -32000, message: "Too many pending client requests" } }]);
+    expect(diagnostics).toContainEqual({ code: "server_request_handler_failed", direction: "inbound", epoch, errorCode: -32000 });
+    release({ currentTimeAt: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await router.handleIncoming(epoch, { id: 3, method: "currentTime/read", params: { threadId: "thread-1" } });
+    expect(handled).toEqual([1, 3]);
+    release({ currentTimeAt: 2 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  it("重复的待处理请求ID终止连接，不覆盖原审批或发出同ID的双响应", async () => {
+    const writer = new RecordingWriter();
+    const diagnostics: RpcDiagnostic[] = [];
+    const failedEpochs: number[] = [];
+    const router = new RpcRouter({
+      boundary: new StrictBoundary(), queueCapacity: 2,
+      onDiagnostic: (event) => diagnostics.push(event),
+      onInboundTaskFailure: (epoch) => failedEpochs.push(epoch),
+    });
+    const epoch = router.open(writer);
+    await establishConnection(router, writer, epoch);
+    writer.messages.length = 0;
+    let release!: (result: unknown) => void;
+    let handled = 0;
+    router.registerServerRequestHandler("currentTime/read", () => {
+      handled += 1;
+      return new Promise((resolve) => { release = resolve; });
+    });
+    const request = { id: "approval", method: "currentTime/read", params: { threadId: "thread-1" } };
+    await router.handleIncoming(epoch, request);
+    await router.handleIncoming(epoch, request);
+    expect(handled).toBe(1);
+    expect(failedEpochs).toEqual([epoch]);
+    expect(diagnostics).toContainEqual({ code: "invalid_server_request", direction: "inbound", epoch, errorCode: -32600 });
+    release({ currentTimeAt: 1 });
+    await flushMicrotasks();
+    expect(writer.messages).toEqual([]);
+    expect(() => router.sendRequest({ method: "thread/list", validateResult: stringResult })).toThrow(RpcConnectionError);
   });
 
   it("客户端业务通知写失败显式返回错误但不泄漏参数", async () => {

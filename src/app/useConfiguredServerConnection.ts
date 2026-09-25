@@ -18,6 +18,8 @@ import type { ServerId } from "../configuration/model";
 import type { ConnectionViewState } from "../store/connectionSlice";
 import type { ConnectConfiguredServerRequest } from "../transport/configuredServer";
 import type { LocalProcessTermination } from "../transport";
+import type { ServerEventStore } from "../appServer/serverEventState";
+import { ServerEventSync } from "../appServer/serverEventSync";
 
 const CONNECTION_ID_PATTERN = /^(?=.{1,64}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u;
 const MAX_CONNECTION_ID_ALLOCATION_ATTEMPTS = 16;
@@ -81,6 +83,7 @@ const CONNECTION_STAGE_DETAILS: Readonly<Record<AppServerConnectionStage, string
   });
 
 export interface ConfiguredServerSessionHandle {
+  readonly serverEvents?: ServerEventStore;
   readonly threadClient?: AppServerThreadClient;
   readonly conversationClient?: AppServerConversationClient;
   readonly capabilityClient?: AppServerCapabilityClient;
@@ -115,6 +118,7 @@ export interface ReconnectViewState {
 }
 
 export interface ConfiguredServerConnectionSnapshot {
+  readonly serverEvents: ServerEventStore | null;
   readonly currentServerId: ServerId | null;
   readonly connectionStage: AppServerConnectionStage | null;
   readonly threadClient: AppServerThreadClient | null;
@@ -153,6 +157,7 @@ export class ConfiguredServerConnectionController {
   private readonly listeners = new Set<() => void>();
 
   private snapshotValue: ConfiguredServerConnectionSnapshot = Object.freeze({
+    serverEvents: null,
     currentServerId: null,
     connectionStage: null,
     threadClient: null,
@@ -592,6 +597,7 @@ export class ConfiguredServerConnectionController {
       view.phase === "ready"
         ? (this.activeAttempt?.session?.accountClient ?? null)
         : null;
+    const serverEvents = this.activeAttempt?.session?.serverEvents ?? null;
     if (
       this.snapshotValue.currentServerId === currentServerId &&
       this.snapshotValue.connectionStage === this.connectionStage &&
@@ -601,6 +607,7 @@ export class ConfiguredServerConnectionController {
       this.snapshotValue.fileClient === fileClient &&
       this.snapshotValue.interactionClient === interactionClient &&
       this.snapshotValue.accountClient === accountClient &&
+      this.snapshotValue.serverEvents === serverEvents &&
       this.snapshotValue.reconnect?.attempt === reconnect?.attempt &&
       this.snapshotValue.reconnect?.nextAttemptAt === reconnect?.nextAttemptAt &&
       this.snapshotValue.view.phase === view.phase &&
@@ -617,6 +624,7 @@ export class ConfiguredServerConnectionController {
       fileClient,
       interactionClient,
       accountClient,
+      serverEvents,
       reconnect,
       view,
     });
@@ -688,16 +696,23 @@ function defaultConfiguredServerSessionFactory(
   options: ConfiguredServerSessionFactoryOptions,
 ): ConfiguredServerSessionHandle {
   const session = createConfiguredServerAppServerSession(options);
+  const eventSync = new ServerEventSync(session, session.events);
   const interactionClient = new AppServerInteractionClient(session);
   return {
-    threadClient: new AppServerThreadClient(session),
+    serverEvents: session.events,
+    threadClient: new AppServerThreadClient(session, eventSync.restoreThread),
     conversationClient: new AppServerConversationClient(session),
     capabilityClient: new AppServerCapabilityClient(session),
     fileClient: new AppServerFileClient(session),
     interactionClient,
     accountClient: new AppServerAccountClient(session),
-    start: () => session.start(),
+    start: async () => {
+      const response = await session.start();
+      void eventSync.refreshProjects();
+      return response;
+    },
     close: async () => {
+      eventSync.dispose();
       interactionClient.dispose();
       await session.close();
     },

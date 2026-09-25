@@ -50,6 +50,17 @@ export class RpcRemoteError extends Error {
   }
 }
 
+/** 只有可公开返回给服务端的固定说明才能传入 message */
+export class RpcServerRequestError extends Error {
+  readonly code: number;
+
+  constructor(code: number, message: string) {
+    super(message);
+    this.name = "RpcServerRequestError";
+    this.code = code;
+  }
+}
+
 export class RpcInvalidResultError extends Error {
   constructor(method: string) {
     super(`JSON-RPC response for ${method} failed result validation`);

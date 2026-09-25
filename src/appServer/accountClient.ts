@@ -20,7 +20,7 @@ type RateLimitsNotification = Extract<
 >;
 type AccountUpdatedNotification = Extract<
   ServerNotification,
-  { method: "account/updated" }
+  { method: "account/updated" | "account/login/completed" }
 >;
 
 type AccountSession = Pick<AppServerSession, "sendRequest" | "subscribeNotifications">;
@@ -55,7 +55,8 @@ export class AppServerAccountClient implements AccountClient {
     handler: (notification: AccountUpdatedNotification) => void,
   ): () => void {
     return this.session.subscribeNotifications((notification) => {
-      if (notification.method === "account/updated") {
+      if (notification.method === "account/updated" ||
+        (notification.method === "account/login/completed" && notification.params.success)) {
         handler(notification);
       }
     });

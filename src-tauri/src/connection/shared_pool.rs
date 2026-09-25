@@ -182,7 +182,23 @@ struct PhysicalConnectionEntry {
     request_routes: HashMap<String, ConnectionId>,
     thread_request_routes: HashMap<String, PendingThreadRequest>,
     thread_subscriptions: HashMap<ConnectionId, HashSet<String>>,
+    resource_owners: HashMap<ResourceKey, ConnectionId>,
+    resource_request_routes: HashMap<String, PendingResourceRequest>,
     server_requests: HashMap<String, HashSet<ConnectionId>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum ResourceKey {
+    Process(String),
+    Command(String),
+    FileWatch(String),
+    SearchSession(String),
+}
+
+struct PendingResourceRequest {
+    key: ResourceKey,
+    release_on_success: bool,
+    release_on_error: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -872,6 +888,8 @@ impl ConfiguredConnectionManager {
                         request_routes: HashMap::new(),
                         thread_request_routes: HashMap::new(),
                         thread_subscriptions: HashMap::new(),
+                        resource_owners: HashMap::new(),
+                        resource_request_routes: HashMap::new(),
                         server_requests: HashMap::new(),
                     },
                 );
@@ -1193,6 +1211,12 @@ fn detach_subscriber(
         .thread_request_routes
         .retain(|request_id, _| physical.request_routes.contains_key(request_id));
     physical.thread_subscriptions.remove(connection_id);
+    physical
+        .resource_owners
+        .retain(|_, owner| owner != connection_id);
+    physical
+        .resource_request_routes
+        .retain(|request_id, _| physical.request_routes.contains_key(request_id));
     for responders in physical.server_requests.values_mut() {
         responders.remove(connection_id);
     }
@@ -1279,6 +1303,10 @@ fn prepare_outbound_for_physical(
     if method.is_some() {
         if let Some(id) = id {
             let id_key = rpc_id_key(id).ok_or(SharedPoolError::InvalidMessage)?;
+            if physical.request_routes.contains_key(&id_key) {
+                return Err(SharedPoolError::InvalidMessage);
+            }
+            prepare_resource_request(physical, connection_id, &id_key, method, object)?;
             if method == Some("thread/unsubscribe") {
                 let thread_id = object
                     .get("params")
@@ -1356,6 +1384,116 @@ fn prepare_outbound_for_physical(
     Err(SharedPoolError::InvalidMessage)
 }
 
+fn string_param<'a>(object: &'a Map<String, Value>, name: &str) -> Option<&'a str> {
+    object.get("params")?.as_object()?.get(name)?.as_str()
+}
+
+fn prepare_resource_request(
+    physical: &mut PhysicalConnectionEntry,
+    connection_id: &ConnectionId,
+    id_key: &str,
+    method: Option<&str>,
+    object: &Map<String, Value>,
+) -> Result<(), SharedPoolError> {
+    let (key, creating, releasing) = match method {
+        Some("process/spawn" | "process/writeStdin" | "process/resizePty" | "process/kill") => (
+            ResourceKey::Process(
+                string_param(object, "processHandle")
+                    .ok_or(SharedPoolError::InvalidMessage)?
+                    .to_owned(),
+            ),
+            method == Some("process/spawn"),
+            false,
+        ),
+        Some(
+            "command/exec"
+            | "command/exec/write"
+            | "command/exec/resize"
+            | "command/exec/terminate",
+        ) => {
+            let Some(process_id) = string_param(object, "processId") else {
+                // Buffered command/exec has no public process ID and no streaming notifications
+                return if method == Some("command/exec") {
+                    Ok(())
+                } else {
+                    Err(SharedPoolError::InvalidMessage)
+                };
+            };
+            (
+                ResourceKey::Command(process_id.to_owned()),
+                method == Some("command/exec"),
+                false,
+            )
+        }
+        Some("fs/watch" | "fs/unwatch") => (
+            ResourceKey::FileWatch(
+                string_param(object, "watchId")
+                    .ok_or(SharedPoolError::InvalidMessage)?
+                    .to_owned(),
+            ),
+            method == Some("fs/watch"),
+            method == Some("fs/unwatch"),
+        ),
+        Some(
+            "fuzzyFileSearch/sessionStart"
+            | "fuzzyFileSearch/sessionUpdate"
+            | "fuzzyFileSearch/sessionStop",
+        ) => (
+            ResourceKey::SearchSession(
+                string_param(object, "sessionId")
+                    .ok_or(SharedPoolError::InvalidMessage)?
+                    .to_owned(),
+            ),
+            method == Some("fuzzyFileSearch/sessionStart"),
+            method == Some("fuzzyFileSearch/sessionStop"),
+        ),
+        _ => return Ok(()),
+    };
+    if creating {
+        if physical.resource_owners.contains_key(&key) {
+            return Err(SharedPoolError::InvalidMessage);
+        }
+        physical
+            .resource_owners
+            .insert(key.clone(), connection_id.clone());
+    } else if physical.resource_owners.get(&key) != Some(connection_id) {
+        return Err(SharedPoolError::NotOwned);
+    }
+    if creating || releasing {
+        let release_on_success = releasing || matches!(key, ResourceKey::Command(_));
+        physical.resource_request_routes.insert(
+            id_key.to_owned(),
+            PendingResourceRequest {
+                key,
+                release_on_success,
+                release_on_error: creating,
+            },
+        );
+    }
+    Ok(())
+}
+
+fn notification_resource_key(
+    method: Option<&str>,
+    object: &Map<String, Value>,
+) -> Option<ResourceKey> {
+    match method {
+        Some("process/outputDelta" | "process/exited") => {
+            string_param(object, "processHandle").map(|id| ResourceKey::Process(id.to_owned()))
+        }
+        Some("command/exec/outputDelta") => {
+            string_param(object, "processId").map(|id| ResourceKey::Command(id.to_owned()))
+        }
+        Some("fs/changed") => {
+            string_param(object, "watchId").map(|id| ResourceKey::FileWatch(id.to_owned()))
+        }
+        Some("fuzzyFileSearch/sessionUpdated" | "fuzzyFileSearch/sessionCompleted") => {
+            string_param(object, "sessionId").map(|id| ResourceKey::SearchSession(id.to_owned()))
+        }
+        _ => None,
+    }
+}
+
 fn route_inbound(
     physical: &mut PhysicalConnectionEntry,
     json: String,
@@ -1374,6 +1512,11 @@ fn route_inbound(
     let id = object.get("id");
     if method.is_some() {
         let targets = protocol_targets(physical, method, object);
+        if method == Some("process/exited")
+            && let Some(key) = notification_resource_key(method, object)
+        {
+            physical.resource_owners.remove(&key);
+        }
         if let Some(id) = id.and_then(rpc_id_key) {
             physical
                 .server_requests
@@ -1438,6 +1581,12 @@ fn route_inbound(
         physical.initialization = initialization;
     }
 
+    if let Some(request) = physical.resource_request_routes.remove(&id_key) {
+        let failed = object.contains_key("error");
+        if (failed && request.release_on_error) || (!failed && request.release_on_success) {
+            physical.resource_owners.remove(&request.key);
+        }
+    }
     apply_thread_request_response(physical, &id_key, object);
     deliver_protocol_to(physical, &id_key, json)
 }
@@ -1491,11 +1640,20 @@ fn protocol_targets(
     method: Option<&str>,
     object: &Map<String, Value>,
 ) -> Vec<ConnectionId> {
-    let thread_id = object
-        .get("params")
-        .and_then(Value::as_object)
-        .and_then(|params| params.get("threadId"))
-        .and_then(Value::as_str);
+    if let Some(key) = notification_resource_key(method, object) {
+        return physical
+            .resource_owners
+            .get(&key)
+            .cloned()
+            .into_iter()
+            .collect();
+    }
+    let thread_id = match method {
+        Some("applyPatchApproval" | "execCommandApproval") => {
+            string_param(object, "conversationId")
+        }
+        _ => string_param(object, "threadId"),
+    };
     if thread_id.is_none() || method.is_some_and(is_global_thread_notification) {
         return physical.subscribers.keys().cloned().collect();
     }
@@ -1523,6 +1681,10 @@ fn is_global_thread_notification(method: &str) -> bool {
             | "thread/unarchived"
             | "thread/closed"
             | "thread/name/updated"
+            | "thread/reverted"
+            | "thread/project/updated"
+            | "thread/goal/updated"
+            | "thread/goal/cleared"
     )
 }
 
@@ -2501,6 +2663,208 @@ mod tests {
                 .unwrap(),
             OutboundDisposition::Forward(_)
         ));
+
+        for (method, global) in [
+            ("thread/project/updated", true),
+            ("thread/goal/updated", true),
+            ("thread/goal/cleared", true),
+            ("thread/reverted", true),
+            ("thread/queue/changed", false),
+            ("thread/settings/updated", false),
+        ] {
+            clear(&first_messages);
+            clear(&second_messages);
+            manager.inner.handle_local_event(
+                key,
+                attachment.generation,
+                local_stdio::ConnectionEvent::ProtocolMessage {
+                    connection_id: attachment.physical.connection_id.as_str().to_owned(),
+                    json: serde_json::json!({ "method": method, "params": { "threadId": "thread-1" } }).to_string(),
+                },
+            );
+            assert_eq!(protocol_messages(&first_messages).len(), 1, "{method}");
+            assert_eq!(
+                protocol_messages(&second_messages).len(),
+                usize::from(global),
+                "{method}"
+            );
+        }
+
+        for method in ["applyPatchApproval", "execCommandApproval"] {
+            clear(&first_messages);
+            clear(&second_messages);
+            manager.inner.handle_local_event(
+                key,
+                attachment.generation,
+                local_stdio::ConnectionEvent::ProtocolMessage {
+                    connection_id: attachment.physical.connection_id.as_str().to_owned(),
+                    json: serde_json::json!({ "id": method, "method": method, "params": { "conversationId": "thread-1" } }).to_string(),
+                },
+            );
+            assert_eq!(protocol_messages(&first_messages).len(), 1);
+            assert!(protocol_messages(&second_messages).is_empty());
+        }
+    }
+
+    #[test]
+    fn routes_resource_notifications_only_to_owner_until_resource_is_released() {
+        let manager = ConfiguredConnectionManager::default();
+        let (key, metadata) = local_identity();
+        let (first_events, first_messages) = recording_channel();
+        let first_id = connection_id("resource-routing-one");
+        let mut first = manager
+            .reserve("main".to_owned(), first_id.clone())
+            .unwrap();
+        let attachment = manager
+            .attach(&mut first, key, metadata, first_events)
+            .unwrap();
+        mark_local_connected(
+            &manager,
+            key,
+            attachment.generation,
+            &attachment.physical.connection_id,
+        );
+        first.commit();
+        let (second_events, second_messages) = recording_channel();
+        let second_id = connection_id("resource-routing-two");
+        let mut second = manager
+            .reserve("other".to_owned(), second_id.clone())
+            .unwrap();
+        manager
+            .attach(&mut second, key, metadata, second_events)
+            .unwrap();
+        second.commit();
+        mark_initialized(&manager, key);
+        let receive = |value: Value| {
+            manager.inner.handle_local_event(
+                key,
+                attachment.generation,
+                local_stdio::ConnectionEvent::ProtocolMessage {
+                    connection_id: attachment.physical.connection_id.as_str().to_owned(),
+                    json: value.to_string(),
+                },
+            );
+        };
+
+        for (create_method, id_field, notification_method, control_method, release_method) in [
+            (
+                "process/spawn",
+                "processHandle",
+                "process/outputDelta",
+                "process/writeStdin",
+                "process/exited",
+            ),
+            (
+                "command/exec",
+                "processId",
+                "command/exec/outputDelta",
+                "command/exec/write",
+                "",
+            ),
+            (
+                "fs/watch",
+                "watchId",
+                "fs/changed",
+                "fs/unwatch",
+                "fs/unwatch",
+            ),
+            (
+                "fuzzyFileSearch/sessionStart",
+                "sessionId",
+                "fuzzyFileSearch/sessionUpdated",
+                "fuzzyFileSearch/sessionUpdate",
+                "fuzzyFileSearch/sessionStop",
+            ),
+        ] {
+            let create = serde_json::json!({ "id": create_method, "method": create_method, "params": { id_field: "resource-1" } });
+            assert!(matches!(
+                manager
+                    .prepare_outbound("main", &first_id, &create.to_string())
+                    .unwrap(),
+                OutboundDisposition::Forward(_)
+            ));
+            // A second logical connection must neither take over a handle nor control the first owner's resource
+            let duplicate = serde_json::json!({ "id": "duplicate", "method": create_method, "params": { id_field: "resource-1" } });
+            assert!(matches!(
+                manager.prepare_outbound("other", &second_id, &duplicate.to_string()),
+                Err(SharedPoolError::InvalidMessage)
+            ));
+            let control = serde_json::json!({ "id": "control", "method": control_method, "params": { id_field: "resource-1" } });
+            assert!(matches!(
+                manager.prepare_outbound("other", &second_id, &control.to_string()),
+                Err(SharedPoolError::NotOwned)
+            ));
+            if create_method != "command/exec" {
+                receive(serde_json::json!({ "id": create_method, "result": {} }));
+            }
+            clear(&first_messages);
+            clear(&second_messages);
+            let notification = serde_json::json!({ "method": notification_method, "params": { id_field: "resource-1" } });
+            receive(notification.clone());
+            assert_eq!(
+                protocol_messages(&first_messages).len(),
+                1,
+                "{notification_method}"
+            );
+            assert!(
+                protocol_messages(&second_messages).is_empty(),
+                "{notification_method}"
+            );
+
+            match release_method {
+                "" => receive(serde_json::json!({ "id": create_method, "result": {} })),
+                "process/exited" => receive(
+                    serde_json::json!({ "method": release_method, "params": { id_field: "resource-1" } }),
+                ),
+                _ => {
+                    let release = serde_json::json!({ "id": "release", "method": release_method, "params": { id_field: "resource-1" } });
+                    assert!(matches!(
+                        manager
+                            .prepare_outbound("main", &first_id, &release.to_string())
+                            .unwrap(),
+                        OutboundDisposition::Forward(_)
+                    ));
+                    // A rejected release keeps the resource's current owner
+                    receive(
+                        serde_json::json!({ "id": "release", "error": { "code": -32603, "message": "release failed" } }),
+                    );
+                    clear(&first_messages);
+                    receive(notification.clone());
+                    assert_eq!(protocol_messages(&first_messages).len(), 1);
+                    assert!(matches!(
+                        manager
+                            .prepare_outbound("main", &first_id, &release.to_string())
+                            .unwrap(),
+                        OutboundDisposition::Forward(_)
+                    ));
+                    receive(serde_json::json!({ "id": "release", "result": {} }));
+                }
+            }
+            clear(&first_messages);
+            clear(&second_messages);
+            receive(notification);
+            assert!(protocol_messages(&first_messages).is_empty());
+            assert!(protocol_messages(&second_messages).is_empty());
+            // Failed creation also releases the reserved handle so another caller can retry
+            assert!(matches!(
+                manager
+                    .prepare_outbound("other", &second_id, &create.to_string())
+                    .unwrap(),
+                OutboundDisposition::Forward(_)
+            ));
+            receive(
+                serde_json::json!({ "id": create_method, "error": { "code": -32603, "message": "creation failed" } }),
+            );
+            assert!(matches!(
+                manager
+                    .prepare_outbound("main", &first_id, &create.to_string())
+                    .unwrap(),
+                OutboundDisposition::Forward(_)
+            ));
+            receive(
+                serde_json::json!({ "id": create_method, "error": { "code": -32603, "message": "creation failed" } }),
+            );
+        }
     }
 
     #[test]

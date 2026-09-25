@@ -19,6 +19,10 @@ import type {
   ThreadDeleteResponse,
   ThreadStartResponse,
   ThreadQueueAddResponse,
+  ThreadQueueListResponse,
+  ThreadGoalGetResponse,
+  ProjectListResponse,
+  CommandExecResponse,
   ThreadSettingsUpdateResponse,
   ThreadBackgroundTerminalsListResponse,
   ThreadBackgroundTerminalsTerminateResponse,
@@ -62,6 +66,10 @@ import {
   validateThreadDeleteResponse as validateThreadDeleteResponseSchema,
   validateThreadStartResponse as validateThreadStartResponseSchema,
   validateThreadQueueAddResponse as validateThreadQueueAddResponseSchema,
+  validateThreadQueueListResponse as validateThreadQueueListResponseSchema,
+  validateThreadGoalGetResponse as validateThreadGoalGetResponseSchema,
+  validateProjectListResponse as validateProjectListResponseSchema,
+  validateCommandExecResponse as validateCommandExecResponseSchema,
   validateThreadSettingsUpdateResponse as validateThreadSettingsUpdateResponseSchema,
   validateThreadBackgroundTerminalsListResponse as validateThreadBackgroundTerminalsListResponseSchema,
   validateThreadBackgroundTerminalsTerminateResponse as validateThreadBackgroundTerminalsTerminateResponseSchema,
@@ -335,6 +343,22 @@ export function validateThreadQueueAddResponse(
     "params",
     "thread/queue/add 响应校验失败",
   );
+}
+
+export function validateThreadQueueListResponse(value: unknown): ProtocolValidationResult<ThreadQueueListResponse> {
+  return validateWithSchema(value, validateThreadQueueListResponseSchema, "invalid_params", "params", "thread/queue/list 响应校验失败");
+}
+
+export function validateThreadGoalGetResponse(value: unknown): ProtocolValidationResult<ThreadGoalGetResponse> {
+  return validateWithSchema(value, validateThreadGoalGetResponseSchema, "invalid_params", "params", "thread/goal/get 响应校验失败");
+}
+
+export function validateProjectListResponse(value: unknown): ProtocolValidationResult<ProjectListResponse> {
+  return validateWithSchema(value, validateProjectListResponseSchema, "invalid_params", "params", "project/list 响应校验失败");
+}
+
+export function validateCommandExecResponse(value: unknown): ProtocolValidationResult<CommandExecResponse> {
+  return validateWithSchema(value, validateCommandExecResponseSchema, "invalid_params", "params", "command/exec 响应校验失败");
 }
 
 export function validateThreadSettingsUpdateResponse(

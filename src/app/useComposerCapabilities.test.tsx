@@ -6,6 +6,7 @@ import type {
   AppsListParams,
   AppsListResponse,
   PluginListResponse,
+  ServerNotification,
 } from "../protocol/generated";
 import type { RequestHandle } from "../protocol/rpc";
 import { useComposerCapabilities } from "./useComposerCapabilities";
@@ -20,6 +21,44 @@ function completed<T>(value: T): RequestHandle<T> {
 }
 
 describe("useComposerCapabilities", () => {
+  it("应用推送优先于迟到的旧列表，并按技能变更重新查询", async () => {
+    const listeners = new Set<(notification: ServerNotification) => void>();
+    let finishApps!: (response: AppsListResponse) => void;
+    const client = {
+      listApps: () => ({ ...completed({ data: [] }), result: new Promise<AppsListResponse>((resolve) => { finishApps = resolve; }) }),
+      listModels: () => completed({ data: [] }),
+      listPermissionProfiles: () => completed({ data: [] }),
+      listPlugins: () => completed({ marketplaces: [] }),
+      listSkills: vi.fn(() => completed({ data: [] })),
+      readConfig: () => completed({ config: {}, origins: {} }),
+      readConfigRequirements: () => completed({ requirements: null }),
+      searchFiles: () => completed({ files: [] }),
+      writeConfigValue: () => completed({ filePath: "/config.toml", status: "ok", version: "v1" }),
+    } satisfies CapabilityClient;
+    const notifications = {
+      subscribeNotifications: (listener: (notification: ServerNotification) => void) => {
+        listeners.add(listener);
+        return () => { listeners.delete(listener); };
+      },
+    };
+    const { result } = renderHook(() => useComposerCapabilities(client, "/workspace", notifications));
+    await waitFor(() => expect(result.current.defaultsLoading).toBe(false));
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.loadMentions(); });
+    act(() => {
+      for (const listener of listeners) {
+        listener({ method: "app/list/updated", params: { data: [{ id: "new", name: "New", isAccessible: true, isEnabled: true }] } });
+        listener({ method: "skills/changed", params: {} });
+      }
+    });
+    await act(async () => {
+      finishApps({ data: [{ id: "old", name: "Old", isAccessible: true, isEnabled: true }] });
+      await pending;
+    });
+    expect(result.current.mentionReferences.map(({ name }) => name)).toEqual(["New"]);
+    expect(client.listSkills).toHaveBeenCalledWith({ cwds: ["/workspace"], forceReload: true });
+  });
+
   it("读取当前目录配置中的默认模型和思考程度并保留隐藏模型元数据", async () => {
     const listModels = vi.fn(() => completed({
       data: [{

@@ -457,6 +457,12 @@ export function useServerThreads(
                 : current,
             );
             break;
+          case "thread/project/updated": {
+            const update = (thread: ThreadSummary) => ({ ...thread, projectId: notification.params.projectId });
+            setState((current) => updateThreadMetadata(current, notification.params.threadId, update));
+            setArchivedState((current) => updateArchivedThreadMetadata(current, notification.params.threadId, update));
+            break;
+          }
           case "thread/name/updated":
             setState((current) =>
               updateThreadMetadata(

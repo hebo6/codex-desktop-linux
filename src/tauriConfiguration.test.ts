@@ -49,6 +49,8 @@ describe("Tauri 发布配置", () => {
     expect(csp).toContain("style-src 'self'");
     expect(csp).not.toMatch(/(?:font|style)-src[^;]*blob:/u);
     expect(csp).not.toContain("'unsafe-inline'");
+    expect(csp).toContain("media-src blob:");
+    expect(tauriConfiguration.app.security.devCsp).toContain("media-src blob:");
   });
 
   it("允许应用窗口订阅和退订应用事件", () => {

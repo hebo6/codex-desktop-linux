@@ -606,6 +606,8 @@ export function reduceConversationNotification(
   notification: ServerNotification,
 ): ConversationState {
   switch (notification.method) {
+    case "thread/reverted":
+      return EMPTY_STATE;
     case "turn/started":
       return { ...withTurn(state, notification.params.turn), activeTurnId: notification.params.turn.id };
     case "turn/completed":

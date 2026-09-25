@@ -75,6 +75,7 @@ export function useThreadSession(
   const [state, setState] = useState<ThreadSessionState>(
     preparedState ?? IDLE_STATE,
   );
+  const [historyRevision, setHistoryRevision] = useState(0);
   const stateRef = useRef(state);
   stateRef.current = state;
   const sourceRef = useRef<ThreadSubscriptionSource | null>(null);
@@ -189,6 +190,19 @@ export function useThreadSession(
         sourceRef.current !== source ||
         notificationThreadId(notification) !== threadId
       ) {
+        return;
+      }
+      if (notification.method === "thread/reverted") {
+        // 撤回会替换整份历史；旧分页响应与正文都不能再归并进新历史
+        sourceRef.current = null;
+        readySubscriptionRef.current = null;
+        resumeRequestRef.current = null;
+        olderTurnsRequestRef.current = null;
+        turnItemRequestsRef.current.clear();
+        retainedThreadIdRef.current = null;
+        preparedStateRef.current = null;
+        setState({ ...IDLE_STATE, phase: "loading" });
+        setHistoryRevision((value) => value + 1);
         return;
       }
       if (resumePending) {
@@ -311,7 +325,7 @@ export function useThreadSession(
         sourceRef.current = null;
       }
     };
-  }, [client, threadId]);
+  }, [client, threadId, historyRevision]);
 
   const loadOlderTurns = useCallback((): Promise<boolean> => {
     const source = sourceRef.current;
@@ -533,6 +547,14 @@ function reduceThreadNotification(
     return state;
   }
   switch (notification.method) {
+    case "thread/project/updated":
+      return state.restoredThread === null ? state : {
+        ...state,
+        restoredThread: {
+          ...state.restoredThread,
+          metadata: { ...state.restoredThread.metadata, projectId: notification.params.projectId },
+        },
+      };
     case "thread/name/updated":
       return state.restoredThread === null
         ? state

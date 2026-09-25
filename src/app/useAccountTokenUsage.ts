@@ -19,8 +19,10 @@ export function useAccountTokenUsage(client: AppServerAccountClient | null) {
   const [state, setState] = useState<AccountTokenUsageState>(EMPTY_STATE);
   const clientRef = useRef(client);
   const generationRef = useRef(0);
+  const requestVersionRef = useRef(0);
 
   const read = useCallback(async (target: AppServerAccountClient, generation: number) => {
+    const requestVersion = ++requestVersionRef.current;
     setState((current) => ({
       ...current,
       error: null,
@@ -28,14 +30,14 @@ export function useAccountTokenUsage(client: AppServerAccountClient | null) {
     }));
     try {
       const response = await target.readTokenUsage().result;
-      if (generation !== generationRef.current || clientRef.current !== target) return;
+      if (generation !== generationRef.current || clientRef.current !== target || requestVersion !== requestVersionRef.current) return;
       setState({
         data: response,
         error: null,
         loading: false,
       });
     } catch {
-      if (generation !== generationRef.current || clientRef.current !== target) return;
+      if (generation !== generationRef.current || clientRef.current !== target || requestVersion !== requestVersionRef.current) return;
       setState((current) => ({
         ...current,
         error: "无法读取账户Token用量历史",
@@ -49,7 +51,12 @@ export function useAccountTokenUsage(client: AppServerAccountClient | null) {
     const generation = ++generationRef.current;
     setState(client === null ? EMPTY_STATE : { ...EMPTY_STATE, loading: true });
     if (client === null) return;
+    const release = client.subscribeAccountUpdates(() => {
+      setState({ ...EMPTY_STATE, loading: true });
+      void read(client, generation);
+    });
     void read(client, generation);
+    return release;
   }, [client, read]);
 
   return { ...state };

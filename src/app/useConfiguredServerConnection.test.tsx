@@ -299,6 +299,7 @@ describe("useConfiguredServerConnection", () => {
     await controller.connect(SERVER_B);
     expect(harness.sessions).toHaveLength(1);
     expect(controller.getSnapshot()).toEqual({
+      serverEvents: null,
       capabilityClient: null,
       connectionStage: null,
       conversationClient: null,

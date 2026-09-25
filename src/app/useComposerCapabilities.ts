@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { CapabilityClient } from "../appServer";
+import type { CapabilityClient, ConversationClient } from "../appServer";
 import type { AppInfo } from "../protocol/generated/types/AppsListResponse";
 import type { FuzzyFileSearchResult } from "../protocol/generated/types/FuzzyFileSearchResponse";
 import type { Model } from "../protocol/generated/types/ModelListResponse";
@@ -43,6 +43,7 @@ export interface ComposerCapabilities {
 export function useComposerCapabilities(
   client: CapabilityClient | null,
   cwd: string | null,
+  notifications: Pick<ConversationClient, "subscribeNotifications"> | null = null,
 ): ComposerCapabilities {
   const [models, setModels] = useState<readonly Model[]>([]);
   const [permissions, setPermissions] = useState<readonly PermissionProfileSummary[]>([]);
@@ -65,6 +66,8 @@ export function useComposerCapabilities(
   const skillsRequestRef = useRef(0);
   const mentionsRequestRef = useRef(0);
   const searchRequestRef = useRef(0);
+  const appsRevisionRef = useRef(0);
+  const pushedAppsRef = useRef<readonly AppInfo[]>([]);
   clientRef.current = client;
 
   useEffect(() => {
@@ -82,6 +85,8 @@ export function useComposerCapabilities(
     setMentionsLoaded(false);
     setMentionsError(null);
     setError(null);
+    appsRevisionRef.current = 0;
+    pushedAppsRef.current = [];
     if (client === null) {
       setModelsLoading(false);
       setPermissionsLoading(false);
@@ -144,6 +149,7 @@ export function useComposerCapabilities(
       return;
     }
     const request = ++mentionsRequestRef.current;
+    const appsRevision = appsRevisionRef.current;
     setMentionsLoading(true);
     setMentionsError(null);
     const [appsResult, pluginsResult] = await Promise.allSettled([
@@ -154,7 +160,9 @@ export function useComposerCapabilities(
       return;
     }
     const references = [
-      ...(appsResult.status === "fulfilled" ? appReferences(appsResult.value) : []),
+      ...appReferences(appsRevision !== appsRevisionRef.current
+        ? pushedAppsRef.current
+        : appsResult.status === "fulfilled" ? appsResult.value : []),
       ...(pluginsResult.status === "fulfilled" ? pluginsResult.value : []),
     ];
     setMentionReferences(references);
@@ -212,6 +220,24 @@ export function useComposerCapabilities(
     }
     return response.files;
   }, [cwd]);
+
+  const reloadSkillsRef = useRef(loadSkills);
+  reloadSkillsRef.current = loadSkills;
+  useEffect(() => notifications?.subscribeNotifications((notification) => {
+    switch (notification.method) {
+      case "skills/changed":
+        void reloadSkillsRef.current(true);
+        break;
+      case "app/list/updated":
+        appsRevisionRef.current += 1;
+        pushedAppsRef.current = notification.params.data;
+        setMentionReferences((current) => [
+          ...appReferences(notification.params.data),
+          ...current.filter(({ kind }) => kind === "plugin"),
+        ]);
+        break;
+    }
+  }), [notifications]);
 
   return {
     models,

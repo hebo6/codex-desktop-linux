@@ -5,6 +5,7 @@ import type { AppServerInteractionClient, InteractionSnapshot } from "../appServ
 const EMPTY_SNAPSHOT = Object.freeze({
   pending: Object.freeze([]),
   resolvedElsewhereCount: 0,
+  failures: Object.freeze([]),
 }) satisfies InteractionSnapshot;
 
 export function useServerInteractions(client: AppServerInteractionClient | null) {

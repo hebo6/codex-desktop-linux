@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
+  ServerNotification,
   ThreadItemsListResponse,
   ThreadResumeResponse,
   ThreadTurnsListResponse,
@@ -45,6 +46,41 @@ function resumeResponse(
 }
 
 describe("useThreadSession", () => {
+  it("撤回后重载历史并丢弃旧历史的迟到分页", async () => {
+    const listeners = new Set<(notification: ServerNotification) => void>();
+    const oldTurn = { id: "removed", status: "completed" as const, items: [], itemsView: "summary" as const };
+    const resumeThread = vi.fn()
+      .mockReturnValueOnce({ result: Promise.resolve(resumeResponse({ data: [oldTurn], nextCursor: "old-page" })) })
+      .mockReturnValue({ result: Promise.resolve(resumeResponse({ data: [], nextCursor: null })) });
+    let finishPage!: (page: ThreadTurnsListResponse) => void;
+    const client = {
+      resumeThread,
+      listThreadTurns: () => ({ result: new Promise<ThreadTurnsListResponse>((resolve) => { finishPage = resolve; }) }),
+      listThreadItems: vi.fn(),
+      subscribeNotifications: (listener: (notification: ServerNotification) => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      unsubscribeThread: () => ({ result: Promise.resolve({ status: "unsubscribed" }) }),
+    } as unknown as ServerThreadsClient;
+    const { result } = renderHook(() => useThreadSession(client, "thread-a"));
+    await waitFor(() => expect(result.current.state.phase).toBe("ready"));
+    let pagination!: Promise<boolean>;
+    act(() => { pagination = result.current.loadOlderTurns(); });
+    act(() => {
+      for (const listener of listeners) listener({ method: "thread/reverted", params: { threadId: "thread-a" } });
+    });
+    await waitFor(() => expect(resumeThread).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.state.phase).toBe("ready"));
+    await act(async () => {
+      finishPage({ data: [oldTurn], nextCursor: null });
+      await pagination;
+    });
+    expect(result.current.state.restoredThread?.turns).toEqual([]);
+    expect(result.current.state.olderTurnsCursor).toBeNull();
+    expect(result.current.state.turnItemPages.size).toBe(0);
+  });
+
   it("StrictMode 重挂载不重复恢复，真实卸载只退订一次", async () => {
     const resumeThread = vi.fn(() => ({
       result: Promise.resolve(resumeResponse({

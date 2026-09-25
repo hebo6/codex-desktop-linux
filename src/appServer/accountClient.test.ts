@@ -30,5 +30,9 @@ describe("AppServerAccountClient", () => {
     notificationHandlers[1]?.({ method: "account/rateLimits/updated", params: { rateLimits: { primary: { usedPercent: 60 } } } } as ServerNotification);
     expect(accountListener).toHaveBeenCalledOnce();
     expect(rateLimitsListener).toHaveBeenCalledOnce();
+    notificationHandlers[0]?.({ method: "account/login/completed", params: { loginId: "login", success: false, error: "cancelled" } });
+    expect(accountListener).toHaveBeenCalledOnce();
+    notificationHandlers[0]?.({ method: "account/login/completed", params: { loginId: "login", success: true } });
+    expect(accountListener).toHaveBeenCalledTimes(2);
   });
 });

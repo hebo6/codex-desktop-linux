@@ -111,7 +111,10 @@ export interface RpcDiagnostic {
 export interface RpcRouterOptions {
   readonly boundary: ProtocolBoundary;
   readonly queueCapacity: number;
+  readonly serverRequestCapacity?: number;
   readonly onDiagnostic?: (diagnostic: RpcDiagnostic) => void;
+  /** 异步服务端请求响应失败；接收队列不等待用户交互 */
+  readonly onInboundTaskFailure?: (epoch: number) => void;
 }
 
 export interface RpcDiagnosticCounts {
