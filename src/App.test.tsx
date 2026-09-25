@@ -1206,7 +1206,7 @@ describe("App", () => {
     const composer = await screen.findByRole("textbox", { name: "任务输入" });
     const panel = await screen.findByRole("region", { name: "子 agent" });
     const summary = await within(panel).findByRole("button", {
-      name: "子 agent · 1 个运行中 · 1 个已完成",
+      name: "子 agent · 1 个运行中",
     });
     expect(panel.closest("[data-composer-accessory-panel]")).not.toBeNull();
     expect(panel.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING)
@@ -1217,7 +1217,7 @@ describe("App", () => {
     }));
     await user.click(summary);
     expect(within(panel).getByText("/root/ui")).toBeVisible();
-    expect(within(panel).getByText("/root/review")).toBeVisible();
+    expect(within(panel).queryByText("/root/review")).not.toBeInTheDocument();
 
     act(() => {
       for (const handler of notificationHandlers) {
@@ -1228,7 +1228,7 @@ describe("App", () => {
       }
     });
     expect(within(panel).getByRole("button", {
-      name: "子 agent · 1 个等待审批 · 1 个已完成",
+      name: "子 agent · 1 个等待审批",
     })).toHaveAttribute("aria-expanded", "true");
     expect(within(panel).getByText("等待审批")).toBeVisible();
     expect(screen.queryAllByRole("button", { name: /停止/u }).length)
@@ -1251,7 +1251,7 @@ describe("App", () => {
     ).not.toBeInTheDocument());
     expect(screen.getByRole("region", { name: "子 agent" })).toBeVisible();
     expect(within(panel).getByText("等待审批")).toBeVisible();
-    expect(within(panel).getByText("已完成")).toBeVisible();
+    expect(within(panel).queryByText("已完成")).not.toBeInTheDocument();
   });
 
   it("已完成回合终止后台命令时不显示停止按钮", async () => {

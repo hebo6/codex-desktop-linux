@@ -25,13 +25,14 @@ export function SubAgentPanel({
   readonly onRetry: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const visibleAgents = agents.filter((agent) => agent.status !== "completed" && agent.status !== "notLoaded");
 
-  if (agents.length === 0 && error === null) {
+  if (visibleAgents.length === 0 && error === null) {
     return null;
   }
 
   const statusCounts = Object.entries(STATUS_LABELS).map(([status, label]) => ({
-    count: agents.filter((agent) => agent.status === status).length,
+    count: visibleAgents.filter((agent) => agent.status === status).length,
     label,
     status,
   })).filter(({ count }) => count > 0);
@@ -58,9 +59,9 @@ export function SubAgentPanel({
       )}
     >
       <div className={styles.content}>
-        {agents.length === 0 ? null : (
+        {visibleAgents.length === 0 ? null : (
           <ul className={styles.agents}>
-            {agents.map((agent) => (
+            {visibleAgents.map((agent) => (
               <li key={agent.threadId}>
                 <div className={styles.identity}>
                   <span className={styles.name}>{agent.name}</span>

@@ -100,6 +100,66 @@ describe("ServerActivityPanel", () => {
     expect(screen.getByText("2,000")).toBeVisible();
   });
 
+  it.each(["complete", "cleared"] as const)("目标结束后隐藏卡片及收尾记录（%s），再次激活时恢复", (ending) => {
+    vi.useFakeTimers();
+    const store = new ServerEventStore();
+    const goal = { threadId: "thread-1", objective: "完成协议接入", status: "active" as const, tokenBudget: 500, tokensUsed: 100, timeUsedSeconds: 15, createdAt: 1, updatedAt: 2 };
+    store.consume({ method: "thread/goal/updated", params: { threadId: "thread-1", goal } });
+    render(<ServerActivityPanel store={store} threadId="thread-1" />);
+    openPanel();
+    expect(screen.getByText("完成协议接入")).toBeVisible();
+
+    consume(store, ending === "complete"
+      ? { method: "thread/goal/updated", params: { threadId: "thread-1", goal: { ...goal, status: "complete" } } }
+      : { method: "thread/goal/cleared", params: { threadId: "thread-1" } });
+    expect(screen.queryByRole("button", { name: /^运行状态/u })).not.toBeInTheDocument();
+    expect(screen.queryByText("会话目标已清除")).not.toBeInTheDocument();
+
+    consume(store, { method: "thread/goal/updated", params: { threadId: "thread-1", goal } });
+    expect(screen.getByText("完成协议接入")).toBeVisible();
+  });
+
+  it("正常完成的活动从面板移除，失败及告警继续展示", () => {
+    vi.useFakeTimers();
+    const store = new ServerEventStore();
+    store.consume({ method: "mcpServer/startupStatus/updated", params: { threadId: "thread-1", name: "tools", status: "starting" } });
+    render(<ServerActivityPanel store={store} threadId="thread-1" />);
+    openPanel();
+    expect(screen.getByText("MCP · tools")).toBeVisible();
+
+    consume(store, { method: "mcpServer/startupStatus/updated", params: { threadId: "thread-1", name: "tools", status: "ready" } });
+    expect(screen.queryByRole("button", { name: /^运行状态/u })).not.toBeInTheDocument();
+
+    consume(store, { method: "mcpServer/startupStatus/updated", params: { threadId: "thread-1", name: "tools", status: "failed", error: "启动失败" } });
+    consume(store, { method: "warning", params: { threadId: "thread-1", message: "需要检查配置" } });
+    expect(screen.getByText("启动失败")).toBeVisible();
+    expect(screen.getByText("需要检查配置")).toBeVisible();
+    expect(screen.getByRole("button", { name: "运行状态 · 2 项需注意" })).toBeVisible();
+  });
+
+  it("没有输出的实时会话正常关闭后隐藏面板", () => {
+    vi.useFakeTimers();
+    const store = new ServerEventStore();
+    store.consume({ method: "thread/realtime/started", params: { threadId: "thread-1", version: "v3", realtimeSessionId: "realtime-1" } });
+    render(<ServerActivityPanel store={store} threadId="thread-1" />);
+    expect(screen.getByRole("button", { name: /^运行状态/u })).toBeVisible();
+    consume(store, { method: "thread/realtime/closed", params: { threadId: "thread-1", reason: "已结束" } });
+    expect(screen.queryByRole("button", { name: /^运行状态/u })).not.toBeInTheDocument();
+  });
+
+  it("实时会话关闭后保留转写和音频内容，不再显示完成状态", () => {
+    const store = new ServerEventStore();
+    store.consume({ method: "thread/realtime/transcript/done", params: { threadId: "thread-1", role: "assistant", text: "转写结果" } });
+    store.consume({ method: "thread/realtime/outputAudio/delta", params: { threadId: "thread-1", audio: { data: "AQACAA==", sampleRate: 24_000, numChannels: 1 } } });
+    store.consume({ method: "thread/realtime/closed", params: { threadId: "thread-1", reason: "已结束" } });
+    render(<ServerActivityPanel store={store} threadId="thread-1" />);
+    openPanel();
+    expect(screen.getByText("转写结果")).toBeVisible();
+    expect(screen.getByRole("button", { name: "加载已接收音频" })).toBeVisible();
+    expect(screen.queryByText("已完成")).not.toBeInTheDocument();
+    expect(screen.queryByText("实时会话已关闭")).not.toBeInTheDocument();
+  });
+
   it("详情按需挂载，汇总diff不会创建重复的正文记录", () => {
     const store = new ServerEventStore();
     store.consume({ method: "turn/diff/updated", params: { threadId: "thread-1", turnId: "turn-1", diff: "+new line" } });

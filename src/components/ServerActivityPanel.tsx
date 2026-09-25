@@ -36,17 +36,19 @@ export function ServerActivityPanel({ store, threadId, failures = EMPTY_FAILURES
 
   if (threadId === null) return null;
 
-  const threadRecords = snapshot?.records.filter((record) => record.threadId === threadId && !SPECIALIZED_METHODS.has(record.method)) ?? [];
+  const threadRecords = snapshot?.records.filter((record) => record.threadId === threadId && record.status !== "completed" && !SPECIALIZED_METHODS.has(record.method)) ?? [];
   const threadFailures = failures.filter((failure) => failure.threadId === threadId);
   const usage = snapshot?.tokenUsageByThread[threadId];
   const goal = snapshot?.goalsByThread[threadId];
   const diffs = Object.values(snapshot?.diffsByTurn ?? {}).filter((diff) => diff.threadId === threadId);
   const realtime = snapshot?.realtimeByThread[threadId];
   const queue = snapshot?.queuesByThread[threadId];
+  const hasGoal = goal?.goal != null && goal.goal.status !== "complete";
+  const hasRealtime = realtime !== undefined && (realtime.status !== "completed" || realtime.transcripts.length > 0 || realtime.chunks.length > 0);
   const hasQueue = queue !== undefined && (queue.entries.length > 0 || queue.status !== "ready");
   const attention = threadRecords.filter((record) => record.status === "warning" || record.status === "failed").length
     + threadFailures.length + (queue?.status === "error" ? 1 : 0);
-  const hasThread = threadRecords.length > 0 || threadFailures.length > 0 || usage !== undefined || goal?.goal != null || diffs.length > 0 || realtime !== undefined || hasQueue;
+  const hasThread = threadRecords.length > 0 || threadFailures.length > 0 || usage !== undefined || hasGoal || diffs.length > 0 || hasRealtime || hasQueue;
 
   if (!hasThread) return null;
 
@@ -68,14 +70,14 @@ export function ServerActivityPanel({ store, threadId, failures = EMPTY_FAILURES
         <section aria-label="当前会话状态" className={styles.scope}>
           <h3>当前会话</h3>
           {usage === undefined ? null : <TokenUsage usage={usage.tokenUsage} stale={usage.stale} />}
-          {goal?.goal == null ? null : <GoalStatus goal={goal.goal} stale={goal.stale} />}
+          {hasGoal ? <GoalStatus goal={goal.goal} stale={goal.stale} /> : null}
           {hasQueue && queue !== undefined ? <QueueStatus queue={queue} /> : null}
           {diffs.map((diff) => <Detail key={diff.turnId} title={`本轮汇总变更 · ${diff.turnId}`}>
             {diff.stale ? <p className={styles.muted}>连接已断开，显示最后收到的变更</p> : null}
             <pre className={styles.output}>{diff.diff || "暂无文件变更"}</pre>
             {diff.truncated ? <Truncated /> : null}
           </Detail>)}
-          {realtime === undefined ? null : <RealtimeStatus key={threadId} realtime={realtime} />}
+          {hasRealtime ? <RealtimeStatus key={threadId} realtime={realtime} /> : null}
           <Failures failures={threadFailures} />
           <Records records={threadRecords} />
         </section>
@@ -167,7 +169,7 @@ function inputDescription(input: QueueInputPreview): ReactNode {
 
 function RealtimeStatus({ realtime }: { readonly realtime: ServerEventSnapshot["realtimeByThread"][string] }) {
   return <article className={styles.card}>
-    <header><h4>实时会话</h4><span>{STATUS_LABELS[realtime.status]}</span></header>
+    <header><h4>实时会话</h4>{realtime.status === "completed" ? null : <span>{STATUS_LABELS[realtime.status]}</span>}</header>
     {realtime.transcripts.map((transcript, index) => <div className={styles.transcript} key={index}>
       <span>{transcript.role === "user" ? "用户" : transcript.role === "assistant" ? "助手" : transcript.role}{transcript.completed ? "" : " · 转写中"}</span>
       <p>{transcript.text}</p>
