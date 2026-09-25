@@ -27,7 +27,7 @@ describe("ServerActivityPanel", () => {
     const store = new ServerEventStore();
     render(<ServerActivityPanel store={store} threadId="thread-1" />);
     act(() => {
-      for (let index = 0; index < 20; index += 1) store.consume({ method: "warning", params: { message: `提醒 ${index}` } });
+      for (let index = 0; index < 20; index += 1) store.consume({ method: "warning", params: { message: `提醒 ${index}`, threadId: "thread-1" } });
       vi.advanceTimersByTime(79);
     });
     expect(store.getSnapshot().records).toHaveLength(20);
@@ -36,24 +36,51 @@ describe("ServerActivityPanel", () => {
     expect(screen.getByRole("button", { name: "运行状态 · 20 项需注意" })).toBeVisible();
   });
 
-  it("折叠时继续合并事件，展开后隔离会话与全局消息", () => {
+  it("折叠时继续合并事件，展示及提醒数量仅属于当前会话", () => {
     vi.useFakeTimers();
     const store = new ServerEventStore();
-    render(<ServerActivityPanel store={store} threadId="thread-1" />);
+    const { rerender } = render(<ServerActivityPanel store={store} threadId="thread-1" />);
     consume(store, { method: "warning", params: { message: "全局连接提醒" } });
     consume(store, { method: "warning", params: { message: "当前会话提醒", threadId: "thread-1" } });
     consume(store, { method: "warning", params: { message: "其他会话提醒", threadId: "thread-2" } });
 
     expect(screen.queryByText("当前会话提醒")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "运行状态 · 1 项需注意" })).toBeVisible();
     openPanel();
     expect(within(screen.getByRole("region", { name: "当前会话状态" })).getByText("当前会话提醒")).toBeVisible();
-    expect(within(screen.getByRole("region", { name: "服务器全局状态" })).getByText("全局连接提醒")).toBeVisible();
+    expect(screen.queryByRole("region", { name: "服务器全局状态" })).not.toBeInTheDocument();
+    expect(screen.queryByText("全局连接提醒")).not.toBeInTheDocument();
     expect(screen.queryByText("其他会话提醒")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^运行状态/u }));
     consume(store, { method: "warning", params: { message: "收起期间新提醒", threadId: "thread-1" } });
     openPanel();
     expect(screen.getByText("收起期间新提醒")).toBeVisible();
+    expect(screen.getByRole("button", { name: "运行状态 · 2 项需注意" })).toBeVisible();
+
+    rerender(<ServerActivityPanel store={store} threadId="thread-2" />);
+    expect(screen.getByText("其他会话提醒")).toBeVisible();
+    expect(screen.queryByText("当前会话提醒")).not.toBeInTheDocument();
+    expect(screen.queryByText("收起期间新提醒")).not.toBeInTheDocument();
+    expect(screen.queryByText("全局连接提醒")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "运行状态 · 1 项需注意" })).toBeVisible();
+
+    rerender(<ServerActivityPanel store={store} threadId={null} />);
+    expect(screen.queryByRole("button", { name: /^运行状态/u })).not.toBeInTheDocument();
+  });
+
+  it.each(["thread-1", null])("只有全局状态时不创建运行面板（当前会话：%s）", (threadId) => {
+    const store = new ServerEventStore();
+    store.consume({ method: "remoteControl/status/changed", params: { installationId: "installation-1", serverName: "server-1", status: "disabled" } });
+    store.consume({ method: "warning", params: { message: "全局连接提醒" } });
+    store.hydrateProjects(0, [{ id: "project-1", name: "协议客户端", roots: [{ path: "/workspace/client" }], createdAt: 1, updatedAt: 1, position: 0, metadata: {} }]);
+    store.startProcess("process", "global-process");
+    render(<ServerActivityPanel store={store} threadId={threadId} failures={[
+      { key: "global-failure", threadId: null, message: "外部认证刷新不可用" },
+    ]} />);
+
+    expect(store.getSnapshot().records.some((record) => record.method === "remoteControl/status/changed")).toBe(true);
+    expect(screen.queryByRole("button", { name: /^运行状态/u })).not.toBeInTheDocument();
   });
 
   it("上下文和目标预算均以剩余量绘制", () => {
@@ -86,15 +113,16 @@ describe("ServerActivityPanel", () => {
     expect(screen.getByText("+new line")).toBeVisible();
   });
 
-  it("展示客户端失败但不泄露其他会话请求", () => {
+  it("客户端失败仅展示和统计当前会话的请求", () => {
     render(<ServerActivityPanel store={null} threadId="thread-1" failures={[
       { key: "1", threadId: "thread-1", message: "客户端没有注册动态工具" },
       { key: "2", threadId: null, message: "外部认证刷新不可用" },
       { key: "3", threadId: "thread-2", message: "另一个会话的失败" },
     ]} />);
+    expect(screen.getByRole("button", { name: "运行状态 · 1 项需注意" })).toBeVisible();
     openPanel();
     expect(screen.getByText("客户端没有注册动态工具")).toBeVisible();
-    expect(screen.getByText("外部认证刷新不可用")).toBeVisible();
+    expect(screen.queryByText("外部认证刷新不可用")).not.toBeInTheDocument();
     expect(screen.queryByText("另一个会话的失败")).not.toBeInTheDocument();
   });
 
@@ -116,7 +144,7 @@ describe("ServerActivityPanel", () => {
     expect(screen.queryByText("不应重复展示的步骤")).not.toBeInTheDocument();
   });
 
-  it("显示队列中的非文本输入和最新项目名称及目录", () => {
+  it("显示当前会话队列中的非文本输入，隐藏全局项目", () => {
     const store = new ServerEventStore();
     store.consume({ method: "thread/queue/changed", params: { threadId: "thread-1" } });
     store.hydrateQueue("thread-1", 1, [{ id: "queued-1", clientUserMessageId: "message-1", input: [
@@ -134,11 +162,9 @@ describe("ServerActivityPanel", () => {
     expect(screen.getByText("已附加图片")).toBeVisible();
     expect(screen.getByText("本地音频 · /tmp/recording.wav")).toBeVisible();
     expect(document.body.textContent).not.toContain("private-data");
-    const projectDetails = screen.getByText("项目 · 1 个").closest("details")!;
-    projectDetails.open = true;
-    fireEvent(projectDetails, new Event("toggle"));
-    expect(screen.getByText("协议客户端")).toBeVisible();
-    expect(screen.getByText("/workspace/client")).toBeVisible();
+    expect(screen.queryByText("项目 · 1 个")).not.toBeInTheDocument();
+    expect(screen.queryByText("协议客户端")).not.toBeInTheDocument();
+    expect(screen.queryByText("/workspace/client")).not.toBeInTheDocument();
   });
 
   it("无目标、空队列和空项目不会产生空面板", () => {
@@ -148,7 +174,7 @@ describe("ServerActivityPanel", () => {
     store.hydrateQueue("thread-1", 1, []);
     store.hydrateProjects(0, []);
     render(<ServerActivityPanel store={store} threadId="thread-1" />);
-    expect(screen.queryByRole("region", { name: "运行状态" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^运行状态/u })).not.toBeInTheDocument();
   });
 
   it("只在用户操作后生成音频Blob并在切换会话时释放", () => {

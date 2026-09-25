@@ -23,7 +23,6 @@ const SPECIALIZED_METHODS = new Set([
   "thread/tokenUsage/updated", "thread/goal/updated", "turn/diff/updated",
   "turn/plan/updated",
   "thread/queue/changed",
-  "process/outputDelta", "process/exited", "command/exec/outputDelta",
   "thread/realtime/transcript/delta", "thread/realtime/transcript/done", "thread/realtime/outputAudio/delta",
 ]);
 
@@ -34,26 +33,22 @@ export function ServerActivityPanel({ store, threadId, failures = EMPTY_FAILURES
 }) {
   const snapshot = useServerEvents(store);
   const [expanded, setExpanded] = useState(false);
-  const records = snapshot?.records.filter((record) => !SPECIALIZED_METHODS.has(record.method)) ?? [];
-  const threadRecords = threadId === null ? [] : records.filter((record) => record.threadId === threadId);
-  const globalRecords = records.filter((record) => record.threadId == null);
-  const threadFailures = threadId === null ? [] : failures.filter((failure) => failure.threadId === threadId);
-  const globalFailures = failures.filter((failure) => failure.threadId === null);
-  const usage = threadId === null ? undefined : snapshot?.tokenUsageByThread[threadId];
-  const goal = threadId === null ? undefined : snapshot?.goalsByThread[threadId];
-  const diffs = Object.values(snapshot?.diffsByTurn ?? {}).filter((diff) => diff.threadId === threadId);
-  const realtime = threadId === null ? undefined : snapshot?.realtimeByThread[threadId];
-  const queue = threadId === null ? undefined : snapshot?.queuesByThread[threadId];
-  const projects = snapshot?.projectsSnapshot;
-  const hasQueue = queue !== undefined && (queue.entries.length > 0 || queue.status !== "ready");
-  const hasProjects = projects !== undefined && (projects.entries.length > 0 || projects.status === "error" || (projects.status === "pending" && projects.version > 0));
-  const processes = Object.values(snapshot?.processes ?? {});
-  const attention = [...threadRecords, ...globalRecords].filter((record) => record.status === "warning" || record.status === "failed").length
-    + threadFailures.length + globalFailures.length + (queue?.status === "error" ? 1 : 0);
-  const hasThread = threadRecords.length > 0 || threadFailures.length > 0 || usage !== undefined || goal?.goal != null || diffs.length > 0 || realtime !== undefined || hasQueue;
-  const hasGlobal = globalRecords.length > 0 || globalFailures.length > 0 || processes.length > 0 || hasProjects;
 
-  if (!hasThread && !hasGlobal) return null;
+  if (threadId === null) return null;
+
+  const threadRecords = snapshot?.records.filter((record) => record.threadId === threadId && !SPECIALIZED_METHODS.has(record.method)) ?? [];
+  const threadFailures = failures.filter((failure) => failure.threadId === threadId);
+  const usage = snapshot?.tokenUsageByThread[threadId];
+  const goal = snapshot?.goalsByThread[threadId];
+  const diffs = Object.values(snapshot?.diffsByTurn ?? {}).filter((diff) => diff.threadId === threadId);
+  const realtime = snapshot?.realtimeByThread[threadId];
+  const queue = snapshot?.queuesByThread[threadId];
+  const hasQueue = queue !== undefined && (queue.entries.length > 0 || queue.status !== "ready");
+  const attention = threadRecords.filter((record) => record.status === "warning" || record.status === "failed").length
+    + threadFailures.length + (queue?.status === "error" ? 1 : 0);
+  const hasThread = threadRecords.length > 0 || threadFailures.length > 0 || usage !== undefined || goal?.goal != null || diffs.length > 0 || realtime !== undefined || hasQueue;
+
+  if (!hasThread) return null;
 
   const window = usage?.tokenUsage.modelContextWindow;
   const contextSummary = usage !== undefined && window != null && window > 0
@@ -70,37 +65,20 @@ export function ServerActivityPanel({ store, threadId, failures = EMPTY_FAILURES
       summary={summary}
     >
       <div className={styles.content}>
-        {hasThread ? (
-          <section aria-label="当前会话状态" className={styles.scope}>
-            <h3>当前会话</h3>
-            {usage === undefined ? null : <TokenUsage usage={usage.tokenUsage} stale={usage.stale} />}
-            {goal?.goal == null ? null : <GoalStatus goal={goal.goal} stale={goal.stale} />}
-            {hasQueue && queue !== undefined ? <QueueStatus queue={queue} /> : null}
-            {diffs.map((diff) => <Detail key={diff.turnId} title={`本轮汇总变更 · ${diff.turnId}`}>
-              {diff.stale ? <p className={styles.muted}>连接已断开，显示最后收到的变更</p> : null}
-              <pre className={styles.output}>{diff.diff || "暂无文件变更"}</pre>
-              {diff.truncated ? <Truncated /> : null}
-            </Detail>)}
-            {realtime === undefined ? null : <RealtimeStatus key={threadId} realtime={realtime} />}
-            <Failures failures={threadFailures} />
-            <Records records={threadRecords} />
-          </section>
-        ) : null}
-        {hasGlobal ? (
-          <section aria-label="服务器全局状态" className={styles.scope}>
-            <h3>服务器</h3>
-            {hasProjects && projects !== undefined ? <ProjectsStatus projects={projects} /> : null}
-            <Failures failures={globalFailures} />
-            {processes.map((process) => <Detail key={`${process.kind}:${process.id}`} title={`${process.kind === "process" ? "进程" : "命令"} ${process.id} · ${STATUS_LABELS[process.status]}`}>
-              {process.exitCode === undefined ? null : <p>退出码 {process.exitCode}</p>}
-              {process.stdout ? <><h4>标准输出</h4><pre className={styles.output}>{process.stdout}</pre></> : null}
-              {process.stderr ? <><h4>错误输出</h4><pre className={styles.output}>{process.stderr}</pre></> : null}
-              {process.stdoutTruncated || process.stderrTruncated ? <Truncated /> : null}
-            </Detail>)}
-            <Records records={globalRecords} />
-          </section>
-        ) : null}
-        {snapshot !== null && snapshot.droppedRecords > 0 ? <p className={styles.muted}>仅保留最近的运行记录，较早的 {number(snapshot.droppedRecords)} 条已移除</p> : null}
+        <section aria-label="当前会话状态" className={styles.scope}>
+          <h3>当前会话</h3>
+          {usage === undefined ? null : <TokenUsage usage={usage.tokenUsage} stale={usage.stale} />}
+          {goal?.goal == null ? null : <GoalStatus goal={goal.goal} stale={goal.stale} />}
+          {hasQueue && queue !== undefined ? <QueueStatus queue={queue} /> : null}
+          {diffs.map((diff) => <Detail key={diff.turnId} title={`本轮汇总变更 · ${diff.turnId}`}>
+            {diff.stale ? <p className={styles.muted}>连接已断开，显示最后收到的变更</p> : null}
+            <pre className={styles.output}>{diff.diff || "暂无文件变更"}</pre>
+            {diff.truncated ? <Truncated /> : null}
+          </Detail>)}
+          {realtime === undefined ? null : <RealtimeStatus key={threadId} realtime={realtime} />}
+          <Failures failures={threadFailures} />
+          <Records records={threadRecords} />
+        </section>
       </div>
     </ComposerAccessoryDisclosure>
   );
@@ -162,21 +140,6 @@ function QueueStatus({ queue }: { readonly queue: ServerEventSnapshot["queuesByT
         {entry.truncated ? <Truncated /> : null}
       </Detail>
     </li>)}</ol>
-  </article>;
-}
-
-function ProjectsStatus({ projects }: { readonly projects: ServerEventSnapshot["projectsSnapshot"] }) {
-  return <article className={styles.card}>
-    <Detail title={`项目 · ${projects.entries.length} 个`}>
-      <ul className={styles.records}>{projects.entries.map((project) => <li key={project.id}>
-        <strong>{project.name}</strong>
-        {project.roots.map((root) => <p className={styles.muted} key={root.path}>{root.path}</p>)}
-      </li>)}</ul>
-    </Detail>
-    {projects.status === "pending" ? <p className={styles.muted}>正在刷新项目列表</p> : null}
-    {projects.status === "unknown" ? <p className={styles.muted}>连接已断开，显示最后收到的项目</p> : null}
-    {projects.status === "error" ? <p>{projects.error}</p> : null}
-    {projects.truncated ? <Truncated /> : null}
   </article>;
 }
 
