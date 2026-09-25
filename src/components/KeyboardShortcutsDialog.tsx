@@ -108,7 +108,12 @@ function KeyboardShortcutsDialogContent({
             value={query}
           />
         </label>
-        <div className={styles.groups}>
+        <div
+          aria-label="快捷键列表"
+          className={styles.groups}
+          role="region"
+          tabIndex={0}
+        >
           {groups.length === 0 ? (
             <p className={styles.empty}>没有匹配的快捷键</p>
           ) : (
