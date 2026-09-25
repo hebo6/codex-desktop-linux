@@ -33,16 +33,24 @@
 }
 
 .suggestionMenu {
+  --suggestion-row-height: 56px;
+  --suggestion-visible-rows: 6;
+  --suggestion-border-width: 1px;
+
   position: absolute;
   z-index: 4;
   right: 0;
   bottom: calc(100% + 12px);
   left: 0;
   width: 100%;
-  max-height: 360px;
+  max-height: calc(
+    var(--suggestion-row-height) * var(--suggestion-visible-rows)
+    + var(--space-3) * 2
+    + var(--suggestion-border-width) * 2
+  );
   padding: var(--space-3);
   overflow: auto;
-  border: 1px solid var(--color-composer-border);
+  border: var(--suggestion-border-width) solid var(--color-composer-border);
   border-radius: 24px;
   background: var(--color-composer-bg);
   box-shadow: var(--shadow-composer);
@@ -53,7 +61,7 @@
   grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
   width: 100%;
-  min-height: 56px;
+  min-height: var(--suggestion-row-height);
   padding: var(--space-2);
   border: 0;
   border-radius: 9px;
