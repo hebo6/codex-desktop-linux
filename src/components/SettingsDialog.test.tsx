@@ -73,6 +73,8 @@ describe("SettingsDialog", () => {
     expect(screen.getByText("Ctrl+PageUp")).toBeVisible();
     expect(screen.getByText("Ctrl+PageDown")).toBeVisible();
     expect(screen.getByText("Ctrl+B")).toBeVisible();
+    expect(screen.getByText("Alt+L")).toBeVisible();
+    expect(screen.getByText("显示或隐藏限额详情")).toBeVisible();
     expect(screen.getByText("Ctrl+Shift+W")).toBeVisible();
     expect(screen.getByText("Ctrl+Shift+D")).toBeVisible();
     expect(screen.getByText("Ctrl+Enter")).toBeVisible();

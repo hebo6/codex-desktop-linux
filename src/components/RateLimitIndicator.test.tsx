@@ -5,6 +5,77 @@ import "../styles/tokens.css";
 import { RateLimitIndicator } from "./RateLimitIndicator";
 
 describe("RateLimitIndicator", () => {
+  it("Alt+L 与点击共用开关状态，长按不重复切换，关闭后保留可用焦点", () => {
+    const { unmount } = render(
+      <RateLimitIndicator data={null} error={null} loading={false} onRefresh={vi.fn()} refreshing={false} updatedAt={null} />,
+    );
+    const trigger = screen.getByRole("button", { name: "账户剩余限额未知" });
+    expect(trigger).toHaveAttribute("aria-keyshortcuts", "Alt+L");
+
+    expect(fireEvent.keyDown(window, { altKey: true, key: "l" })).toBe(false);
+    expect(screen.getByRole("dialog", { name: "账户剩余限额详情" })).toBeVisible();
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    fireEvent.keyDown(window, { altKey: true, key: "l", repeat: true });
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    const refresh = screen.getByRole("button", { name: "刷新" });
+    refresh.focus();
+    fireEvent.keyDown(refresh, { altKey: true, key: "L" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(trigger);
+    fireEvent.keyDown(window, { altKey: true, key: "l" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { altKey: true, key: "l" });
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { altKey: true, key: "l" });
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+
+    fireEvent.keyDown(window, { altKey: true, key: "l" });
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    unmount();
+    expect(fireEvent.keyDown(window, { altKey: true, key: "l" })).toBe(true);
+  });
+
+  it.each([
+    { altKey: false },
+    { ctrlKey: true },
+    { shiftKey: true },
+    { metaKey: true },
+    { isComposing: true },
+    { repeat: true },
+    { key: "u" },
+  ])("不响应其他组合、输入法合成或重复事件：%j", (overrides) => {
+    render(
+      <RateLimitIndicator data={null} error={null} loading={false} onRefresh={vi.fn()} refreshing={false} updatedAt={null} />,
+    );
+
+    fireEvent.keyDown(window, { altKey: true, key: "l", ...overrides });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("不响应已被其他控件处理的快捷键", () => {
+    render(
+      <RateLimitIndicator data={null} error={null} loading={false} onRefresh={vi.fn()} refreshing={false} updatedAt={null} />,
+    );
+    const event = new KeyboardEvent("keydown", { altKey: true, key: "l", cancelable: true });
+    event.preventDefault();
+
+    fireEvent(window, event);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("圆环优先展示普通 5 小时限额，详情展示所有窗口", () => {
     render(
       <RateLimitIndicator
@@ -36,7 +107,7 @@ describe("RateLimitIndicator", () => {
 
     const trigger = screen.getByRole("button", { name: "账户剩余限额 85%" });
     expect(trigger).toHaveAttribute("data-attention", "normal");
-    expect(trigger).toHaveAttribute("title", "Codex · 5 小时窗口剩余 85%");
+    expect(trigger).toHaveAttribute("title", "Codex · 5 小时窗口剩余 85%（Alt+L）");
     fireEvent.click(trigger);
     expect(
       getComputedStyle(document.documentElement)
@@ -74,7 +145,7 @@ describe("RateLimitIndicator", () => {
 
     const trigger = screen.getByRole("button", { name: "账户剩余限额 65%" });
     expect(trigger).toHaveTextContent("65");
-    expect(trigger).toHaveAttribute("title", "Codex · 7 天窗口剩余 65%");
+    expect(trigger).toHaveAttribute("title", "Codex · 7 天窗口剩余 65%（Alt+L）");
     expect(container.querySelector('circle[pathLength="100"]')).toHaveAttribute("stroke-dasharray", "65 35");
     fireEvent.click(trigger);
     expect(screen.getByRole("progressbar", { name: "Codex · 7 天窗口剩余 65%" })).toBeVisible();

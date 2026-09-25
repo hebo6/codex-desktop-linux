@@ -52,6 +52,32 @@ export function RateLimitIndicator({
   const attention = rateLimitAttention(percent);
 
   useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        !event.altKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.metaKey ||
+        event.key.toLowerCase() !== "l" ||
+        document.querySelector('[aria-modal="true"]') !== null
+      ) {
+        return;
+      }
+      event.preventDefault();
+      if (!event.repeat) {
+        if (open && rootRef.current?.contains(document.activeElement)) {
+          buttonRef.current?.focus();
+        }
+        setOpen((current) => !current);
+      }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
     const closeOnOutside = (event: PointerEvent) => {
       if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
@@ -77,12 +103,13 @@ export function RateLimitIndicator({
       <button
         aria-expanded={open}
         aria-haspopup="dialog"
+        aria-keyshortcuts="Alt+L"
         aria-label={percent === null ? "账户剩余限额未知" : `账户剩余限额 ${percent}%`}
         className={styles.trigger}
         data-attention={attention}
         onClick={() => setOpen((current) => !current)}
         ref={buttonRef}
-        title={percent === null ? "剩余限额未知" : `${indicatorWindow?.name}剩余 ${percent}%`}
+        title={`${percent === null ? "剩余限额未知" : `${indicatorWindow?.name}剩余 ${percent}%`}（Alt+L）`}
         type="button"
       >
         <svg aria-hidden="true" className={styles.ring} viewBox="0 0 42 42">

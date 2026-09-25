@@ -454,6 +454,31 @@ describe("App", () => {
     expect(screen.queryByRole("dialog", { name: "键盘快捷键" })).not.toBeInTheDocument();
   });
 
+  it("Alt+L 在输入框内切换限额弹框，模态对话框打开时不响应", async () => {
+    const user = userEvent.setup();
+    renderSidebarThreadScenario();
+    const composer = await screen.findByRole("textbox", { name: "任务输入" });
+    await user.type(composer, "保留草稿");
+
+    fireEvent.keyDown(composer, { altKey: true, key: "l" });
+    expect(screen.getByRole("dialog", { name: "账户剩余限额详情" })).toBeVisible();
+    expect(composer).toHaveFocus();
+    fireEvent.keyDown(composer, { altKey: true, key: "l" });
+    expect(screen.queryByRole("dialog", { name: "账户剩余限额详情" })).not.toBeInTheDocument();
+    expect(composer).toHaveFocus();
+    expect(composer).toHaveValue("保留草稿");
+
+    fireEvent.keyDown(composer, { ctrlKey: true, key: "/" });
+    const search = screen.getByRole("searchbox", { name: "搜索键盘快捷键" });
+    fireEvent.keyDown(search, { altKey: true, key: "l" });
+    expect(screen.queryByRole("dialog", { name: "账户剩余限额详情" })).not.toBeInTheDocument();
+    expect(search).toHaveFocus();
+
+    fireEvent.keyDown(search, { key: "Escape" });
+    fireEvent.keyDown(composer, { altKey: true, key: "l" });
+    expect(screen.getByRole("dialog", { name: "账户剩余限额详情" })).toBeVisible();
+  });
+
   it("通过 Ctrl+Shift+D 打开协议检查器", () => {
     const protocolDebugWindowOpener = vi.fn(async () => undefined);
     renderApp(() => ({ servers: [], proxies: [] }), {
