@@ -1946,6 +1946,353 @@ describe("ConversationView", () => {
     );
   });
 
+  describe("手动收起运行中工作流", () => {
+    function setup({ questionTop = 1_000, contentHeight = 1_450 } = {}) {
+      const layout = { contentHeight, groupHeight: 400, questionTop };
+      const viewportHeight = 600;
+      const observers: FakeResizeObserver[] = [];
+      class FakeResizeObserver {
+        readonly targets = new Set<Element>();
+        disconnected = false;
+
+        constructor(readonly callback: ResizeObserverCallback) {
+          observers.push(this);
+        }
+
+        observe(target: Element) {
+          this.targets.add(target);
+        }
+
+        disconnect() {
+          this.disconnected = true;
+        }
+
+        unobserve(target: Element) {
+          this.targets.delete(target);
+        }
+
+        deliver() {
+          this.callback([], this as unknown as ResizeObserver);
+        }
+      }
+      Object.defineProperty(globalThis, "ResizeObserver", {
+        configurable: true,
+        value: FakeResizeObserver,
+      });
+      vi.spyOn(HTMLElement.prototype, "clientHeight", "get")
+        .mockImplementation(function (this: HTMLElement) {
+          return this.getAttribute("aria-label") === "会话消息"
+            ? viewportHeight
+            : 0;
+        });
+      vi.spyOn(HTMLElement.prototype, "scrollHeight", "get")
+        .mockImplementation(function (this: HTMLElement) {
+          const floor = this.querySelector<HTMLElement>(
+            '[data-running-turn-floor="true"]',
+          );
+          return Math.max(
+            28 + layout.contentHeight,
+            floor === null ? 0 : Number.parseFloat(floor.style.minHeight),
+          );
+        });
+      const originalBoundingRect = HTMLElement.prototype.getBoundingClientRect;
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+        .mockImplementation(function (this: HTMLElement) {
+          const scroller = this.closest<HTMLElement>('[aria-label="会话消息"]');
+          const scrollTop = scroller?.scrollTop ?? 0;
+          let height: number;
+          let top: number;
+          if (this.getAttribute("aria-label") === "会话消息") {
+            height = viewportHeight;
+            top = 0;
+          } else if (this.matches("[data-conversation-list]")) {
+            height = layout.contentHeight;
+            top = 28 - scrollTop;
+          } else if (this.matches("[data-user-message]")) {
+            height = 50;
+            top = layout.questionTop - scrollTop;
+          } else if (this.matches("[data-activity-group]")) {
+            height = layout.groupHeight;
+            top = layout.questionTop + 60 - scrollTop;
+          } else if (this.matches("[data-activity-group-header]")) {
+            height = 36;
+            top = layout.questionTop + 60 - scrollTop;
+          } else {
+            return originalBoundingRect.call(this);
+          }
+          return {
+            bottom: top + height,
+            height,
+            left: 0,
+            right: 880,
+            top,
+            width: 880,
+            x: 0,
+            y: top,
+            toJSON: () => ({}),
+          };
+        });
+
+      const turn = {
+        id: "turn-manual-collapse",
+        items: [
+          {
+            content: [{ text: "检查手动收起留白", type: "text" as const }],
+            id: "question-manual-collapse",
+            type: "userMessage" as const,
+          },
+          {
+            id: "reasoning-manual-collapse",
+            summary: ["运行中的工作流内容"],
+            type: "reasoning" as const,
+          },
+        ],
+        itemsView: "full" as const,
+        status: "inProgress" as const,
+      } satisfies ThreadTurn;
+      const view = render(
+        <ConversationView restoredThread={{ ...RESTORED, turns: [] }} />,
+      );
+      const scroller = screen.getByLabelText("会话消息");
+      let currentScrollTop = 0;
+      const clamp = (value: number) => Math.max(
+        0,
+        Math.min(value, scroller.scrollHeight - viewportHeight),
+      );
+      Object.defineProperty(scroller, "scrollTop", {
+        configurable: true,
+        get: () => {
+          currentScrollTop = clamp(currentScrollTop);
+          return currentScrollTop;
+        },
+        set: (value: number) => {
+          currentScrollTop = clamp(value);
+        },
+      });
+      const updateTurn = (updated: ThreadTurn, threadId = RESTORED.metadata.id) => {
+        view.rerender(
+          <ConversationView
+            restoredThread={{
+              ...RESTORED,
+              metadata: { ...RESTORED.metadata, id: threadId },
+              turns: [updated],
+            }}
+          />,
+        );
+      };
+      updateTurn(turn);
+      const group = scroller.querySelector<HTMLElement>("[data-activity-group]")!;
+      const header = within(group).getByRole("button");
+      const floor = scroller.querySelector<HTMLElement>(
+        '[data-running-turn-floor="true"]',
+      )!;
+      const notify = (target: Element) => {
+        act(() => {
+          for (const observer of [...observers]) {
+            if (!observer.disconnected && observer.targets.has(target)) {
+              observer.deliver();
+            }
+          }
+        });
+      };
+      const groupObserver = () => observers.findLast(
+        (observer) => !observer.disconnected && observer.targets.has(group),
+      )!;
+      return {
+        ...view,
+        floor,
+        group,
+        groupObserver,
+        header,
+        layout,
+        notify,
+        scroller,
+        turn,
+        updateTurn,
+      };
+    }
+
+    it("只按工作流减少量回收占位，即使回答同时增长抵消会话高度变化", () => {
+      const { floor, group, header, layout, notify, turn, updateTurn } = setup();
+      expect(floor).toHaveStyle({ minHeight: "1548px" });
+      fireEvent.click(header);
+      layout.groupHeight = 200;
+      updateTurn({
+        ...turn,
+        items: [
+          ...turn.items,
+          {
+            id: "streaming-manual-collapse",
+            text: "回答增长与工作流收起相抵，会话总高度保持不变",
+            type: "agentMessage",
+          },
+        ],
+      });
+      notify(group);
+      expect(floor).toHaveStyle({ minHeight: "1348px" });
+
+      layout.groupHeight = 250;
+      notify(group);
+      layout.groupHeight = 200;
+      notify(group);
+      expect(floor).toHaveStyle({ minHeight: "1348px" });
+    });
+
+    it("快速反向展开后再次收起只回收本次高度，旧观察回调失效", () => {
+      const { floor, group, groupObserver, header, layout, notify } = setup();
+      fireEvent.click(header);
+      const previousObserver = groupObserver();
+      layout.groupHeight = 300;
+      notify(group);
+      expect(floor).toHaveStyle({ minHeight: "1448px" });
+
+      fireEvent.click(header);
+      expect(previousObserver.disconnected).toBe(true);
+      layout.groupHeight = 400;
+      fireEvent.click(header);
+      layout.groupHeight = 200;
+      act(() => previousObserver.deliver());
+      expect(floor).toHaveStyle({ minHeight: "1448px" });
+      notify(group);
+      expect(floor).toHaveStyle({ minHeight: "1248px" });
+    });
+
+    it("回收后的占位不低于视口高度，收起完成后断开观察", async () => {
+      const { floor, group, groupObserver, header, layout, notify } = setup({
+        questionTop: 52,
+        contentHeight: 500,
+      });
+      expect(floor).toHaveStyle({ minHeight: "600px" });
+      fireEvent.click(header);
+      const observer = groupObserver();
+      layout.groupHeight = 36;
+      layout.contentHeight = 136;
+      notify(group);
+      expect(floor).toHaveStyle({ minHeight: "600px" });
+      await waitFor(() => expect(group).toHaveAttribute("data-content-mounted", "false"));
+      expect(observer.disconnected).toBe(true);
+    });
+
+    it.each(["收起期间", "收起完成后"])(
+      "%s滚动范围夹紧产生的滚动事件不会恢复已暂停的跟随",
+      async (scrollTiming) => {
+        const { group, header, layout, notify, scroller, turn, updateTurn } = setup();
+        await finishAnimationFrame();
+        userScroll(scroller, 900);
+        fireEvent.click(header);
+        layout.groupHeight = 36;
+        layout.contentHeight = 1_086;
+        notify(group);
+        expect(scroller.scrollTop).toBe(584);
+        if (scrollTiming === "收起完成后") {
+          await waitFor(() => expect(group).toHaveAttribute("data-content-mounted", "false"));
+        }
+        fireEvent.scroll(scroller);
+        await waitFor(() => expect(group).toHaveAttribute("data-content-mounted", "false"));
+
+        layout.contentHeight = 1_500;
+        updateTurn({
+          ...turn,
+          items: [
+            ...turn.items,
+            {
+              id: "streaming-after-manual-collapse",
+              text: "用户离底后仍继续回答",
+              type: "agentMessage",
+            },
+          ],
+        });
+        expect(scroller.scrollTop).toBe(584);
+        expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+      },
+    );
+
+    it("手动收起中最终回答到达时结束回收并保留自动问题对齐", async () => {
+      const { floor, group, groupObserver, header, layout, notify, scroller, turn, updateTurn } = setup();
+      fireEvent.click(header);
+      const observer = groupObserver();
+      layout.groupHeight = 300;
+      notify(group);
+      expect(floor).toHaveStyle({ minHeight: "1448px" });
+      updateTurn({
+        ...turn,
+        items: [
+          ...turn.items,
+          {
+            id: "final-manual-collapse",
+            phase: "final_answer",
+            text: "最终回答开始",
+            type: "agentMessage",
+          },
+        ],
+      });
+      expect(observer.disconnected).toBe(true);
+      layout.groupHeight = 36;
+      layout.contentHeight = 1_100;
+      act(() => observer.deliver());
+      notify(scroller.querySelector("[data-conversation-list]")!);
+      await waitFor(() => expect(group).toHaveAttribute("data-content-mounted", "false"));
+      expect(floor).toHaveStyle({ minHeight: "1548px" });
+      expect(scroller.scrollTop).toBe(948);
+    });
+
+    it("最终回答锁定后重新展开再收起仍回收占位，后续回答增长不抢滚动位置", async () => {
+      const { floor, group, header, layout, notify, scroller, turn, updateTurn } = setup();
+      await finishAnimationFrame();
+      const finalAnswer = {
+        id: "final-reopened-collapse",
+        phase: "final_answer" as const,
+        text: "最终回答已经开始",
+        type: "agentMessage" as const,
+      };
+      updateTurn({ ...turn, items: [...turn.items, finalAnswer] });
+      layout.groupHeight = 36;
+      layout.contentHeight = 1_100;
+      await waitFor(() => expect(group).toHaveAttribute("data-content-mounted", "false"));
+      notify(scroller.querySelector("[data-conversation-list]")!);
+      expect(floor).toHaveStyle({ minHeight: "1548px" });
+      expect(scroller.scrollTop).toBe(948);
+
+      fireEvent.click(header);
+      layout.groupHeight = 400;
+      layout.contentHeight = 1_464;
+      await waitFor(() =>
+        expect(group.querySelector("[data-visible]"))
+          .toHaveAttribute("data-visible", "true")
+      );
+      fireEvent.click(header);
+      layout.groupHeight = 36;
+      layout.contentHeight = 1_100;
+      notify(group);
+      await waitFor(() => expect(group).toHaveAttribute("data-content-mounted", "false"));
+      expect(floor).toHaveStyle({ minHeight: "1184px" });
+      expect(scroller.scrollTop).toBe(584);
+
+      layout.contentHeight = 1_800;
+      updateTurn({
+        ...turn,
+        items: [...turn.items, { ...finalAnswer, text: "最终回答继续增长" }],
+      });
+      expect(scroller.scrollTop).toBe(584);
+      expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+    });
+
+    it("切换线程后断开旧工作流观察，延迟回调不修改新线程", () => {
+      const { groupObserver, header, layout, scroller, turn, updateTurn } = setup();
+      fireEvent.click(header);
+      const observer = groupObserver();
+      updateTurn(turn, "thread-after-manual-collapse");
+      expect(observer.disconnected).toBe(true);
+      const nextFloor = scroller.querySelector<HTMLElement>(
+        '[data-running-turn-floor="true"]',
+      );
+      const nextMinHeight = nextFloor?.style.minHeight;
+      layout.groupHeight = 36;
+      act(() => observer.deliver());
+      expect(nextFloor?.style.minHeight).toBe(nextMinHeight);
+    });
+  });
+
   it("运行中活动和回答填满留白后分段跟随，手动离底后暂停", () => {
     let contentDocumentBottom = 880;
     const viewportHeight = 600;

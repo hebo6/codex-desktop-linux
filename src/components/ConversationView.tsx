@@ -229,9 +229,11 @@ export function ConversationView({
   } | null>(null);
   const historyLoadRef = useRef<Promise<boolean> | null>(null);
   const followBottomRef = useRef(true);
+  const preserveFollowingOnLayoutRef = useRef(false);
   const lockedFinalAnswerTurnIdRef = useRef<string | null>(null);
   const completedUserActivityExpansionRef = useRef(false);
   const userActivityExpansionCountRef = useRef(0);
+  const userActivityCollapsesRef = useRef(new Map<HTMLElement, () => void>());
   const scrollbarDragRef = useRef(false);
   const touchPositionRef = useRef<{ x: number; y: number } | null>(null);
   const observedThreadIdRef = useRef(restoredThread.metadata.id);
@@ -334,7 +336,10 @@ export function ConversationView({
         scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <=
           BOTTOM_THRESHOLD;
       if (atBottom) {
-        if (lockedFinalAnswerTurnIdRef.current === null) {
+        if (
+          lockedFinalAnswerTurnIdRef.current === null &&
+          (!preserveFollowingOnLayoutRef.current || allowExitFollowing)
+        ) {
           followBottomRef.current = true;
         }
         setShowJumpToBottom(false);
@@ -359,6 +364,7 @@ export function ConversationView({
       if (!canScroll) {
         return;
       }
+      preserveFollowingOnLayoutRef.current = false;
       followBottomRef.current = false;
       setShowJumpToBottom(true);
     },
@@ -366,6 +372,7 @@ export function ConversationView({
   );
 
   const scrollToBottom = useCallback((scroller: HTMLDivElement) => {
+    preserveFollowingOnLayoutRef.current = false;
     scroller.scrollTop = Math.max(
       0,
       scroller.scrollHeight - scroller.clientHeight,
@@ -404,6 +411,67 @@ export function ConversationView({
       setShowJumpToBottom(true);
     }
   }, []);
+
+  const startUserActivityCollapse = useCallback((group: HTMLElement) => {
+    const scroller = scrollerRef.current;
+    const floorAtStart = runningTurnFloorVisible ? runningTurnFloor : null;
+    const collapses = userActivityCollapsesRef.current;
+    // 滚动范围缩短会产生延迟 scroll 事件，不能借此恢复已暂停的跟随
+    preserveFollowingOnLayoutRef.current = true;
+    pendingFinalAnswerQuestionPositionRef.current = null;
+    let smallestHeight = group.getBoundingClientRect().height;
+    let observing = true;
+    const reclaimFloor = () => {
+      if (!observing || scroller === null || !group.isConnected) {
+        return;
+      }
+      const height = group.getBoundingClientRect().height;
+      // 活动更新可能让收起中的高度回弹，仅回收新减少的部分
+      const reduction = smallestHeight - height;
+      if (reduction <= 0) {
+        return;
+      }
+      smallestHeight = height;
+      const contentHeight = contentRef.current?.getBoundingClientRect().height;
+      setRunningTurnFloor((current) => {
+        if (
+          current === null ||
+          floorAtStart === null ||
+          current.turnId !== floorAtStart.turnId ||
+          current.kind !== floorAtStart.kind ||
+          contentHeight === undefined
+        ) {
+          return current;
+        }
+        return {
+          ...current,
+          contentHeight,
+          floorHeight: Math.max(
+            scroller.clientHeight,
+            current.floorHeight - reduction,
+          ),
+        };
+      });
+    };
+    const observer = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(reclaimFloor);
+    const finish = () => {
+      if (!observing) {
+        return;
+      }
+      observer?.disconnect();
+      reclaimFloor();
+      observing = false;
+      if (scroller !== null) {
+        updateBottomState(scroller, false);
+      }
+      collapses.delete(group);
+    };
+    collapses.set(group, finish);
+    observer?.observe(group);
+    return finish;
+  }, [runningTurnFloor, runningTurnFloorVisible, updateBottomState]);
 
   const positionPendingFinalAnswerQuestion = useCallback(
     (scroller: HTMLDivElement) => {
@@ -514,6 +582,9 @@ export function ConversationView({
 
   const followContent = useCallback(
     (scroller: HTMLDivElement) => {
+      if (userActivityCollapsesRef.current.size > 0) {
+        return;
+      }
       if (positionPendingFinalAnswerQuestion(scroller)) {
         return;
       }
@@ -568,6 +639,7 @@ export function ConversationView({
         return;
       }
       if (!followBottomRef.current) {
+        updateBottomState(scroller, false);
         return;
       }
       const contentBottom = contentRect.bottom;
@@ -654,6 +726,7 @@ export function ConversationView({
     const naturalBottom =
       scroller.scrollTop + contentRect.bottom - scrollerRect.top;
     pendingQuestionPositionRef.current = latestQuestion.itemId;
+    preserveFollowingOnLayoutRef.current = false;
     followBottomRef.current = true;
     setShowJumpToBottom(false);
     setRunningTurnFloor({
@@ -844,6 +917,9 @@ export function ConversationView({
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
+    for (const finish of userActivityCollapsesRef.current.values()) {
+      finish();
+    }
     pendingQuestionPositionRef.current = null;
     pendingFinalAnswerQuestionPositionRef.current = null;
     setRunningTurnFloor(null);
@@ -1087,6 +1163,7 @@ export function ConversationView({
                   actionError={actionError}
                   blobUrlFactory={blobUrlFactory}
                   commandLocationRequest={commandLocationRequest}
+                  onUserActivityCollapse={startUserActivityCollapse}
                   onUserActivityExpansionFinish={finishUserActivityExpansion}
                   onUserActivityExpansionStart={startUserActivityExpansion}
                   {...(onLoadTurnItemPage === undefined
@@ -1169,6 +1246,7 @@ function ConversationRowView({
   onOpenDiff,
   onOpenImage,
   onRunShellCommand,
+  onUserActivityCollapse,
   onUserActivityExpansionFinish,
   onUserActivityExpansionStart,
   row,
@@ -1184,6 +1262,7 @@ function ConversationRowView({
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenImage?: (url: string, name: string) => void;
   readonly onRunShellCommand?: (command: string) => Promise<boolean>;
+  readonly onUserActivityCollapse: (group: HTMLElement) => () => void;
   readonly onUserActivityExpansionFinish: (expanded: boolean) => void;
   readonly onUserActivityExpansionStart: () => void;
   readonly row: ConversationRow;
@@ -1224,6 +1303,7 @@ function ConversationRowView({
     <ActivityGroup
       commandLocationRequest={commandLocationRequest}
       items={row.segment.items}
+      onUserCollapse={onUserActivityCollapse}
       onUserExpansionFinish={onUserActivityExpansionFinish}
       onUserExpansionStart={onUserActivityExpansionStart}
       turn={row.turn}
@@ -1704,6 +1784,7 @@ function ActivityGroup({
   onLoadDetails,
   onOpenDiff,
   onOpenLink,
+  onUserCollapse,
   onUserExpansionFinish,
   onUserExpansionStart,
   turn,
@@ -1715,6 +1796,7 @@ function ActivityGroup({
   readonly onLoadDetails?: () => Promise<boolean>;
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenLink?: (link: string) => void;
+  readonly onUserCollapse: (group: HTMLElement) => () => void;
   readonly onUserExpansionFinish: (expanded: boolean) => void;
   readonly onUserExpansionStart: () => void;
   readonly turn: ThreadTurn;
@@ -1735,13 +1817,20 @@ function ActivityGroup({
   );
   const initiallyExpanded = automaticallyExpanded || detailsHydrated;
   const transition = useCollapsibleContent(initiallyExpanded);
+  const groupRef = useRef<HTMLElement>(null);
+  const finishUserCollapseRef = useRef<(() => void) | null>(null);
   const previousAutomaticallyExpandedRef = useRef(automaticallyExpanded);
   const previousDetailsHydratedRef = useRef(detailsHydrated);
   const userExpansionActiveRef = useRef(false);
   const userExpansionPendingRef = useRef(false);
   const duration = useTurnDuration(turn, workRunning);
   const visibleItems = items;
-  const setGroupOpen = transition.setOpen;
+  const setOpen = transition.setOpen;
+  const setGroupOpen = useCallback((open: boolean) => {
+    finishUserCollapseRef.current?.();
+    finishUserCollapseRef.current = null;
+    setOpen(open);
+  }, [setOpen]);
   const canLoadDetails = onLoadDetails !== undefined &&
     turn.itemsView !== "full" && detailsPage?.complete !== true;
   const initialDetailsLoading = canLoadDetails && !detailsHydrated &&
@@ -1793,6 +1882,18 @@ function ActivityGroup({
     }
   }, [onUserExpansionFinish]);
 
+  useLayoutEffect(() => {
+    if (!transition.contentMounted) {
+      finishUserCollapseRef.current?.();
+      finishUserCollapseRef.current = null;
+    }
+  }, [transition.contentMounted]);
+
+  useEffect(() => () => {
+    finishUserCollapseRef.current?.();
+    finishUserCollapseRef.current = null;
+  }, []);
+
   useEffect(() => {
     if (
       commandLocationRequest !== null &&
@@ -1810,12 +1911,17 @@ function ActivityGroup({
       return;
     }
     userExpansionPendingRef.current = false;
+    finishUserCollapseRef.current?.();
+    finishUserCollapseRef.current = null;
     if (nextExpanded) {
       userExpansionActiveRef.current = true;
       onUserExpansionStart();
     } else if (userExpansionActiveRef.current) {
       userExpansionActiveRef.current = false;
       onUserExpansionFinish(false);
+    }
+    if (!nextExpanded && groupRef.current !== null) {
+      finishUserCollapseRef.current = onUserCollapse(groupRef.current);
     }
     transition.setOpen(nextExpanded);
   };
@@ -1827,6 +1933,7 @@ function ActivityGroup({
       data-content-mounted={transition.contentMounted}
       data-expanded={transition.expanded}
       data-status={runningCommandCount > 0 ? "inProgress" : groupStatus}
+      ref={groupRef}
     >
       <button
         aria-expanded={transition.targetExpanded}
