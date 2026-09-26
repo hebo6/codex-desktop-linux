@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 export type ThreadListCwdFilter = string | string[];
 export type SortDirection = "asc" | "desc";
@@ -41,6 +41,10 @@ export interface ThreadListParams {
    * Optional provider filter; when set, only sessions recorded under these providers are returned. When present but empty, includes all providers.
    */
   modelProviders?: string[] | null;
+  /**
+   * Optional originator allowlist, matching any supplied value exactly. Supported by hosted backends only; the local app-server rejects a nonempty list. Omitted or empty lists leave originators unrestricted.
+   */
+  originators?: string[] | null;
   /**
    * Optional direct parent thread filter. Mutually exclusive with `ancestorThreadId`.
    */

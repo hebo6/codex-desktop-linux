@@ -244,6 +244,51 @@ const RESTORED = {
 } satisfies RestoredThread;
 
 describe("ConversationView", () => {
+  it("函数调用输出归入工作流并可展开查看", async () => {
+    render(
+      <ConversationView restoredThread={{
+        ...RESTORED,
+        turns: [{
+          ...TURN,
+          items: [TURN.items[0]!, {
+            id: "function-output",
+            type: "functionCallOutput",
+            name: "check_workspace",
+            output: "工作区检查完成",
+          }],
+        }],
+      }} />,
+    );
+    expect(screen.queryByText("工作区检查完成")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /已运行/u }));
+    const output = await screen.findByRole("button", { name: "工具结果 · check_workspace" });
+    fireEvent.click(output);
+    await waitFor(() => expect(screen.getByText("工作区检查完成")).toBeVisible());
+  });
+
+  it("文件 ID 图片显示为附件，不创建无效的图片 URL", () => {
+    const create = vi.fn();
+    render(
+      <ConversationView
+        blobUrlFactory={{ create, revoke: vi.fn() }}
+        restoredThread={{
+          ...RESTORED,
+          turns: [{
+            ...TURN,
+            items: [{
+              id: "user-file-image",
+              type: "userMessage",
+              content: [{ type: "image", fileId: "file-example" }],
+            }],
+          }],
+        }}
+      />,
+    );
+    expect(screen.getByText("图片附件")).toBeVisible();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it("通过活动组逐页加载摘要回合并在完成后移除加载入口", async () => {
     const user = TURN.items[0]!;
     const command = TURN.items.find(({ id }) => id === "command")!;

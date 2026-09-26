@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 export type AdditionalContextKind = "untrusted" | "application";
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
@@ -15,6 +15,10 @@ export type ModeKind = "plan" | "default";
  * A non-empty reasoning effort value advertised by the model.
  */
 export type ReasoningEffort = string;
+/**
+ * Requested cyber treatment for a ChatGPT-authenticated Codex turn. Authorization and model-tier restrictions remain server-owned.
+ */
+export type CyberAccessProgram = "standard" | "daybreakBlue" | "daybreakRed";
 export type LegacyAppPathString = string;
 export type UserInput =
   | TextUserInput
@@ -25,6 +29,11 @@ export type UserInput =
   | SkillUserInput
   | MentionUserInput;
 export type TextUserInputType = "text";
+export type ImageUserInput = {
+  detail?: ImageDetail | null;
+  type: ImageUserInputType;
+  [k: string]: unknown | undefined;
+} & (UrlUserInput | FileIdUserInput);
 export type ImageDetail = "auto" | "low" | "high" | "original";
 export type ImageUserInputType = "image";
 export type LocalImageUserInputType = "localImage";
@@ -36,6 +45,9 @@ export type MentionUserInputType = "mention";
  * Controls the effective multi-agent delegation instructions for a turn. `custom` means the configured mode hint defines the policy instead of a built-in policy.
  */
 export type MultiAgentMode = ("explicitRequestOnly" | "proactive") | CustomMultiAgentMode;
+/**
+ * Deprecated: `friendly` and `pragmatic` no longer select a style.
+ */
 export type Personality = "none" | "friendly" | "pragmatic";
 /**
  * A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).
@@ -57,6 +69,24 @@ export type WorkspaceWriteSandboxPolicyType = "workspaceWrite";
  * A summary of the reasoning performed by the model. This can be useful for debugging and understanding the model's reasoning process. See https://platform.openai.com/docs/guides/reasoning?api-mode=responses#reasoning-summaries
  */
 export type ReasoningSummary = ("auto" | "concise" | "detailed") | "none";
+export type FunctionCallOutputBody = string | FunctionCallOutputContentItem[];
+/**
+ * Responses API compatible content items that can be returned by a tool call. This is a subset of ContentItem with the types we support as function call outputs.
+ */
+export type FunctionCallOutputContentItem =
+  | InputTextFunctionCallOutputContentItem
+  | InputImageFunctionCallOutputContentItem
+  | InputAudioFunctionCallOutputContentItem
+  | EncryptedContentFunctionCallOutputContentItem;
+export type InputTextFunctionCallOutputContentItemType = "input_text";
+export type InputImageFunctionCallOutputContentItem = {
+  detail?: ImageDetail | null;
+  type: InputImageFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+} & (ImageUrlFunctionCallOutputContentItem | FileIdFunctionCallOutputContentItem);
+export type InputImageFunctionCallOutputContentItemType = "input_image";
+export type InputAudioFunctionCallOutputContentItemType = "input_audio";
+export type EncryptedContentFunctionCallOutputContentItemType = "encrypted_content";
 
 export interface TurnStartParams {
   /**
@@ -84,6 +114,14 @@ export interface TurnStartParams {
    * Override the working directory for this turn and subsequent turns.
    */
   cwd?: string | null;
+  /**
+   * EXPERIMENTAL - Request a workspace-authorized cyber program for this turn. Omission preserves automatic behavior. This does not grant access.
+   */
+  cyberAccessProgram?: CyberAccessProgram | null;
+  /**
+   * Replace this thread's disabled plugin IDs. Omitted/null preserves the list; [] clears it.
+   */
+  disabledPluginIds?: string[] | null;
   /**
    * Override the reasoning effort for this turn and subsequent turns.
    */
@@ -114,7 +152,7 @@ export interface TurnStartParams {
    */
   permissions?: string | null;
   /**
-   * Override the personality for this turn and subsequent turns.
+   * @deprecated `friendly` and `pragmatic` no longer select a style. Changing this does not rewrite the thread's existing instructions.
    */
   personality?: Personality | null;
   /**
@@ -140,10 +178,19 @@ export interface TurnStartParams {
    */
   serviceTier?: string | null;
   /**
+   * Override the service tier only when this request starts a new turn. Use "default" for standard speed. Omitted or null inherits the thread's tier. Does not change the thread's tier or a turn being steered.
+   */
+  serviceTierForTurn?: string | null;
+  /**
    * Override the reasoning summary for this turn and subsequent turns.
    */
   summary?: ReasoningSummary | null;
   threadId: string;
+  toolOutput?: TurnToolOutput | null;
+  /**
+   * Optional source classification for the caller that starts this turn. Ignored when this request steers an already-active turn.
+   */
+  turnTrigger?: string | null;
   [k: string]: unknown | undefined;
 }
 export interface AdditionalContextEntry {
@@ -212,10 +259,12 @@ export interface ByteRange {
   start: number;
   [k: string]: unknown | undefined;
 }
-export interface ImageUserInput {
-  detail?: ImageDetail | null;
-  type: ImageUserInputType;
+export interface UrlUserInput {
   url: string;
+  [k: string]: unknown | undefined;
+}
+export interface FileIdUserInput {
+  fileId: string;
   [k: string]: unknown | undefined;
 }
 export interface LocalImageUserInput {
@@ -269,5 +318,34 @@ export interface WorkspaceWriteSandboxPolicy {
   networkAccess?: boolean;
   type: WorkspaceWriteSandboxPolicyType;
   writableRoots?: AbsolutePathBuf[];
+  [k: string]: unknown | undefined;
+}
+export interface TurnToolOutput {
+  name: string;
+  namespace?: string | null;
+  output: FunctionCallOutputBody;
+  [k: string]: unknown | undefined;
+}
+export interface InputTextFunctionCallOutputContentItem {
+  text: string;
+  type: InputTextFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface ImageUrlFunctionCallOutputContentItem {
+  image_url: string;
+  [k: string]: unknown | undefined;
+}
+export interface FileIdFunctionCallOutputContentItem {
+  file_id: string;
+  [k: string]: unknown | undefined;
+}
+export interface InputAudioFunctionCallOutputContentItem {
+  audio_url: string;
+  type: InputAudioFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface EncryptedContentFunctionCallOutputContentItem {
+  encrypted_content: string;
+  type: EncryptedContentFunctionCallOutputContentItemType;
   [k: string]: unknown | undefined;
 }

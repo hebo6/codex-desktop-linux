@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
 /**
@@ -18,6 +18,9 @@ export type ReasoningEffort = string;
  * Controls the effective multi-agent delegation instructions for a turn. `custom` means the configured mode hint defines the policy instead of a built-in policy.
  */
 export type MultiAgentMode = ("explicitRequestOnly" | "proactive") | CustomMultiAgentMode;
+/**
+ * Deprecated: `friendly` and `pragmatic` no longer select a style.
+ */
 export type Personality = "none" | "friendly" | "pragmatic";
 export type SandboxPolicy =
   | DangerFullAccessSandboxPolicy
@@ -60,6 +63,10 @@ export interface ThreadSettingsUpdateParams {
    */
   cwd?: string | null;
   /**
+   * Replace this thread's disabled plugin IDs. Omitted/null preserves the list; [] clears it.
+   */
+  disabledPluginIds?: string[] | null;
+  /**
    * Override the reasoning effort for subsequent turns.
    */
   effort?: ReasoningEffort | null;
@@ -76,7 +83,7 @@ export interface ThreadSettingsUpdateParams {
    */
   permissions?: string | null;
   /**
-   * Override the personality for subsequent turns.
+   * @deprecated `friendly` and `pragmatic` no longer select a style. Changing this does not rewrite the thread's existing instructions.
    */
   personality?: Personality | null;
   /**

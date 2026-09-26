@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 export type ReviewDelivery = "inline" | "detached";
 export type ReviewTarget =
@@ -11,7 +11,7 @@ export type CustomReviewTargetType = "custom";
 
 export interface ReviewStartParams {
   /**
-   * Where to run the review: inline (default) on the current thread or detached on a new thread (returned in `reviewThreadId`).
+   * Where to run the review: inline (default) on the current thread or detached on a new thread (returned in `reviewThreadId`). Detached delivery is deprecated and emits `deprecationNotice`. Use `thread/start` followed by an inline review for a separate review thread.
    */
   delivery?: ReviewDelivery | null;
   target: ReviewTarget;

@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 /**
  * Request from the client to the server.
@@ -7,6 +7,11 @@
 export type ClientRequest =
   | InitializeRequest
   | ServerDiagnosticsRequest
+  | UserVerificationStatusRequest
+  | UserVerificationEnrollRequest
+  | UserVerificationDeleteRequest
+  | UserVerificationVerifyRequest
+  | UserVerificationCancelRequest
   | ThreadStartRequest
   | ThreadResumeRequest
   | ThreadForkRequest
@@ -26,10 +31,15 @@ export type ClientRequest =
   | ThreadQueueReorderRequest
   | ThreadQueueStartRequest
   | ThreadMetadataUpdateRequest
+  | ThreadAttachmentAddRequest
+  | ThreadAttachmentListRequest
+  | ThreadAttachmentRemoveRequest
   | ThreadSectionMoveRequest
   | ThreadSettingsUpdateRequest
   | ThreadMemoryModeSetRequest
+  | MemoryStatusRequest
   | MemoryResetRequest
+  | RolloutCompressRequest
   | ThreadUnarchiveRequest
   | ThreadCompactStartRequest
   | ThreadShellCommandRequest
@@ -37,7 +47,6 @@ export type ClientRequest =
   | ThreadBackgroundTerminalsCleanRequest
   | ThreadBackgroundTerminalsListRequest
   | ThreadBackgroundTerminalsTerminateRequest
-  | ThreadRollbackRequest
   | ThreadRevertRequest
   | ThreadListRequest
   | ProjectListRequest
@@ -67,6 +76,7 @@ export type ClientRequest =
   | PluginListRequest
   | PluginSearchRequest
   | PluginInstalledRequest
+  | PluginReconcileRequest
   | PluginReadRequest
   | PluginSkillReadRequest
   | PluginShareSaveRequest
@@ -90,6 +100,7 @@ export type ClientRequest =
   | PluginInstallRequest
   | PluginUninstallRequest
   | TurnStartRequest
+  | TurnSettingsUpdateRequest
   | TurnSteerRequest
   | TurnInterruptRequest
   | ThreadRealtimeStartRequest
@@ -97,9 +108,13 @@ export type ClientRequest =
   | ThreadRealtimeAppendTextRequest
   | ThreadRealtimeAppendSpeechRequest
   | ThreadRealtimeStopRequest
+  | ThreadTimelineListRequest
   | ThreadRealtimeListVoicesRequest
   | ReviewStartRequest
   | ModelListRequest
+  | AccountGatewayOAuthReadRequest
+  | AccountGatewayOAuthLoginRequest
+  | AccountGatewayOAuthCancelRequest
   | ModelProviderCapabilitiesReadRequest
   | ExperimentalFeatureListRequest
   | PermissionProfileListRequest
@@ -120,6 +135,8 @@ export type ClientRequest =
   | ConfigMcpServerReloadRequest
   | McpServerStatusListRequest
   | McpServerResourceReadRequest
+  | McpServerEventStreamStartRequest
+  | McpServerEventStreamStopRequest
   | McpServerToolCallRequest
   | WindowsSandboxSetupStartRequest
   | WindowsSandboxReadinessRequest
@@ -158,6 +175,11 @@ export type ClientRequest =
 export type RequestId = string | number;
 export type InitializeRequestMethod = "initialize";
 export type ServerDiagnosticsRequestMethod = "server/diagnostics";
+export type UserVerificationStatusRequestMethod = "userVerification/status";
+export type UserVerificationEnrollRequestMethod = "userVerification/enroll";
+export type UserVerificationDeleteRequestMethod = "userVerification/delete";
+export type UserVerificationVerifyRequestMethod = "userVerification/verify";
+export type UserVerificationCancelRequestMethod = "userVerification/cancel";
 export type ThreadStartRequestMethod = "thread/start";
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
 /**
@@ -175,6 +197,9 @@ export type ThreadHistoryMode = "legacy" | "paginated";
  * Controls the effective multi-agent delegation instructions for a turn. `custom` means the configured mode hint defines the policy instead of a built-in policy.
  */
 export type MultiAgentMode = ("explicitRequestOnly" | "proactive") | CustomMultiAgentMode;
+/**
+ * Deprecated: `friendly` and `pragmatic` no longer select a style.
+ */
 export type Personality = "none" | "friendly" | "pragmatic";
 /**
  * A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).
@@ -205,12 +230,18 @@ export type ResponseItem =
   | WebSearchCallResponseItem
   | ImageGenerationCallResponseItem
   | CompactionResponseItem
+  | ConfigurationUpdateResponseItem
   | CompactionTriggerResponseItem
   | ContextCompactionResponseItem
   | OtherResponseItem;
 export type ContentItem =
   InputTextContentItem | InputImageContentItem | InputAudioContentItem | OutputTextContentItem;
 export type InputTextContentItemType = "input_text";
+export type InputImageContentItem = {
+  detail?: ImageDetail | null;
+  type: InputImageContentItemType;
+  [k: string]: unknown | undefined;
+} & (ImageUrlContentItem | FileIdContentItem);
 export type ImageDetail = "auto" | "low" | "high" | "original";
 export type InputImageContentItemType = "input_image";
 export type InputAudioContentItemType = "input_audio";
@@ -249,6 +280,11 @@ export type FunctionCallOutputContentItem =
   | InputAudioFunctionCallOutputContentItem
   | EncryptedContentFunctionCallOutputContentItem;
 export type InputTextFunctionCallOutputContentItemType = "input_text";
+export type InputImageFunctionCallOutputContentItem = {
+  detail?: ImageDetail | null;
+  type: InputImageFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+} & (ImageUrlFunctionCallOutputContentItem | FileIdFunctionCallOutputContentItem);
 export type InputImageFunctionCallOutputContentItemType = "input_image";
 export type InputAudioFunctionCallOutputContentItemType = "input_audio";
 export type EncryptedContentFunctionCallOutputContentItemType = "encrypted_content";
@@ -268,6 +304,11 @@ export type OtherResponsesApiWebSearchActionType = "other";
 export type WebSearchCallResponseItemType = "web_search_call";
 export type ImageGenerationCallResponseItemType = "image_generation_call";
 export type CompactionResponseItemType = "compaction";
+/**
+ * A non-empty reasoning effort value advertised by the model.
+ */
+export type ReasoningEffort = string;
+export type ConfigurationUpdateResponseItemType = "configuration_update";
 export type CompactionTriggerResponseItemType = "compaction_trigger";
 export type ContextCompactionResponseItemType = "context_compaction";
 export type OtherResponseItemType = "other";
@@ -295,6 +336,11 @@ export type UserInput =
   | SkillUserInput
   | MentionUserInput;
 export type TextUserInputType = "text";
+export type ImageUserInput = {
+  detail?: ImageDetail | null;
+  type: ImageUserInputType;
+  [k: string]: unknown | undefined;
+} & (UrlUserInput | FileIdUserInput);
 export type ImageUserInputType = "image";
 export type LocalImageUserInputType = "localImage";
 export type AudioUserInputType = "audio";
@@ -307,16 +353,15 @@ export type ThreadQueueDeleteRequestMethod = "thread/queue/delete";
 export type ThreadQueueReorderRequestMethod = "thread/queue/reorder";
 export type ThreadQueueStartRequestMethod = "thread/queue/start";
 export type ThreadMetadataUpdateRequestMethod = "thread/metadata/update";
+export type ThreadAttachmentAddRequestMethod = "thread/attachment/add";
+export type ThreadAttachmentListRequestMethod = "thread/attachment/list";
+export type ThreadAttachmentRemoveRequestMethod = "thread/attachment/remove";
 export type ThreadSectionMoveRequestMethod = "thread/section/move";
 export type ThreadSettingsUpdateRequestMethod = "thread/settings/update";
 /**
  * Initial collaboration mode to use when the TUI starts.
  */
 export type ModeKind = "plan" | "default";
-/**
- * A non-empty reasoning effort value advertised by the model.
- */
-export type ReasoningEffort = string;
 export type SandboxPolicy =
   | DangerFullAccessSandboxPolicy
   | ReadOnlySandboxPolicy
@@ -333,7 +378,9 @@ export type WorkspaceWriteSandboxPolicyType = "workspaceWrite";
 export type ReasoningSummary = ("auto" | "concise" | "detailed") | "none";
 export type ThreadMemoryModeSetRequestMethod = "thread/memoryMode/set";
 export type ThreadMemoryMode = "enabled" | "disabled";
+export type MemoryStatusRequestMethod = "memory/status";
 export type MemoryResetRequestMethod = "memory/reset";
+export type RolloutCompressRequestMethod = "rollout/compress";
 export type ThreadUnarchiveRequestMethod = "thread/unarchive";
 export type ThreadCompactStartRequestMethod = "thread/compact/start";
 export type ThreadShellCommandRequestMethod = "thread/shellCommand";
@@ -342,7 +389,6 @@ export type ThreadBackgroundTerminalsCleanRequestMethod = "thread/backgroundTerm
 export type ThreadBackgroundTerminalsListRequestMethod = "thread/backgroundTerminals/list";
 export type ThreadBackgroundTerminalsTerminateRequestMethod =
   "thread/backgroundTerminals/terminate";
-export type ThreadRollbackRequestMethod = "thread/rollback";
 export type ThreadRevertRequestMethod = "thread/revert";
 export type ThreadListRequestMethod = "thread/list";
 export type ThreadListCwdFilter = string | string[];
@@ -359,6 +405,7 @@ export type ThreadSourceKind =
   | "subAgentOther"
   | "unknown";
 export type ProjectListRequestMethod = "project/list";
+export type ProjectSortKey = "position" | "recencyAt";
 export type ProjectReadRequestMethod = "project/read";
 export type ProjectCreateRequestMethod = "project/create";
 export type ProjectImportRequestMethod = "project/import";
@@ -389,6 +436,7 @@ export type PluginListMarketplaceKind =
 export type PluginSearchRequestMethod = "plugin/search";
 export type PluginSearchScope = "global" | "workspace" | "personal";
 export type PluginInstalledRequestMethod = "plugin/installed";
+export type PluginReconcileRequestMethod = "plugin/reconcile";
 export type PluginReadRequestMethod = "plugin/read";
 export type PluginSkillReadRequestMethod = "plugin/skill/read";
 export type PluginShareSaveRequestMethod = "plugin/share/save";
@@ -417,6 +465,11 @@ export type PluginInstallRequestMethod = "plugin/install";
 export type PluginUninstallRequestMethod = "plugin/uninstall";
 export type TurnStartRequestMethod = "turn/start";
 export type AdditionalContextKind = "untrusted" | "application";
+/**
+ * Requested cyber treatment for a ChatGPT-authenticated Codex turn. Authorization and model-tier restrictions remain server-owned.
+ */
+export type CyberAccessProgram = "standard" | "daybreakBlue" | "daybreakRed";
+export type TurnSettingsUpdateRequestMethod = "turn/settings/update";
 export type TurnSteerRequestMethod = "turn/steer";
 export type TurnInterruptRequestMethod = "turn/interrupt";
 export type ThreadRealtimeStartRequestMethod = "thread/realtime/start";
@@ -427,9 +480,12 @@ export type RealtimeOutputModality = "text" | "audio";
  * EXPERIMENTAL - transport used by thread realtime.
  */
 export type ThreadRealtimeStartTransport =
-  WebsocketThreadRealtimeStartTransport | WebrtcThreadRealtimeStartTransport;
+  | WebsocketThreadRealtimeStartTransport
+  | WebrtcThreadRealtimeStartTransport
+  | ExistingCallThreadRealtimeStartTransport;
 export type WebsocketThreadRealtimeStartTransportType = "websocket";
 export type WebrtcThreadRealtimeStartTransportType = "webrtc";
+export type ExistingCallThreadRealtimeStartTransportType = "existingCall";
 export type RealtimeConversationVersion = "v1" | "v2" | "v3";
 export type RealtimeVoice =
   | "alloy"
@@ -455,6 +511,7 @@ export type ThreadRealtimeAppendAudioRequestMethod = "thread/realtime/appendAudi
 export type ThreadRealtimeAppendTextRequestMethod = "thread/realtime/appendText";
 export type ThreadRealtimeAppendSpeechRequestMethod = "thread/realtime/appendSpeech";
 export type ThreadRealtimeStopRequestMethod = "thread/realtime/stop";
+export type ThreadTimelineListRequestMethod = "thread/timeline/list";
 export type ThreadRealtimeListVoicesRequestMethod = "thread/realtime/listVoices";
 export type ReviewStartRequestMethod = "review/start";
 export type ReviewDelivery = "inline" | "detached";
@@ -465,6 +522,9 @@ export type BaseBranchReviewTargetType = "baseBranch";
 export type CommitReviewTargetType = "commit";
 export type CustomReviewTargetType = "custom";
 export type ModelListRequestMethod = "model/list";
+export type AccountGatewayOAuthReadRequestMethod = "account/gatewayOAuth/read";
+export type AccountGatewayOAuthLoginRequestMethod = "account/gatewayOAuth/login";
+export type AccountGatewayOAuthCancelRequestMethod = "account/gatewayOAuth/cancel";
 export type ModelProviderCapabilitiesReadRequestMethod = "modelProvider/capabilities/read";
 export type ExperimentalFeatureListRequestMethod = "experimentalFeature/list";
 export type PermissionProfileListRequestMethod = "permissionProfile/list";
@@ -488,6 +548,8 @@ export type ConfigMcpServerReloadRequestMethod = "config/mcpServer/reload";
 export type McpServerStatusListRequestMethod = "mcpServerStatus/list";
 export type McpServerStatusDetail = "full" | "toolsAndAuthOnly";
 export type McpServerResourceReadRequestMethod = "mcpServer/resource/read";
+export type McpServerEventStreamStartRequestMethod = "mcpServer/event/stream/start";
+export type McpServerEventStreamStopRequestMethod = "mcpServer/event/stream/stop";
 export type McpServerToolCallRequestMethod = "mcpServer/tool/call";
 export type WindowsSandboxSetupStartRequestMethod = "windowsSandbox/setupStart";
 export type WindowsSandboxSetupMode = "elevated" | "unelevated";
@@ -498,21 +560,20 @@ export type LoginAccountParams =
   | ChatgptLoginAccountParams
   | ChatgptDeviceCodeLoginAccountParams
   | ChatgptAuthTokensLoginAccountParams
-  | AmazonBedrockLoginAccountParams;
+  | AmazonBedrockLoginAccountParams
+  | AmazonBedrockAccessKeysLoginAccountParams;
 export type ApiKeyLoginAccountParamsType = "apiKey";
 export type LoginAppBrand = "codex" | "chatgpt";
 export type ChatgptLoginAccountParamsType = "chatgpt";
 export type ChatgptDeviceCodeLoginAccountParamsType = "chatgptDeviceCode";
 export type ChatgptAuthTokensLoginAccountParamsType = "chatgptAuthTokens";
 export type AmazonBedrockLoginAccountParamsType = "amazonBedrock";
+export type AmazonBedrockAccessKeysLoginAccountParamsType = "amazonBedrockAccessKeys";
 export type AccountBedrockDiscoverRequestMethod = "account/bedrock/discover";
 export type AccountBedrockSetupRequestMethod = "account/bedrock/setup";
-export type BedrockSetupParams =
-  ProfileBedrockSetupParams | EnvironmentBedrockSetupParams | AccessKeysBedrockSetupParams;
+export type BedrockSetupParams = ProfileBedrockSetupParams | EnvironmentBedrockSetupParams;
 export type ProfileBedrockSetupParamsType = "profile";
-export type AwsCredentialType = "accessKeys" | "bedrockApiKey";
 export type EnvironmentBedrockSetupParamsType = "environment";
-export type AccessKeysBedrockSetupParamsType = "accessKeys";
 export type AccountLoginCancelRequestMethod = "account/login/cancel";
 export type AccountLogoutRequestMethod = "account/logout";
 export type AccountRateLimitsReadRequestMethod = "account/rateLimits/read";
@@ -579,6 +640,10 @@ export interface InitializeCapabilities {
    */
   experimentalApi?: boolean;
   /**
+   * Use explicit gateway OAuth login instead of automatic browser authorization. Applies to this app-server's gateway runtime; later connections cannot undo it.
+   */
+  explicitGatewayOauth?: boolean;
+  /**
    * MCP extension settings declared by the app-server client.
    */
   extensions?: {
@@ -618,6 +683,62 @@ export interface ServerDiagnosticsRequest {
 export interface ServerDiagnosticsParams {
   [k: string]: unknown | undefined;
 }
+export interface UserVerificationStatusRequest {
+  id: RequestId;
+  method: UserVerificationStatusRequestMethod;
+  params: UserVerificationStatusParams;
+  [k: string]: unknown | undefined;
+}
+export interface UserVerificationStatusParams {}
+export interface UserVerificationEnrollRequest {
+  id: RequestId;
+  method: UserVerificationEnrollRequestMethod;
+  params: UserVerificationEnrollParams;
+  [k: string]: unknown | undefined;
+}
+export interface UserVerificationEnrollParams {}
+export interface UserVerificationDeleteRequest {
+  id: RequestId;
+  method: UserVerificationDeleteRequestMethod;
+  params: UserVerificationDeleteParams;
+  [k: string]: unknown | undefined;
+}
+export interface UserVerificationDeleteParams {}
+export interface UserVerificationVerifyRequest {
+  id: RequestId;
+  method: UserVerificationVerifyRequestMethod;
+  params: UserVerificationVerifyParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Local signing primitive, independent of any pending elicitation.
+ */
+export interface UserVerificationVerifyParams {
+  /**
+   * Unpadded base64url encoding of 1–4096 challenge bytes.
+   */
+  challenge: string;
+  /**
+   * Additional display context; at most 4096 UTF-8 bytes.
+   */
+  description: string;
+  /**
+   * Display context already approved by the UI; 1–256 UTF-8 bytes.
+   */
+  title: string;
+}
+export interface UserVerificationCancelRequest {
+  id: RequestId;
+  method: UserVerificationCancelRequestMethod;
+  params: UserVerificationCancelParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Cancels a native verification RPC issued on this connection, not an elicitation. Use a fresh request ID for each operation and a distinct ID for this cancellation RPC.
+ */
+export interface UserVerificationCancelParams {
+  requestId: RequestId;
+}
 /**
  * NEW APIs
  */
@@ -642,6 +763,10 @@ export interface ThreadStartParams {
     [k: string]: unknown | undefined;
   } | null;
   cwd?: string | null;
+  /**
+   * Initial Daybreak choice for this persistent thread. Omitted or null leaves it unset. This does not select a turn's `cyberAccessProgram` or grant access. Not supported for ephemeral threads.
+   */
+  daybreakEnabled?: boolean | null;
   developerInstructions?: string | null;
   dynamicTools?: DynamicToolSpec[] | null;
   /**
@@ -673,6 +798,9 @@ export interface ThreadStartParams {
    * Named profile id for this thread. Cannot be combined with `sandbox`.
    */
   permissions?: string | null;
+  /**
+   * @deprecated `friendly` and `pragmatic` no longer select a style.
+   */
   personality?: Personality | null;
   /**
    * Optional project identity for this new thread. Durable threads persist the assignment; ephemeral threads expose it only in live responses.
@@ -795,7 +923,7 @@ export interface ThreadResumeParams {
   cwd?: string | null;
   developerInstructions?: string | null;
   /**
-   * When true, return only thread metadata and live-resume state without populating `thread.turns`. This is useful when the client plans to call `thread/turns/list` immediately after resuming.
+   * When true, return only thread metadata and live-resume state without populating `thread.turns`. This is useful when the client plans to call `thread/turns/list` immediately after resuming. Full-history hydration is deprecated for paginated threads; use this with `thread/turns/list` and `thread/items/list` instead.
    */
   excludeTurns?: boolean;
   /**
@@ -819,6 +947,9 @@ export interface ThreadResumeParams {
    * Named profile id for the resumed thread. Cannot be combined with `sandbox`.
    */
   permissions?: string | null;
+  /**
+   * @deprecated `friendly` and `pragmatic` no longer select a style. Changing this does not rewrite the thread's existing instructions.
+   */
   personality?: Personality | null;
   /**
    * Replace the thread's runtime workspace roots. Paths must be absolute.
@@ -843,10 +974,12 @@ export interface InputTextContentItem {
   type: InputTextContentItemType;
   [k: string]: unknown | undefined;
 }
-export interface InputImageContentItem {
-  detail?: ImageDetail | null;
+export interface ImageUrlContentItem {
   image_url: string;
-  type: InputImageContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface FileIdContentItem {
+  file_id: string;
   [k: string]: unknown | undefined;
 }
 export interface InputAudioContentItem {
@@ -959,9 +1092,11 @@ export interface ToolSearchCallResponseItem {
   [k: string]: unknown | undefined;
 }
 export interface FunctionCallOutputResponseItem {
-  call_id: string;
+  call_id?: string | null;
   id?: string | null;
   internal_chat_message_metadata_passthrough?: InternalChatMessageMetadataPassthrough | null;
+  name?: string | null;
+  namespace?: string | null;
   output: FunctionCallOutputBody;
   type: FunctionCallOutputResponseItemType;
   [k: string]: unknown | undefined;
@@ -971,10 +1106,12 @@ export interface InputTextFunctionCallOutputContentItem {
   type: InputTextFunctionCallOutputContentItemType;
   [k: string]: unknown | undefined;
 }
-export interface InputImageFunctionCallOutputContentItem {
-  detail?: ImageDetail | null;
+export interface ImageUrlFunctionCallOutputContentItem {
   image_url: string;
-  type: InputImageFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface FileIdFunctionCallOutputContentItem {
+  file_id: string;
   [k: string]: unknown | undefined;
 }
 export interface InputAudioFunctionCallOutputContentItem {
@@ -1062,6 +1199,21 @@ export interface CompactionResponseItem {
   type: CompactionResponseItemType;
   [k: string]: unknown | undefined;
 }
+/**
+ * A durable input control interpreted by the backend at its position in history.
+ */
+export interface ConfigurationUpdateResponseItem {
+  reasoning: ConfigurationReasoning;
+  type: ConfigurationUpdateResponseItemType;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Reasoning settings interpreted by the backend for the routed model.
+ */
+export interface ConfigurationReasoning {
+  effort: ReasoningEffort;
+  [k: string]: unknown | undefined;
+}
 export interface CompactionTriggerResponseItem {
   type: CompactionTriggerResponseItemType;
   [k: string]: unknown | undefined;
@@ -1127,7 +1279,7 @@ export interface ThreadForkParams {
   developerInstructions?: string | null;
   ephemeral?: boolean;
   /**
-   * When true, return only thread metadata and live fork state without populating `thread.turns`. This is useful when the client plans to call `thread/turns/list` immediately after forking.
+   * When true, return only thread metadata and live fork state without populating `thread.turns`. This is useful when the client plans to call `thread/turns/list` immediately after forking. Full-history hydration is deprecated for paginated threads; use this with `thread/turns/list` and `thread/items/list` instead.
    */
   excludeTurns?: boolean;
   /**
@@ -1315,10 +1467,12 @@ export interface ByteRange {
   start: number;
   [k: string]: unknown | undefined;
 }
-export interface ImageUserInput {
-  detail?: ImageDetail | null;
-  type: ImageUserInputType;
+export interface UrlUserInput {
   url: string;
+  [k: string]: unknown | undefined;
+}
+export interface FileIdUserInput {
+  fileId: string;
   [k: string]: unknown | undefined;
 }
 export interface LocalImageUserInput {
@@ -1420,6 +1574,10 @@ export interface ThreadMetadataUpdateRequest {
 }
 export interface ThreadMetadataUpdateParams {
   /**
+   * Save the client's Daybreak choice for this persistent thread. Omitted or null leaves it unchanged. This does not select a turn's `cyberAccessProgram` or grant access.
+   */
+  daybreakEnabled?: boolean | null;
+  /**
    * Patch the stored Git metadata for this thread. Omit a field to leave it unchanged, set it to `null` to clear it, or provide a string to replace the stored value.
    */
   gitInfo?: ThreadMetadataGitInfoUpdateParams | null;
@@ -1443,6 +1601,52 @@ export interface ThreadMetadataGitInfoUpdateParams {
    * Omit to leave the stored commit unchanged, set to `null` to clear it, or provide a non-empty string to replace it.
    */
   sha?: string | null;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadAttachmentAddRequest {
+  id: RequestId;
+  method: ThreadAttachmentAddRequestMethod;
+  params: ThreadAttachmentAddParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Parameters for creating or locating an attachment on its owning thread.
+ */
+export interface ThreadAttachmentAddParams {
+  attachmentType: string;
+  identityKey: string;
+  payload: unknown;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadAttachmentListRequest {
+  id: RequestId;
+  method: ThreadAttachmentListRequestMethod;
+  params: ThreadAttachmentListParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Parameters for listing attachments from one thread.
+ */
+export interface ThreadAttachmentListParams {
+  cursor?: string | null;
+  limit?: number | null;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadAttachmentRemoveRequest {
+  id: RequestId;
+  method: ThreadAttachmentRemoveRequestMethod;
+  params: ThreadAttachmentRemoveParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Parameters for deleting an attachment by its stable thread-local identity.
+ */
+export interface ThreadAttachmentRemoveParams {
+  attachmentType: string;
+  identityKey: string;
+  threadId: string;
   [k: string]: unknown | undefined;
 }
 export interface ThreadSectionMoveRequest {
@@ -1495,6 +1699,10 @@ export interface ThreadSettingsUpdateParams {
    */
   cwd?: string | null;
   /**
+   * Replace this thread's disabled plugin IDs. Omitted/null preserves the list; [] clears it.
+   */
+  disabledPluginIds?: string[] | null;
+  /**
    * Override the reasoning effort for subsequent turns.
    */
   effort?: ReasoningEffort | null;
@@ -1511,7 +1719,7 @@ export interface ThreadSettingsUpdateParams {
    */
   permissions?: string | null;
   /**
-   * Override the personality for subsequent turns.
+   * @deprecated `friendly` and `pragmatic` no longer select a style. Changing this does not rewrite the thread's existing instructions.
    */
   personality?: Personality | null;
   /**
@@ -1579,9 +1787,31 @@ export interface ThreadMemoryModeSetParams {
   threadId: string;
   [k: string]: unknown | undefined;
 }
+export interface MemoryStatusRequest {
+  id: RequestId;
+  method: MemoryStatusRequestMethod;
+  params: MemoryStatusParams;
+  [k: string]: unknown | undefined;
+}
+export interface MemoryStatusParams {
+  /**
+   * Required distinct consolidated threads. Defaults to 20; supported range is 1..=4096.
+   */
+  minConsolidatedThreads?: number | null;
+  [k: string]: unknown | undefined;
+}
 export interface MemoryResetRequest {
   id: RequestId;
   method: MemoryResetRequestMethod;
+  params?: null;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Start a best-effort background compression pass for cold local rollouts.
+ */
+export interface RolloutCompressRequest {
+  id: RequestId;
+  method: RolloutCompressRequestMethod;
   params?: null;
   [k: string]: unknown | undefined;
 }
@@ -1617,6 +1847,10 @@ export interface ThreadShellCommandParams {
    */
   command: string;
   threadId: string;
+  /**
+   * Maximum execution time in milliseconds. Defaults to one hour when omitted or null. Must be non-negative; zero requests an immediate timeout, not unlimited execution. Does not affect the immediate RPC acknowledgement.
+   */
+  timeoutMs?: number | null;
   [k: string]: unknown | undefined;
 }
 export interface ThreadApproveGuardianDeniedActionRequest {
@@ -1674,25 +1908,6 @@ export interface ThreadBackgroundTerminalsTerminateParams {
   threadId: string;
   [k: string]: unknown | undefined;
 }
-export interface ThreadRollbackRequest {
-  id: RequestId;
-  method: ThreadRollbackRequestMethod;
-  params: ThreadRollbackParams;
-  [k: string]: unknown | undefined;
-}
-/**
- * DEPRECATED: `thread/rollback` will be removed soon.
- */
-export interface ThreadRollbackParams {
-  /**
-   * The number of turns to drop from the end of the thread. Must be >= 1.
-   *
-   * This only modifies the thread's history and does not revert local file changes that have been made by the agent. Clients are responsible for reverting these changes.
-   */
-  numTurns: number;
-  threadId: string;
-  [k: string]: unknown | undefined;
-}
 export interface ThreadRevertRequest {
   id: RequestId;
   method: ThreadRevertRequestMethod;
@@ -1744,6 +1959,10 @@ export interface ThreadListParams {
    */
   modelProviders?: string[] | null;
   /**
+   * Optional originator allowlist, matching any supplied value exactly. Supported by hosted backends only; the local app-server rejects a nonempty list. Omitted or empty lists leave originators unrestricted.
+   */
+  originators?: string[] | null;
+  /**
    * Optional direct parent thread filter. Mutually exclusive with `ancestorThreadId`.
    */
   parentThreadId?: string | null;
@@ -1786,6 +2005,14 @@ export interface ProjectListRequest {
 export interface ProjectListParams {
   cursor?: string | null;
   limit?: number | null;
+  /**
+   * Requires sortKey. Defaults to asc for position and desc for recencyAt.
+   */
+  sortDirection?: SortDirection | null;
+  /**
+   * Defaults to position. Recency sorting always places empty projects last.
+   */
+  sortKey?: ProjectSortKey | null;
   [k: string]: unknown | undefined;
 }
 export interface ProjectReadRequest {
@@ -2041,7 +2268,7 @@ export interface ThreadReadRequest {
 }
 export interface ThreadReadParams {
   /**
-   * When true, include turns and their items from rollout history.
+   * When true, include turns and their items from rollout history. Full-history hydration is deprecated for paginated threads; prefer a metadata-only read and page with `thread/turns/list` and `thread/items/list`.
    */
   includeTurns?: boolean;
   threadId: string;
@@ -2238,6 +2465,19 @@ export interface PluginInstalledParams {
    * Additional uninstalled plugin names that should be returned when present locally. This is used by mention surfaces that intentionally expose install entrypoints.
    */
   installSuggestionPluginNames?: string[] | null;
+  [k: string]: unknown | undefined;
+}
+export interface PluginReconcileRequest {
+  id: RequestId;
+  method: PluginReconcileRequestMethod;
+  params: PluginReconcileParams;
+  [k: string]: unknown | undefined;
+}
+export interface PluginReconcileParams {
+  /**
+   * Optional client-provided reason recorded with the reconciliation attempt.
+   */
+  reason?: string | null;
   [k: string]: unknown | undefined;
 }
 export interface PluginReadRequest {
@@ -2645,6 +2885,14 @@ export interface TurnStartParams {
    */
   cwd?: string | null;
   /**
+   * EXPERIMENTAL - Request a workspace-authorized cyber program for this turn. Omission preserves automatic behavior. This does not grant access.
+   */
+  cyberAccessProgram?: CyberAccessProgram | null;
+  /**
+   * Replace this thread's disabled plugin IDs. Omitted/null preserves the list; [] clears it.
+   */
+  disabledPluginIds?: string[] | null;
+  /**
    * Override the reasoning effort for this turn and subsequent turns.
    */
   effort?: ReasoningEffort | null;
@@ -2674,7 +2922,7 @@ export interface TurnStartParams {
    */
   permissions?: string | null;
   /**
-   * Override the personality for this turn and subsequent turns.
+   * @deprecated `friendly` and `pragmatic` no longer select a style. Changing this does not rewrite the thread's existing instructions.
    */
   personality?: Personality | null;
   /**
@@ -2700,16 +2948,64 @@ export interface TurnStartParams {
    */
   serviceTier?: string | null;
   /**
+   * Override the service tier only when this request starts a new turn. Use "default" for standard speed. Omitted or null inherits the thread's tier. Does not change the thread's tier or a turn being steered.
+   */
+  serviceTierForTurn?: string | null;
+  /**
    * Override the reasoning summary for this turn and subsequent turns.
    */
   summary?: ReasoningSummary | null;
   threadId: string;
+  toolOutput?: TurnToolOutput | null;
+  /**
+   * Optional source classification for the caller that starts this turn. Ignored when this request steers an already-active turn.
+   */
+  turnTrigger?: string | null;
   [k: string]: unknown | undefined;
 }
 export interface AdditionalContextEntry {
   kind: AdditionalContextKind;
   value: string;
   [k: string]: unknown | undefined;
+}
+export interface TurnToolOutput {
+  name: string;
+  namespace?: string | null;
+  output: FunctionCallOutputBody;
+  [k: string]: unknown | undefined;
+}
+export interface TurnSettingsUpdateRequest {
+  id: RequestId;
+  method: TurnSettingsUpdateRequestMethod;
+  params: TurnSettingsUpdateParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Experimental settings changes for one running turn, not future turns. Unsupported fields are rejected rather than silently ignored. Any live task kind may accept publication. Child sessions and consumers of frozen initial settings are unchanged.
+ */
+export interface TurnSettingsUpdateParams {
+  /**
+   * Changes the active turn's reviewer without changing future thread settings. Already captured steps and pending approvals retain their original reviewer.
+   */
+  approvalsReviewer?: ApprovalsReviewer | null;
+  /**
+   * Omission or `null` leaves the effort unchanged.
+   */
+  effort?: ReasoningEffort | null;
+  /**
+   * Omission or `null` leaves the model unchanged.
+   */
+  model?: string | null;
+  /**
+   * `null` clears the requested tier; omission leaves it unchanged.
+   */
+  serviceTier?: string | null;
+  /**
+   * Omission or `null` leaves the summary preference unchanged.
+   */
+  summary?: ReasoningSummary | null;
+  threadId: string;
+  turnId: string;
 }
 export interface TurnSteerRequest {
   id: RequestId;
@@ -2764,6 +3060,10 @@ export interface ThreadRealtimeStartRequest {
  * EXPERIMENTAL - start a thread-scoped realtime session.
  */
 export interface ThreadRealtimeStartParams {
+  /**
+   * Relays public reasoning summaries as quiet context for realtime V3 delegations. Defaults to false.
+   */
+  backendReasoningStatus?: boolean;
   /**
    * Leaves Codex response handoffs to the client's explicit append calls instead of forwarding them automatically. Defaults to false.
    */
@@ -2849,6 +3149,14 @@ export interface WebrtcThreadRealtimeStartTransport {
   type: WebrtcThreadRealtimeStartTransportType;
   [k: string]: unknown | undefined;
 }
+export interface ExistingCallThreadRealtimeStartTransport {
+  /**
+   * Identifier of a realtime call already created and negotiated by the client.
+   */
+  callId: string;
+  type: ExistingCallThreadRealtimeStartTransportType;
+  [k: string]: unknown | undefined;
+}
 export interface ThreadRealtimeAppendAudioRequest {
   id: RequestId;
   method: ThreadRealtimeAppendAudioRequestMethod;
@@ -2916,6 +3224,21 @@ export interface ThreadRealtimeStopParams {
   threadId: string;
   [k: string]: unknown | undefined;
 }
+export interface ThreadTimelineListRequest {
+  id: RequestId;
+  method: ThreadTimelineListRequestMethod;
+  params: ThreadTimelineListParams;
+  [k: string]: unknown | undefined;
+}
+/**
+ * EXPERIMENTAL - list ordinary and realtime thread history in rollout order.
+ */
+export interface ThreadTimelineListParams {
+  cursor?: string | null;
+  limit?: number | null;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
 export interface ThreadRealtimeListVoicesRequest {
   id: RequestId;
   method: ThreadRealtimeListVoicesRequestMethod;
@@ -2936,7 +3259,7 @@ export interface ReviewStartRequest {
 }
 export interface ReviewStartParams {
   /**
-   * Where to run the review: inline (default) on the current thread or detached on a new thread (returned in `reviewThreadId`).
+   * Where to run the review: inline (default) on the current thread or detached on a new thread (returned in `reviewThreadId`). Detached delivery is deprecated and emits `deprecationNotice`. Use `thread/start` followed by an inline review for a separate review thread.
    */
   delivery?: ReviewDelivery | null;
   target: ReviewTarget;
@@ -2997,6 +3320,24 @@ export interface ModelListParams {
    * Optional page size; defaults to a reasonable server-side value.
    */
   limit?: number | null;
+  [k: string]: unknown | undefined;
+}
+export interface AccountGatewayOAuthReadRequest {
+  id: RequestId;
+  method: AccountGatewayOAuthReadRequestMethod;
+  params?: null;
+  [k: string]: unknown | undefined;
+}
+export interface AccountGatewayOAuthLoginRequest {
+  id: RequestId;
+  method: AccountGatewayOAuthLoginRequestMethod;
+  params?: null;
+  [k: string]: unknown | undefined;
+}
+export interface AccountGatewayOAuthCancelRequest {
+  id: RequestId;
+  method: AccountGatewayOAuthCancelRequestMethod;
+  params?: null;
   [k: string]: unknown | undefined;
 }
 export interface ModelProviderCapabilitiesReadRequest {
@@ -3277,8 +3618,45 @@ export interface McpResourceReadParams {
    */
   originCallId?: string | null;
   server: string;
+  /**
+   * Explicit hosted app/account. Omit to retain legacy resource discovery.
+   */
+  target?: McpResourceReadTarget | null;
   threadId?: string | null;
   uri: string;
+  [k: string]: unknown | undefined;
+}
+export interface McpResourceReadTarget {
+  connectorId: string;
+  /**
+   * Null explicitly requests no-auth access, subject to the app's resource policy.
+   */
+  linkId: string | null;
+  [k: string]: unknown | undefined;
+}
+export interface McpServerEventStreamStartRequest {
+  id: RequestId;
+  method: McpServerEventStreamStartRequestMethod;
+  params: McpServerEventStreamStartParams;
+  [k: string]: unknown | undefined;
+}
+export interface McpServerEventStreamStartParams {
+  _meta?: unknown;
+  arguments: unknown;
+  name: string;
+  server: string;
+  subscriptionId: string;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
+export interface McpServerEventStreamStopRequest {
+  id: RequestId;
+  method: McpServerEventStreamStopRequestMethod;
+  params: McpServerEventStreamStopParams;
+  [k: string]: unknown | undefined;
+}
+export interface McpServerEventStreamStopParams {
+  subscriptionId: string;
   [k: string]: unknown | undefined;
 }
 export interface McpServerToolCallRequest {
@@ -3364,6 +3742,17 @@ export interface AmazonBedrockLoginAccountParams {
   type: AmazonBedrockLoginAccountParamsType;
   [k: string]: unknown | undefined;
 }
+/**
+ * [UNSTABLE] Managed Amazon Bedrock AWS access key login is experimental.
+ */
+export interface AmazonBedrockAccessKeysLoginAccountParams {
+  accessKeyId: string;
+  region: string;
+  secretAccessKey: string;
+  sessionToken?: string | null;
+  type: AmazonBedrockAccessKeysLoginAccountParamsType;
+  [k: string]: unknown | undefined;
+}
 export interface AccountBedrockDiscoverRequest {
   id: RequestId;
   method: AccountBedrockDiscoverRequestMethod;
@@ -3386,17 +3775,8 @@ export interface ProfileBedrockSetupParams {
   [k: string]: unknown | undefined;
 }
 export interface EnvironmentBedrockSetupParams {
-  credentialType: AwsCredentialType;
   region: string;
   type: EnvironmentBedrockSetupParamsType;
-  [k: string]: unknown | undefined;
-}
-export interface AccessKeysBedrockSetupParams {
-  accessKeyId: string;
-  region: string;
-  secretAccessKey: string;
-  sessionToken?: string | null;
-  type: AccessKeysBedrockSetupParamsType;
   [k: string]: unknown | undefined;
 }
 export interface AccountLoginCancelRequest {
@@ -3418,7 +3798,21 @@ export interface AccountLogoutRequest {
 export interface AccountRateLimitsReadRequest {
   id: RequestId;
   method: AccountRateLimitsReadRequestMethod;
-  params?: null;
+  params?: GetAccountRateLimitsParams | null;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Usage-read capabilities of the requesting client, never inferred from its experiment arm.
+ */
+export interface GetAccountRateLimitsParams {
+  /**
+   * Skip the separate reset-credit detail lookup for background usage polls. The usage response still includes the available count; omitted/false preserves detailed reads.
+   */
+  excludeResetCreditDetails?: boolean;
+  /**
+   * The client supports automatic Luna Reserve fallback. For eligible ChatGPT CLI users, allow the backend to record experiment exposure after ordinary usage is blocked.
+   */
+  supportsLunaReserve?: boolean;
   [k: string]: unknown | undefined;
 }
 export interface AccountRateLimitResetCreditConsumeRequest {
@@ -4020,7 +4414,7 @@ export interface ConfigBatchWriteParams {
    */
   filePath?: string | null;
   /**
-   * When true, hot-reload updated runtime settings into loaded threads after writing. Session-static model, reasoning-effort, Plan-mode reasoning-effort, service-tier, and personality defaults are not reloaded.
+   * When true, hot-reload updated runtime settings into loaded threads after writing. Session-static model, reasoning-effort, Plan-mode reasoning-effort, and service-tier defaults are not reloaded. The deprecated personality setting is also not reloaded.
    */
   reloadUserConfig?: boolean;
   [k: string]: unknown | undefined;

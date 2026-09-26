@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 export type RateLimitResetType = "codexRateLimits" | "unknown";
 export type RateLimitResetCreditStatus = "available" | "redeeming" | "redeemed" | "unknown";
@@ -29,7 +29,21 @@ export type RateLimitReachedType =
   | "workspace_member_usage_limit_reached";
 
 export interface GetAccountRateLimitsResponse {
+  /**
+   * Account associated with this usage snapshot, when supplied by the backend.
+   */
+  accountId?: string | null;
+  /**
+   * Backend permission for ordinary included usage, validated against the active account. Null means unavailable; clients must not infer recovery from percentages or reset times.
+   */
+  ordinaryUsageAllowed?: boolean | null;
   rateLimitResetCredits?: RateLimitResetCreditsSummary | null;
+  /**
+   * Optional backend-owned banner from the same usage read. Its nested keys retain the backend's snake_case contract; an absent banner leaves the client's existing UI unchanged.
+   */
+  rateLimitUpsell?: {
+    [k: string]: unknown | undefined;
+  };
   /**
    * Backward-compatible single-bucket view; mirrors the historical payload.
    */
@@ -82,6 +96,10 @@ export interface RateLimitSnapshot {
   individualLimit?: SpendControlLimitSnapshot | null;
   limitId?: string | null;
   limitName?: string | null;
+  /**
+   * Normal model whose display name and reasoning options describe this quota alias.
+   */
+  normalModelSlug?: string | null;
   planType?: PlanType | null;
   primary?: RateLimitWindow | null;
   rateLimitReachedType?: RateLimitReachedType | null;

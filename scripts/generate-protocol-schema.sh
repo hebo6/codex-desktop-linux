@@ -2,8 +2,8 @@
 
 set -eu
 
-readonly expected_commit="657bd889ae28edcbf5395c103b479bf8b328704e"
-readonly expected_codex_version="codex-cli 0.149.0"
+readonly expected_commit="36650394c5b38c2990ccf2a3457165ca3e9d9726"
+readonly expected_codex_version="codex-cli 0.157.1"
 
 project_dir=$(realpath "$(dirname "$0")/..")
 schema_dir="$project_dir/protocol/schema"

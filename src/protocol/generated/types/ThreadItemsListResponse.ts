@@ -1,10 +1,11 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 export type ThreadItem =
   | UserMessageThreadItem
   | HookPromptThreadItem
   | AgentMessageThreadItem
+  | FunctionCallOutputThreadItem
   | PlanThreadItem
   | ReasoningThreadItem
   | CommandExecutionThreadItem
@@ -29,6 +30,11 @@ export type UserInput =
   | SkillUserInput
   | MentionUserInput;
 export type TextUserInputType = "text";
+export type ImageUserInput = {
+  detail?: ImageDetail | null;
+  type: ImageUserInputType;
+  [k: string]: unknown | undefined;
+} & (UrlUserInput | FileIdUserInput);
 export type ImageDetail = "auto" | "low" | "high" | "original";
 export type ImageUserInputType = "image";
 export type LocalImageUserInputType = "localImage";
@@ -46,6 +52,25 @@ export type AgentMessageDelivery = "async";
  */
 export type MessagePhase = "commentary" | "final_answer";
 export type AgentMessageThreadItemType = "agentMessage";
+export type FunctionCallOutputBody = string | FunctionCallOutputContentItem[];
+/**
+ * Responses API compatible content items that can be returned by a tool call. This is a subset of ContentItem with the types we support as function call outputs.
+ */
+export type FunctionCallOutputContentItem =
+  | InputTextFunctionCallOutputContentItem
+  | InputImageFunctionCallOutputContentItem
+  | InputAudioFunctionCallOutputContentItem
+  | EncryptedContentFunctionCallOutputContentItem;
+export type InputTextFunctionCallOutputContentItemType = "input_text";
+export type InputImageFunctionCallOutputContentItem = {
+  detail?: ImageDetail | null;
+  type: InputImageFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+} & (ImageUrlFunctionCallOutputContentItem | FileIdFunctionCallOutputContentItem);
+export type InputImageFunctionCallOutputContentItemType = "input_image";
+export type InputAudioFunctionCallOutputContentItemType = "input_audio";
+export type EncryptedContentFunctionCallOutputContentItemType = "encrypted_content";
+export type FunctionCallOutputThreadItemType = "functionCallOutput";
 export type PlanThreadItemType = "plan";
 export type ReasoningThreadItemType = "reasoning";
 export type CommandAction =
@@ -65,6 +90,7 @@ export type DeletePatchChangeKindType = "delete";
 export type UpdatePatchChangeKindType = "update";
 export type PatchApplyStatus = "inProgress" | "completed" | "failed" | "declined";
 export type FileChangeThreadItemType = "fileChange";
+export type McpAppDisplayMode = "inline" | "fullscreen";
 export type McpToolCallStatus = "inProgress" | "completed" | "failed";
 export type McpToolCallThreadItemType = "mcpToolCall";
 export type DynamicToolCallOutputContentItem =
@@ -82,10 +108,19 @@ export type CollabAgentStatus =
  * A non-empty reasoning effort value advertised by the model.
  */
 export type ReasoningEffort = string;
-export type CollabAgentToolCallStatus = "inProgress" | "completed" | "failed";
-export type CollabAgentTool = "spawnAgent" | "sendInput" | "resumeAgent" | "wait" | "closeAgent";
+export type CollabAgentToolCallStatus = "inProgress" | "completed" | "failed" | "interrupted";
+export type CollabAgentTool =
+  | "spawnAgent"
+  | "sendInput"
+  | "resumeAgent"
+  | "wait"
+  | "closeAgent"
+  | "sendMessage"
+  | "followupTask"
+  | "interruptAgent"
+  | "listAgents";
 export type CollabAgentToolCallThreadItemType = "collabAgentToolCall";
-export type SubAgentActivityKind = "started" | "interacted" | "interrupted";
+export type SubAgentActivityKind = "started" | "interacted" | "interrupted" | "completed";
 export type SubAgentActivityThreadItemType = "subAgentActivity";
 export type WebSearchAction =
   | SearchWebSearchAction
@@ -125,7 +160,15 @@ export interface ThreadItemsListResponse {
   [k: string]: unknown | undefined;
 }
 export interface ThreadItemEntry {
+  /**
+   * Unix timestamp (milliseconds) when the item completed, if recorded by the producer.
+   */
+  completedAtMs?: number | null;
   item: ThreadItem;
+  /**
+   * Unix timestamp (milliseconds) when the item started, if recorded by the producer.
+   */
+  startedAtMs?: number | null;
   /**
    * Turn containing this item.
    */
@@ -164,10 +207,12 @@ export interface ByteRange {
   start: number;
   [k: string]: unknown | undefined;
 }
-export interface ImageUserInput {
-  detail?: ImageDetail | null;
-  type: ImageUserInputType;
+export interface UrlUserInput {
   url: string;
+  [k: string]: unknown | undefined;
+}
+export interface FileIdUserInput {
+  fileId: string;
   [k: string]: unknown | undefined;
 }
 export interface LocalImageUserInput {
@@ -214,6 +259,7 @@ export interface AgentMessageThreadItem {
   id: string;
   memoryCitation?: MemoryCitation | null;
   phase?: MessagePhase | null;
+  questions?: AsyncUserInputQuestion[] | null;
   text: string;
   type: AgentMessageThreadItemType;
   [k: string]: unknown | undefined;
@@ -228,6 +274,41 @@ export interface MemoryCitationEntry {
   lineStart: number;
   note: string;
   path: string;
+  [k: string]: unknown | undefined;
+}
+export interface AsyncUserInputQuestion {
+  options?: string[] | null;
+  title: string;
+}
+export interface FunctionCallOutputThreadItem {
+  id: string;
+  name: string;
+  namespace?: string | null;
+  output: FunctionCallOutputBody;
+  type: FunctionCallOutputThreadItemType;
+  [k: string]: unknown | undefined;
+}
+export interface InputTextFunctionCallOutputContentItem {
+  text: string;
+  type: InputTextFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface ImageUrlFunctionCallOutputContentItem {
+  image_url: string;
+  [k: string]: unknown | undefined;
+}
+export interface FileIdFunctionCallOutputContentItem {
+  file_id: string;
+  [k: string]: unknown | undefined;
+}
+export interface InputAudioFunctionCallOutputContentItem {
+  audio_url: string;
+  type: InputAudioFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface EncryptedContentFunctionCallOutputContentItem {
+  encrypted_content: string;
+  type: EncryptedContentFunctionCallOutputContentItemType;
   [k: string]: unknown | undefined;
 }
 /**
@@ -350,9 +431,13 @@ export interface McpToolCallThreadItem {
   error?: McpToolCallError | null;
   id: string;
   /**
-   * Deprecated: use `appContext.resourceUri` instead.
+   * Legacy compatibility field; prefer `mcpAppUi.resourceUri` when available.
    */
   mcpAppResourceUri?: string | null;
+  /**
+   * Presentation captured from the invoked descriptor; absent in older history.
+   */
+  mcpAppUi?: McpAppUi | null;
   pluginId?: string | null;
   readOnlyHint?: boolean | null;
   result?: McpToolCallResult | null;
@@ -372,6 +457,14 @@ export interface McpToolCallAppContext {
 }
 export interface McpToolCallError {
   message: string;
+  [k: string]: unknown | undefined;
+}
+/**
+ * UI resource and display preference for model invocations, captured from the tool descriptor.
+ */
+export interface McpAppUi {
+  preferredModelDisplayMode: McpAppDisplayMode;
+  resourceUri: string;
   [k: string]: unknown | undefined;
 }
 export interface McpToolCallResult {

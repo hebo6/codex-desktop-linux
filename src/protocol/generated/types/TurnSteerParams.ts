@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 export type AdditionalContextKind = "untrusted" | "application";
 export type UserInput =
@@ -11,6 +11,11 @@ export type UserInput =
   | SkillUserInput
   | MentionUserInput;
 export type TextUserInputType = "text";
+export type ImageUserInput = {
+  detail?: ImageDetail | null;
+  type: ImageUserInputType;
+  [k: string]: unknown | undefined;
+} & (UrlUserInput | FileIdUserInput);
 export type ImageDetail = "auto" | "low" | "high" | "original";
 export type ImageUserInputType = "image";
 export type LocalImageUserInputType = "localImage";
@@ -75,10 +80,12 @@ export interface ByteRange {
   start: number;
   [k: string]: unknown | undefined;
 }
-export interface ImageUserInput {
-  detail?: ImageDetail | null;
-  type: ImageUserInputType;
+export interface UrlUserInput {
   url: string;
+  [k: string]: unknown | undefined;
+}
+export interface FileIdUserInput {
+  fileId: string;
   [k: string]: unknown | undefined;
 }
 export interface LocalImageUserInput {

@@ -253,7 +253,17 @@ function McpForm({ answers, disabled, onAnswersChange, onOpenLink, onRespond, re
       </>
     );
   }
-  if (params.mode === "openai/form") {
+  if (params.mode === "openai/userVerification") {
+    return (
+      <>
+        <Detail label={`来自 ${params.serverName}`}><strong>{params.title}</strong></Detail>
+        <p className={styles.reason}>{params.description}</p>
+        <p className={styles.unsupported}>当前客户端尚未支持此请求所需的设备身份验证</p>
+        <div className={styles.actions}><button disabled={disabled} onClick={() => onRespond({ action: "decline", content: null, _meta: null })} type="button">拒绝</button></div>
+      </>
+    );
+  }
+  if (params.mode === "openai/form" || params.mode === "openaiForm") {
     return (
       <>
         <p className={styles.reason}>{params.message}</p>

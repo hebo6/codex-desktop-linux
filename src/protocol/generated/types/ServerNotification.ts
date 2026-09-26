@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 /**
  * Notification sent from the server to the client.
@@ -21,6 +21,7 @@ export type ServerNotification = {
   | ThreadRevertedNotification
   | SkillsChangedNotification
   | ThreadNameUpdatedNotification
+  | ThreadAttachmentUpdatedNotification
   | ThreadGoalUpdatedNotification
   | ThreadGoalClearedNotification
   | ThreadQueueChangedNotification
@@ -54,7 +55,9 @@ export type ServerNotification = {
   | ItemMcpToolCallProgressNotification
   | McpServerOauthLoginCompletedNotification
   | McpServerStartupStatusUpdatedNotification
+  | McpServerEventStreamNotificationNotification
   | AccountUpdatedNotification
+  | AccountGatewayOAuthChangedNotification
   | AccountRateLimitsUpdatedNotification
   | AppListUpdatedNotification
   | RemoteControlStatusChangedNotification
@@ -67,6 +70,8 @@ export type ServerNotification = {
   | ThreadCompactedNotification
   | ModelReroutedNotification
   | ModelVerificationNotification
+  | ModelProviderAuthRecoveryStartedNotification
+  | ModelProviderAuthRecoveryCompletedNotification
   | TurnModerationMetadataNotification
   | ModelSafetyBufferingUpdatedNotification
   | WarningNotification
@@ -77,6 +82,9 @@ export type ServerNotification = {
   | FuzzyFileSearchSessionCompletedNotification
   | ThreadRealtimeStartedNotification
   | ThreadRealtimeItemAddedNotification
+  | ThreadRealtimeItemStartedNotification
+  | ThreadRealtimeItemTranscriptDeltaNotification
+  | ThreadRealtimeItemCompletedNotification
   | ThreadRealtimeTranscriptDeltaNotification
   | ThreadRealtimeTranscriptDoneNotification
   | ThreadRealtimeOutputAudioDeltaNotification
@@ -98,6 +106,7 @@ export type CodexErrorInfo =
       | "contextWindowExceeded"
       | "sessionBudgetExceeded"
       | "usageLimitExceeded"
+      | "rateLimitExceeded"
       | "serverOverloaded"
       | "cyberPolicy"
       | "misalignmentPolicyViolation"
@@ -121,7 +130,12 @@ export type ThreadStartedNotificationMethod = "thread/started";
  * IMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.
  */
 export type AbsolutePathBuf = string;
+export type LegacyAppPathString = string;
 export type ThreadHistoryMode = "legacy" | "paginated";
+/**
+ * A non-empty reasoning effort value advertised by the model.
+ */
+export type ReasoningEffort = string;
 export type SessionSource =
   | ("cli" | "vscode" | "exec" | "appServer" | "unknown")
   | CustomSessionSource
@@ -142,6 +156,7 @@ export type ThreadItem =
   | UserMessageThreadItem
   | HookPromptThreadItem
   | AgentMessageThreadItem
+  | FunctionCallOutputThreadItem
   | PlanThreadItem
   | ReasoningThreadItem
   | CommandExecutionThreadItem
@@ -166,6 +181,11 @@ export type UserInput =
   | SkillUserInput
   | MentionUserInput;
 export type TextUserInputType = "text";
+export type ImageUserInput = {
+  detail?: ImageDetail | null;
+  type: ImageUserInputType;
+  [k: string]: unknown | undefined;
+} & (UrlUserInput | FileIdUserInput);
 export type ImageDetail = "auto" | "low" | "high" | "original";
 export type ImageUserInputType = "image";
 export type LocalImageUserInputType = "localImage";
@@ -183,11 +203,29 @@ export type AgentMessageDelivery = "async";
  */
 export type MessagePhase = "commentary" | "final_answer";
 export type AgentMessageThreadItemType = "agentMessage";
+export type FunctionCallOutputBody = string | FunctionCallOutputContentItem[];
+/**
+ * Responses API compatible content items that can be returned by a tool call. This is a subset of ContentItem with the types we support as function call outputs.
+ */
+export type FunctionCallOutputContentItem =
+  | InputTextFunctionCallOutputContentItem
+  | InputImageFunctionCallOutputContentItem
+  | InputAudioFunctionCallOutputContentItem
+  | EncryptedContentFunctionCallOutputContentItem;
+export type InputTextFunctionCallOutputContentItemType = "input_text";
+export type InputImageFunctionCallOutputContentItem = {
+  detail?: ImageDetail | null;
+  type: InputImageFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+} & (ImageUrlFunctionCallOutputContentItem | FileIdFunctionCallOutputContentItem);
+export type InputImageFunctionCallOutputContentItemType = "input_image";
+export type InputAudioFunctionCallOutputContentItemType = "input_audio";
+export type EncryptedContentFunctionCallOutputContentItemType = "encrypted_content";
+export type FunctionCallOutputThreadItemType = "functionCallOutput";
 export type PlanThreadItemType = "plan";
 export type ReasoningThreadItemType = "reasoning";
 export type CommandAction =
   ReadCommandAction | ListFilesCommandAction | SearchCommandAction | UnknownCommandAction;
-export type LegacyAppPathString = string;
 export type ReadCommandActionType = "read";
 export type ListFilesCommandActionType = "listFiles";
 export type SearchCommandActionType = "search";
@@ -202,6 +240,7 @@ export type DeletePatchChangeKindType = "delete";
 export type UpdatePatchChangeKindType = "update";
 export type PatchApplyStatus = "inProgress" | "completed" | "failed" | "declined";
 export type FileChangeThreadItemType = "fileChange";
+export type McpAppDisplayMode = "inline" | "fullscreen";
 export type McpToolCallStatus = "inProgress" | "completed" | "failed";
 export type McpToolCallThreadItemType = "mcpToolCall";
 export type DynamicToolCallOutputContentItem =
@@ -215,14 +254,19 @@ export type DynamicToolCallStatus = "inProgress" | "completed" | "failed";
 export type DynamicToolCallThreadItemType = "dynamicToolCall";
 export type CollabAgentStatus =
   "pendingInit" | "running" | "interrupted" | "completed" | "errored" | "shutdown" | "notFound";
-/**
- * A non-empty reasoning effort value advertised by the model.
- */
-export type ReasoningEffort = string;
-export type CollabAgentToolCallStatus = "inProgress" | "completed" | "failed";
-export type CollabAgentTool = "spawnAgent" | "sendInput" | "resumeAgent" | "wait" | "closeAgent";
+export type CollabAgentToolCallStatus = "inProgress" | "completed" | "failed" | "interrupted";
+export type CollabAgentTool =
+  | "spawnAgent"
+  | "sendInput"
+  | "resumeAgent"
+  | "wait"
+  | "closeAgent"
+  | "sendMessage"
+  | "followupTask"
+  | "interruptAgent"
+  | "listAgents";
 export type CollabAgentToolCallThreadItemType = "collabAgentToolCall";
-export type SubAgentActivityKind = "started" | "interacted" | "interrupted";
+export type SubAgentActivityKind = "started" | "interacted" | "interrupted" | "completed";
 export type SubAgentActivityThreadItemType = "subAgentActivity";
 export type WebSearchAction =
   | SearchWebSearchAction
@@ -252,6 +296,11 @@ export type ThreadClosedNotificationMethod = "thread/closed";
 export type ThreadRevertedNotificationMethod = "thread/reverted";
 export type SkillsChangedNotificationMethod = "skills/changed";
 export type ThreadNameUpdatedNotificationMethod = "thread/name/updated";
+export type ThreadAttachmentUpdatedNotificationMethod = "thread/attachment/updated";
+/**
+ * The persisted attachment change represented by a notification.
+ */
+export type ThreadAttachmentOperation = "created" | "deleted";
 export type ThreadGoalUpdatedNotificationMethod = "thread/goal/updated";
 export type ThreadGoalStatus =
   "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
@@ -276,6 +325,9 @@ export type ModeKind = "plan" | "default";
  * Controls the effective multi-agent delegation instructions for a turn. `custom` means the configured mode hint defines the policy instead of a built-in policy.
  */
 export type MultiAgentMode = ("explicitRequestOnly" | "proactive") | CustomMultiAgentMode;
+/**
+ * Deprecated: `friendly` and `pragmatic` no longer select a style.
+ */
 export type Personality = "none" | "friendly" | "pragmatic";
 export type SandboxPolicy =
   | DangerFullAccessSandboxPolicy
@@ -306,7 +358,8 @@ export type HookEventName =
   | "userPromptSubmit"
   | "subagentStart"
   | "subagentStop"
-  | "stop";
+  | "stop"
+  | "interrupt";
 export type HookExecutionMode = "sync" | "async";
 export type HookHandlerType = "command" | "mcpTool" | "prompt" | "agent";
 export type HookScope = "thread" | "turn";
@@ -333,6 +386,7 @@ export type ItemAutoApprovalReviewStartedNotificationMethod = "item/autoApproval
 export type GuardianApprovalReviewAction =
   | CommandGuardianApprovalReviewAction
   | ExecveGuardianApprovalReviewAction
+  | WriteStdinGuardianApprovalReviewAction
   | ApplyPatchGuardianApprovalReviewAction
   | NetworkAccessGuardianApprovalReviewAction
   | McpToolCallGuardianApprovalReviewAction
@@ -340,6 +394,7 @@ export type GuardianApprovalReviewAction =
 export type GuardianCommandSource = "shell" | "unifiedExec";
 export type CommandGuardianApprovalReviewActionType = "command";
 export type ExecveGuardianApprovalReviewActionType = "execve";
+export type WriteStdinGuardianApprovalReviewActionType = "writeStdin";
 export type ApplyPatchGuardianApprovalReviewActionType = "applyPatch";
 export type NetworkApprovalProtocol = "http" | "https" | "socks5Tcp" | "socks5Udp";
 export type NetworkAccessGuardianApprovalReviewActionType = "networkAccess";
@@ -408,6 +463,8 @@ export type McpServerOauthLoginCompletedNotificationMethod = "mcpServer/oauthLog
 export type McpServerStartupStatusUpdatedNotificationMethod = "mcpServer/startupStatus/updated";
 export type McpServerStartupFailureReason = "reauthenticationRequired";
 export type McpServerStartupState = "starting" | "ready" | "failed" | "cancelled";
+export type McpServerEventStreamNotificationNotificationMethod =
+  "mcpServer/event/stream/notification";
 export type AccountUpdatedNotificationMethod = "account/updated";
 /**
  * Authentication mode for OpenAI-backed providers.
@@ -419,7 +476,8 @@ export type AuthMode =
   | "headers"
   | "agentIdentity"
   | "personalAccessToken"
-  | "bedrockApiKey";
+  | "bedrockApiKey"
+  | "bedrockAccessKeys";
 export type PlanType =
   | "free"
   | "go"
@@ -438,6 +496,8 @@ export type PlanType =
   | "edu_plus"
   | "edu_pro"
   | "unknown";
+export type AccountGatewayOAuthChangedNotificationMethod = "account/gatewayOAuth/changed";
+export type GatewayOAuthStatus = "notReady" | "started" | "succeeded" | "failed";
 export type AccountRateLimitsUpdatedNotificationMethod = "account/rateLimits/updated";
 export type RateLimitReachedType =
   | "rate_limit_reached"
@@ -472,6 +532,10 @@ export type ModelReroutedNotificationMethod = "model/rerouted";
 export type ModelRerouteReason = "highRiskCyberActivity";
 export type ModelVerificationNotificationMethod = "model/verification";
 export type ModelVerification = "trustedAccessForCyber";
+export type ModelProviderAuthRecoveryStartedNotificationMethod =
+  "modelProvider/authRecoveryStarted";
+export type ModelProviderAuthRecoveryCompletedNotificationMethod =
+  "modelProvider/authRecoveryCompleted";
 export type TurnModerationMetadataNotificationMethod = "turn/moderationMetadata";
 export type ModelSafetyBufferingUpdatedNotificationMethod = "model/safetyBuffering/updated";
 export type WarningNotificationMethod = "warning";
@@ -484,6 +548,39 @@ export type FuzzyFileSearchSessionCompletedNotificationMethod = "fuzzyFileSearch
 export type ThreadRealtimeStartedNotificationMethod = "thread/realtime/started";
 export type RealtimeConversationVersion = "v1" | "v2" | "v3";
 export type ThreadRealtimeItemAddedNotificationMethod = "thread/realtime/itemAdded";
+export type ThreadRealtimeItemStartedNotificationMethod = "thread/realtime/item/started";
+/**
+ * EXPERIMENTAL - a thread-scoped realtime item in the canonical timeline.
+ */
+export type ThreadRealtimeItem = {
+  id: string;
+  realtimeSessionId: string;
+  [k: string]: unknown | undefined;
+} & ThreadRealtimeItem1;
+export type ThreadRealtimeItem1 =
+  | RealtimeSessionStartedThreadRealtimeItem
+  | TranscriptSegmentThreadRealtimeItem
+  | BemItemPromotedThreadRealtimeItem
+  | RealtimeSessionClosedThreadRealtimeItem;
+export type RealtimeSessionStartedThreadRealtimeItemType = "realtimeSessionStarted";
+export type ThreadRealtimeTranscriptRole = "user" | "assistant";
+export type TranscriptSegmentThreadRealtimeItemType = "transcriptSegment";
+/**
+ * EXPERIMENTAL - how an existing agent item appears in a realtime conversation.
+ */
+export type ThreadRealtimeBemItemPresentation =
+  | WholeItemThreadRealtimeBemItemPresentation
+  | InlineMarkdownThreadRealtimeBemItemPresentation
+  | InlineVisualizationThreadRealtimeBemItemPresentation;
+export type WholeItemThreadRealtimeBemItemPresentationType = "wholeItem";
+export type InlineMarkdownThreadRealtimeBemItemPresentationType = "inlineMarkdown";
+export type InlineVisualizationThreadRealtimeBemItemPresentationType = "inlineVisualization";
+export type BemItemPromotedThreadRealtimeItemType = "bemItemPromoted";
+export type ThreadRealtimeSessionOutcome = "ended" | "failed";
+export type RealtimeSessionClosedThreadRealtimeItemType = "realtimeSessionClosed";
+export type ThreadRealtimeItemTranscriptDeltaNotificationMethod =
+  "thread/realtime/item/transcript/delta";
+export type ThreadRealtimeItemCompletedNotificationMethod = "thread/realtime/item/completed";
 export type ThreadRealtimeTranscriptDeltaNotificationMethod = "thread/realtime/transcript/delta";
 export type ThreadRealtimeTranscriptDoneNotificationMethod = "thread/realtime/transcript/done";
 export type ThreadRealtimeOutputAudioDeltaNotificationMethod = "thread/realtime/outputAudio/delta";
@@ -515,6 +612,10 @@ export interface TurnError {
   additionalDetails?: string | null;
   codexErrorInfo?: CodexErrorInfo | null;
   message: string;
+  /**
+   * Optional public explanation and continuation instruction for a misalignment block.
+   */
+  misalignment?: MisalignmentErrorDetails | null;
   [k: string]: unknown | undefined;
 }
 export interface HttpConnectionFailedCodexErrorInfo {
@@ -559,6 +660,25 @@ export interface ActiveTurnNotSteerableCodexErrorInfo {
     [k: string]: unknown | undefined;
   };
 }
+export interface MisalignmentErrorDetails {
+  /**
+   * A substantive localized explanation is required before offering continuation.
+   */
+  detailedExplanation?: string | null;
+  /**
+   * Open-ended classification; clients must accept categories added by Responses.
+   */
+  errorType?: string | null;
+  /**
+   * Instruction to submit as the next turn's user input if continuation is confirmed.
+   */
+  steer?: MisalignmentSteer | null;
+  [k: string]: unknown | undefined;
+}
+export interface MisalignmentSteer {
+  message: string;
+  [k: string]: unknown | undefined;
+}
 export interface ThreadStartedNotification {
   method: ThreadStartedNotificationMethod;
   params: ThreadStartedNotification1;
@@ -594,6 +714,14 @@ export interface Thread {
    */
   cwd: AbsolutePathBuf;
   /**
+   * Saved Daybreak choice, independent of turn execution. Null if unset.
+   */
+  daybreakEnabled?: boolean | null;
+  /**
+   * Current environments for a loaded thread, in priority order, primary first. `null` means the thread is not loaded or the server does not expose its selection. An empty list means no environments are selected. This does not report connection status.
+   */
+  environments?: ThreadEnvironment[] | null;
+  /**
    * Whether the thread is ephemeral and should not be materialized on disk.
    */
   ephemeral: boolean;
@@ -618,6 +746,10 @@ export interface Thread {
    */
   id: string;
   /**
+   * Current configured model when loaded, otherwise the latest persisted model. Null when unavailable. This is not per-turn execution telemetry.
+   */
+  model?: string | null;
+  /**
    * Model provider used for this thread (for example, 'openai').
    */
   modelProvider: string;
@@ -625,6 +757,10 @@ export interface Thread {
    * Optional user-facing thread title.
    */
   name?: string | null;
+  /**
+   * Originator recorded when the thread was created, independent of its current client or executor. Null when the recorded originator is unavailable.
+   */
+  originator?: string | null;
   /**
    * The ID of the parent thread. This will only be set if this thread is a subagent.
    */
@@ -641,6 +777,10 @@ export interface Thread {
    * Canonical project assignment owned by app-server, if any.
    */
   projectId: string | null;
+  /**
+   * Current configured reasoning effort when loaded, otherwise the latest persisted effort. Null when unset or unavailable. This is not per-turn execution telemetry.
+   */
+  reasoningEffort?: ReasoningEffort | null;
   /**
    * Unix timestamp (in seconds) used for thread recency ordering.
    */
@@ -670,13 +810,22 @@ export interface Thread {
    */
   threadSource?: ThreadSource | null;
   /**
-   * Only populated on `thread/resume`, `thread/rollback`, `thread/fork`, and `thread/read` (when `includeTurns` is true) responses. For all other responses and notifications returning a Thread, the turns field will be an empty list.
+   * Only populated on `thread/resume`, `thread/fork`, and `thread/read` (when `includeTurns` is true) responses. For all other responses and notifications returning a Thread, the turns field will be an empty list.
    */
   turns: Turn[];
   /**
    * Unix timestamp (in seconds) when the thread was last updated.
    */
   updatedAt: number;
+  [k: string]: unknown | undefined;
+}
+/**
+ * An environment selected by a loaded thread, independent of connection status.
+ */
+export interface ThreadEnvironment {
+  cwd: LegacyAppPathString;
+  environmentId: string;
+  runtimeWorkspaceRoots: LegacyAppPathString[];
   [k: string]: unknown | undefined;
 }
 /**
@@ -817,10 +966,12 @@ export interface ByteRange {
   start: number;
   [k: string]: unknown | undefined;
 }
-export interface ImageUserInput {
-  detail?: ImageDetail | null;
-  type: ImageUserInputType;
+export interface UrlUserInput {
   url: string;
+  [k: string]: unknown | undefined;
+}
+export interface FileIdUserInput {
+  fileId: string;
   [k: string]: unknown | undefined;
 }
 export interface LocalImageUserInput {
@@ -867,6 +1018,7 @@ export interface AgentMessageThreadItem {
   id: string;
   memoryCitation?: MemoryCitation | null;
   phase?: MessagePhase | null;
+  questions?: AsyncUserInputQuestion[] | null;
   text: string;
   type: AgentMessageThreadItemType;
   [k: string]: unknown | undefined;
@@ -881,6 +1033,41 @@ export interface MemoryCitationEntry {
   lineStart: number;
   note: string;
   path: string;
+  [k: string]: unknown | undefined;
+}
+export interface AsyncUserInputQuestion {
+  options?: string[] | null;
+  title: string;
+}
+export interface FunctionCallOutputThreadItem {
+  id: string;
+  name: string;
+  namespace?: string | null;
+  output: FunctionCallOutputBody;
+  type: FunctionCallOutputThreadItemType;
+  [k: string]: unknown | undefined;
+}
+export interface InputTextFunctionCallOutputContentItem {
+  text: string;
+  type: InputTextFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface ImageUrlFunctionCallOutputContentItem {
+  image_url: string;
+  [k: string]: unknown | undefined;
+}
+export interface FileIdFunctionCallOutputContentItem {
+  file_id: string;
+  [k: string]: unknown | undefined;
+}
+export interface InputAudioFunctionCallOutputContentItem {
+  audio_url: string;
+  type: InputAudioFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface EncryptedContentFunctionCallOutputContentItem {
+  encrypted_content: string;
+  type: EncryptedContentFunctionCallOutputContentItemType;
   [k: string]: unknown | undefined;
 }
 /**
@@ -1003,9 +1190,13 @@ export interface McpToolCallThreadItem {
   error?: McpToolCallError | null;
   id: string;
   /**
-   * Deprecated: use `appContext.resourceUri` instead.
+   * Legacy compatibility field; prefer `mcpAppUi.resourceUri` when available.
    */
   mcpAppResourceUri?: string | null;
+  /**
+   * Presentation captured from the invoked descriptor; absent in older history.
+   */
+  mcpAppUi?: McpAppUi | null;
   pluginId?: string | null;
   readOnlyHint?: boolean | null;
   result?: McpToolCallResult | null;
@@ -1025,6 +1216,14 @@ export interface McpToolCallAppContext {
 }
 export interface McpToolCallError {
   message: string;
+  [k: string]: unknown | undefined;
+}
+/**
+ * UI resource and display preference for model invocations, captured from the tool descriptor.
+ */
+export interface McpAppUi {
+  preferredModelDisplayMode: McpAppDisplayMode;
+  resourceUri: string;
   [k: string]: unknown | undefined;
 }
 export interface McpToolCallResult {
@@ -1279,6 +1478,22 @@ export interface ThreadNameUpdatedNotification1 {
   threadName?: string | null;
   [k: string]: unknown | undefined;
 }
+export interface ThreadAttachmentUpdatedNotification {
+  method: ThreadAttachmentUpdatedNotificationMethod;
+  params: ThreadAttachmentUpdatedNotification1;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Notification published after a thread attachment is created or deleted.
+ */
+export interface ThreadAttachmentUpdatedNotification1 {
+  attachmentId: string;
+  attachmentType: string;
+  identityKey: string;
+  operation: ThreadAttachmentOperation;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
 export interface ThreadGoalUpdatedNotification {
   method: ThreadGoalUpdatedNotificationMethod;
   params: ThreadGoalUpdatedNotification1;
@@ -1370,6 +1585,10 @@ export interface ThreadSettings {
   approvalsReviewer: ApprovalsReviewer;
   collaborationMode: CollaborationMode;
   cwd: AbsolutePathBuf;
+  /**
+   * Saved list of disabled plugin IDs. Does not yet filter plugin capabilities.
+   */
+  disabledPluginIds?: string[];
   effort?: ReasoningEffort | null;
   model: string;
   modelProvider: string;
@@ -1377,6 +1596,9 @@ export interface ThreadSettings {
    * @deprecated Always `explicitRequestOnly`. Use `effort` for Ultra behavior.
    */
   multiAgentMode?: MultiAgentMode & string;
+  /**
+   * @deprecated Reports the saved setting; `friendly` and `pragmatic` no longer select a style.
+   */
   personality?: Personality | null;
   sandboxPolicy: SandboxPolicy;
   serviceTier?: string | null;
@@ -1604,7 +1826,7 @@ export interface ItemGuardianApprovalReviewStartedNotification {
   /**
    * Identifier for the reviewed item or tool call when one exists.
    *
-   * In most cases, one review maps to one target item. The exceptions are - execve reviews, where a single command may contain multiple execve calls to review (only possible when using the shell_zsh_fork feature) - network policy reviews, where there is no target item
+   * In most cases, one review maps to one target item. The exceptions are - execve reviews, where a single command may contain multiple execve calls to review (only possible when using the shell_zsh_fork feature) - stdin reviews, which refer to the existing parent command item and have a separate approval ID in the action payload - network policy reviews, where there is no target item
    *
    * A network call is triggered by a CommandExecution item, so having a target_item_id set to the CommandExecution item would be misleading because the review is about the network call, not the command execution. Therefore, target_item_id is set to None for network policy reviews.
    */
@@ -1615,7 +1837,7 @@ export interface ItemGuardianApprovalReviewStartedNotification {
 }
 export interface CommandGuardianApprovalReviewAction {
   command: string;
-  cwd: AbsolutePathBuf;
+  cwd: LegacyAppPathString;
   source: GuardianCommandSource;
   type: CommandGuardianApprovalReviewActionType;
   [k: string]: unknown | undefined;
@@ -1628,9 +1850,20 @@ export interface ExecveGuardianApprovalReviewAction {
   type: ExecveGuardianApprovalReviewActionType;
   [k: string]: unknown | undefined;
 }
+/**
+ * A child approval for input to an existing command execution item.
+ */
+export interface WriteStdinGuardianApprovalReviewAction {
+  approvalId: string;
+  cwd: LegacyAppPathString;
+  processId: string;
+  stdin: string;
+  type: WriteStdinGuardianApprovalReviewActionType;
+  [k: string]: unknown | undefined;
+}
 export interface ApplyPatchGuardianApprovalReviewAction {
-  cwd: AbsolutePathBuf;
-  files: AbsolutePathBuf[];
+  cwd: LegacyAppPathString;
+  files: LegacyAppPathString[];
   type: ApplyPatchGuardianApprovalReviewActionType;
   [k: string]: unknown | undefined;
 }
@@ -1756,7 +1989,7 @@ export interface ItemGuardianApprovalReviewCompletedNotification {
   /**
    * Identifier for the reviewed item or tool call when one exists.
    *
-   * In most cases, one review maps to one target item. The exceptions are - execve reviews, where a single command may contain multiple execve calls to review (only possible when using the shell_zsh_fork feature) - network policy reviews, where there is no target item
+   * In most cases, one review maps to one target item. The exceptions are - execve reviews, where a single command may contain multiple execve calls to review (only possible when using the shell_zsh_fork feature) - stdin reviews, which refer to the existing parent command item and have a separate approval ID in the action payload - network policy reviews, where there is no target item
    *
    * A network call is triggered by a CommandExecution item, so having a target_item_id set to the CommandExecution item would be misleading because the review is about the network call, not the command execution. Therefore, target_item_id is set to None for network policy reviews.
    */
@@ -2036,6 +2269,21 @@ export interface McpServerStatusUpdatedNotification {
   threadId?: string | null;
   [k: string]: unknown | undefined;
 }
+export interface McpServerEventStreamNotificationNotification {
+  method: McpServerEventStreamNotificationNotificationMethod;
+  params: McpServerEventStreamNotification;
+  [k: string]: unknown | undefined;
+}
+export interface McpServerEventStreamNotification {
+  notification: McpServerEventNotification;
+  subscriptionId: string;
+  [k: string]: unknown | undefined;
+}
+export interface McpServerEventNotification {
+  method: string;
+  params: unknown;
+  [k: string]: unknown | undefined;
+}
 export interface AccountUpdatedNotification {
   method: AccountUpdatedNotificationMethod;
   params: AccountUpdatedNotification1;
@@ -2044,6 +2292,21 @@ export interface AccountUpdatedNotification {
 export interface AccountUpdatedNotification1 {
   authMode?: AuthMode | null;
   planType?: PlanType | null;
+  [k: string]: unknown | undefined;
+}
+export interface AccountGatewayOAuthChangedNotification {
+  method: AccountGatewayOAuthChangedNotificationMethod;
+  params: GatewayOAuthChangedNotification;
+  [k: string]: unknown | undefined;
+}
+export interface GatewayOAuthChangedNotification {
+  /**
+   * Authorization handoff, sent only to the connection that started login.
+   */
+  authUrl?: string | null;
+  error?: string | null;
+  providerId: string;
+  status: GatewayOAuthStatus;
   [k: string]: unknown | undefined;
 }
 export interface AccountRateLimitsUpdatedNotification {
@@ -2065,6 +2328,10 @@ export interface RateLimitSnapshot {
   individualLimit?: SpendControlLimitSnapshot | null;
   limitId?: string | null;
   limitName?: string | null;
+  /**
+   * Normal model whose display name and reasoning options describe this quota alias.
+   */
+  normalModelSlug?: string | null;
   planType?: PlanType | null;
   primary?: RateLimitWindow | null;
   rateLimitReachedType?: RateLimitReachedType | null;
@@ -2331,6 +2598,23 @@ export interface ModelVerificationNotification1 {
   verifications: ModelVerification[];
   [k: string]: unknown | undefined;
 }
+export interface ModelProviderAuthRecoveryStartedNotification {
+  method: ModelProviderAuthRecoveryStartedNotificationMethod;
+  params: AuthRecoveryNotification;
+  [k: string]: unknown | undefined;
+}
+export interface AuthRecoveryNotification {
+  message: string;
+  provider: string;
+  threadId: string;
+  turnId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ModelProviderAuthRecoveryCompletedNotification {
+  method: ModelProviderAuthRecoveryCompletedNotificationMethod;
+  params: AuthRecoveryNotification;
+  [k: string]: unknown | undefined;
+}
 export interface TurnModerationMetadataNotification {
   method: TurnModerationMetadataNotificationMethod;
   params: TurnModerationMetadataNotification1;
@@ -2501,6 +2785,81 @@ export interface ThreadRealtimeItemAddedNotification {
  */
 export interface ThreadRealtimeItemAddedNotification1 {
   item: unknown;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadRealtimeItemStartedNotification {
+  method: ThreadRealtimeItemStartedNotificationMethod;
+  params: ThreadRealtimeItemStartedNotification1;
+  [k: string]: unknown | undefined;
+}
+/**
+ * EXPERIMENTAL - a realtime timeline item started before its content streams.
+ */
+export interface ThreadRealtimeItemStartedNotification1 {
+  item: ThreadRealtimeItem;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
+export interface RealtimeSessionStartedThreadRealtimeItem {
+  type: RealtimeSessionStartedThreadRealtimeItemType;
+  [k: string]: unknown | undefined;
+}
+export interface TranscriptSegmentThreadRealtimeItem {
+  role: ThreadRealtimeTranscriptRole;
+  text: string;
+  type: TranscriptSegmentThreadRealtimeItemType;
+  [k: string]: unknown | undefined;
+}
+export interface BemItemPromotedThreadRealtimeItem {
+  item_id: string;
+  presentation: ThreadRealtimeBemItemPresentation;
+  turn_id: string;
+  type: BemItemPromotedThreadRealtimeItemType;
+  [k: string]: unknown | undefined;
+}
+export interface WholeItemThreadRealtimeBemItemPresentation {
+  type: WholeItemThreadRealtimeBemItemPresentationType;
+  [k: string]: unknown | undefined;
+}
+export interface InlineMarkdownThreadRealtimeBemItemPresentation {
+  type: InlineMarkdownThreadRealtimeBemItemPresentationType;
+  [k: string]: unknown | undefined;
+}
+export interface InlineVisualizationThreadRealtimeBemItemPresentation {
+  index: number;
+  type: InlineVisualizationThreadRealtimeBemItemPresentationType;
+  [k: string]: unknown | undefined;
+}
+export interface RealtimeSessionClosedThreadRealtimeItem {
+  outcome: ThreadRealtimeSessionOutcome;
+  type: RealtimeSessionClosedThreadRealtimeItemType;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadRealtimeItemTranscriptDeltaNotification {
+  method: ThreadRealtimeItemTranscriptDeltaNotificationMethod;
+  params: ThreadRealtimeItemTranscriptDeltaNotification1;
+  [k: string]: unknown | undefined;
+}
+/**
+ * EXPERIMENTAL - text appended to an active realtime transcript item.
+ */
+export interface ThreadRealtimeItemTranscriptDeltaNotification1 {
+  delta: string;
+  itemId: string;
+  threadId: string;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadRealtimeItemCompletedNotification {
+  method: ThreadRealtimeItemCompletedNotificationMethod;
+  params: ThreadRealtimeItemCompletedNotification1;
+  [k: string]: unknown | undefined;
+}
+/**
+ * EXPERIMENTAL - a realtime timeline item published after canonical commit.
+ */
+export interface ThreadRealtimeItemCompletedNotification1 {
+  item: ThreadRealtimeItem;
   threadId: string;
   [k: string]: unknown | undefined;
 }

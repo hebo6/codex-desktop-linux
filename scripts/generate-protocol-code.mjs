@@ -381,7 +381,7 @@ for (const { schemaPath } of schemaDeclarations) {
 
 for (const { typeName, schemaPath } of schemaDeclarations) {
   const schema = schemas.get(schemaPath);
-  const source = await compile(schema, typeName, {
+  const source = await compile(prepareTypeSchema(structuredClone(schema)), typeName, {
     additionalProperties: true,
     bannerComment: generatedHeader.trimEnd(),
     cwd: schemaDirectory,
@@ -633,6 +633,31 @@ function toPascalCase(value) {
 
 function lowerFirst(value) {
   return `${value[0].toLowerCase()}${value.slice(1)}`;
+}
+
+function prepareTypeSchema(value) {
+  if (Array.isArray(value)) {
+    return value.map(prepareTypeSchema);
+  }
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    value[key] = prepareTypeSchema(child);
+  }
+  if (value.properties !== undefined && Array.isArray(value.anyOf)) {
+    // json-schema-to-typescript 会丢弃 anyOf 旁的共同字段，显式交集保留判别字段
+    const { anyOf, title, description, $schema, $id, definitions, ...common } = value;
+    return {
+      ...(title === undefined ? {} : { title }),
+      ...(description === undefined ? {} : { description }),
+      ...($schema === undefined ? {} : { $schema }),
+      ...($id === undefined ? {} : { $id }),
+      ...(definitions === undefined ? {} : { definitions }),
+      allOf: [common, { anyOf }],
+    };
+  }
+  return value;
 }
 
 function prepareValidationSchema(value) {

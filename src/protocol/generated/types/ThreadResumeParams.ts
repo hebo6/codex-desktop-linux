@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
 /**
@@ -20,12 +20,18 @@ export type ResponseItem =
   | WebSearchCallResponseItem
   | ImageGenerationCallResponseItem
   | CompactionResponseItem
+  | ConfigurationUpdateResponseItem
   | CompactionTriggerResponseItem
   | ContextCompactionResponseItem
   | OtherResponseItem;
 export type ContentItem =
   InputTextContentItem | InputImageContentItem | InputAudioContentItem | OutputTextContentItem;
 export type InputTextContentItemType = "input_text";
+export type InputImageContentItem = {
+  detail?: ImageDetail | null;
+  type: InputImageContentItemType;
+  [k: string]: unknown | undefined;
+} & (ImageUrlContentItem | FileIdContentItem);
 export type ImageDetail = "auto" | "low" | "high" | "original";
 export type InputImageContentItemType = "input_image";
 export type InputAudioContentItemType = "input_audio";
@@ -64,6 +70,11 @@ export type FunctionCallOutputContentItem =
   | InputAudioFunctionCallOutputContentItem
   | EncryptedContentFunctionCallOutputContentItem;
 export type InputTextFunctionCallOutputContentItemType = "input_text";
+export type InputImageFunctionCallOutputContentItem = {
+  detail?: ImageDetail | null;
+  type: InputImageFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+} & (ImageUrlFunctionCallOutputContentItem | FileIdFunctionCallOutputContentItem);
 export type InputImageFunctionCallOutputContentItemType = "input_image";
 export type InputAudioFunctionCallOutputContentItemType = "input_audio";
 export type EncryptedContentFunctionCallOutputContentItemType = "encrypted_content";
@@ -83,11 +94,19 @@ export type OtherResponsesApiWebSearchActionType = "other";
 export type WebSearchCallResponseItemType = "web_search_call";
 export type ImageGenerationCallResponseItemType = "image_generation_call";
 export type CompactionResponseItemType = "compaction";
+/**
+ * A non-empty reasoning effort value advertised by the model.
+ */
+export type ReasoningEffort = string;
+export type ConfigurationUpdateResponseItemType = "configuration_update";
 export type CompactionTriggerResponseItemType = "compaction_trigger";
 export type ContextCompactionResponseItemType = "context_compaction";
 export type OtherResponseItemType = "other";
 export type TurnItemsView = "notLoaded" | "summary" | "full";
 export type SortDirection = "asc" | "desc";
+/**
+ * Deprecated: `friendly` and `pragmatic` no longer select a style.
+ */
 export type Personality = "none" | "friendly" | "pragmatic";
 /**
  * A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).
@@ -119,7 +138,7 @@ export interface ThreadResumeParams {
   cwd?: string | null;
   developerInstructions?: string | null;
   /**
-   * When true, return only thread metadata and live-resume state without populating `thread.turns`. This is useful when the client plans to call `thread/turns/list` immediately after resuming.
+   * When true, return only thread metadata and live-resume state without populating `thread.turns`. This is useful when the client plans to call `thread/turns/list` immediately after resuming. Full-history hydration is deprecated for paginated threads; use this with `thread/turns/list` and `thread/items/list` instead.
    */
   excludeTurns?: boolean;
   /**
@@ -143,6 +162,9 @@ export interface ThreadResumeParams {
    * Named profile id for the resumed thread. Cannot be combined with `sandbox`.
    */
   permissions?: string | null;
+  /**
+   * @deprecated `friendly` and `pragmatic` no longer select a style. Changing this does not rewrite the thread's existing instructions.
+   */
   personality?: Personality | null;
   /**
    * Replace the thread's runtime workspace roots. Paths must be absolute.
@@ -177,10 +199,12 @@ export interface InputTextContentItem {
   type: InputTextContentItemType;
   [k: string]: unknown | undefined;
 }
-export interface InputImageContentItem {
-  detail?: ImageDetail | null;
+export interface ImageUrlContentItem {
   image_url: string;
-  type: InputImageContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface FileIdContentItem {
+  file_id: string;
   [k: string]: unknown | undefined;
 }
 export interface InputAudioContentItem {
@@ -293,9 +317,11 @@ export interface ToolSearchCallResponseItem {
   [k: string]: unknown | undefined;
 }
 export interface FunctionCallOutputResponseItem {
-  call_id: string;
+  call_id?: string | null;
   id?: string | null;
   internal_chat_message_metadata_passthrough?: InternalChatMessageMetadataPassthrough | null;
+  name?: string | null;
+  namespace?: string | null;
   output: FunctionCallOutputBody;
   type: FunctionCallOutputResponseItemType;
   [k: string]: unknown | undefined;
@@ -305,10 +331,12 @@ export interface InputTextFunctionCallOutputContentItem {
   type: InputTextFunctionCallOutputContentItemType;
   [k: string]: unknown | undefined;
 }
-export interface InputImageFunctionCallOutputContentItem {
-  detail?: ImageDetail | null;
+export interface ImageUrlFunctionCallOutputContentItem {
   image_url: string;
-  type: InputImageFunctionCallOutputContentItemType;
+  [k: string]: unknown | undefined;
+}
+export interface FileIdFunctionCallOutputContentItem {
+  file_id: string;
   [k: string]: unknown | undefined;
 }
 export interface InputAudioFunctionCallOutputContentItem {
@@ -394,6 +422,21 @@ export interface CompactionResponseItem {
   id?: string | null;
   internal_chat_message_metadata_passthrough?: InternalChatMessageMetadataPassthrough | null;
   type: CompactionResponseItemType;
+  [k: string]: unknown | undefined;
+}
+/**
+ * A durable input control interpreted by the backend at its position in history.
+ */
+export interface ConfigurationUpdateResponseItem {
+  reasoning: ConfigurationReasoning;
+  type: ConfigurationUpdateResponseItemType;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Reasoning settings interpreted by the backend for the routed model.
+ */
+export interface ConfigurationReasoning {
+  effort: ReasoningEffort;
   [k: string]: unknown | undefined;
 }
 export interface CompactionTriggerResponseItem {

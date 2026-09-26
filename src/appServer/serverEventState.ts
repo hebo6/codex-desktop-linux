@@ -22,6 +22,7 @@ const transient = "断线后标记未知；等待新通知，不推断完成";
 
 // This is deliberately exhaustive: a protocol update must choose a consumer and recovery contract.
 export const SERVER_NOTIFICATION_POLICIES = {
+  "account/gatewayOAuth/changed": policy("serverEvents", "按提供方替换网关认证状态，不保存授权URL", "account/gatewayOAuth/read"),
   "account/login/completed": policy("serverEvents", "记录登录结果，触发账户刷新", "account/read"),
   "account/rateLimits/updated": policy("account", "合并稀疏限额值；null不清除已有元数据", "account/rateLimits/read"),
   "account/updated": policy("account", "刷新账户身份和用量", "account/read"),
@@ -53,11 +54,14 @@ export const SERVER_NOTIFICATION_POLICIES = {
   "item/reasoning/summaryTextDelta": policy("conversation", "按summaryIndex追加推理摘要", history),
   "item/reasoning/textDelta": policy("conversation", "按contentIndex追加推理正文", history),
   "item/started": policy("conversation", "建立会话item及MCP生命周期", history),
+  "mcpServer/event/stream/notification": policy("serverEvents", "记录订阅及事件方法，不解释或保存事件载荷", "重新建立MCP事件订阅"),
   "mcpServer/oauthLogin/completed": policy("serverEvents", "显示OAuth结果并使MCP状态失效", "mcpServerStatus/list"),
   "mcpServer/startupStatus/updated": policy("serverEvents", "按会话和服务器名称替换启动状态", "mcpServerStatus/list"),
   "model/rerouted": policy("serverEvents", "记录模型切换原因与实际模型", transient),
   "model/safetyBuffering/updated": policy("serverEvents", "替换缓冲状态、原因和更快模型建议", transient),
   "model/verification": policy("serverEvents", "替换回合模型验证快照", transient),
+  "modelProvider/authRecoveryCompleted": policy("serverEvents", "按回合和提供方完成认证恢复状态", transient),
+  "modelProvider/authRecoveryStarted": policy("serverEvents", "按回合和提供方建立认证恢复状态", transient),
   "process/exited": policy("serverEvents", "收尾分流输出，合并非流式捕获并记录退出码", "断线后进程状态未知"),
   "process/outputDelta": policy("serverEvents", "按processHandle及流增量解码base64字节", "断线后进程状态未知"),
   "project/changed": policy("serverEvents", "保存项目变更类型并使项目缓存失效", "project/list"),
@@ -65,6 +69,7 @@ export const SERVER_NOTIFICATION_POLICIES = {
   "serverRequest/resolved": policy("interaction", "移除其他客户端已完成的待处理交互", "断线清除待处理请求"),
   "skills/changed": policy("serverEvents", "使当前技能查询失效", "skills/list使用当前查询参数"),
   "thread/archived": policy("conversation", "更新会话归档列表", "thread/list"),
+  "thread/attachment/updated": policy("serverEvents", "按附件替换创建或删除状态", "thread/attachment/list"),
   "thread/closed": policy("serverEvents", "结束会话订阅，把未完成瞬时活动标未知", "重新订阅并读取thread/read"),
   "thread/compacted": policy("serverEvents", "记录已弃用压缩通知，不伪造历史item", history),
   "thread/deleted": policy("serverEvents", "删除该会话所有附加状态和活动", "thread/list"),
@@ -77,6 +82,9 @@ export const SERVER_NOTIFICATION_POLICIES = {
   "thread/queue/changed": policy("serverEvents", "递增队列版本并查询全量队列", "thread/queue/list"),
   "thread/realtime/closed": policy("serverEvents", "结束实时流并保存关闭原因", "重新建立实时会话"),
   "thread/realtime/error": policy("serverEvents", "标记实时流失败并保存原因", "重新建立实时会话"),
+  "thread/realtime/item/completed": policy("serverEvents", "以规范时间线条目替换最终记录，不重复合入扁平转写流", "thread/timeline/list"),
+  "thread/realtime/item/started": policy("serverEvents", "以item.id建立实时条目状态，不重复合入扁平转写流", "thread/timeline/list"),
+  "thread/realtime/item/transcript/delta": policy("serverEvents", "按itemId追加实时条目文本，不重复合入扁平转写流", "thread/timeline/list"),
   "thread/realtime/itemAdded": policy("serverEvents", "保存有界非音频实时条目", "不重放瞬时条目"),
   "thread/realtime/outputAudio/delta": policy("serverEvents", "计数音频字节，保留有界最新片段及格式", "音频无法重放；明确标记丢弃"),
   "thread/realtime/sdp": policy("serverEvents", "替换远端SDP协商描述", "重新协商实时连接"),
@@ -303,6 +311,11 @@ export class ServerEventStore {
         this.record(notification, `MCP 认证 · ${p.name}`, p.success ? "认证成功" : p.error ?? "认证失败", p.success ? "completed" : "failed", undefined, p.threadId ?? undefined);
         break;
       }
+      case "mcpServer/event/stream/notification": {
+        const p = notification.params;
+        this.record(notification, "MCP 订阅事件", `${p.subscriptionId} · ${p.notification.method}`, "info", undefined, undefined, undefined, undefined, false);
+        break;
+      }
       case "error": {
         const p = notification.params;
         this.record(notification, p.willRetry ? "正在重试" : "回合错误", p.error.message, p.willRetry ? "running" : "failed", keyOf("error", p.threadId, p.turnId), p.threadId, p.turnId, p.error.additionalDetails ?? undefined);
@@ -331,6 +344,12 @@ export class ServerEventStore {
       case "model/verification": {
         const p = notification.params;
         this.record(notification, "模型验证", `${p.verifications.length} 项验证结果`, "info", keyOf("verification", p.threadId, p.turnId), p.threadId, p.turnId);
+        break;
+      }
+      case "modelProvider/authRecoveryStarted":
+      case "modelProvider/authRecoveryCompleted": {
+        const p = notification.params;
+        this.record(notification, `模型认证恢复 · ${p.provider}`, p.message, notification.method === "modelProvider/authRecoveryStarted" ? "running" : "completed", keyOf("auth-recovery", p.threadId, p.turnId, p.provider), p.threadId, p.turnId);
         break;
       }
       case "turn/moderationMetadata":
@@ -402,6 +421,17 @@ export class ServerEventStore {
       case "account/login/completed":
         this.record(notification, "账户登录", notification.params.success ? "登录成功" : notification.params.error ?? "登录失败", notification.params.success ? "completed" : "failed");
         break;
+      case "account/gatewayOAuth/changed": {
+        const p = notification.params;
+        const statuses = { notReady: "warning", started: "running", succeeded: "completed", failed: "failed" } satisfies Record<typeof p.status, ServerEventStatus>;
+        this.record(notification, `网关认证 · ${p.providerId}`, p.error ?? p.status, statuses[p.status], keyOf("gateway-oauth", p.providerId), undefined, undefined, undefined, false);
+        break;
+      }
+      case "thread/attachment/updated": {
+        const p = notification.params;
+        this.record(notification, p.operation === "created" ? "会话附件已创建" : "会话附件已删除", `${p.attachmentType} · ${p.attachmentId}`, "completed", keyOf("attachment", p.threadId, p.attachmentId), p.threadId);
+        break;
+      }
       case "windows/worldWritableWarning":
         this.record(notification, "Windows 沙箱目录告警", notification.params.failedScan ? "目录权限扫描失败" : `检测到所有用户可写的目录，另有 ${notification.params.extraCount} 条路径`, "warning", undefined, undefined, undefined, notification.params.samplePaths.join("\n"));
         break;
@@ -410,6 +440,9 @@ export class ServerEventStore {
         break;
       case "thread/realtime/started":
       case "thread/realtime/itemAdded":
+      case "thread/realtime/item/started":
+      case "thread/realtime/item/transcript/delta":
+      case "thread/realtime/item/completed":
       case "thread/realtime/transcript/delta":
       case "thread/realtime/transcript/done":
       case "thread/realtime/outputAudio/delta":
@@ -663,6 +696,21 @@ export class ServerEventStore {
       case "thread/realtime/itemAdded":
         this.record(notification, "实时会话条目", "收到实时会话内容", "info", undefined, threadId);
         break;
+      case "thread/realtime/item/started":
+      case "thread/realtime/item/completed": {
+        const item = notification.params.item;
+        const completed = notification.method === "thread/realtime/item/completed";
+        const status = item.type === "realtimeSessionClosed" && item.outcome === "failed" ? "failed" : completed ? "completed" : "running";
+        this.record(notification, "实时会话条目", item.type, status, keyOf("realtime-item", threadId, item.id), threadId, undefined, item.type === "transcriptSegment" ? item.text : undefined);
+        break;
+      }
+      case "thread/realtime/item/transcript/delta": {
+        const p = notification.params;
+        const id = keyOf("realtime-item", threadId, p.itemId);
+        const text = (this.snapshot.records.find((entry) => entry.id === id)?.text ?? "") + p.delta;
+        this.record(notification, "实时会话条目", "transcriptSegment", "running", id, threadId, undefined, text, false);
+        break;
+      }
       case "thread/realtime/transcript/delta":
       case "thread/realtime/transcript/done": {
         const p = notification.params;

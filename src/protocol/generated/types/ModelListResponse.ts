@@ -1,6 +1,10 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
+/**
+ * Requested cyber treatment for a ChatGPT-authenticated Codex turn. Authorization and model-tier restrictions remain server-owned.
+ */
+export type CyberAccessProgram = "standard" | "daybreakBlue" | "daybreakRed";
 /**
  * A non-empty reasoning effort value advertised by the model.
  */
@@ -28,6 +32,10 @@ export interface Model {
    */
   additionalSpeedTiers?: string[];
   availabilityNux?: ModelAvailabilityNux | null;
+  /**
+   * Null when the catalog does not provide access-program metadata.
+   */
+  availableAccessPrograms?: ModelAccessPrograms | null;
   defaultReasoningEffort: ReasoningEffort;
   /**
    * Catalog default service tier id for this model, when one is configured.
@@ -47,6 +55,9 @@ export interface Model {
   multiAgentVersion?: MultiAgentVersion | null;
   serviceTiers?: ModelServiceTier[];
   supportedReasoningEfforts: ReasoningEffortOption[];
+  /**
+   * @deprecated Always false; models no longer support personality selection.
+   */
   supportsPersonality?: boolean;
   upgrade?: string | null;
   upgradeInfo?: ModelUpgradeInfo | null;
@@ -54,6 +65,16 @@ export interface Model {
 }
 export interface ModelAvailabilityNux {
   message: string;
+  [k: string]: unknown | undefined;
+}
+/**
+ * Caller-specific explicit access programs advertised by model discovery.
+ */
+export interface ModelAccessPrograms {
+  /**
+   * Accepted explicit selections.
+   */
+  cyber: CyberAccessProgram[];
   [k: string]: unknown | undefined;
 }
 export interface ModelServiceTier {

@@ -5,8 +5,8 @@
 | 项目 | 值 |
 | --- | --- |
 | 上游仓库 | [openai/codex](https://github.com/openai/codex) |
-| 上游提交 | `657bd889ae28edcbf5395c103b479bf8b328704e` |
-| Codex CLI 版本 | `codex-cli 0.149.0` |
+| 上游提交 | `36650394c5b38c2990ccf2a3457165ca3e9d9726` |
+| Codex CLI 版本 | `codex-cli 0.157.1` |
 | 上游生成命令 | `codex app-server generate-json-schema --experimental --out <目录>` |
 | 固化目录 | `protocol/schema` |
 
@@ -38,14 +38,14 @@
 
 ## 固化产物
 
-`protocol/schema/UPSTREAM_COMMIT` 记录上游完整提交号，`protocol/schema/SHA256SUMS` 记录全部 401 个 JSON 文件按相对路径排序后的 SHA256
+`protocol/schema/UPSTREAM_COMMIT` 记录上游完整提交号，`protocol/schema/SHA256SUMS` 记录全部 440 个 JSON 文件按相对路径排序后的 SHA256
 
 两个聚合入口的校验值如下
 
 | 文件 | SHA256 |
 | --- | --- |
-| `codex_app_server_protocol.schemas.json` | `4f4a8d8f53f971b97f818639f58c8d26bb68bfcdfa2d2f20572cb97e6761ab91` |
-| `codex_app_server_protocol.v2.schemas.json` | `6f76cce25156d405f1da54f205751e38f7b9eb42246ac0742b9958dd60275350` |
+| `codex_app_server_protocol.schemas.json` | `d6d70a4b2af4c6bb03dee46af2cda9c8b7b4d656cd5a55c54f748146985cdb43` |
+| `codex_app_server_protocol.v2.schemas.json` | `dae22897ba9e48d9f3a8f65c4353f2a62b4c24be31bd9893f7cd8e1c7601076c` |
 
 `codex_app_server_protocol.schemas.json` 是完整命名空间聚合包，`codex_app_server_protocol.v2.schemas.json` 是扁平化 v2 聚合包，目录内其余 JSON 文件是请求、响应、通知及共享负载的独立 Schema
 
@@ -66,6 +66,8 @@ pnpm protocol:check
 该命令会先使用 Node.js 内置加密模块校验清单路径、JSON 文件全集和全部 SHA256，不依赖系统 `sha256sum` 命令，也不会重新构建上游 Schema
 
 生成物位于 `src/protocol/generated`，每个文件都记录固定上游提交并禁止手动修改
+
+Schema 同时包含对象公共字段与 `anyOf` 时，类型生成前等价改写为显式交集，保留图片输入等联合类型的共同判别字段；运行时校验继续使用原始 Schema 约束
 
 `src/protocol/validation` 在 envelope 校验后继续按服务端方法和参数执行二级校验，并只生成不含原始字段值的错误摘要
 

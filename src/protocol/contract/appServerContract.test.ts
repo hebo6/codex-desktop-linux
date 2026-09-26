@@ -175,6 +175,7 @@ describe("脱敏 app-server 协议契约", () => {
     const router = new RpcRouter({
       boundary: schemaProtocolBoundary,
       queueCapacity: 1,
+      serverRequestCapacity: recording.serverRequests.length + 2,
     });
     const epoch = router.open(writer);
     const initialization = router.initialize(initializationParams());
@@ -191,6 +192,10 @@ describe("脱敏 app-server 协议契约", () => {
     );
     for (const message of recording.serverRequests) {
       await router.handleIncoming(epoch, message);
+      await vi.waitFor(() => expect(writer.messages).toContainEqual({
+        id: recordOf(message).id,
+        result: { accepted: true },
+      }));
     }
     await router.handleIncoming(epoch, {
       id: "server-unknown",

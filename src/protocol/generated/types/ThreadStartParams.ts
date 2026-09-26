@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
 /**
@@ -17,6 +17,9 @@ export type ThreadHistoryMode = "legacy" | "paginated";
  * Controls the effective multi-agent delegation instructions for a turn. `custom` means the configured mode hint defines the policy instead of a built-in policy.
  */
 export type MultiAgentMode = ("explicitRequestOnly" | "proactive") | CustomMultiAgentMode;
+/**
+ * Deprecated: `friendly` and `pragmatic` no longer select a style.
+ */
 export type Personality = "none" | "friendly" | "pragmatic";
 /**
  * A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).
@@ -48,6 +51,10 @@ export interface ThreadStartParams {
     [k: string]: unknown | undefined;
   } | null;
   cwd?: string | null;
+  /**
+   * Initial Daybreak choice for this persistent thread. Omitted or null leaves it unset. This does not select a turn's `cyberAccessProgram` or grant access. Not supported for ephemeral threads.
+   */
+  daybreakEnabled?: boolean | null;
   developerInstructions?: string | null;
   dynamicTools?: DynamicToolSpec[] | null;
   /**
@@ -79,6 +86,9 @@ export interface ThreadStartParams {
    * Named profile id for this thread. Cannot be combined with `sandbox`.
    */
   permissions?: string | null;
+  /**
+   * @deprecated `friendly` and `pragmatic` no longer select a style.
+   */
   personality?: Personality | null;
   /**
    * Optional project identity for this new thread. Durable threads persist the assignment; ephemeral threads expose it only in live responses.

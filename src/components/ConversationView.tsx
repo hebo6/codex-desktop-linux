@@ -1403,6 +1403,14 @@ function ItemView({
           ))}
         </ActivityDisclosure>
       );
+    case "functionCallOutput":
+      return (
+        <ActivityDisclosure label={`工具结果 · ${item.name}`} status="completed">
+          {typeof item.output === "string"
+            ? <pre>{item.output}</pre>
+            : <JsonBlock value={item.output} />}
+        </ActivityDisclosure>
+      );
     case "agentMessage":
       return (
         <AgentMessage
@@ -1616,6 +1624,9 @@ function UserMessageBody({
           case "mention":
             return <span className={styles.chip} key={index}>@{input.name}</span>;
           case "image":
+            if (typeof input.url !== "string") {
+              return <span className={styles.attachment} key={index}>图片附件</span>;
+            }
             return (
               <UserImageAttachment
                 blobUrlFactory={blobUrlFactory}
@@ -2689,6 +2700,7 @@ function isWorkActivity(item: ThreadItem): boolean {
   }
   return [
     "hookPrompt",
+    "functionCallOutput",
     "plan",
     "reasoning",
     "commandExecution",

@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAskForApproval;
 /**
@@ -7,6 +7,7 @@ export type AskForApproval = ("untrusted" | "on-request" | "never") | GranularAs
  */
 export type ApprovalsReviewer = "user" | "auto_review" | "guardian_subagent";
 export type AppToolApproval = "auto" | "prompt" | "writes" | "approve";
+export type AllowDenyRequirement = "allow" | "deny";
 /**
  * Backward-compatible API shape for ChatGPT workspace login restrictions.
  */
@@ -74,7 +75,9 @@ export interface Config {
    */
   approvals_reviewer?: ApprovalsReviewer | null;
   apps?: AppsConfig | null;
+  browser_use?: BrowserUseConfig | null;
   compact_prompt?: string | null;
+  computer_use?: ComputerUseConfig | null;
   desktop?: {
     [k: string]: unknown | undefined;
   } | null;
@@ -122,6 +125,47 @@ export interface AppsDefaultConfig {
   destructive_enabled?: boolean;
   enabled?: boolean;
   open_world_enabled?: boolean;
+  [k: string]: unknown | undefined;
+}
+export interface BrowserUseConfig {
+  allow_history_access?: boolean | null;
+  default_origin_policy?: BrowserUseOriginPolicyConfig | null;
+  origins?: {
+    [k: string]: BrowserUseOriginPolicyConfig;
+  } | null;
+  [k: string]: unknown | undefined;
+}
+export interface BrowserUseOriginPolicyConfig {
+  access?: AllowDenyRequirement | null;
+  downloads?: AllowDenyRequirement | null;
+  full_cdp_access?: AllowDenyRequirement | null;
+  uploads?: AllowDenyRequirement | null;
+  [k: string]: unknown | undefined;
+}
+export interface ComputerUseConfig {
+  default_app_access?: AllowDenyRequirement | null;
+  macos?: ComputerUseMacosConfig | null;
+  windows?: ComputerUseWindowsConfig | null;
+  [k: string]: unknown | undefined;
+}
+export interface ComputerUseMacosConfig {
+  bundle_ids?: {
+    [k: string]: AllowDenyRequirement;
+  } | null;
+  [k: string]: unknown | undefined;
+}
+export interface ComputerUseWindowsConfig {
+  aumids?: {
+    [k: string]: AllowDenyRequirement;
+  } | null;
+  exes?: ComputerUseWindowsExeConfig[] | null;
+  [k: string]: unknown | undefined;
+}
+export interface ComputerUseWindowsExeConfig {
+  access: AllowDenyRequirement;
+  binary_name?: string | null;
+  product_name: string;
+  publisher_name: string;
   [k: string]: unknown | undefined;
 }
 export interface SandboxWorkspaceWrite {

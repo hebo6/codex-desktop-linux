@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 /**
  * A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).
@@ -31,6 +31,10 @@ export interface SkillMetadata {
   interface?: SkillInterface | null;
   name: string;
   path: AbsolutePathBuf;
+  /**
+   * Owning plugin ID, matching `PluginSummary.id`, when known.
+   */
+  pluginId?: string | null;
   scope: SkillScope;
   /**
    * Legacy short_description from SKILL.md. Prefer SKILL.json interface.short_description.

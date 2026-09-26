@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
-import type { ClientRequest } from "../generated";
+import type { ClientRequest, ThreadItemsListResponse } from "../generated";
 import {
   parseJsonRpcMessage,
   validateConfigReadResponse,
@@ -19,6 +19,33 @@ import {
 } from ".";
 
 describe("协议运行时边界", () => {
+  it("图片输入保留共同判别字段，同时接受 URL 和文件 ID", () => {
+    type UserInput = Extract<
+      ThreadItemsListResponse["data"][number]["item"],
+      { type: "userMessage" }
+    >["content"][number];
+    const images: Extract<UserInput, { type: "image" }>[] = [
+      { type: "image", url: "https://example.com/image.png" },
+      { type: "image", fileId: "file-example" },
+    ];
+    expectTypeOf(images[0]!.type).toEqualTypeOf<"image">();
+    const page = {
+      data: [{
+        turnId: "turn-1",
+        item: { id: "user-1", type: "userMessage", content: images },
+      }],
+      nextCursor: null,
+    };
+    expect(validateThreadItemsListResponse(page).ok).toBe(true);
+    expect(validateThreadItemsListResponse({
+      ...page,
+      data: [{
+        ...page.data[0],
+        item: { ...page.data[0]!.item, content: [{ url: "https://example.com/image.png" }] },
+      }],
+    }).ok).toBe(false);
+  });
+
   it("接受固定 Schema 中的稳定服务端通知", () => {
     expect(
       validateServerNotification({
@@ -240,6 +267,56 @@ describe("协议运行时边界", () => {
     if (!invalid.ok) {
       expect(invalid.error.summary).not.toContain("secret-value");
     }
+  });
+
+  describe("子 agent 完成记录", () => {
+    const completedActivity = {
+      agentPath: "/root/review",
+      agentThreadId: "agent-thread-1",
+      id: "activity-1",
+      kind: "completed",
+      type: "subAgentActivity",
+    };
+
+    it("接受包含普通记录和 completed 子 agent 记录的历史分页响应", () => {
+      expect(validateThreadItemsListResponse({
+        data: [
+          {
+            item: { id: "message-1", text: "检查完成", type: "agentMessage" },
+            turnId: "turn-1",
+          },
+          { item: completedActivity, turnId: "turn-1" },
+        ],
+        nextCursor: "older-items",
+      }).ok).toBe(true);
+    });
+
+    it.each([
+      ["item/started", { startedAtMs: 100 }],
+      ["item/completed", { completedAtMs: 100 }],
+    ] as const)("接受 %s 通知中的 completed 子 agent 记录", (method, timestamp) => {
+      expect(validateServerNotification({
+        method,
+        params: {
+          ...timestamp,
+          item: completedActivity,
+          threadId: "thread-1",
+          turnId: "turn-1",
+        },
+      }).ok).toBe(true);
+    });
+
+    it("仍拒绝非法的子 agent 活动类型", () => {
+      const item = { ...completedActivity, kind: "invalid-kind" };
+      expect(validateThreadItemsListResponse({
+        data: [{ item, turnId: "turn-1" }],
+        nextCursor: null,
+      }).ok).toBe(false);
+      expect(validateServerNotification({
+        method: "item/completed",
+        params: { completedAtMs: 100, item, threadId: "thread-1", turnId: "turn-1" },
+      }).ok).toBe(false);
+    });
   });
 
   it("按 int32、uint、uint16、uint32 和 uint64 边界拒绝越界值", () => {

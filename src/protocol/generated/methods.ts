@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 export const KNOWN_SERVER_REQUEST_METHODS = [
   "account/chatgptAuthTokens/refresh",
   "applyPatchApproval",
@@ -23,6 +23,7 @@ export function isKnownServerRequestMethod(method: string): method is KnownServe
 }
 
 export const KNOWN_SERVER_NOTIFICATION_METHODS = [
+  "account/gatewayOAuth/changed",
   "account/login/completed",
   "account/rateLimits/updated",
   "account/updated",
@@ -54,11 +55,14 @@ export const KNOWN_SERVER_NOTIFICATION_METHODS = [
   "item/reasoning/summaryTextDelta",
   "item/reasoning/textDelta",
   "item/started",
+  "mcpServer/event/stream/notification",
   "mcpServer/oauthLogin/completed",
   "mcpServer/startupStatus/updated",
   "model/rerouted",
   "model/safetyBuffering/updated",
   "model/verification",
+  "modelProvider/authRecoveryCompleted",
+  "modelProvider/authRecoveryStarted",
   "process/exited",
   "process/outputDelta",
   "project/changed",
@@ -66,6 +70,7 @@ export const KNOWN_SERVER_NOTIFICATION_METHODS = [
   "serverRequest/resolved",
   "skills/changed",
   "thread/archived",
+  "thread/attachment/updated",
   "thread/closed",
   "thread/compacted",
   "thread/deleted",
@@ -78,6 +83,9 @@ export const KNOWN_SERVER_NOTIFICATION_METHODS = [
   "thread/queue/changed",
   "thread/realtime/closed",
   "thread/realtime/error",
+  "thread/realtime/item/completed",
+  "thread/realtime/item/started",
+  "thread/realtime/item/transcript/delta",
   "thread/realtime/itemAdded",
   "thread/realtime/outputAudio/delta",
   "thread/realtime/sdp",

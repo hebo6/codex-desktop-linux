@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 /**
  * A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).
@@ -11,6 +11,14 @@ export type PluginAuthPolicy = "ON_INSTALL" | "ON_USE";
 export type PluginAvailability = "DISABLED_BY_ADMIN" | "AVAILABLE";
 export type PluginDisabledReason =
   "disabled_by_admin" | "plan_not_eligible" | "required_app_unavailable" | "unknown";
+export type PluginEntrypoint =
+  GlobalPluginEntrypoint | SettingsPluginEntrypoint | ThreadPluginEntrypoint | FilePluginEntrypoint;
+export type PluginQuickActionTarget = ToolPluginQuickActionTarget;
+export type ToolPluginQuickActionTargetType = "tool";
+export type GlobalPluginEntrypointType = "global";
+export type SettingsPluginEntrypointType = "settings";
+export type ThreadPluginEntrypointType = "thread";
+export type FilePluginEntrypointType = "file";
 export type PluginInstallPolicy = "NOT_AVAILABLE" | "AVAILABLE" | "INSTALLED_BY_DEFAULT";
 export type PluginInstallPolicySource = "WORKSPACE_SETTING" | "IMPLICIT_CANONICAL_APP";
 export type PluginShareDiscoverability = "LISTED" | "UNLISTED" | "PRIVATE";
@@ -63,6 +71,7 @@ export interface PluginSummary {
    */
   eligiblePlanTypes?: string[] | null;
   enabled: boolean;
+  extensions?: PluginExtensions | null;
   id: string;
   installPolicy: PluginInstallPolicy;
   installPolicySource?: PluginInstallPolicySource | null;
@@ -92,6 +101,93 @@ export interface PluginSummary {
    * Version advertised by the remote marketplace backend when available.
    */
   version?: string | null;
+  [k: string]: unknown | undefined;
+}
+export interface PluginExtensions {
+  entrypoints?: PluginEntrypoint[] | null;
+  fileHandlers?: PluginEntrypoint[];
+  searchMentionProviders?: PluginSearchProvider[];
+  settings?: PluginSettings[];
+  settingsEntrypoints?: PluginEntrypoint[];
+  threadEntrypoints?: PluginEntrypoint[];
+  [k: string]: unknown | undefined;
+}
+export interface GlobalPluginEntrypoint {
+  appId: string;
+  icons: PluginIcon[];
+  quickAction?: PluginQuickAction | null;
+  resourceUri: string;
+  title: string;
+  toolName: string;
+  type: GlobalPluginEntrypointType;
+  [k: string]: unknown | undefined;
+}
+export interface PluginIcon {
+  mimeType?: string | null;
+  sizes?: string[] | null;
+  src: string;
+  theme?: string | null;
+  [k: string]: unknown | undefined;
+}
+export interface PluginQuickAction {
+  icons: PluginIcon[];
+  target: PluginQuickActionTarget;
+  title: string;
+  [k: string]: unknown | undefined;
+}
+export interface ToolPluginQuickActionTarget {
+  arguments?: unknown;
+  name: string;
+  type: ToolPluginQuickActionTargetType;
+  [k: string]: unknown | undefined;
+}
+export interface SettingsPluginEntrypoint {
+  appId: string;
+  icons: PluginIcon[];
+  resourceUri: string;
+  searchTerms?: string[];
+  title: string;
+  toolName: string;
+  type: SettingsPluginEntrypointType;
+  [k: string]: unknown | undefined;
+}
+export interface ThreadPluginEntrypoint {
+  appId: string;
+  icons: PluginIcon[];
+  resourceUri: string;
+  title: string;
+  toolName: string;
+  type: ThreadPluginEntrypointType;
+  [k: string]: unknown | undefined;
+}
+export interface FilePluginEntrypoint {
+  appId: string;
+  extensions: string[];
+  icons: PluginIcon[];
+  resourceUri: string;
+  title: string;
+  toolName: string;
+  type: FilePluginEntrypointType;
+  [k: string]: unknown | undefined;
+}
+export interface PluginSearchProvider {
+  appId: string;
+  call?: PluginSearchProviderCall | null;
+  linkId: string;
+  title: string;
+  toolName: string;
+  [k: string]: unknown | undefined;
+}
+export interface PluginSearchProviderCall {
+  _meta: unknown;
+  arguments: unknown;
+  name: string;
+  [k: string]: unknown | undefined;
+}
+export interface PluginSettings {
+  appId: string;
+  readToolName: string;
+  updateToolName: string;
   [k: string]: unknown | undefined;
 }
 export interface PluginInterface {

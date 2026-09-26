@@ -65,9 +65,9 @@ describe("ServerEventStore", () => {
 
   it("队列只接受匹配版本，保留有界文本和非文本摘要", () => {
     const store = new ServerEventStore();
-    const input = [{ id: "q", clientUserMessageId: "u", input: [{ type: "text" as const, text: "运行测试" }, { type: "image" as const, url: "data:image/png;base64,SECRET" }, { type: "localImage" as const, path: "/tmp/image.png" }, { type: "skill" as const, path: "/tmp/skill", name: "test" }] }];
+    const input = [{ id: "q", clientUserMessageId: "u", input: [{ type: "text" as const, text: "运行测试" }, { type: "image" as const, url: "data:image/png;base64,SECRET" }, { type: "image" as const, fileId: "SECRET_FILE_ID" }, { type: "localImage" as const, path: "/tmp/image.png" }, { type: "skill" as const, path: "/tmp/skill", name: "test" }] }];
     expect(store.hydrateQueue("t", 0, input)).toBe(true);
-    expect(store.getSnapshot().queuesByThread.t?.entries[0]?.inputs).toEqual([{ type: "text", text: "运行测试" }, { type: "image" }, { type: "localImage", path: "/tmp/image.png" }, { type: "skill", path: "/tmp/skill", name: "test" }]);
+    expect(store.getSnapshot().queuesByThread.t?.entries[0]?.inputs).toEqual([{ type: "text", text: "运行测试" }, { type: "image" }, { type: "image" }, { type: "localImage", path: "/tmp/image.png" }, { type: "skill", path: "/tmp/skill", name: "test" }]);
     expect(JSON.stringify(store.getSnapshot())).not.toContain("SECRET");
     expect(store.getSnapshot().records[0]?.detail).toBe("1 条待处理输入");
     store.consume({ method: "thread/queue/changed", params: { threadId: "t" } });
@@ -137,6 +137,65 @@ describe("ServerEventStore", () => {
     store.consume({ method: "thread/realtime/transcript/done", params: { threadId: "t", role: "user", text: "完整文本" } });
     store.consume({ method: "thread/realtime/transcript/delta", params: { threadId: "t", role: "user", delta: "下一段" } });
     expect(store.getSnapshot().realtimeByThread.t?.transcripts.map((entry) => entry.text)).toEqual(["完整文本", "下一段"]);
+  });
+
+  it("实时规范条目按ID累计并由完成快照覆盖，不重复写入扁平转写流", () => {
+    const store = new ServerEventStore();
+    const item = { id: "item", realtimeSessionId: "session", type: "transcriptSegment" as const, role: "user" as const, text: "" };
+    store.consume({ method: "thread/realtime/item/started", params: { threadId: "t", item } });
+    store.consume({ method: "thread/realtime/item/transcript/delta", params: { threadId: "t", itemId: item.id, delta: "草稿" } });
+    store.consume({ method: "thread/realtime/item/transcript/delta", params: { threadId: "t", itemId: item.id, delta: "内容" } });
+    expect(store.getSnapshot().records).toHaveLength(1);
+    expect(store.getSnapshot().records[0]).toMatchObject({ status: "running", text: "草稿内容" });
+    expect(store.getSnapshot().realtimeByThread.t?.transcripts).toEqual([]);
+
+    store.consume({ method: "thread/realtime/transcript/delta", params: { threadId: "t", role: "user", delta: "草稿内容" } });
+    store.consume({ method: "thread/realtime/item/completed", params: { threadId: "t", item: { ...item, text: "最终文本" } } });
+    store.consume({ method: "thread/realtime/transcript/done", params: { threadId: "t", role: "user", text: "最终文本" } });
+    expect(store.getSnapshot().records.find((entry) => entry.id === key("realtime-item", "t", "item")))
+      .toMatchObject({ status: "completed", text: "最终文本" });
+    expect(store.getSnapshot().realtimeByThread.t?.transcripts).toEqual([
+      { role: "user", text: "最终文本", completed: true, truncated: false },
+    ]);
+
+    store.consume({ method: "thread/realtime/item/completed", params: { threadId: "t", item: { id: "closed", realtimeSessionId: "session", type: "realtimeSessionClosed", outcome: "failed" } } });
+    expect(store.getSnapshot().records.at(-1)?.status).toBe("failed");
+  });
+
+  it("模型提供方认证恢复按回合和提供方完成，断线保留未完成状态为未知", () => {
+    const store = new ServerEventStore();
+    const params = { threadId: "t", turnId: "r", provider: "provider", message: "正在恢复认证" };
+    store.consume({ method: "modelProvider/authRecoveryStarted", params });
+    store.consume({ method: "modelProvider/authRecoveryCompleted", params: { ...params, message: "认证已恢复" } });
+    store.consume({ method: "modelProvider/authRecoveryStarted", params: { ...params, turnId: "next" } });
+    expect(store.getSnapshot().records).toHaveLength(2);
+    expect(store.getSnapshot().records[0]).toMatchObject({ status: "completed", detail: "认证已恢复", turnId: "r" });
+    store.disconnect();
+    expect(store.getSnapshot().records[1]).toMatchObject({ status: "unknown", turnId: "next" });
+  });
+
+  it("网关认证按提供方替换各阶段状态，授权URL不保留在记录中", () => {
+    const store = new ServerEventStore();
+    for (const [status, expected] of [["notReady", "warning"], ["started", "running"], ["succeeded", "completed"], ["failed", "failed"]] as const) {
+      store.consume({ method: "account/gatewayOAuth/changed", params: { providerId: "gateway", status, authUrl: "https://gateway.test/authorize?code=SECRET" } });
+      expect(store.getSnapshot().records).toHaveLength(1);
+      expect(store.getSnapshot().records[0]?.status).toBe(expected);
+    }
+    expect(JSON.stringify(store.getSnapshot())).not.toContain("SECRET");
+  });
+
+  it("附件变更以附件ID替换状态，MCP订阅事件不保存未知载荷", () => {
+    const store = new ServerEventStore();
+    const attachment = { threadId: "t", attachmentId: "attachment", attachmentType: "file", identityKey: "identity" };
+    store.consume({ method: "thread/attachment/updated", params: { ...attachment, operation: "created" } });
+    store.consume({ method: "thread/attachment/updated", params: { ...attachment, operation: "deleted" } });
+    expect(store.getSnapshot().records).toHaveLength(1);
+    expect(store.getSnapshot().records[0]).toMatchObject({ title: "会话附件已删除", status: "completed", threadId: "t" });
+    store.consume({ method: "mcpServer/event/stream/notification", params: { subscriptionId: "subscription", notification: { method: "server/event", params: { payload: "SECRET_MEDIA" } } } });
+    expect(store.getSnapshot().records.at(-1)).toMatchObject({ detail: "subscription · server/event", status: "info" });
+    expect(JSON.stringify(store.getSnapshot())).not.toContain("SECRET_MEDIA");
+    store.consume({ method: "thread/deleted", params: { threadId: "t" } });
+    expect(store.getSnapshot().records).toHaveLength(1);
   });
 
   it("实时音频按格式与item分组并限制总缓存，SDP凭据不进入展示记录", () => {

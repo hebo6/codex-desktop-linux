@@ -136,4 +136,49 @@ describe("ApprovalPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "查看链接" }));
     expect(onOpenLink).toHaveBeenCalledWith("https://example.com/auth");
   });
+
+  it.each(["openai/form", "openaiForm"] as const)("MCP %s 专用表单仅提供拒绝操作", (mode) => {
+    const request: ServerRequest = {
+      id: 1,
+      method: "mcpServer/elicitation/request",
+      params: {
+        message: "请确认外部工具操作",
+        mode,
+        requestedSchema: {},
+        serverName: "example-mcp",
+        threadId: "thread-1",
+      },
+    };
+    const { onRespond } = renderPanel(request);
+
+    expect(screen.getByText("请确认外部工具操作")).toBeVisible();
+    expect(screen.getByText("此服务器请求了当前客户端无法安全呈现的专用表单")).toBeVisible();
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "拒绝" }));
+    expect(onRespond).toHaveBeenCalledWith("number:1", { action: "decline", content: null, _meta: null });
+  });
+
+  it("MCP 设备验证展示请求说明且仅提供拒绝操作", () => {
+    const request: ServerRequest = {
+      id: 1,
+      method: "mcpServer/elicitation/request",
+      params: {
+        challenge: "verification-challenge",
+        description: "此操作需要确认你的身份",
+        mode: "openai/userVerification",
+        serverName: "example-mcp",
+        threadId: "thread-1",
+        title: "确认外部工具操作",
+      },
+    };
+    const { onRespond } = renderPanel(request);
+
+    expect(screen.getByText("确认外部工具操作")).toBeVisible();
+    expect(screen.getByText("此操作需要确认你的身份")).toBeVisible();
+    expect(screen.getByText("当前客户端尚未支持此请求所需的设备身份验证")).toBeVisible();
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(onRespond).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "拒绝" }));
+    expect(onRespond).toHaveBeenCalledWith("number:1", { action: "decline", content: null, _meta: null });
+  });
 });

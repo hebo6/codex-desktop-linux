@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改
-// Codex app-server 上游提交：657bd889ae28edcbf5395c103b479bf8b328704e
+// Codex app-server 上游提交：36650394c5b38c2990ccf2a3457165ca3e9d9726
 
 /**
  * Request initiated from the server and sent to the client.
@@ -51,6 +51,10 @@ export type ReadCommandActionType = "read";
 export type ListFilesCommandActionType = "listFiles";
 export type SearchCommandActionType = "search";
 export type UnknownCommandActionType = "unknown";
+/**
+ * Distinguishes a command approval from input sent to an existing terminal.
+ */
+export type CommandExecutionApprovalKind = "command" | "writeStdin";
 export type NetworkApprovalProtocol = "http" | "https" | "socks5Tcp" | "socks5Udp";
 export type ItemFileChangeRequestApprovalRequestMethod = "item/fileChange/requestApproval";
 export type ItemToolRequestUserInputRequestMethod = "item/tool/requestUserInput";
@@ -69,6 +73,14 @@ export type McpServerElicitationRequestParams = {
 export type McpServerElicitationRequestParams1 =
   | {
       _meta?: unknown;
+      challenge: string;
+      description: string;
+      mode: "openai/userVerification";
+      title: string;
+      [k: string]: unknown | undefined;
+    }
+  | {
+      _meta?: unknown;
       message: string;
       mode: "form";
       requestedSchema: McpElicitationSchema;
@@ -78,6 +90,13 @@ export type McpServerElicitationRequestParams1 =
       _meta?: unknown;
       message: string;
       mode: "openai/form";
+      requestedSchema: unknown;
+      [k: string]: unknown | undefined;
+    }
+  | {
+      _meta?: unknown;
+      message: string;
+      mode: "openaiForm";
       requestedSchema: unknown;
       [k: string]: unknown | undefined;
     }
@@ -112,12 +131,6 @@ export type McpElicitationNumberType = "number" | "integer";
 export type McpElicitationBooleanType = "boolean";
 export type McpElicitationObjectType = "object";
 export type ItemPermissionsRequestApprovalRequestMethod = "item/permissions/requestApproval";
-/**
- * A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).
- *
- * IMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.
- */
-export type AbsolutePathBuf = string;
 export type ItemToolCallRequestMethod = "item/tool/call";
 export type AccountChatgptAuthTokensRefreshRequestMethod = "account/chatgptAuthTokens/refresh";
 export type ChatgptAuthTokensRefreshReason = "unauthorized";
@@ -156,7 +169,7 @@ export interface CommandExecutionRequestApprovalParams {
    *
    * For regular shell/unified_exec approvals, this is null.
    *
-   * For zsh-exec-bridge subcommand approvals, multiple callbacks can belong to one parent `itemId`, so `approvalId` is a distinct opaque callback id (a UUID) used to disambiguate routing.
+   * For zsh-exec-bridge subcommand approvals, multiple callbacks can belong to one parent `itemId`, so `approvalId` is a distinct opaque callback id (a UUID) used to disambiguate routing. Stdin approvals also use a distinct callback id; inspect `kind` to distinguish them.
    */
   approvalId?: string | null;
   /**
@@ -180,6 +193,10 @@ export interface CommandExecutionRequestApprovalParams {
    */
   environmentId?: string | null;
   itemId: string;
+  /**
+   * Kind of action under review. Defaults to `command` for older servers.
+   */
+  kind?: CommandExecutionApprovalKind & string;
   /**
    * Optional context for a managed-network approval prompt.
    */
@@ -500,7 +517,7 @@ export interface ItemPermissionsRequestApprovalRequest {
   [k: string]: unknown | undefined;
 }
 export interface PermissionsRequestApprovalParams {
-  cwd: AbsolutePathBuf;
+  cwd: LegacyAppPathString;
   environmentId?: string | null;
   itemId: string;
   permissions: RequestPermissionProfile;
