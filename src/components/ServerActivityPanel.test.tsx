@@ -97,7 +97,7 @@ describe("ServerActivityPanel", () => {
     openPanel();
     expect(screen.getByRole("meter", { name: "上下文剩余" })).toHaveAttribute("aria-valuenow", "800");
     expect(screen.getByRole("meter", { name: "目标预算剩余" })).toHaveAttribute("aria-valuenow", "400");
-    expect(screen.getByText("2,000")).toBeVisible();
+    expect(screen.getByText("2K")).toBeVisible();
   });
 
   it.each(["complete", "cleared"] as const)("目标结束后隐藏卡片及收尾记录（%s），再次激活时恢复", (ending) => {

@@ -4,6 +4,7 @@ import { useServerEvents } from "../app/useServerEvents";
 import type { QueueInputPreview, ServerEventRecord, ServerEventSnapshot, ServerEventStore } from "../appServer/serverEventState";
 import type { ThreadGoal, ThreadRealtimeAudioChunk, ThreadTokenUsage } from "../protocol/generated/types/ServerNotification";
 import { ComposerAccessoryDisclosure } from "./ComposerAccessoryPanel";
+import { formatTokenCount } from "./formatTokenCount";
 import styles from "./ServerActivityPanel.module.css";
 
 interface RequestFailure {
@@ -110,7 +111,7 @@ function GoalStatus({ goal, stale }: { readonly goal: ThreadGoal; readonly stale
     {stale ? <p className={styles.muted}>目标状态待重新同步</p> : null}
     {goal.tokenBudget != null && goal.tokenBudget > 0
       ? <Remaining label="目标预算" used={goal.tokensUsed} total={goal.tokenBudget} />
-      : <p className={styles.muted}>已使用 {number(goal.tokensUsed)} Token · 未设置 Token 预算</p>}
+      : <p className={styles.muted}>已使用 {formatTokenCount(goal.tokensUsed)} Token · 未设置 Token 预算</p>}
     <p className={styles.muted}>已运行 {number(Math.round(goal.timeUsedSeconds))} 秒</p>
   </article>;
 }
@@ -119,7 +120,7 @@ function Remaining({ label, used, total }: { readonly label: string; readonly us
   const remaining = Math.min(total, Math.max(0, total - used));
   const percent = Math.round(remainingRatio(used, total) * 100);
   return <div className={styles.remaining}>
-    <span>{label}剩余 {number(remaining)} / {number(total)} Token · {percent}%</span>
+    <span>{label}剩余 {formatTokenCount(remaining)} / {formatTokenCount(total)} Token · {percent}%</span>
     <div aria-label={`${label}剩余`} aria-valuemax={total} aria-valuemin={0} aria-valuenow={remaining} className={styles.track} role="meter">
       <div className={styles.fill} style={{ width: `${percent}%` }} />
     </div>
@@ -127,7 +128,7 @@ function Remaining({ label, used, total }: { readonly label: string; readonly us
 }
 
 function Metric({ label, value }: { readonly label: string; readonly value: number }) {
-  return <div><dt>{label}</dt><dd>{number(value)}</dd></div>;
+  return <div><dt>{label}</dt><dd>{formatTokenCount(value)}</dd></div>;
 }
 
 function QueueStatus({ queue }: { readonly queue: ServerEventSnapshot["queuesByThread"][string] }) {
