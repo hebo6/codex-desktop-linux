@@ -229,8 +229,7 @@ export function ConversationView({
   } | null>(null);
   const historyLoadRef = useRef<Promise<boolean> | null>(null);
   const followBottomRef = useRef(true);
-  const preserveFollowingOnLayoutRef = useRef(false);
-  const lockedFinalAnswerTurnIdRef = useRef<string | null>(null);
+  const userScrollTopRef = useRef<number | null>(null);
   const completedUserActivityExpansionRef = useRef(false);
   const userActivityExpansionCountRef = useRef(0);
   const userActivityCollapsesRef = useRef(new Map<HTMLElement, () => void>());
@@ -331,19 +330,16 @@ export function ConversationView({
   );
 
   const updateBottomState = useCallback(
-    (scroller: HTMLDivElement, allowExitFollowing = true) => {
+    (scroller: HTMLDivElement, source: "user" | "scrollbar" | "layout" = "layout") => {
       const atBottom =
         scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <=
           BOTTOM_THRESHOLD;
       if (atBottom) {
-        if (
-          lockedFinalAnswerTurnIdRef.current === null &&
-          (!preserveFollowingOnLayoutRef.current || allowExitFollowing)
-        ) {
+        if (source === "user") {
           followBottomRef.current = true;
         }
         setShowJumpToBottom(false);
-      } else if (allowExitFollowing || !followBottomRef.current) {
+      } else if (source !== "layout" || !followBottomRef.current) {
         followBottomRef.current = false;
         setShowJumpToBottom(true);
       }
@@ -352,7 +348,7 @@ export function ConversationView({
     [],
   );
 
-  const stopFollowingForUserScroll = useCallback(
+  const handleUserScrollIntent = useCallback(
     (scroller: HTMLDivElement, direction: -1 | 1) => {
       const maximumScrollTop = Math.max(
         0,
@@ -361,23 +357,33 @@ export function ConversationView({
       const canScroll = direction < 0
         ? scroller.scrollTop > BOTTOM_THRESHOLD
         : scroller.scrollTop < maximumScrollTop - BOTTOM_THRESHOLD;
+      pendingQuestionPositionRef.current = null;
+      pendingFinalAnswerQuestionPositionRef.current = null;
+      userScrollTopRef.current = null;
       if (!canScroll) {
+        if (direction > 0) {
+          updateBottomState(scroller, "user");
+        }
         return;
       }
-      preserveFollowingOnLayoutRef.current = false;
+      if (direction > 0) {
+        userScrollTopRef.current = scroller.scrollTop;
+      }
       followBottomRef.current = false;
       setShowJumpToBottom(true);
     },
-    [],
+    [updateBottomState],
   );
 
   const scrollToBottom = useCallback((scroller: HTMLDivElement) => {
-    preserveFollowingOnLayoutRef.current = false;
+    userScrollTopRef.current = null;
+    pendingQuestionPositionRef.current = null;
+    pendingFinalAnswerQuestionPositionRef.current = null;
     scroller.scrollTop = Math.max(
       0,
       scroller.scrollHeight - scroller.clientHeight,
     );
-    followBottomRef.current = lockedFinalAnswerTurnIdRef.current === null;
+    followBottomRef.current = true;
     setShowJumpToBottom(false);
   }, []);
 
@@ -417,7 +423,7 @@ export function ConversationView({
     const floorAtStart = runningTurnFloorVisible ? runningTurnFloor : null;
     const collapses = userActivityCollapsesRef.current;
     // 滚动范围缩短会产生延迟 scroll 事件，不能借此恢复已暂停的跟随
-    preserveFollowingOnLayoutRef.current = true;
+    userScrollTopRef.current = null;
     pendingFinalAnswerQuestionPositionRef.current = null;
     let smallestHeight = group.getBoundingClientRect().height;
     let observing = true;
@@ -464,7 +470,7 @@ export function ConversationView({
       reclaimFloor();
       observing = false;
       if (scroller !== null) {
-        updateBottomState(scroller, false);
+        updateBottomState(scroller);
       }
       collapses.delete(group);
     };
@@ -522,11 +528,12 @@ export function ConversationView({
         });
         return true;
       }
+      userScrollTopRef.current = null;
       scroller.scrollTop = targetTop;
       setShowJumpToBottom(false);
       if (!turnHasMountedActivityContent(scroller, pending.turnId)) {
         pendingFinalAnswerQuestionPositionRef.current = null;
-        updateBottomState(scroller, false);
+        updateBottomState(scroller);
       }
       return true;
     },
@@ -556,6 +563,7 @@ export function ConversationView({
       scrollTop: scroller.scrollTop,
     };
     followBottomRef.current = false;
+    userScrollTopRef.current = null;
     setShowJumpToBottom(true);
     const request = onLoadOlderTurns();
     historyLoadRef.current = request;
@@ -592,13 +600,6 @@ export function ConversationView({
         return;
       }
       if (userActivityExpansionCountRef.current > 0) {
-        return;
-      }
-      if (
-        runningTurnId !== null &&
-        lockedFinalAnswerTurnIdRef.current === runningTurnId
-      ) {
-        updateBottomState(scroller, false);
         return;
       }
       if (runningTurnId === null && followBottomRef.current) {
@@ -639,7 +640,7 @@ export function ConversationView({
         return;
       }
       if (!followBottomRef.current) {
-        updateBottomState(scroller, false);
+        updateBottomState(scroller);
         return;
       }
       const contentBottom = contentRect.bottom;
@@ -701,7 +702,8 @@ export function ConversationView({
     if (historyQuestions.length <= previousQuestionCount) {
       return;
     }
-    lockedFinalAnswerTurnIdRef.current = null;
+    userScrollTopRef.current = null;
+    pendingFinalAnswerQuestionPositionRef.current = null;
     const scroller = scrollerRef.current;
     const content = contentRef.current;
     const latestQuestion = historyQuestions.at(-1);
@@ -726,7 +728,6 @@ export function ConversationView({
     const naturalBottom =
       scroller.scrollTop + contentRect.bottom - scrollerRect.top;
     pendingQuestionPositionRef.current = latestQuestion.itemId;
-    preserveFollowingOnLayoutRef.current = false;
     followBottomRef.current = true;
     setShowJumpToBottom(false);
     setRunningTurnFloor({
@@ -754,6 +755,7 @@ export function ConversationView({
     ) {
       return;
     }
+    userScrollTopRef.current = null;
     scroller.scrollTop =
       anchor.scrollTop + scroller.scrollHeight - anchor.scrollHeight;
     pendingHistoryAnchorRef.current = null;
@@ -795,6 +797,7 @@ export function ConversationView({
       });
       return;
     }
+    userScrollTopRef.current = null;
     scroller.scrollTop = targetTop;
     pendingQuestionPositionRef.current = null;
   }, [
@@ -822,7 +825,7 @@ export function ConversationView({
       return;
     }
     const wasFollowing = followBottomRef.current;
-    lockedFinalAnswerTurnIdRef.current = runningTurnId;
+    userScrollTopRef.current = null;
     followBottomRef.current = false;
     const scroller = scrollerRef.current;
     const content = contentRef.current;
@@ -923,7 +926,7 @@ export function ConversationView({
     pendingQuestionPositionRef.current = null;
     pendingFinalAnswerQuestionPositionRef.current = null;
     setRunningTurnFloor(null);
-    lockedFinalAnswerTurnIdRef.current = null;
+    userScrollTopRef.current = null;
     completedUserActivityExpansionRef.current = false;
     userActivityExpansionCountRef.current = 0;
     followBottomRef.current = true;
@@ -971,6 +974,8 @@ export function ConversationView({
       }
       const scrollerRect = scroller.getBoundingClientRect();
       const commandRect = command.getBoundingClientRect();
+      userScrollTopRef.current = null;
+      pendingFinalAnswerQuestionPositionRef.current = null;
       scroller.scrollTop = Math.max(
         0,
         scroller.scrollTop +
@@ -978,7 +983,7 @@ export function ConversationView({
           scrollerRect.top -
           Math.max(24, (scroller.clientHeight - commandRect.height) / 2),
       );
-      updateBottomState(scroller);
+      updateBottomState(scroller, "user");
       command.querySelector<HTMLElement>("button, [tabindex]")?.focus({
         preventScroll: true,
       });
@@ -999,7 +1004,20 @@ export function ConversationView({
 
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     const scroller = event.currentTarget;
-    const atBottom = updateBottomState(scroller, scrollbarDragRef.current);
+    const previousTop = userScrollTopRef.current;
+    // 原生滚动锚定已关闭；布局夹紧只会向上修正，不能当作用户向下触底
+    const userScrolledDown = previousTop !== null && scroller.scrollTop > previousTop;
+    const atBottom = updateBottomState(
+      scroller,
+      userScrolledDown ? "user" : scrollbarDragRef.current ? "scrollbar" : "layout",
+    );
+    if (scrollbarDragRef.current) {
+      userScrollTopRef.current = scroller.scrollTop;
+    } else if (previousTop !== null) {
+      userScrollTopRef.current = atBottom || scroller.scrollTop < previousTop
+        ? null
+        : scroller.scrollTop;
+    }
     if (
       !atBottom &&
       scroller.scrollTop <= HISTORY_LOAD_THRESHOLD &&
@@ -1013,7 +1031,7 @@ export function ConversationView({
     if (event.deltaY === 0) {
       return;
     }
-    stopFollowingForUserScroll(
+    handleUserScrollIntent(
       event.currentTarget,
       event.deltaY < 0 ? -1 : 1,
     );
@@ -1041,7 +1059,7 @@ export function ConversationView({
           ? 1
           : null;
     if (direction !== null) {
-      stopFollowingForUserScroll(event.currentTarget, direction);
+      handleUserScrollIntent(event.currentTarget, direction);
     }
   };
 
@@ -1058,6 +1076,10 @@ export function ConversationView({
     scrollbarDragRef.current =
       scrollbarWidth > 0 &&
       event.clientX >= rect.right - scrollbarWidth;
+    if (scrollbarDragRef.current) {
+      pendingFinalAnswerQuestionPositionRef.current = null;
+      userScrollTopRef.current = scroller.scrollTop;
+    }
   };
 
   const handleTouchStart = (event: ReactTouchEvent<HTMLDivElement>) => {
@@ -1077,7 +1099,7 @@ export function ConversationView({
     const deltaY = previous.y - touch.clientY;
     touchPositionRef.current = { x: touch.clientX, y: touch.clientY };
     if (Math.abs(deltaY) > Math.abs(deltaX) && deltaY !== 0) {
-      stopFollowingForUserScroll(
+      handleUserScrollIntent(
         event.currentTarget,
         deltaY < 0 ? -1 : 1,
       );
@@ -1198,8 +1220,10 @@ export function ConversationView({
             const scroller = scrollerRef.current;
             const top = questionTop(question);
             if (scroller !== null && top !== null) {
+              userScrollTopRef.current = null;
+              pendingFinalAnswerQuestionPositionRef.current = null;
               scroller.scrollTop = top;
-              updateBottomState(scroller);
+              updateBottomState(scroller, "user");
             }
           }}
           questions={historyQuestions}

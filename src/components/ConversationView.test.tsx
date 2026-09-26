@@ -1337,7 +1337,7 @@ describe("ConversationView", () => {
     );
   });
 
-  it("最终回答开始时恢复问题位置并停止自动跟随", async () => {
+  it.each(["按钮", "滚轮", "键盘", "触摸惯性", "滚动条", "异步回答"])("最终回答开始时暂停，通过%s回到底部后继续跟随回答和工具执行", async (resumeWith) => {
     const viewportHeight = 600;
     let contentHeight = 1_800;
     let finalAnswerDocumentTop = 1_700;
@@ -1519,6 +1519,7 @@ describe("ConversationView", () => {
         {
           id: "answer-final-position",
           phase: "final_answer" as const,
+          ...(resumeWith === "异步回答" ? { delivery: "async" as const } : {}),
           text: "最终回答开始",
           type: "agentMessage" as const,
         },
@@ -1541,6 +1542,8 @@ describe("ConversationView", () => {
     contentHeight = 500;
     finalAnswerDocumentTop = 400;
     act(() => contentResize?.());
+    // 活动收起后的原生滚动事件只能更新底部位置，不能恢复跟随
+    fireEvent.scroll(scroller);
 
     await waitFor(() => expect(question?.getBoundingClientRect().top).toBe(52));
     expect(scroller.scrollTop).toBe(0);
@@ -1562,17 +1565,78 @@ describe("ConversationView", () => {
     );
     expect(scroller.scrollTop).toBe(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "回到底部" }));
+    switch (resumeWith) {
+      case "滚轮":
+        userScroll(scroller, 428);
+        break;
+      case "键盘":
+        fireEvent.keyDown(scroller, { key: "End" });
+        scroller.scrollTop = 428;
+        fireEvent.scroll(scroller);
+        break;
+      case "触摸惯性": {
+        // jsdom 没有 TouchList，用原生事件携带浏览器的 item() 接口
+        for (const [type, clientY] of [["touchstart", 200], ["touchmove", 100]] as const) {
+          const event = new Event(type, { bubbles: true });
+          Object.defineProperty(event, "touches", {
+            value: { item: () => ({ clientX: 100, clientY }) },
+          });
+          fireEvent(scroller, event);
+        }
+        scroller.scrollTop = 100;
+        fireEvent.scroll(scroller);
+        fireEvent.touchEnd(scroller);
+        scroller.scrollTop = 428;
+        fireEvent.scroll(scroller);
+        break;
+      }
+      case "滚动条":
+        Object.defineProperties(scroller, {
+          clientWidth: { configurable: true, value: 865 },
+          offsetWidth: { configurable: true, value: 880 },
+        });
+        fireEvent.pointerDown(scroller, { pointerType: "mouse", clientX: 875 });
+        scroller.scrollTop = 428;
+        fireEvent.scroll(scroller);
+        fireEvent.pointerUp(window);
+        break;
+      default:
+        fireEvent.click(screen.getByRole("button", { name: "回到底部" }));
+    }
     expect(scroller.scrollTop).toBe(428);
 
     contentHeight = 1_200;
     finalAnswerDocumentTop = 1_100;
     act(() => contentResize?.());
 
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible()
-    );
-    expect(scroller.scrollTop).toBe(428);
+    expect(scroller.scrollTop).toBe(1_028);
+    expect(screen.queryByRole("button", { name: "回到底部" }))
+      .not.toBeInTheDocument();
+
+    const resumedTurn = {
+      ...answeringTurn,
+      items: [
+        ...answeringTurn.items,
+        { id: "thinking-after-answer", type: "reasoning" as const, summary: ["继续检查"] },
+        {
+          id: "command-after-answer",
+          type: "commandExecution" as const,
+          command: "pnpm test",
+          commandActions: [],
+          cwd: "/workspace/project",
+          status: "inProgress" as const,
+        },
+      ],
+    } satisfies ThreadTurn;
+    contentHeight = 1_600;
+    rerender(<ConversationView restoredThread={{ ...RESTORED, turns: [resumedTurn] }} />);
+    expect(scroller.scrollTop).toBe(1_428);
+
+    userScroll(scroller, 600);
+    contentHeight = 1_800;
+    act(() => contentResize?.());
+    expect(scroller.scrollTop).toBe(600);
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });
 
   it("位于底部时内容增长后继续跟随底部", () => {
@@ -2281,7 +2345,7 @@ describe("ConversationView", () => {
       expect(scroller.scrollTop).toBe(948);
     });
 
-    it("最终回答锁定后重新展开再收起仍回收占位，后续回答增长不抢滚动位置", async () => {
+    it("最终回答暂停跟随后重新展开再收起仍回收占位，后续回答增长不抢滚动位置", async () => {
       const { floor, group, header, layout, notify, scroller, turn, updateTurn } = setup();
       await finishAnimationFrame();
       const finalAnswer = {
@@ -2318,6 +2382,65 @@ describe("ConversationView", () => {
         ...turn,
         items: [...turn.items, { ...finalAnswer, text: "最终回答继续增长" }],
       });
+      expect(scroller.scrollTop).toBe(584);
+      expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+    });
+
+    it.each(["收起期间", "收起完成后"])("%s已在底部时向下输入恢复跟随，并取消最终回答定位", async (timing) => {
+      const { group, layout, notify, scroller, turn, updateTurn } = setup({
+        questionTop: 52,
+        contentHeight: 500,
+      });
+      await finishAnimationFrame();
+      const finalAnswer = {
+        id: "final-short-answer",
+        phase: "final_answer" as const,
+        text: "短回答",
+        type: "agentMessage" as const,
+      };
+      updateTurn({ ...turn, items: [...turn.items, finalAnswer] });
+      if (timing === "收起完成后") {
+        layout.groupHeight = 36;
+        await waitFor(() => expect(group).toHaveAttribute("data-content-mounted", "false"));
+        notify(scroller.querySelector("[data-conversation-list]")!);
+      }
+      expect(scroller.scrollTop).toBe(0);
+      expect(scroller.scrollHeight).toBe(600);
+
+      // 已在底部时，浏览器不会再产生 scroll 事件
+      fireEvent.wheel(scroller, { deltaY: 1 });
+      layout.contentHeight = 1_000;
+      updateTurn({ ...turn, items: [...turn.items, { ...finalAnswer, text: "回答继续增长" }] });
+      expect(scroller.scrollTop).toBe(828);
+      await waitFor(() => expect(group).toHaveAttribute("data-content-mounted", "false"));
+      notify(scroller.querySelector("[data-conversation-list]")!);
+      expect(scroller.scrollTop).toBe(828);
+    });
+
+    it("按住滚动条时布局夹紧到底部不会恢复跟随", async () => {
+      const { group, header, layout, notify, scroller, turn, updateTurn } = setup();
+      await finishAnimationFrame();
+      userScroll(scroller, 900);
+      Object.defineProperties(scroller, {
+        clientWidth: { configurable: true, value: 865 },
+        offsetWidth: { configurable: true, value: 880 },
+      });
+      fireEvent.pointerDown(scroller, { pointerType: "mouse", clientX: 875 });
+      fireEvent.click(header);
+      layout.groupHeight = 36;
+      layout.contentHeight = 1_086;
+      notify(group);
+      expect(scroller.scrollTop).toBe(584);
+      fireEvent.scroll(scroller);
+      fireEvent.pointerUp(window);
+      await waitFor(() => expect(group).toHaveAttribute("data-content-mounted", "false"));
+
+      layout.contentHeight = 1_500;
+      updateTurn({ ...turn, items: [...turn.items, {
+        id: "progress-after-layout-clamp",
+        type: "agentMessage",
+        text: "继续执行",
+      }] });
       expect(scroller.scrollTop).toBe(584);
       expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
     });
