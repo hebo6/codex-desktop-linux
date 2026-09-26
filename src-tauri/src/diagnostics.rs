@@ -47,7 +47,7 @@ pub(crate) struct SystemDiagnostics {
 pub(crate) fn read_system_diagnostics() -> SystemDiagnostics {
     SystemDiagnostics {
         client_version: CLIENT_VERSION,
-        protocol_baseline: include_str!("../../protocol/schema/UPSTREAM_COMMIT").trim(),
+        protocol_baseline: include_str!("../../protocol/schema/CODEX_VERSION").trim(),
         operating_system: std::env::consts::OS,
         architecture: std::env::consts::ARCH,
         webview_version: tauri::webview_version().ok(),
@@ -73,9 +73,8 @@ mod tests {
             .unwrap_or_else(|_| env!("CARGO_PKG_VERSION").to_owned());
         assert_eq!(report.as_object().unwrap().len(), 7);
         assert_eq!(report["clientVersion"], expected_client_version);
-        assert_eq!(
-            report["protocolBaseline"],
-            "36650394c5b38c2990ccf2a3457165ca3e9d9726"
-        );
+        let protocol_baseline = report["protocolBaseline"].as_str().unwrap();
+        assert!(!protocol_baseline.is_empty());
+        assert!(!protocol_baseline.contains(['\n', '\r']));
     }
 }

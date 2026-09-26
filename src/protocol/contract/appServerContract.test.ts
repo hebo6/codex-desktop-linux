@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import clientRequestSchema from "../../../protocol/schema/ClientRequest.json";
 import {
-  APP_SERVER_SCHEMA_COMMIT,
   KNOWN_SERVER_REQUEST_METHODS,
   type InitializeParams,
   type JSONRPCMessage,
@@ -41,7 +40,6 @@ interface RecordedServerResult {
 }
 
 interface ContractRecording {
-  readonly schemaCommit: string;
   readonly recordingSource: string;
   readonly deidentified: boolean;
   readonly clientRequests: readonly RecordedClientRequest[];
@@ -107,9 +105,8 @@ function initializationResult(): unknown {
 }
 
 describe("脱敏 app-server 协议契约", () => {
-  it("将完整实验版客户端请求固定到参考提交并声明 experimentalApi", () => {
+  it("按当前基线校验实验版客户端请求并声明 experimentalApi", () => {
     expect(recording).toMatchObject({
-      schemaCommit: APP_SERVER_SCHEMA_COMMIT,
       recordingSource: "controlled-app-server",
       deidentified: true,
     });

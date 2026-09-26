@@ -4,7 +4,7 @@
 
 客户端负责桌面窗口、连接、凭据、文件访问、本地偏好和用户界面，不实现模型推理、工具执行沙箱或服务端会话语义
 
-app-server 协议定义以固定 Codex CLI 版本生成并由项目固化的[协议基线](protocol-baseline.md)为准
+app-server 协议定义以本机 Codex CLI 生成并由项目固化的[协议基线](protocol-baseline.md)为准
 
 远程 WebSocket 传输仍是上游实验能力，技术设计必须保留多服务器和远程连接能力，并在用户界面中呈现实验性质
 
@@ -84,7 +84,7 @@ flowchart LR
 
 ### Schema 与类型
 
-构建流程从固定上游提交生成完整实验版 JSON Schema，再生成 TypeScript 判别联合和运行时校验器
+协议基线更新时使用本机 Codex CLI 生成完整实验版 JSON Schema，TypeScript 判别联合和运行时校验器从已固化的 Schema 生成
 
 前端边界使用 Ajv 校验 Rust 转发的协议消息，校验失败时只记录不含原始字段值的协议错误摘要，不使用宽松类型吞掉字段差异
 

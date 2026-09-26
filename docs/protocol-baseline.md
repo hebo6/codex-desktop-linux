@@ -1,12 +1,11 @@
 # app-server 协议基线
 
-## 固定来源
+## 生成来源
 
 | 项目 | 值 |
 | --- | --- |
 | 上游仓库 | [openai/codex](https://github.com/openai/codex) |
-| 上游提交 | `36650394c5b38c2990ccf2a3457165ca3e9d9726` |
-| Codex CLI 版本 | `codex-cli 0.157.1` |
+| Codex CLI | `PATH` 中的本机 `codex` |
 | 上游生成命令 | `codex app-server generate-json-schema --experimental --out <目录>` |
 | 固化目录 | `protocol/schema` |
 
@@ -22,30 +21,21 @@
 ./scripts/generate-protocol-schema.sh --update
 ```
 
-验证工作树中的基线可由固定 Codex CLI 版本复现时执行
+验证工作树中的基线与本机 Codex CLI 的生成结果一致时执行
 
 ```bash
 ./scripts/generate-protocol-schema.sh --check
 ```
 
-脚本要求 `codex --version` 为表中固定版本，并执行上游 `codex app-server generate-json-schema --experimental --out <临时目录>` 生成 JSON Schema
-
-该 CLI 版本的生成结果与表中上游提交的实验版预计算协议归档一致
+脚本不限制 CLI 版本，直接调用本机 Codex 生成 JSON Schema，不查询或推断上游提交号
 
 原始生成目录位于 `/tmp`
 
-`--update` 只把最终 JSON Schema、来源提交和校验清单同步到本项目
+`--update` 只把最终 JSON Schema、CLI 版本和校验清单同步到本项目；`--check` 比较这些文件并在出现差异时失败，不修改基线
 
 ## 固化产物
 
-`protocol/schema/UPSTREAM_COMMIT` 记录上游完整提交号，`protocol/schema/SHA256SUMS` 记录全部 440 个 JSON 文件按相对路径排序后的 SHA256
-
-两个聚合入口的校验值如下
-
-| 文件 | SHA256 |
-| --- | --- |
-| `codex_app_server_protocol.schemas.json` | `d6d70a4b2af4c6bb03dee46af2cda9c8b7b4d656cd5a55c54f748146985cdb43` |
-| `codex_app_server_protocol.v2.schemas.json` | `dae22897ba9e48d9f3a8f65c4353f2a62b4c24be31bd9893f7cd8e1c7601076c` |
+`protocol/schema/CODEX_VERSION` 记录生成时 `codex --version` 的实际输出，`protocol/schema/SHA256SUMS` 记录全部 JSON 文件按相对路径排序后的 SHA256，版本标识来源，校验清单标识确切内容
 
 `codex_app_server_protocol.schemas.json` 是完整命名空间聚合包，`codex_app_server_protocol.v2.schemas.json` 是扁平化 v2 聚合包，目录内其余 JSON 文件是请求、响应、通知及共享负载的独立 Schema
 
@@ -65,7 +55,7 @@ pnpm protocol:check
 
 该命令会先使用 Node.js 内置加密模块校验清单路径、JSON 文件全集和全部 SHA256，不依赖系统 `sha256sum` 命令，也不会重新构建上游 Schema
 
-生成物位于 `src/protocol/generated`，每个文件都记录固定上游提交并禁止手动修改
+生成物位于 `src/protocol/generated`，每个文件都记录基线的 CLI 版本并禁止手动修改
 
 Schema 同时包含对象公共字段与 `anyOf` 时，类型生成前等价改写为显式交集，保留图片输入等联合类型的共同判别字段；运行时校验继续使用原始 Schema 约束
 
@@ -92,7 +82,7 @@ app-server 在语义上使用 JSON-RPC 2.0，但 stdio 行与 WebSocket 文本�
 
 ## 实验能力
 
-Schema 必须使用 `--experimental` 生成，保留固定提交中标记为实验的方法和字段
+Schema 必须使用 `--experimental` 生成，保留本机 CLI 导出的实验方法和字段
 
 生成实验 Schema 与运行时启用实验 API 是两件独立的事，连接初始化仍必须显式声明以下能力
 
@@ -110,7 +100,7 @@ Schema 必须使用 `--experimental` 生成，保留固定提交中标记为实�
 
 ## `rawResponse*/completed` 不对称
 
-固定提交的 Rust `ServerNotification` 枚举包含内部通知 `rawResponseItem/completed` 与 `rawResponse/completed`，但 JSON Schema 导出器通过明确排除清单将这两个方法从 `ServerNotification` 判别联合中移除，即使启用 `--experimental` 也不会成为合法通知方法
+当前基线对应的 Rust `ServerNotification` 枚举包含内部通知 `rawResponseItem/completed` 与 `rawResponse/completed`，但 JSON Schema 导出器通过明确排除清单将这两个方法从 `ServerNotification` 判别联合中移除，即使启用 `--experimental` 也不会成为合法通知方法
 
 导出器仍会生成独立的 `v2/RawResponseItemCompletedNotification.json` 与 `v2/RawResponseCompletedNotification.json` 负载 Schema，并在聚合包的定义区保留对应负载类型，这正说明负载类型存在不等于 wire 方法对客户端开放
 

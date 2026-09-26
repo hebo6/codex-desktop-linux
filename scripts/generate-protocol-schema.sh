@@ -2,9 +2,6 @@
 
 set -eu
 
-readonly expected_commit="36650394c5b38c2990ccf2a3457165ca3e9d9726"
-readonly expected_codex_version="codex-cli 0.157.1"
-
 project_dir=$(realpath "$(dirname "$0")/..")
 schema_dir="$project_dir/protocol/schema"
 mode=${1:---check}
@@ -23,12 +20,6 @@ case "$mode" in
 esac
 
 actual_codex_version=$(codex --version)
-if [ "$actual_codex_version" != "$expected_codex_version" ]; then
-    printf '%s\n' "Codex CLI 版本不匹配" >&2
-    printf '%s\n' "期望: $expected_codex_version" >&2
-    printf '%s\n' "实际: $actual_codex_version" >&2
-    exit 1
-fi
 
 temporary_dir=$(mktemp -d /tmp/codex-app-server-schema.XXXXXX)
 raw_generated_dir="$temporary_dir/raw"
@@ -52,7 +43,7 @@ find "$raw_generated_dir" -type f -name '*.json' -printf '%P\n' \
         cp "$raw_generated_dir/$relative_path" "$destination_path"
     done
 
-printf '%s\n' "$expected_commit" >"$generated_dir/UPSTREAM_COMMIT"
+printf '%s\n' "$actual_codex_version" >"$generated_dir/CODEX_VERSION"
 
 find "$generated_dir" -type f -name '*.json' -printf '%P\n' \
     | LC_ALL=C sort \
@@ -69,11 +60,11 @@ if [ "$mode" = "--check" ]; then
     fi
 
     diff -ru "$schema_dir" "$generated_dir"
-    printf '%s\n' "协议 Schema 与固定 Codex CLI 版本一致"
+    printf '%s\n' "协议 Schema 与本机 $actual_codex_version 的生成结果一致"
     exit 0
 fi
 
 mkdir -p "$schema_dir"
 find "$schema_dir" -mindepth 1 -delete
 cp -a "$generated_dir/." "$schema_dir/"
-printf '%s\n' "协议 Schema 已更新到 $schema_dir"
+printf '%s\n' "协议 Schema 已使用本机 $actual_codex_version 更新到 $schema_dir"

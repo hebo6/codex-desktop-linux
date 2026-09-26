@@ -366,11 +366,11 @@ const numericFormats = Object.freeze({
   double: {},
 });
 
-const upstreamCommit = await validateSchemaBaseline();
+const codexVersion = await validateSchemaBaseline();
 
 const generatedHeader = [
   "// 此文件由 scripts/generate-protocol-code.mjs 自动生成，请勿手动修改",
-  `// Codex app-server 上游提交：${upstreamCommit}`,
+  `// Codex CLI 版本：${codexVersion}`,
   "",
 ].join("\n");
 
@@ -422,7 +422,7 @@ addGeneratedOutput(
 
 addGeneratedOutput(
   join(outputDirectory, "index.ts"),
-  `${generatedHeader}export const APP_SERVER_SCHEMA_COMMIT = ${JSON.stringify(upstreamCommit)} as const;\n\n${schemaDeclarations
+  `${generatedHeader}export const APP_SERVER_SCHEMA_CODEX_VERSION = ${JSON.stringify(codexVersion)} as const;\n\n${schemaDeclarations
     .map(({ typeName }) => `export type { ${typeName} } from "./types/${typeName}";`)
     .join("\n")}\n\nexport {\n  KNOWN_SERVER_NOTIFICATION_METHODS,\n  KNOWN_SERVER_REQUEST_METHODS,\n  isKnownServerNotificationMethod,\n  isKnownServerRequestMethod,\n} from "./methods";\nexport type {\n  KnownServerNotificationMethod,\n  KnownServerRequestMethod,\n} from "./methods";\n`,
 );
@@ -438,7 +438,7 @@ const ajv = new Ajv({
 
 const standaloneExports = {};
 for (const { validatorName, typeName, schemaPath } of validatorDeclarations) {
-  const schemaId = `urn:codex-app-server:${upstreamCommit}:${typeName}`;
+  const schemaId = `urn:codex-app-server:${encodeURIComponent(codexVersion)}:${typeName}`;
   const validationSchema = prepareValidationSchema(structuredClone(schemas.get(schemaPath)));
   validationSchema.$id = schemaId;
   ajv.addSchema(validationSchema, schemaId);
@@ -473,12 +473,12 @@ async function readSchema(schemaPath) {
 }
 
 async function validateSchemaBaseline() {
-  const upstreamCommitPath = join(schemaDirectory, "UPSTREAM_COMMIT");
-  const upstreamCommitSource = await readFile(upstreamCommitPath, "utf8");
-  if (!/^[0-9a-f]{40}\n$/u.test(upstreamCommitSource)) {
-    throw new Error("protocol/schema/UPSTREAM_COMMIT 不是完整 Git 提交号");
+  const codexVersionPath = join(schemaDirectory, "CODEX_VERSION");
+  const codexVersionSource = await readFile(codexVersionPath, "utf8");
+  if (!/^\S[^\r\n\0]*\n$/u.test(codexVersionSource)) {
+    throw new Error("protocol/schema/CODEX_VERSION 必须包含非空的单行 Codex CLI 版本");
   }
-  const commit = upstreamCommitSource.slice(0, -1);
+  const version = codexVersionSource.slice(0, -1);
 
   const checksumManifestPath = join(schemaDirectory, "SHA256SUMS");
   const checksumManifest = await readFile(checksumManifestPath, "utf8");
@@ -506,7 +506,7 @@ async function validateSchemaBaseline() {
     }
   }
 
-  return commit;
+  return version;
 }
 
 function parseChecksumManifest(source) {
@@ -756,7 +756,7 @@ function parseArguments(arguments_) {
 function addGeneratedOutput(path, source) {
   const normalizedSource = source.replaceAll("\r\n", "\n").replace(/\s+$/u, "") + "\n";
   if (!normalizedSource.startsWith(generatedHeader)) {
-    throw new Error(`生成物头部与 protocol/schema/UPSTREAM_COMMIT 不一致：${relative(projectDirectory, path)}`);
+    throw new Error(`生成物头部与 protocol/schema/CODEX_VERSION 不一致：${relative(projectDirectory, path)}`);
   }
   generatedOutputs.set(path, normalizedSource);
 }
@@ -791,5 +791,5 @@ async function persistOrCheckGeneratedOutputs() {
     return;
   }
 
-  process.stdout.write(`协议生成物与 ${upstreamCommit} 一致\n`);
+  process.stdout.write(`协议生成物与 ${codexVersion} 基线一致\n`);
 }
