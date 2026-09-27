@@ -1,28 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ThreadSummary } from "../app/useServerThreads";
 import { ConnectionShell } from "./ConnectionShell";
-
-afterEach(() => vi.unstubAllGlobals());
-
-const FOCUS_THREADS: ThreadSummary[] = [0, 1].map((index) => ({
-  cliVersion: "1.0.0",
-  createdAt: 100,
-  cwd: "/workspace/project",
-  ephemeral: false,
-  id: `focus-thread-${index}`,
-  modelProvider: "openai",
-  name: `聚焦会话 ${index}`,
-  preview: "",
-  projectId: null,
-  sessionId: `focus-session-${index}`,
-  source: "appServer",
-  status: { type: "idle" },
-  turns: [],
-  updatedAt: 200,
-}));
 
 describe("ConnectionShell", () => {
   it("顶部栏使用深层窗口拖拽区域", () => {
@@ -303,107 +283,6 @@ describe("ConnectionShell", () => {
     expect(screen.getByRole("button", { name: "显示侧栏" })).toBeVisible();
     fireEvent.keyDown(window, { ctrlKey: true, key: "b" });
     expect(screen.getByRole("button", { name: "隐藏侧栏" })).toBeVisible();
-  });
-
-  it.each([false, true])("Ctrl+Shift+E 展开侧栏并从输入框聚焦当前会话（窄窗口：%s）", async (narrow) => {
-    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: narrow })));
-    const user = userEvent.setup();
-    const onOpenThread = vi.fn();
-    render(
-      <ConnectionShell
-        currentThreadId="focus-thread-1"
-        mainContent={<textarea aria-label="任务输入" defaultValue="未发送内容" />}
-        onOpenThread={onOpenThread}
-        phase="ready"
-        threadListPhase="ready"
-        threads={FOCUS_THREADS}
-      />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: "隐藏侧栏" }));
-    const editor = screen.getByRole("textbox", { name: "任务输入" });
-    editor.focus();
-    fireEvent.keyDown(editor, { ctrlKey: true, shiftKey: true, key: "E" });
-
-    const sidebar = screen.getByLabelText("会话侧栏");
-    expect(sidebar.closest("[data-sidebar-collapsed]"))
-      .toHaveAttribute("data-sidebar-collapsed", "false");
-    expect(sidebar).toHaveAttribute("data-open", String(narrow));
-    expect(screen.getByRole("button", { name: /^聚焦会话 1，/u })).toHaveFocus();
-    expect(onOpenThread).not.toHaveBeenCalled();
-    expect(editor).toHaveValue("未发送内容");
-
-    await user.keyboard("{ArrowUp}");
-    expect(screen.getByRole("button", { name: /^聚焦会话 0，/u })).toHaveFocus();
-    await user.keyboard("{Enter}");
-    expect(onOpenThread).toHaveBeenCalledWith("focus-thread-0");
-
-    editor.focus();
-    fireEvent.keyDown(editor, { ctrlKey: true, shiftKey: true, key: "e" });
-    expect(screen.getByRole("button", { name: /^聚焦会话 1，/u })).toHaveFocus();
-    expect(sidebar).toHaveAttribute("data-open", String(narrow));
-  });
-
-  it.each([null, "missing-thread", "focus-thread-0"])("没有可操作的当前会话时聚焦第一条可操作会话（%s）", (currentThreadId) => {
-    render(
-      <ConnectionShell
-        currentThreadId={currentThreadId}
-        pendingThreadIds={["focus-thread-0"]}
-        phase="ready"
-        threadListPhase="ready"
-        threads={FOCUS_THREADS}
-      />,
-    );
-    fireEvent.keyDown(window, { ctrlKey: true, shiftKey: true, key: "E" });
-    expect(screen.getByRole("button", { name: /^聚焦会话 1，/u })).toHaveFocus();
-  });
-
-  it.each([false, true])("空列表聚焦新建任务，不可用时聚焦折叠按钮（可新建：%s）", (canCreate) => {
-    render(
-      <ConnectionShell
-        onNewTask={vi.fn()}
-        phase={canCreate ? "ready" : "disconnected"}
-        threadListPhase={canCreate ? "ready" : "idle"}
-      />,
-    );
-    fireEvent.keyDown(window, { ctrlKey: true, shiftKey: true, key: "E" });
-    expect(screen.getByRole("button", { name: canCreate ? "新建任务" : "隐藏侧栏" }))
-      .toHaveFocus();
-  });
-
-  it("模态对话框打开时不展开侧栏或抢占焦点", () => {
-    render(
-      <ConnectionShell
-        mainContent={<div aria-modal="true" role="dialog"><input aria-label="对话框输入" /></div>}
-        phase="ready"
-        threadListPhase="ready"
-        threads={FOCUS_THREADS}
-      />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: "隐藏侧栏" }));
-    const input = screen.getByRole("textbox", { name: "对话框输入" });
-    input.focus();
-    fireEvent.keyDown(input, { ctrlKey: true, shiftKey: true, key: "E" });
-    expect(input).toHaveFocus();
-    expect(screen.getByRole("button", { name: "显示侧栏" })).toBeVisible();
-  });
-
-  it("聚焦已归档列表时保持当前视图且不恢复会话", () => {
-    const onUnarchiveThread = vi.fn();
-    render(
-      <ConnectionShell
-        archivedThreadListPhase="ready"
-        archivedThreads={FOCUS_THREADS}
-        onUnarchiveThread={onUnarchiveThread}
-        phase="ready"
-        threadListPhase="ready"
-      />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: "最近会话操作" }));
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "已归档会话" }));
-    fireEvent.keyDown(window, { ctrlKey: true, shiftKey: true, key: "E" });
-    expect(screen.getByRole("list", { name: "已归档会话" })).toBeVisible();
-    expect(screen.getByRole("button", { name: /^聚焦会话 0，已归档/u })).toHaveFocus();
-    expect(onUnarchiveThread).not.toHaveBeenCalled();
   });
 
   it("断线时保留当前进程主内容并提供只读提示", () => {

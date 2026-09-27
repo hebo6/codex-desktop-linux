@@ -511,24 +511,6 @@ describe("App", () => {
     expect(screen.getByRole("dialog", { name: "账户剩余限额详情" })).toBeVisible();
   });
 
-  it("从输入框聚焦侧边栏后可用 Ctrl+L 返回并保留草稿", async () => {
-    const user = userEvent.setup();
-    renderSidebarThreadScenario();
-    const composer = await screen.findByRole("textbox", { name: "任务输入" });
-    await user.type(composer, "保留草稿");
-    fireEvent.click(screen.getByRole("button", { name: "隐藏侧栏" }));
-    composer.focus();
-
-    fireEvent.keyDown(composer, { ctrlKey: true, shiftKey: true, key: "E" });
-    expect(screen.getByRole("button", { name: /^侧边栏目标，/u })).toHaveFocus();
-    expect(screen.getByRole("button", { name: "隐藏侧栏" })).toBeVisible();
-    expect(composer).toHaveValue("保留草稿");
-
-    fireEvent.keyDown(document.activeElement!, { ctrlKey: true, key: "l" });
-    expect(composer).toHaveFocus();
-    expect(composer).toHaveValue("保留草稿");
-  });
-
   it("通过 Ctrl+Shift+D 打开协议检查器", () => {
     const protocolDebugWindowOpener = vi.fn(async () => undefined);
     renderApp(() => ({ servers: [], proxies: [] }), {

@@ -1,14 +1,11 @@
 import {
   useCallback,
   useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
   type ReactNode,
-  type Ref,
   type UIEvent,
 } from "react";
 import { createPortal } from "react-dom";
@@ -31,7 +28,6 @@ import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import styles from "./RecentThreads.module.css";
 
 export interface RecentThreadsProps {
-  readonly ref?: Ref<RecentThreadsHandle>;
   readonly archiveNotices: readonly ThreadSummary[];
   readonly currentThreadId: string | null;
   readonly draftThreadIds: ReadonlySet<string>;
@@ -66,10 +62,6 @@ export interface RecentThreadsProps {
   readonly threads: readonly ThreadSummary[];
   readonly readOnly?: boolean;
   readonly view: ThreadListView;
-}
-
-export interface RecentThreadsHandle {
-  focus: () => boolean;
 }
 
 export type ThreadListView = "recent" | "archived";
@@ -153,7 +145,6 @@ const RELATIVE_TIME_FORMATTER = new Intl.RelativeTimeFormat("zh-CN", {
 const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();
 
 export function RecentThreads({
-  ref,
   archiveNotices,
   currentThreadId,
   draftThreadIds,
@@ -187,7 +178,6 @@ export function RecentThreads({
   view,
 }: RecentThreadsProps) {
   const listRef = useRef<HTMLDivElement>(null);
-  const [pendingFocusThreadId, setPendingFocusThreadId] = useState<string | null>(null);
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -244,9 +234,6 @@ export function RecentThreads({
     if (currentThreadId !== null) {
       keys.add(`thread:${currentThreadId}`);
     }
-    if (pendingFocusThreadId !== null) {
-      keys.add(`thread:${pendingFocusThreadId}`);
-    }
     if (contextMenu !== null) {
       keys.add(`thread:${contextMenu.threadId}`);
     }
@@ -254,7 +241,7 @@ export function RecentThreads({
       keys.add(`thread:${threadId}`);
     }
     return keys;
-  }, [contextMenu, currentThreadId, pendingFocusThreadId, pendingThreadIds]);
+  }, [contextMenu, currentThreadId, pendingThreadIds]);
   const getEntryKey = useCallback(
     (index: number) => entries[index]?.key ?? `missing:${index}`,
     [entries],
@@ -284,51 +271,6 @@ export function RecentThreads({
     scrollerRef: listRef,
     overscan: 320,
   });
-
-  useImperativeHandle(ref, () => ({
-    focus() {
-      setContextMenu(null);
-      if (listRef.current === null) {
-        return false;
-      }
-      const focusableThreads = groups.flatMap((group) => group.threads).filter(
-        ({ id }) => !pendingThreadIds.includes(id) && !removingThreadIds.includes(id),
-      );
-      const target = focusableThreads.find(({ id }) => id === currentThreadId)
-        ?? focusableThreads[0];
-      if (target === undefined) {
-        return false;
-      }
-      const group = groups.find(({ threads }) => threads.some(({ id }) => id === target.id));
-      if (group !== undefined) {
-        setCollapsedGroupKeys((current) => withoutKey(current, `group:${group.key}`));
-        if (group.kind === "project") {
-          const requiredCount = group.threads.findIndex(({ id }) => id === target.id) + 1;
-          setVisibleGroupThreadCounts((current) => mapWith(
-            current,
-            group.key,
-            Math.max(current.get(group.key) ?? INITIAL_GROUP_THREAD_COUNT, requiredCount),
-          ));
-        }
-      }
-      setPendingFocusThreadId(target.id);
-      return true;
-    },
-  }), [currentThreadId, groups, pendingThreadIds, removingThreadIds]);
-
-  useLayoutEffect(() => {
-    if (pendingFocusThreadId === null) {
-      return;
-    }
-    const index = entries.findIndex(
-      (entry) => entry.type === "thread" && entry.thread.id === pendingFocusThreadId,
-    );
-    virtual.scrollToIndex(index);
-    threadRowButtons(listRef.current)
-      .find((button) => button.dataset.threadId === pendingFocusThreadId)
-      ?.focus({ preventScroll: true });
-    setPendingFocusThreadId(null);
-  }, [entries, pendingFocusThreadId, virtual.scrollToIndex]);
 
   const toggleGroup = useCallback((key: string) => {
     setCollapsedGroupKeys((current) => {
@@ -483,7 +425,20 @@ export function RecentThreads({
     if (target === undefined) {
       return;
     }
-    setPendingFocusThreadId(target.thread.id);
+    const entryIndex = entries.findIndex(({ key }) => key === target.key);
+    const renderedTarget = threadRowButtons(listRef.current).find(
+      (button) => button.dataset.threadId === target.thread.id,
+    );
+    if (renderedTarget !== undefined) {
+      renderedTarget.focus();
+      return;
+    }
+    virtual.scrollToIndex(entryIndex);
+    requestAnimationFrame(() => {
+      threadRowButtons(listRef.current)
+        .find((button) => button.dataset.threadId === target.thread.id)
+        ?.focus();
+    });
   };
 
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {

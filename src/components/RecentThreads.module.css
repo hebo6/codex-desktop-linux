@@ -343,7 +343,8 @@
   content: "";
 }
 
-.threadRow:hover {
+.threadRow:hover,
+.threadRow:focus-visible {
   background: var(--color-fill-hover);
 }
 
@@ -353,18 +354,6 @@
 }
 
 .threadRow[data-current="true"]::before {
-  background: currentColor;
-}
-
-.threadRow:focus-visible {
-  color: var(--color-text-primary);
-  background: color-mix(in srgb, var(--color-text-primary) 14%, transparent);
-}
-
-.threadRow:focus-visible::before {
-  top: 22px;
-  bottom: 22px;
-  width: 3px;
   background: currentColor;
 }
 
