@@ -699,6 +699,54 @@ describe("App", () => {
     expect(request?.activeTabId).toBe(request?.tabs[1]?.id);
   });
 
+  it("关闭最后一个已有会话标签后新任务沿用其项目", async () => {
+    const user = userEvent.setup();
+    const { tabsUpdater } = renderSidebarThreadScenario();
+    await screen.findByRole("textbox", { name: "任务输入" });
+    await user.click(await screen.findByRole("button", {
+      name: /^侧边栏目标，/u,
+    }));
+    await screen.findByText("这个会话还没有回合");
+
+    await user.click(screen.getByRole("button", { name: "关闭“侧边栏目标”" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "项目" }))
+      .toHaveAttribute("title", SIDEBAR_THREAD.cwd));
+    expect(screen.getAllByRole("tab")).toHaveLength(1);
+    expect(screen.getByRole("tab", { name: /新任务.*sidebar/u }))
+      .toHaveAttribute("aria-selected", "true");
+    const request = tabsUpdater.mock.calls.at(-1)?.[0];
+    expect(request?.tabs).toEqual([
+      { id: expect.any(String), threadId: null },
+    ]);
+    expect(request?.activeTabId).not.toBe("tab-new");
+  });
+
+  it("关闭最后一个未发送标签后新任务沿用预选项目并丢弃输入", async () => {
+    const user = userEvent.setup();
+    const { tabsUpdater } = renderSidebarThreadScenario();
+    await user.click(await screen.findByRole("button", { name: "项目" }));
+    await user.click(screen.getByRole("button", { name: "输入自定义目录…" }));
+    await user.type(
+      screen.getByRole("textbox", { name: "服务器工作目录" }),
+      "/workspace/selected-project",
+    );
+    await user.click(screen.getByRole("button", { name: "应用" }));
+    await user.type(screen.getByRole("textbox", { name: "任务输入" }), "未发送草稿");
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "w" });
+
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole("button", { name: "项目" }))
+      .toHaveAttribute("title", "/workspace/selected-project"));
+    expect(screen.getAllByRole("tab")).toHaveLength(1);
+    expect(screen.getByRole("tab", { name: /新任务.*selected-project/u }))
+      .toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "任务输入" }))
+      .toHaveValue(""));
+    expect(tabsUpdater.mock.calls[0]?.[0].activeTabId).not.toBe("tab-new");
+  });
+
   it("可信域名打开失败时在确认框恢复操作上下文", async () => {
     const user = userEvent.setup();
     const thread = {

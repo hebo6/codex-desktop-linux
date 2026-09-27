@@ -1549,13 +1549,13 @@ export function App({
     const tab = windowTabs.find(({ id }) => id === tabId);
     setWindowActionError(null);
     try {
-      await windowState.closeTab(tabId);
+      const state = await windowState.closeTab(tabId);
       setDraftCwds((current) => {
-        if (!current.has(tabId)) {
-          return current;
-        }
         const next = new Map(current);
         next.delete(tabId);
+        if (windowTabs.length === 1 && state.activeTabId !== undefined) {
+          next.set(state.activeTabId, composerCwd);
+        }
         return next;
       });
       setTransientDraftPresence((current) => {
