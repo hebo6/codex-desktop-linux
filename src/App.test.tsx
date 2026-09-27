@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Provider } from "react-redux";
 import {
   act,
+  cleanup,
   fireEvent,
   render,
   screen,
@@ -10,7 +11,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   ConfiguredServerSessionFactory,
@@ -56,6 +57,7 @@ import type {
 } from "./transport/windowState";
 import type { DeepLinkTargetSubscriber } from "./transport/deepLink";
 import type { ConfiguredServerStatusSubscriber } from "./transport/configuredServerStatuses";
+import * as clipboard from "./transport/clipboard";
 import type { DraftStore } from "./transport/drafts";
 import type {
   PendingThreadResult,
@@ -323,6 +325,7 @@ const SIDEBAR_THREAD = {
 } as const;
 
 function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: ServerEventStore) {
+  const notificationHandlers = new Set<(notification: ServerNotification) => void>();
   const requestSession = {
     sendRequest(request: { readonly method: string }) {
       const result = request.method === "thread/list"
@@ -349,7 +352,10 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
         result: Promise.resolve(result),
       };
     },
-    subscribeNotifications: () => () => undefined,
+    subscribeNotifications(handler: (notification: ServerNotification) => void) {
+      notificationHandlers.add(handler);
+      return () => { notificationHandlers.delete(handler); };
+    },
   };
   const sessionFactory: ConfiguredServerSessionFactory = (options) => ({
     ...(serverEvents === undefined ? {} : { serverEvents }),
@@ -403,7 +409,12 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
       tabsUpdater,
     },
   });
-  return { tabsUpdater };
+  return {
+    tabsUpdater,
+    emitNotification(notification: ServerNotification) {
+      for (const handler of notificationHandlers) handler(notification);
+    },
+  };
 }
 
 describe("App", () => {
@@ -718,6 +729,138 @@ describe("App", () => {
       { id: expect.any(String), threadId: SIDEBAR_THREAD.id },
     ]);
     expect(request?.activeTabId).toBe(request?.tabs[1]?.id);
+  });
+
+  describe("标签图片草稿", () => {
+    beforeEach(() => {
+      vi.stubGlobal("createImageBitmap", vi.fn(async () => ({
+        width: 1,
+        height: 1,
+        close: vi.fn(),
+      })));
+      let nextUrl = 0;
+      vi.stubGlobal("URL", class extends URL {
+        static override createObjectURL = vi.fn(() => `blob:tab-image-${nextUrl++}`);
+        static override revokeObjectURL = vi.fn();
+      });
+    });
+
+    afterEach(() => {
+      cleanup();
+      vi.unstubAllGlobals();
+    });
+
+    function attachImage(name: string) {
+      const image = new File(
+        [Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])],
+        name,
+        { type: "image/png" },
+      );
+      fireEvent.change(screen.getByLabelText("选择图片附件"), {
+        target: { files: [image] },
+      });
+      return screen.findByRole("button", { name: `预览 ${name}` });
+    }
+
+    it("仅图片草稿打开侧边栏后保留原标签，切换标签恢复各自图片", async () => {
+      const user = userEvent.setup();
+      const { tabsUpdater } = renderSidebarThreadScenario();
+      await screen.findByRole("textbox", { name: "任务输入" });
+      await attachImage("new-task.png");
+
+      await user.click(await screen.findByRole("button", { name: /^侧边栏目标，/u }));
+
+      await screen.findByText("这个会话还没有回合");
+      expect(tabsUpdater.mock.calls[0]?.[0].tabs).toEqual([
+        { id: "tab-new", threadId: null },
+        { id: expect.any(String), threadId: SIDEBAR_THREAD.id },
+      ]);
+      expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+      await attachImage("existing-thread.png");
+
+      await user.click(screen.getByRole("tab", { name: /新任务/u }));
+
+      expect(await screen.findByRole("button", { name: "预览 new-task.png" })).toBeVisible();
+      expect(screen.queryByRole("button", { name: "预览 existing-thread.png" })).not.toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "任务输入" })).toHaveValue("");
+
+      await user.click(screen.getByRole("tab", { name: /侧边栏目标/u }));
+
+      expect(await screen.findByRole("button", { name: "预览 existing-thread.png" })).toBeVisible();
+      expect(screen.queryByRole("button", { name: "预览 new-task.png" })).not.toBeInTheDocument();
+    });
+
+    it("后台剪贴板读取为空后关闭其他标签不再提示有草稿", async () => {
+      let resolveClipboard!: (files: readonly clipboard.ClipboardFileResult[]) => void;
+      const clipboardRead = new Promise<readonly clipboard.ClipboardFileResult[]>((resolve) => {
+        resolveClipboard = resolve;
+      });
+      const readClipboardFiles = vi.spyOn(clipboard, "readClipboardFiles")
+        .mockReturnValue(clipboardRead);
+      const user = userEvent.setup();
+      const { tabsUpdater } = renderSidebarThreadScenario();
+      const composer = await screen.findByRole("textbox", { name: "任务输入" });
+      fireEvent.paste(composer, {
+        clipboardData: {
+          files: [],
+          items: [],
+          types: ["image/png"],
+          getData: () => "",
+        },
+      });
+      expect(readClipboardFiles).toHaveBeenCalledOnce();
+      expect(screen.getByLabelText("附件")).toHaveTextContent("正在读取图片");
+
+      await user.click(await screen.findByRole("button", { name: /^侧边栏目标，/u }));
+      await screen.findByText("这个会话还没有回合");
+      expect(screen.getAllByRole("tab")).toHaveLength(2);
+
+      await act(async () => { resolveClipboard([]); });
+      fireEvent.contextMenu(screen.getByRole("tab", { name: /侧边栏目标/u }));
+      await user.click(screen.getByRole("menuitem", { name: "关闭其他标签页" }));
+
+      await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(2));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.getAllByRole("tab")).toHaveLength(1);
+      expect(screen.queryByRole("tab", { name: /新任务/u })).not.toBeInTheDocument();
+    });
+
+    it("已有会话在原标签返回新建页时清空图片草稿", async () => {
+      const user = userEvent.setup();
+      const { tabsUpdater, emitNotification } = renderSidebarThreadScenario();
+      await screen.findByRole("textbox", { name: "任务输入" });
+      await user.click(await screen.findByRole("button", { name: /^侧边栏目标，/u }));
+      await screen.findByText("这个会话还没有回合");
+      await attachImage("deleted-thread.png");
+
+      act(() => {
+        emitNotification({
+          method: "thread/deleted",
+          params: { threadId: SIDEBAR_THREAD.id },
+        });
+      });
+      await user.click(await screen.findByRole("button", { name: "返回新建页" }));
+
+      await screen.findByRole("textbox", { name: "任务输入" });
+      expect(tabsUpdater.mock.calls.at(-1)?.[0]).toMatchObject({
+        tabs: [{ id: "tab-new", threadId: null }],
+        activeTabId: "tab-new",
+      });
+      expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+    });
+
+    it("关闭最后一个带图标签后替代标签没有图片草稿", async () => {
+      const { tabsUpdater } = renderSidebarThreadScenario();
+      await screen.findByRole("textbox", { name: "任务输入" });
+      await attachImage("closed-tab.png");
+
+      fireEvent.keyDown(window, { ctrlKey: true, key: "w" });
+
+      await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.queryByLabelText("附件")).not.toBeInTheDocument());
+      expect(screen.getAllByRole("tab")).toHaveLength(1);
+      expect(tabsUpdater.mock.calls[0]?.[0].activeTabId).not.toBe("tab-new");
+    });
   });
 
   it("关闭最后一个已有会话标签后新任务沿用其项目", async () => {

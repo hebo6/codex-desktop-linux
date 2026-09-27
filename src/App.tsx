@@ -21,6 +21,7 @@ import {
 } from "./app/usePlaintextCredentialConfirmation";
 import { useTurnPlan } from "./app/useTurnPlan";
 import { useSubAgents } from "./app/useSubAgents";
+import { useTabAttachments } from "./app/useTabAttachments";
 import {
   useServerProfileMutations,
   type ServerProfileMutationCommands,
@@ -395,6 +396,11 @@ export function App({
     () => createTransientDraftStore(draftStore),
     [draftStore],
   );
+  const { draft: attachmentDraft, tabIds: attachmentTabIds } = useTabAttachments(
+    boundServerId,
+    windowTabs,
+    activeTabId,
+  );
   const updateTabSession = useCallback((
     tabId: string,
     threadId: string,
@@ -602,10 +608,14 @@ export function App({
   const draftThreadIds = draftThreadPresence.keyPrefix === draftKeyPrefix
     ? draftThreadPresence.threadIds
     : EMPTY_THREAD_IDS;
-  const transientDraftTabIds =
-    transientDraftPresence.keyPrefix === transientKeyPrefix
+  const transientDraftTabIds = useMemo(() => new Set([
+    ...(transientDraftPresence.keyPrefix === transientKeyPrefix
       ? transientDraftPresence.tabIds
-      : EMPTY_THREAD_IDS;
+      : EMPTY_THREAD_IDS),
+    ...windowTabs.flatMap((tab) => tab.threadId === null && attachmentTabIds.has(tab.id)
+      ? [tab.id]
+      : []),
+  ]), [attachmentTabIds, transientDraftPresence, transientKeyPrefix, windowTabs]);
   const knownTransientDraftTabIds =
     transientDraftPresence.keyPrefix === transientKeyPrefix
       ? transientDraftPresence.knownTabIds
@@ -2139,6 +2149,7 @@ export function App({
               ) ? (
                 <Composer
                   activeTurn={conversation.activeTurnId !== null}
+                  attachmentDraft={attachmentDraft}
                   capabilitiesError={
                     currentThreadId === null
                       ? configuredProjects.error ?? composerCapabilities.error

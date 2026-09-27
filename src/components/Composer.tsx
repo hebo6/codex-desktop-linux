@@ -18,6 +18,7 @@ import { createPortal } from "react-dom";
 
 import type { ConversationTurnConfiguration } from "../app/useConversation";
 import type { ComposerMentionReference } from "../app/useComposerCapabilities";
+import type { AttachmentDraft, DraftAttachment } from "../app/useTabAttachments";
 import { useSavedPrompts } from "../app/useSavedPrompts";
 import {
   browserBlobUrls,
@@ -99,15 +100,6 @@ const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: "attach", description: "选择并附加图片", behavior: "attach" },
 ];
 
-interface DraftAttachment {
-  readonly id: string;
-  readonly name: string;
-  readonly size: number;
-  readonly blob: Blob | null;
-  readonly error: string | null;
-  readonly status: "preparing" | "ready" | "error";
-}
-
 interface ComposerContent {
   readonly text: string;
   readonly tokens: readonly StructuredInput[];
@@ -127,6 +119,7 @@ type ImageValidator = (blob: Blob) => Promise<void>;
 
 export interface ComposerProps {
   readonly activeTurn: boolean;
+  readonly attachmentDraft: AttachmentDraft;
   readonly cwd: string | null;
   readonly draftKey?: string | null;
   readonly draftStore?: DraftStore;
@@ -184,6 +177,7 @@ export interface ComposerProps {
 
 export function Composer({
   activeTurn,
+  attachmentDraft,
   cwd,
   draftKey = null,
   draftStore = persistentDraftStore,
@@ -247,7 +241,7 @@ export function Composer({
     composerContentsEqual,
   );
   const { text, tokens } = composerContent;
-  const [attachments, setAttachments] = useState<readonly DraftAttachment[]>([]);
+  const [attachments, setAttachments] = attachmentDraft;
   const [selectedTokenIndex, setSelectedTokenIndex] = useState<number | null>(null);
   const [editingCwd, setEditingCwd] = useState(false);
   const [cwdInput, setCwdInput] = useState(cwd ?? "");
@@ -469,7 +463,6 @@ export function Composer({
     clipboardReadRequestRef.current += 1;
     readingClipboardFilesRef.current = false;
     setReadingClipboardFiles(false);
-    setAttachments([]);
     setClipboardReadError(null);
     if (
       previousDraftKey !== null &&
@@ -1148,19 +1141,29 @@ export function Composer({
     const request = ++clipboardReadRequestRef.current;
     setReadingClipboardFiles(true);
     setClipboardReadError(null);
+    const pendingId = crypto.randomUUID();
+    setAttachments((current) => [...current, {
+      id: pendingId,
+      name: "剪贴板图片",
+      size: 0,
+      blob: null,
+      error: null,
+      status: "preparing",
+    }]);
 
     let results: readonly ClipboardFileResult[];
     try {
       results = await clipboardFilesReader();
     } catch {
+      setAttachments((current) => current.filter(({ id }) => id !== pendingId));
       if (request !== clipboardReadRequestRef.current) return;
       setClipboardReadError("无法读取系统剪贴板");
       finishClipboardFileRead(request);
       return;
     }
-    if (request !== clipboardReadRequestRef.current) return;
     if (results.length === 0) {
-      if (reportEmpty) {
+      setAttachments((current) => current.filter(({ id }) => id !== pendingId));
+      if (reportEmpty && request === clipboardReadRequestRef.current) {
         setClipboardReadError("剪贴板中没有可读取的图片");
       }
       finishClipboardFileRead(request);
@@ -1188,7 +1191,9 @@ export function Composer({
         status: "error" as const,
       };
     });
-    setAttachments((current) => [...current, ...additions]);
+    setAttachments((current) => current.flatMap((attachment) =>
+      attachment.id === pendingId ? additions : [attachment]
+    ));
     finishClipboardFileRead(request);
     await prepareQueuedFiles(queued);
   };

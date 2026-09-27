@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { RestoredThread, ThreadSummary, ThreadTurn } from "../app/useServerThreads";
+import type { DraftAttachment } from "../app/useTabAttachments";
 import { Composer } from "../components/Composer";
 import { ConnectionShell } from "../components/ConnectionShell";
 import { ConversationView } from "../components/ConversationView";
@@ -282,9 +283,11 @@ export function VisualRegressionFixture({ state, theme }: VisualRegressionQuery)
 }
 
 function FixtureComposer({ state }: Pick<VisualRegressionQuery, "state">) {
+  const attachmentDraft = useState<readonly DraftAttachment[]>([]);
   return (
     <Composer
       activeTurn={false}
+      attachmentDraft={attachmentDraft}
       cwd="/workspace/codex-desktop-linux"
       error={null}
       initialText={state === "slash" ? "/" : ""}

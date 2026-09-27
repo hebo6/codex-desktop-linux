@@ -4,6 +4,7 @@ import { useState, type ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { Composer } from "./Composer";
+import { useTabAttachments, type DraftAttachment } from "../app/useTabAttachments";
 import {
   createDraftStore,
   type DraftStore,
@@ -83,23 +84,28 @@ function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}
     create: vi.fn(() => `blob:attachment-${blobUrlIndex++}`),
     revoke: vi.fn(),
   };
-  const result = render(
-    <Composer
-      activeTurn={false}
-      blobUrlFactory={blobUrlFactory}
-      cwd="/workspace/project"
-      error={null}
-      imageValidator={async () => undefined}
-      onQueue={onQueue}
-      onRunShellCommand={onRunShellCommand}
-      onSend={onSend}
-      onStop={onStop}
-      showProjectPicker={true}
-      stopping={false}
-      submitting={false}
-      {...overrides}
-    />,
-  );
+  function Harness() {
+    const attachmentDraft = useState<readonly DraftAttachment[]>([]);
+    return (
+      <Composer
+        activeTurn={false}
+        attachmentDraft={attachmentDraft}
+        blobUrlFactory={blobUrlFactory}
+        cwd="/workspace/project"
+        error={null}
+        imageValidator={async () => undefined}
+        onQueue={onQueue}
+        onRunShellCommand={onRunShellCommand}
+        onSend={onSend}
+        onStop={onStop}
+        showProjectPicker={true}
+        stopping={false}
+        submitting={false}
+        {...overrides}
+      />
+    );
+  }
+  const result = render(<Harness />);
   return {
     blobUrlFactory,
     onQueue,
@@ -107,6 +113,54 @@ function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}
     onSend,
     onStop,
     unmount: result.unmount,
+  };
+}
+
+function renderTabbedComposer(
+  overrides: Partial<ComponentProps<typeof Composer>> = {},
+) {
+  const tabs = [
+    { id: "tab:a", threadId: "thread-a" },
+    { id: "tab:b", threadId: "thread-b" },
+  ];
+  let nextUrl = 0;
+  const props = {
+    activeTurn: false,
+    blobUrlFactory: {
+      create: vi.fn(() => `blob:session-image-${nextUrl++}`),
+      revoke: vi.fn(),
+    },
+    cwd: "/workspace/project",
+    draftStore: {
+      listKeys: vi.fn(async () => []),
+      load: vi.fn(async () => null),
+      save: vi.fn(async () => undefined),
+      delete: vi.fn(async () => undefined),
+      transition: vi.fn(async () => undefined),
+    },
+    error: null,
+    imageValidator: async () => undefined,
+    onQueue: vi.fn(async () => true),
+    onRunShellCommand: vi.fn(async () => true),
+    onSend: vi.fn(async () => true),
+    onStop: vi.fn(async () => true),
+    showProjectPicker: false,
+    stopping: false,
+    submitting: false,
+    ...overrides,
+  };
+  function Harness({ tabId, visible }: { readonly tabId: string; readonly visible: boolean }) {
+    const { draft: attachmentDraft } = useTabAttachments("server", tabs, tabId);
+    return visible
+      ? <Composer {...props} attachmentDraft={attachmentDraft} draftKey={tabId} />
+      : null;
+  }
+  const result = render(<Harness tabId="tab:a" visible />);
+  return {
+    ...props,
+    showTab: (tabId: string, visible = true) => result.rerender(
+      <Harness tabId={tabId} visible={visible} />,
+    ),
   };
 }
 
@@ -156,6 +210,7 @@ describe("Composer", () => {
 
     function Harness() {
       const [draftKey, setDraftKey] = useState("tab:a");
+      const attachmentDraft = useState<readonly DraftAttachment[]>([]);
       return (
         <>
           <button onClick={() => setDraftKey("tab:a")} type="button">
@@ -166,6 +221,7 @@ describe("Composer", () => {
           </button>
           <Composer
             activeTurn={false}
+            attachmentDraft={attachmentDraft}
             cwd="/workspace/project"
             draftKey={draftKey}
             draftStore={draftStore}
@@ -352,9 +408,11 @@ describe("Composer", () => {
 
     function Harness() {
       const [draftKey, setDraftKey] = useState("window:server:draft");
+      const attachmentDraft = useState<readonly DraftAttachment[]>([]);
       return (
         <Composer
           activeTurn={false}
+          attachmentDraft={attachmentDraft}
           cwd="/workspace/project"
           draftKey={draftKey}
           draftStore={draftStore}
@@ -447,6 +505,7 @@ describe("Composer", () => {
 
     function Harness() {
       const [draftKey, setDraftKey] = useState("window:server:new");
+      const attachmentDraft = useState<readonly DraftAttachment[]>([]);
       return (
         <>
           <button onClick={() => setDraftKey("window:server:new")} type="button">
@@ -454,6 +513,7 @@ describe("Composer", () => {
           </button>
           <Composer
             activeTurn={false}
+            attachmentDraft={attachmentDraft}
             cwd="/workspace/project"
             draftKey={draftKey}
             draftStore={draftStore}
@@ -677,9 +737,11 @@ describe("Composer", () => {
 
     function Harness() {
       const [draftKey, setDraftKey] = useState("window:server:draft");
+      const attachmentDraft = useState<readonly DraftAttachment[]>([]);
       return (
         <Composer
           activeTurn={false}
+          attachmentDraft={attachmentDraft}
           cwd="/workspace/project"
           draftKey={draftKey}
           draftStore={draftStore}
@@ -1744,47 +1806,92 @@ describe("Composer", () => {
     expect(blobUrlFactory.revoke).toHaveBeenCalledWith("blob:attachment-0");
   });
 
-  it("切换会话时关闭附件预览并释放缩略图和预览的 Blob URL", async () => {
+  it("切换标签保留各自附件并在恢复时重新创建预览 URL", async () => {
     const user = userEvent.setup();
-    let nextUrl = 0;
-    const blobUrlFactory = {
-      create: vi.fn(() => `blob:session-image-${nextUrl++}`),
-      revoke: vi.fn(),
-    };
-    const props: ComponentProps<typeof Composer> = {
-      activeTurn: false,
-      blobUrlFactory,
-      cwd: "/workspace/project",
-      draftStore: {
-        listKeys: vi.fn(async () => []),
-        load: vi.fn(async () => null),
-        save: vi.fn(async () => undefined),
-        delete: vi.fn(async () => undefined),
-        transition: vi.fn(async () => undefined),
-      },
-      error: null,
-      imageValidator: async () => undefined,
-      onQueue: vi.fn(async () => true),
-      onRunShellCommand: vi.fn(async () => true),
-      onSend: vi.fn(async () => true),
-      onStop: vi.fn(async () => true),
-      showProjectPicker: false,
-      stopping: false,
-      submitting: false,
-    };
-    const { rerender } = render(<Composer {...props} draftKey="tab:a" />);
+    const { blobUrlFactory, draftStore, onSend, showTab } = renderTabbedComposer();
     fireEvent.change(screen.getByLabelText("选择图片附件"), {
       target: { files: [imageFile("session.png")] },
     });
     await user.click(await screen.findByRole("button", { name: "预览 session.png" }));
     expect(screen.getByRole("dialog", { name: "session.png" })).toBeVisible();
 
-    rerender(<Composer {...props} draftKey="tab:b" />);
+    showTab("tab:b");
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
     expect(blobUrlFactory.revoke).toHaveBeenCalledWith("blob:session-image-0");
     expect(blobUrlFactory.revoke).toHaveBeenCalledWith("blob:session-image-1");
+
+    fireEvent.change(screen.getByLabelText("选择图片附件"), {
+      target: { files: [imageFile("other.webp", "image/webp")] },
+    });
+    await screen.findByRole("button", { name: "预览 other.webp" });
+    showTab("tab:a", false);
+    showTab("tab:a");
+    expect(await screen.findByRole("button", { name: "预览 session.png" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "预览 other.webp" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(draftStore.save).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "发送" }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith(
+      [{ type: "image", url: "data:image/png;base64,iVBORw0KGgo=" }],
+      { cwd: "/workspace/project" },
+    ));
+    await waitFor(() => expect(screen.queryByLabelText("附件")).not.toBeInTheDocument());
+    showTab("tab:b");
+    expect(await screen.findByRole("button", { name: "预览 other.webp" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "移除 other.webp" }));
+    showTab("tab:a");
+    expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+    showTab("tab:b");
+    expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+  });
+
+  it("图片准备期间卸载输入框仍更新原标签并恢复发送能力", async () => {
+    const ready = deferred();
+    const imageValidator = vi.fn(() => ready.promise);
+    const { showTab } = renderTabbedComposer({ imageValidator });
+    fireEvent.change(screen.getByLabelText("选择图片附件"), {
+      target: { files: [imageFile("pending.png")] },
+    });
+    await waitFor(() => expect(imageValidator).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText("附件")).toHaveTextContent("正在读取图片");
+    showTab("tab:b", false);
+    ready.resolve();
+    showTab("tab:b");
+    expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+    showTab("tab:a");
+    expect(await screen.findByRole("button", { name: "预览 pending.png" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "发送" })).toBeEnabled();
+  });
+
+  it("系统剪贴板读取期间切换标签后仍将图片加入原标签", async () => {
+    const clipboardRead = deferred<readonly {
+      readonly name: string;
+      readonly size: number;
+      readonly file: File;
+      readonly error: null;
+    }[]>();
+    const { showTab } = renderTabbedComposer({ clipboardFilesReader: () => clipboardRead.promise });
+    fireEvent.paste(screen.getByRole("textbox", { name: "任务输入" }), {
+      clipboardData: { getData: () => "", items: [], types: ["image/png"] },
+    });
+    expect(screen.getByLabelText("附件")).toHaveTextContent("正在读取图片");
+    showTab("tab:b", false);
+    showTab("tab:b");
+    expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+    showTab("tab:a");
+    expect(screen.getByLabelText("附件")).toHaveTextContent("正在读取图片");
+    expect(screen.getByRole("button", { name: "发送" })).toBeDisabled();
+    showTab("tab:b");
+    const file = imageFile("clipboard.png");
+    clipboardRead.resolve([{ name: file.name, size: file.size, file, error: null }]);
+    showTab("tab:a");
+    expect(await screen.findByRole("button", { name: "预览 clipboard.png" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "发送" })).toBeEnabled();
+    showTab("tab:b");
+    expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
   });
 
   it("为没有文件名的剪贴板图片生成稳定名称", async () => {
