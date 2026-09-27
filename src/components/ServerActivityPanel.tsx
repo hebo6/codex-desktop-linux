@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useServerEvents } from "../app/useServerEvents";
+import type { ThreadTurn } from "../app/useServerThreads";
 import type { QueueInputPreview, ServerEventRecord, ServerEventSnapshot, ServerEventStore } from "../appServer/serverEventState";
 import { parseTurnDiff } from "../content/turnDiff";
 import type { ThreadGoal, ThreadRealtimeAudioChunk, ThreadTokenUsage } from "../protocol/generated/types/ServerNotification";
 import { ComposerAccessoryDisclosure } from "./ComposerAccessoryPanel";
 import { formatTokenCount } from "./formatTokenCount";
+import { formatTerminalInput } from "./formatTerminalInput";
 import styles from "./ServerActivityPanel.module.css";
 
 interface RequestFailure {
@@ -15,6 +17,7 @@ interface RequestFailure {
 }
 
 const EMPTY_FAILURES: readonly RequestFailure[] = [];
+const EMPTY_TURNS: readonly ThreadTurn[] = [];
 const STATUS_LABELS = {
   running: "进行中", completed: "已完成", failed: "失败", warning: "需注意", unknown: "状态待同步", info: "已更新",
 };
@@ -28,9 +31,10 @@ const SPECIALIZED_METHODS = new Set([
   "thread/realtime/transcript/delta", "thread/realtime/transcript/done", "thread/realtime/outputAudio/delta",
 ]);
 
-export function ServerActivityPanel({ store, threadId, failures = EMPTY_FAILURES, onOpenDiff }: {
+export function ServerActivityPanel({ store, threadId, turns = EMPTY_TURNS, failures = EMPTY_FAILURES, onOpenDiff }: {
   readonly store: ServerEventStore | null;
   readonly threadId: string | null;
+  readonly turns?: readonly ThreadTurn[];
   readonly failures?: readonly RequestFailure[];
   readonly onOpenDiff?: (path: string, diff: string) => void;
 }) {
@@ -78,7 +82,7 @@ export function ServerActivityPanel({ store, threadId, failures = EMPTY_FAILURES
           {diffs.map((diff) => <TurnDiffSummary diff={diff} key={`${threadId}:${diff.turnId}`} {...(onOpenDiff === undefined ? {} : { onOpenDiff })} />)}
           {hasRealtime ? <RealtimeStatus key={threadId} realtime={realtime} /> : null}
           <Failures failures={threadFailures} />
-          <Records records={threadRecords} />
+          <Records records={threadRecords} turns={turns} />
         </section>
       </div>
     </ComposerAccessoryDisclosure>
@@ -273,14 +277,26 @@ function pcmWave(chunks: readonly ThreadRealtimeAudioChunk[]): Blob {
   return new Blob([bytes], { type: "audio/wav" });
 }
 
-function Records({ records }: { readonly records: readonly ServerEventRecord[] }) {
+function Records({ records, turns }: { readonly records: readonly ServerEventRecord[]; readonly turns: readonly ThreadTurn[] }) {
+  // 终端输入可以发生在后续回合，itemId 始终指向最初启动的命令
+  const commands = useMemo(() => new Map(turns.flatMap((turn) => turn.items.flatMap((item) =>
+    item.type === "commandExecution" ? [[item.id, item.command] as const] : [],
+  ))), [turns]);
   return <ul className={styles.records}>{[...records].reverse().map((record) => <li className={styles.card} data-status={record.status} key={record.id}>
-    <header><h4>{record.title}</h4><span>{STATUS_LABELS[record.status]}</span></header>
-    {record.detail ? <p>{record.detail}</p> : null}
-    {record.text || record.params !== undefined ? <Detail title="查看详情">{() => <>
-      {record.text ? <pre className={styles.output}>{record.text}</pre> : null}
-      {record.params === undefined ? null : <pre className={styles.output}>{formatDetails(record.params)}</pre>}
-    </>}</Detail> : null}
+    <header><h4>{record.title}</h4><span>{record.terminalInput === undefined ? STATUS_LABELS[record.status] : "已发送"}</span></header>
+    {record.terminalInput === undefined ? <>
+      {record.detail ? <p>{record.detail}</p> : null}
+      {record.text || record.params !== undefined ? <Detail title="查看详情">{() => <>
+        {record.text ? <pre className={styles.output}>{record.text}</pre> : null}
+        {record.params === undefined ? null : <pre className={styles.output}>{formatDetails(record.params)}</pre>}
+      </>}</Detail> : null}
+    </> : <>
+      {commands.has(record.terminalInput.itemId)
+        ? <pre aria-label="对应命令" className={styles.terminalCommand}>{commands.get(record.terminalInput.itemId)}</pre>
+        : <p className={styles.muted}>命令记录未加载</p>}
+      <p className={styles.muted}>进程 {record.terminalInput.processId}</p>
+      <pre aria-label="已发送的终端输入" className={styles.output}>{formatTerminalInput(record.text ?? "")}</pre>
+    </>}
     {record.truncated ? <Truncated /> : null}
   </li>)}</ul>;
 }

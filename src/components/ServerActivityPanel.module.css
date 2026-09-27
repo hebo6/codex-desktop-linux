@@ -182,6 +182,16 @@ button.diffFile:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+.terminalCommand {
+  max-height: 120px;
+  margin: 0;
+  overflow: auto;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .output {
   max-height: 240px;
   padding: var(--space-2);

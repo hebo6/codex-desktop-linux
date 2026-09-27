@@ -458,6 +458,25 @@ describe("App", () => {
     expect(within(dialog).getByRole("table", { name: "左右差异对照" })).toBeVisible();
   });
 
+  it("终端输入面板关联会话中的命令活动并显示控制按键", async () => {
+    const serverEvents = new ServerEventStore();
+    const { emitNotification } = renderSidebarThreadScenario(false, serverEvents);
+    fireEvent.click(await screen.findByRole("button", { name: /侧边栏目标，线程空闲/u }));
+    await screen.findByText("这个会话还没有回合");
+    act(() => {
+      emitNotification({ method: "item/started", params: {
+        threadId: SIDEBAR_THREAD.id, turnId: "command-turn", startedAtMs: 1,
+        item: { type: "commandExecution", id: "command-1", command: "pnpm dev --host 127.0.0.1", cwd: SIDEBAR_THREAD.cwd, commandActions: [], status: "inProgress" },
+      } });
+      serverEvents.consume({ method: "item/commandExecution/terminalInteraction", params: {
+        threadId: SIDEBAR_THREAD.id, turnId: "input-turn", itemId: "command-1", processId: "2557", stdin: "\u0003",
+      } });
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "运行状态" }));
+    expect(screen.getByLabelText("对应命令")).toHaveTextContent("pnpm dev --host 127.0.0.1");
+    expect(screen.getByLabelText("已发送的终端输入")).toHaveTextContent("Ctrl+C：请求中断");
+  });
+
   it("未绑定服务器时窗口标题显示产品名称", async () => {
     const setTitle = vi.mocked(getCurrentWindow().setTitle);
     setTitle.mockClear();

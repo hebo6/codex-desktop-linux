@@ -113,6 +113,24 @@ describe("ServerEventStore", () => {
     expect(store.getSnapshot().processes[key("process", "p")]).toMatchObject({ stdout: "N", stderr: "", stdoutTruncated: true });
   });
 
+  it("终端输入保留原始字符与命令标识，空轮询不创建或更新输入记录", () => {
+    const store = new ServerEventStore();
+    const params = { threadId: "t", turnId: "r", itemId: "command", processId: "2557", stdin: "" };
+    store.consume({ method: "item/commandExecution/terminalInteraction", params });
+    expect(store.getSnapshot().records).toHaveLength(0);
+    for (const stdin of ["yes\n", "\u0003"]) {
+      store.consume({ method: "item/commandExecution/terminalInteraction", params: { ...params, stdin } });
+    }
+    const snapshot = store.getSnapshot();
+    expect(snapshot.records).toHaveLength(1);
+    expect(snapshot.records[0]).toMatchObject({
+      text: "yes\n\u0003",
+      terminalInput: { itemId: "command", processId: "2557" },
+    });
+    store.consume({ method: "item/commandExecution/terminalInteraction", params });
+    expect(store.getSnapshot()).toBe(snapshot);
+  });
+
   it("非流式退出捕获和命令响应都可完成状态，显式开始支持句柄重用", () => {
     const store = new ServerEventStore();
     store.consume({ method: "process/exited", params: { processHandle: "p", exitCode: 1, stdout: "out", stderr: "err", stdoutCapReached: false, stderrCapReached: true } });

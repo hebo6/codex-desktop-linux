@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SERVER_EVENT_LIMITS, ServerEventStore } from "../appServer/serverEventState";
+import type { ThreadTurn } from "../app/useServerThreads";
 import type { ServerNotification } from "../protocol/generated";
 import { ServerActivityPanel } from "./ServerActivityPanel";
 
@@ -19,6 +20,20 @@ function openPanel() {
 const UPDATED_FILE_DIFF = "diff --git a/src/App.tsx b/src/App.tsx\nindex abc..def\n--- a/src/App.tsx\n+++ b/src/App.tsx\n@@ -1 +1 @@\n-old line\n+new line\n";
 const DELETED_FILE_DIFF = "diff --git a/old.txt b/old.txt\ndeleted file mode 100644\nindex abc..000\n--- a/old.txt\n+++ /dev/null\n@@ -1 +0,0 @@\n-removed line\n";
 
+const COMMAND_TURN: ThreadTurn = {
+  id: "earlier-turn", status: "completed", itemsView: "full",
+  items: [{
+    type: "commandExecution", id: "command-1", command: "pnpm dev --host 127.0.0.1",
+    cwd: "/workspace", commandActions: [], processId: "2557", status: "inProgress",
+  }],
+};
+
+function terminalInput(store: ServerEventStore, stdin: string) {
+  store.consume({ method: "item/commandExecution/terminalInteraction", params: {
+    threadId: "thread-1", turnId: "later-turn", itemId: "command-1", processId: "2557", stdin,
+  } });
+}
+
 function openDiffSummary() {
   const details = screen.getByText(/^本轮汇总变更/u).closest("details")!;
   details.open = true;
@@ -32,6 +47,55 @@ afterEach(() => {
 });
 
 describe("ServerActivityPanel", () => {
+  it("跨回合关联具体命令，直接展示中断按键且不宣称命令已停止", () => {
+    const store = new ServerEventStore();
+    terminalInput(store, "\u0003");
+    render(<ServerActivityPanel store={store} threadId="thread-1" turns={[COMMAND_TURN]} />);
+    openPanel();
+    expect(screen.getByLabelText("对应命令")).toHaveTextContent("pnpm dev --host 127.0.0.1");
+    expect(screen.getByText("进程 2557")).toBeVisible();
+    expect(screen.getByText("已发送")).toBeVisible();
+    expect(screen.getByLabelText("已发送的终端输入")).toHaveTextContent("⟦Ctrl+C：请求中断⟧");
+    expect(document.body.textContent).not.toContain("\u0003");
+    expect(screen.queryByText("已停止")).not.toBeInTheDocument();
+  });
+
+  it("命令未加载时不借用同进程号的其他命令，历史加载后自动显示对应命令", () => {
+    const store = new ServerEventStore();
+    terminalInput(store, "\u0003");
+    const unrelatedTurn: ThreadTurn = { ...COMMAND_TURN, items: [{
+      ...COMMAND_TURN.items[0]!, id: "other-command", command: "不应显示的命令",
+    }] };
+    const { rerender } = render(<ServerActivityPanel store={store} threadId="thread-1" turns={[unrelatedTurn]} />);
+    openPanel();
+    expect(screen.getByText("命令记录未加载")).toBeVisible();
+    expect(screen.queryByLabelText("对应命令")).not.toBeInTheDocument();
+    rerender(<ServerActivityPanel store={store} threadId="thread-1" turns={[COMMAND_TURN, unrelatedTurn]} />);
+    expect(screen.queryByText("命令记录未加载")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("对应命令")).toHaveTextContent("pnpm dev --host 127.0.0.1");
+    expect(screen.queryByText("不应显示的命令")).not.toBeInTheDocument();
+  });
+
+  it("按原顺序展示普通文字和按键，换行保持可读且不渲染控制字符", () => {
+    const store = new ServerEventStore();
+    terminalInput(store, "你好\tworld\r\n");
+    terminalInput(store, "next\n\r\u0004\u001a\u001b\b\u007f\u0000\u009b");
+    render(<ServerActivityPanel store={store} threadId="thread-1" turns={[COMMAND_TURN]} />);
+    openPanel();
+    expect(screen.getByLabelText("已发送的终端输入").textContent).toBe(
+      "你好⟦Tab：制表⟧world⟦Enter：回车换行⟧\nnext⟦Enter：换行⟧\n⟦Enter：回车⟧"
+      + "⟦Ctrl+D：结束输入⟧⟦Ctrl+Z：请求挂起⟧⟦Esc⟧⟦Backspace：退格⟧⟦Backspace：退格⟧⟦U+0000⟧⟦U+009B⟧",
+    );
+    expect(store.getSnapshot().records[0]?.text).toContain("你好\tworld\r\n");
+  });
+
+  it("等待输出的空轮询不显示为终端输入", () => {
+    const store = new ServerEventStore();
+    terminalInput(store, "");
+    render(<ServerActivityPanel store={store} threadId="thread-1" turns={[COMMAND_TURN]} />);
+    expect(screen.queryByRole("button", { name: /^运行状态/u })).not.toBeInTheDocument();
+  });
+
   it("高频通知先消费到存储，再合并为一次界面刷新", () => {
     vi.useFakeTimers();
     const store = new ServerEventStore();

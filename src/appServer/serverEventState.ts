@@ -117,6 +117,7 @@ export interface ServerEventRecord {
   readonly threadId?: string | undefined;
   readonly turnId?: string | undefined;
   readonly text?: string | undefined;
+  readonly terminalInput?: { readonly itemId: string; readonly processId: string };
   readonly params?: unknown;
   readonly truncated?: boolean;
 }
@@ -357,8 +358,10 @@ export class ServerEventStore {
         break;
       case "item/commandExecution/terminalInteraction": {
         const p = notification.params;
+        if (p.stdin.length === 0) break;
         const id = keyOf("stdin", p.threadId, p.turnId, p.itemId);
         this.record(notification, "终端输入", `进程 ${p.processId}`, "info", id, p.threadId, p.turnId, (this.snapshot.records.find((entry) => entry.id === id)?.text ?? "") + p.stdin, false);
+        this.updateRecord(id, { terminalInput: { itemId: p.itemId, processId: p.processId } });
         break;
       }
       case "item/fileChange/outputDelta": {

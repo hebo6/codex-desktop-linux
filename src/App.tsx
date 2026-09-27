@@ -2167,6 +2167,7 @@ export function App({
                       <ServerActivityPanel
                         store={connection.serverEvents}
                         threadId={currentThreadId}
+                        turns={displayedRestoredThread?.turns ?? EMPTY_THREAD_TURNS}
                         failures={serverInteractions.failures}
                         onOpenDiff={openDiff}
                       />
