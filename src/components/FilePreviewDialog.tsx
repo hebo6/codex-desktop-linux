@@ -142,6 +142,7 @@ export function FilePreviewDialog({
   const fileRequest = request?.type === "dataImage" ? null : request;
   const dataImageRequest = request?.type === "dataImage" ? request : null;
   const previewPath = dataImageRequest?.name ?? fileRequest?.path ?? null;
+  const diff = fileRequest?.diff ?? null;
   const isTopmostModal = useModalLayer(request !== null);
 
   useEffect(() => {
@@ -185,6 +186,10 @@ export function FilePreviewDialog({
       setError("缺少文件预览请求");
       return;
     }
+    if (diff !== null) {
+      setLoading(false);
+      return;
+    }
     if (client === null) {
       setLoading(false);
       setError("当前服务器连接不可用，无法读取文件");
@@ -216,7 +221,7 @@ export function FilePreviewDialog({
     return () => {
       disposed = true;
     };
-  }, [attempt, client, dataImageRequest, defaultWrap, fileRequest, request]);
+  }, [attempt, client, dataImageRequest, defaultWrap, diff, fileRequest, request]);
 
   useEffect(() => {
     if (request === null) return;
@@ -541,29 +546,31 @@ export function FilePreviewDialog({
       <section aria-labelledby={titleId} aria-modal="true" className={styles.dialog} ref={dialogRef} role="dialog" tabIndex={-1}>
         <header className={styles.header}>
           <div>
-            <h2 id={titleId}>{name}</h2>
+            <h2 id={titleId} title={fileRequest?.path}>{diff === null ? name : fileRequest?.path}</h2>
             <p>{dataImageRequest === null ? `${serverName} · ${relativePath}` : relativePath}</p>
           </div>
           <div className={styles.headerActions}>
-            {fileRequest !== null && isHtml(fileRequest.path) ? (
+            {diff === null && fileRequest !== null && isHtml(fileRequest.path) ? (
               <button disabled={loaded === null || openingHtml} onClick={() => void openHtml()} type="button">
                 {openingHtml ? "正在打开" : "在浏览器中打开"}
               </button>
             ) : null}
-            <button disabled={loaded === null || saving} onClick={() => void save()} type="button">{saving ? "正在保存" : "另存为"}</button>
+            {diff === null ? <button disabled={loaded === null || saving} onClick={() => void save()} type="button">{saving ? "正在保存" : "另存为"}</button> : null}
             <button aria-label="关闭文件预览" onClick={onClose} type="button">×</button>
           </div>
         </header>
         {browserStatus === null ? null : <div className={styles.status} role="status">{browserStatus}</div>}
         {saveStatus === null ? null : <div className={styles.status} role="status">{saveStatus}</div>}
         <div className={styles.meta}>
-          <span>{decoded === null ? "正在识别" : kindLabel(decoded.type)}</span>
-          <span>{loaded === null ? "大小未知" : formatBytes(decodedBase64Size(loaded.dataBase64))}</span>
-          {sourceText === null ? null : <><span>{language}</span><span>UTF-8</span><span>{lineEnding(sourceText)}</span></>}
-          {loaded !== null && loaded.modifiedAtMs > 0 ? <span>{new Date(loaded.modifiedAtMs).toLocaleString()}</span> : null}
+          {diff !== null ? <span>文件差异</span> : <>
+            <span>{decoded === null ? "正在识别" : kindLabel(decoded.type)}</span>
+            <span>{loaded === null ? "大小未知" : formatBytes(decodedBase64Size(loaded.dataBase64))}</span>
+            {sourceText === null ? null : <><span>{language}</span><span>UTF-8</span><span>{lineEnding(sourceText)}</span></>}
+            {loaded !== null && loaded.modifiedAtMs > 0 ? <span>{new Date(loaded.modifiedAtMs).toLocaleString()}</span> : null}
+          </>}
         </div>
         <div className={styles.toolbar}>
-          {fileRequest?.diff !== undefined && fileRequest.diff !== null ? (
+          {diff !== null ? (
             <>
               <button aria-pressed={diffMode === "unified"} onClick={() => setDiffMode("unified")} type="button">统一差异</button>
               <button aria-pressed={diffMode === "split"} onClick={() => setDiffMode("split")} type="button">左右对照</button>
@@ -612,8 +619,8 @@ export function FilePreviewDialog({
             : <button onClick={() => void navigator.clipboard.writeText(fileRequest.path)} type="button">复制路径</button>}
         </div>
         <main className={styles.content}>
-          {fileRequest?.diff !== undefined && fileRequest.diff !== null ? (
-            <DiffView diff={fileRequest.diff} mode={diffMode} />
+          {diff !== null ? (
+            <DiffView diff={diff} mode={diffMode} />
           ) : loading ? <div className={styles.placeholder} role="status">正在读取 {name}</div> : error !== null ? (
             <div className={styles.placeholder} role="alert"><strong>{error}</strong><button onClick={() => setAttempt((value) => value + 1)} type="button">重试</button></div>
           ) : decoded?.type === "tooLarge" ? (
@@ -706,15 +713,20 @@ function TextSource({ column, endLine, highlightedLines, line, matchingLines, qu
 }
 
 function DiffView({ diff, mode }: { readonly diff: string; readonly mode: "unified" | "split" }) {
-  const lines = diff.replace(/\r\n?/gu, "\n").split("\n");
+  let inHunk = false;
+  const lines = diff.replace(/\r\n?/gu, "\n").split("\n").map((text) => {
+    if (text.startsWith("diff --git ")) inHunk = false;
+    if (text.startsWith("@@")) inHunk = true;
+    return { text, kind: diffLineKind(text, inHunk) };
+  });
   if (mode === "unified") {
-    return <pre className={styles.unifiedDiff}>{lines.map((line, index) => <span data-kind={diffLineKind(line)} key={index}>{line || " "}</span>)}</pre>;
+    return <pre className={styles.unifiedDiff}>{lines.map((line, index) => <span data-kind={line.kind} key={index}>{line.text || " "}</span>)}</pre>;
   }
   const rows = splitDiffRows(lines);
   return <div className={styles.splitDiff} role="table" aria-label="左右差异对照">{rows.map((row, index) => <div className={styles.diffRow} key={index} role="row"><code data-kind={row.leftKind} role="cell">{row.left || " "}</code><code data-kind={row.rightKind} role="cell">{row.right || " "}</code></div>)}</div>;
 }
 
-function splitDiffRows(lines: readonly string[]): readonly { left: string; right: string; leftKind: string; rightKind: string }[] {
+function splitDiffRows(lines: readonly { text: string; kind: string }[]): readonly { left: string; right: string; leftKind: string; rightKind: string }[] {
   const rows: { left: string; right: string; leftKind: string; rightKind: string }[] = [];
   let removed: string[] = [];
   let added: string[] = [];
@@ -726,20 +738,19 @@ function splitDiffRows(lines: readonly string[]): readonly { left: string; right
     removed = [];
     added = [];
   };
-  for (const line of lines) {
-    if (line.startsWith("-") && !line.startsWith("---")) { removed.push(line.slice(1)); continue; }
-    if (line.startsWith("+") && !line.startsWith("+++")) { added.push(line.slice(1)); continue; }
+  for (const { text, kind } of lines) {
+    if (kind === "remove") { removed.push(text.slice(1)); continue; }
+    if (kind === "add") { added.push(text.slice(1)); continue; }
     flush();
-    const kind = diffLineKind(line);
-    rows.push({ left: line, right: line, leftKind: kind, rightKind: kind });
+    rows.push({ left: text, right: text, leftKind: kind, rightKind: kind });
   }
   flush();
   return rows;
 }
 
-function diffLineKind(line: string): string {
-  if (line.startsWith("+") && !line.startsWith("+++")) return "add";
-  if (line.startsWith("-") && !line.startsWith("---")) return "remove";
+function diffLineKind(line: string, inHunk: boolean): string {
+  if (line.startsWith("+") && (inHunk || !line.startsWith("+++"))) return "add";
+  if (line.startsWith("-") && (inHunk || !line.startsWith("---"))) return "remove";
   if (line.startsWith("@@")) return "hunk";
   if (line.startsWith("diff ") || line.startsWith("---") || line.startsWith("+++")) return "meta";
   return "context";

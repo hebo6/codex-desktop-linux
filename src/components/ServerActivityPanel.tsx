@@ -1,7 +1,8 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useServerEvents } from "../app/useServerEvents";
 import type { QueueInputPreview, ServerEventRecord, ServerEventSnapshot, ServerEventStore } from "../appServer/serverEventState";
+import { parseTurnDiff } from "../content/turnDiff";
 import type { ThreadGoal, ThreadRealtimeAudioChunk, ThreadTokenUsage } from "../protocol/generated/types/ServerNotification";
 import { ComposerAccessoryDisclosure } from "./ComposerAccessoryPanel";
 import { formatTokenCount } from "./formatTokenCount";
@@ -27,10 +28,11 @@ const SPECIALIZED_METHODS = new Set([
   "thread/realtime/transcript/delta", "thread/realtime/transcript/done", "thread/realtime/outputAudio/delta",
 ]);
 
-export function ServerActivityPanel({ store, threadId, failures = EMPTY_FAILURES }: {
+export function ServerActivityPanel({ store, threadId, failures = EMPTY_FAILURES, onOpenDiff }: {
   readonly store: ServerEventStore | null;
   readonly threadId: string | null;
   readonly failures?: readonly RequestFailure[];
+  readonly onOpenDiff?: (path: string, diff: string) => void;
 }) {
   const snapshot = useServerEvents(store);
   const [expanded, setExpanded] = useState(false);
@@ -73,11 +75,7 @@ export function ServerActivityPanel({ store, threadId, failures = EMPTY_FAILURES
           {usage === undefined ? null : <TokenUsage usage={usage.tokenUsage} stale={usage.stale} />}
           {hasGoal ? <GoalStatus goal={goal.goal} stale={goal.stale} /> : null}
           {hasQueue && queue !== undefined ? <QueueStatus queue={queue} /> : null}
-          {diffs.map((diff) => <Detail key={diff.turnId} title={`本轮汇总变更 · ${diff.turnId}`}>
-            {diff.stale ? <p className={styles.muted}>连接已断开，显示最后收到的变更</p> : null}
-            <pre className={styles.output}>{diff.diff || "暂无文件变更"}</pre>
-            {diff.truncated ? <Truncated /> : null}
-          </Detail>)}
+          {diffs.map((diff) => <TurnDiffSummary diff={diff} key={`${threadId}:${diff.turnId}`} {...(onOpenDiff === undefined ? {} : { onOpenDiff })} />)}
           {hasRealtime ? <RealtimeStatus key={threadId} realtime={realtime} /> : null}
           <Failures failures={threadFailures} />
           <Records records={threadRecords} />
@@ -85,6 +83,50 @@ export function ServerActivityPanel({ store, threadId, failures = EMPTY_FAILURES
       </div>
     </ComposerAccessoryDisclosure>
   );
+}
+
+function TurnDiffSummary({ diff, onOpenDiff }: {
+  readonly diff: ServerEventSnapshot["diffsByTurn"][string];
+  readonly onOpenDiff?: (path: string, diff: string) => void;
+}) {
+  const parsed = useMemo(() => parseTurnDiff(diff.diff), [diff.diff]);
+  const partial = diff.truncated || parsed.incomplete;
+  const totals = parsed.files.reduce((sum, file) => ({
+    additions: sum.additions + file.additions,
+    deletions: sum.deletions + file.deletions,
+  }), { additions: 0, deletions: 0 });
+  const kinds = { add: "新增", update: "修改", delete: "删除", rename: "重命名" };
+
+  return <Detail title={<span className={styles.diffSummary}>
+    <span>本轮汇总变更 · {partial ? "已识别 " : ""}{parsed.files.length} 个文件</span>
+    {parsed.files.length > 0 ? <DiffStats {...totals} /> : null}
+  </span>}>
+    {diff.stale ? <p className={styles.muted}>连接已断开，显示最后收到的变更</p> : null}
+    {partial ? <p className={styles.muted}>{diff.truncated ? "内容已截断，仅统计可识别文件" : "部分变更无法识别，仅统计可识别文件"}</p> : null}
+    {parsed.files.length === 0 && !partial ? <p className={styles.muted}>暂无文件变更</p> : null}
+    <ul aria-label="变更文件" className={styles.diffFiles}>
+      {parsed.files.map((file) => {
+        const path = file.previousPath === null ? file.path : `${file.previousPath} → ${file.path}`;
+        const label = `${kinds[file.kind]} ${path}，新增 ${file.additions} 行，删除 ${file.deletions} 行`;
+        const content = <>
+          <span className={styles.diffKind}>{kinds[file.kind]}</span>
+          <code className={styles.diffPath} title={path}>{path}</code>
+          <DiffStats additions={file.additions} deletions={file.deletions} />
+        </>;
+        return <li key={file.path}>{onOpenDiff === undefined
+          ? <div className={styles.diffFile} aria-label={label}>{content}</div>
+          : <button aria-label={label} className={styles.diffFile} onClick={() => onOpenDiff(file.path, file.diff)} type="button">{content}</button>}
+        </li>;
+      })}
+    </ul>
+    {partial ? <Detail title="查看保留的原始补丁"><pre className={styles.output}>{diff.diff}</pre></Detail> : null}
+  </Detail>;
+}
+
+function DiffStats({ additions, deletions }: { readonly additions: number; readonly deletions: number }) {
+  return <span aria-label={`新增 ${additions} 行，删除 ${deletions} 行`} className={styles.diffStats}>
+    <span>+{additions}</span><span>−{deletions}</span>
+  </span>;
 }
 
 function TokenUsage({ usage, stale }: { readonly usage: ThreadTokenUsage; readonly stale: boolean }) {
@@ -249,7 +291,7 @@ function Failures({ failures }: { readonly failures: readonly RequestFailure[] }
   </li>)}</ul>;
 }
 
-function Detail({ title, children }: { readonly title: string; readonly children: ReactNode | (() => ReactNode) }) {
+function Detail({ title, children }: { readonly title: ReactNode; readonly children: ReactNode | (() => ReactNode) }) {
   const [open, setOpen] = useState(false);
   return <details className={styles.detail} onToggle={(event) => setOpen(event.currentTarget.open)}>
     <summary>{title}</summary>{open ? <div>{typeof children === "function" ? children() : children}</div> : null}

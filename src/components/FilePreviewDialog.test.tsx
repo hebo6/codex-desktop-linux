@@ -407,19 +407,47 @@ describe("FilePreviewDialog", () => {
   });
 
   it("文件变更支持统一差异和左右对照", async () => {
+    const client = clientFor("current content differs from the snapshot");
     render(
       <FilePreviewDialog
-        client={clientFor("new")}
+        client={client}
         onClose={vi.fn()}
         request={{ path: "/remote/a.txt", diff: "@@ -1 +1 @@\n-old\n+new" }}
         serverName="服务器"
       />,
     );
+    expect(client.getMetadata).not.toHaveBeenCalled();
+    expect(client.readFile).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "/remote/a.txt" })).toBeVisible();
+    expect(screen.getByText("文件差异")).toBeVisible();
+    expect(screen.queryByText("正在识别")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "另存为" })).not.toBeInTheDocument();
     expect(screen.getByText("-old")).toHaveAttribute("data-kind", "remove");
     fireEvent.click(screen.getByRole("button", { name: "左右对照" }));
     expect(screen.getByRole("table", { name: "左右差异对照" })).toBeVisible();
     expect(screen.getAllByRole("cell").some((cell) => cell.textContent === "old")).toBe(true);
     expect(screen.getAllByRole("cell").some((cell) => cell.textContent === "new")).toBe(true);
+  });
+
+  it("离线仍能查看已删除文件的补丁并用键盘关闭", () => {
+    const onClose = vi.fn();
+    render(<FilePreviewDialog client={null} onClose={onClose} request={{ path: "/remote/deleted.txt", diff: "@@ -1 +0,0 @@\n-removed" }} serverName="服务器" />);
+    expect(screen.getByText("-removed")).toBeVisible();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("差异正文中的连续加减号保留增删语义，不误判为文件头", () => {
+    const diff = "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n--- removed\n+++ added\n";
+    render(<FilePreviewDialog client={null} onClose={vi.fn()} request={{ path: "a.txt", diff }} serverName="服务器" />);
+    expect(screen.getByText("--- a/a.txt")).toHaveAttribute("data-kind", "meta");
+    expect(screen.getByText("+++ b/a.txt")).toHaveAttribute("data-kind", "meta");
+    expect(screen.getByText("--- removed")).toHaveAttribute("data-kind", "remove");
+    expect(screen.getByText("+++ added")).toHaveAttribute("data-kind", "add");
+    fireEvent.click(screen.getByRole("button", { name: "左右对照" }));
+    expect(screen.getByRole("cell", { name: "-- removed" })).toHaveAttribute("data-kind", "remove");
+    expect(screen.getByRole("cell", { name: "++ added" })).toHaveAttribute("data-kind", "add");
   });
 
   it("将键盘焦点限制在文件预览对话框", async () => {

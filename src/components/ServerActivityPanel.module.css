@@ -115,6 +115,73 @@
   cursor: pointer;
 }
 
+.diffSummary {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.diffFiles {
+  padding: 0;
+  margin: var(--space-1) 0;
+  list-style: none;
+}
+
+.diffFiles:empty {
+  display: none;
+}
+
+.diffFile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+
+button.diffFile {
+  cursor: pointer;
+}
+
+button.diffFile:hover,
+button.diffFile:focus-visible {
+  outline: none;
+  background: var(--color-fill-subtle);
+}
+
+.diffKind,
+.diffStats {
+  flex: 0 0 auto;
+}
+
+.diffKind {
+  color: var(--color-text-tertiary);
+}
+
+.diffPath {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diffStats {
+  display: inline-flex;
+  gap: var(--space-2);
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
 .output {
   max-height: 240px;
   padding: var(--space-2);

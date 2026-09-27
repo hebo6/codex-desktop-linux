@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ServerEventStore } from "../appServer/serverEventState";
+import { SERVER_EVENT_LIMITS, ServerEventStore } from "../appServer/serverEventState";
 import type { ServerNotification } from "../protocol/generated";
 import { ServerActivityPanel } from "./ServerActivityPanel";
 
@@ -14,6 +14,16 @@ function consume(store: ServerEventStore, notification: ServerNotification) {
 
 function openPanel() {
   fireEvent.click(screen.getByRole("button", { name: /^运行状态/u }));
+}
+
+const UPDATED_FILE_DIFF = "diff --git a/src/App.tsx b/src/App.tsx\nindex abc..def\n--- a/src/App.tsx\n+++ b/src/App.tsx\n@@ -1 +1 @@\n-old line\n+new line\n";
+const DELETED_FILE_DIFF = "diff --git a/old.txt b/old.txt\ndeleted file mode 100644\nindex abc..000\n--- a/old.txt\n+++ /dev/null\n@@ -1 +0,0 @@\n-removed line\n";
+
+function openDiffSummary() {
+  const details = screen.getByText(/^本轮汇总变更/u).closest("details")!;
+  details.open = true;
+  fireEvent(details, new Event("toggle"));
+  return details;
 }
 
 afterEach(() => {
@@ -160,17 +170,75 @@ describe("ServerActivityPanel", () => {
     expect(screen.queryByText("实时会话已关闭")).not.toBeInTheDocument();
   });
 
-  it("详情按需挂载，汇总diff不会创建重复的正文记录", () => {
+  it("汇总展示文件数与增删统计，按需挂载文件列表，点击仅打开所选文件差异", () => {
     const store = new ServerEventStore();
-    store.consume({ method: "turn/diff/updated", params: { threadId: "thread-1", turnId: "turn-1", diff: "+new line" } });
+    const onOpenDiff = vi.fn();
+    store.consume({ method: "turn/diff/updated", params: { threadId: "thread-1", turnId: "turn-1", diff: UPDATED_FILE_DIFF + DELETED_FILE_DIFF } });
+    render(<ServerActivityPanel onOpenDiff={onOpenDiff} store={store} threadId="thread-1" />);
+    openPanel();
+    expect(screen.getByText("本轮汇总变更 · 2 个文件")).toBeVisible();
+    expect(screen.getByLabelText("新增 1 行，删除 2 行")).toBeVisible();
+    expect(screen.queryByRole("list", { name: "变更文件" })).not.toBeInTheDocument();
+    expect(screen.queryByText("整轮文件变更")).not.toBeInTheDocument();
+
+    const details = openDiffSummary();
+    const files = screen.getByRole("list", { name: "变更文件" });
+    expect(within(files).getAllByRole("listitem")).toHaveLength(2);
+    fireEvent.click(within(files).getByRole("button", { name: "修改 src/App.tsx，新增 1 行，删除 1 行" }));
+    expect(onOpenDiff).toHaveBeenLastCalledWith("src/App.tsx", UPDATED_FILE_DIFF);
+    fireEvent.click(within(files).getByRole("button", { name: "删除 old.txt，新增 0 行，删除 1 行" }));
+    expect(onOpenDiff).toHaveBeenLastCalledWith("old.txt", DELETED_FILE_DIFF);
+    expect(screen.queryByText("+new line")).not.toBeInTheDocument();
+
+    details.open = false;
+    fireEvent(details, new Event("toggle"));
+    expect(screen.queryByRole("list", { name: "变更文件" })).not.toBeInTheDocument();
+  });
+
+  it("同一回合更新时替换文件和统计，断线仍可查看收到的差异", () => {
+    vi.useFakeTimers();
+    const store = new ServerEventStore();
+    const onOpenDiff = vi.fn();
+    store.consume({ method: "turn/diff/updated", params: { threadId: "thread-1", turnId: "turn-1", diff: UPDATED_FILE_DIFF } });
+    render(<ServerActivityPanel onOpenDiff={onOpenDiff} store={store} threadId="thread-1" />);
+    openPanel();
+    openDiffSummary();
+    consume(store, { method: "turn/diff/updated", params: { threadId: "thread-1", turnId: "turn-1", diff: DELETED_FILE_DIFF } });
+    expect(screen.getAllByText(/^本轮汇总变更/u)).toHaveLength(1);
+    expect(screen.queryByText("src/App.tsx")).not.toBeInTheDocument();
+    act(() => { store.disconnect(); vi.advanceTimersByTime(80); });
+    expect(screen.getByText("连接已断开，显示最后收到的变更")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "删除 old.txt，新增 0 行，删除 1 行" }));
+    expect(onOpenDiff).toHaveBeenCalledWith("old.txt", DELETED_FILE_DIFF);
+  });
+
+  it("截断补丁只统计能识别的文件，保留原始片段供按需查看", () => {
+    const store = new ServerEventStore();
+    store.consume({ method: "turn/diff/updated", params: { threadId: "thread-1", turnId: "turn-1", diff: `${"x".repeat(SERVER_EVENT_LIMITS.text)}\n${UPDATED_FILE_DIFF}` } });
+    render(<ServerActivityPanel onOpenDiff={vi.fn()} store={store} threadId="thread-1" />);
+    openPanel();
+    expect(screen.getByText("本轮汇总变更 · 已识别 1 个文件")).toBeVisible();
+    openDiffSummary();
+    expect(screen.getByText("内容已截断，仅统计可识别文件")).toBeVisible();
+    expect(screen.getByRole("button", { name: "修改 src/App.tsx，新增 1 行，删除 1 行" })).toBeVisible();
+    expect(document.querySelector("pre")).toBeNull();
+    const raw = screen.getByText("查看保留的原始补丁").closest("details")!;
+    raw.open = true;
+    fireEvent(raw, new Event("toggle"));
+    expect(document.querySelector("pre")?.textContent).toContain(UPDATED_FILE_DIFF);
+  });
+
+  it.each([
+    ["", "暂无文件变更"],
+    ["@@ -1 +1 @@\n-old\n+new", "部分变更无法识别，仅统计可识别文件"],
+  ])("空或缺少文件路径的补丁不伪造文件列表（%s）", (diff, message) => {
+    const store = new ServerEventStore();
+    store.consume({ method: "turn/diff/updated", params: { threadId: "thread-1", turnId: "turn-1", diff } });
     render(<ServerActivityPanel store={store} threadId="thread-1" />);
     openPanel();
-    expect(screen.queryByText("+new line")).not.toBeInTheDocument();
-    const summary = screen.getByText("本轮汇总变更 · turn-1");
-    const details = summary.closest("details")!;
-    details.open = true;
-    fireEvent(details, new Event("toggle"));
-    expect(screen.getByText("+new line")).toBeVisible();
+    openDiffSummary();
+    expect(screen.getByText(message)).toBeVisible();
+    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
   });
 
   it("客户端失败仅展示和统计当前会话的请求", () => {

@@ -1975,14 +1975,9 @@ export function App({
     }
   };
 
-  const openDiff = (rawPath: string, diff: string) => {
-    const resolved = resolveLink(rawPath, composerCwd);
-    if (resolved.type !== "file") {
-      setContentError(resolved.type === "blocked" ? resolved.reason : "无法解析文件变更路径");
-      return;
-    }
+  const openDiff = (path: string, diff: string) => {
     setContentError(null);
-    setPreviewRequest({ path: resolved.path, diff });
+    setPreviewRequest({ path, diff });
   };
 
   const connectServer = async (
@@ -2167,6 +2162,7 @@ export function App({
                         store={connection.serverEvents}
                         threadId={currentThreadId}
                         failures={serverInteractions.failures}
+                        onOpenDiff={openDiff}
                       />
                       <TaskPlanPanel plan={turnPlan} />
                       <SubAgentPanel

@@ -32,6 +32,7 @@ import {
   type ExternalUrlOpener,
 } from "./App";
 import { collectHighRiskServerIds } from "./app/highRiskServerIds";
+import { ServerEventStore } from "./appServer/serverEventState";
 import {
   ConfigurationCommandError,
   type ConfigurationSnapshot,
@@ -321,7 +322,7 @@ const SIDEBAR_THREAD = {
   updatedAt: 200,
 } as const;
 
-function renderSidebarThreadScenario(existingThreadTab = false) {
+function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: ServerEventStore) {
   const requestSession = {
     sendRequest(request: { readonly method: string }) {
       const result = request.method === "thread/list"
@@ -351,6 +352,7 @@ function renderSidebarThreadScenario(existingThreadTab = false) {
     subscribeNotifications: () => () => undefined,
   };
   const sessionFactory: ConfiguredServerSessionFactory = (options) => ({
+    ...(serverEvents === undefined ? {} : { serverEvents }),
     conversationClient: new AppServerConversationClient(requestSession as never),
     threadClient: new AppServerThreadClient(requestSession as never),
     async start() {
@@ -405,6 +407,25 @@ function renderSidebarThreadScenario(existingThreadTab = false) {
 }
 
 describe("App", () => {
+  it("从本轮汇总打开单个文件差异，特殊文件名保持原样", async () => {
+    const serverEvents = new ServerEventStore();
+    const path = "#notes%20.md:42";
+    const diff = `diff --git a/${path} b/${path}\nindex abc..def\n--- a/${path}\n+++ b/${path}\n@@ -1 +1 @@\n-before\n+after\n`;
+    serverEvents.consume({ method: "turn/diff/updated", params: { threadId: SIDEBAR_THREAD.id, turnId: "turn-diff", diff } });
+    renderSidebarThreadScenario(false, serverEvents);
+    fireEvent.click(await screen.findByRole("button", { name: /侧边栏目标，线程空闲/u }));
+    fireEvent.click(await screen.findByRole("button", { name: "运行状态" }));
+    const details = screen.getByText("本轮汇总变更 · 1 个文件").closest("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    fireEvent.click(screen.getByRole("button", { name: `修改 ${path}，新增 1 行，删除 1 行` }));
+    const dialog = await screen.findByRole("dialog", { name: path });
+    expect(within(dialog).getByText("-before")).toBeVisible();
+    expect(within(dialog).getByText("+after")).toBeVisible();
+    fireEvent.click(within(dialog).getByRole("button", { name: "左右对照" }));
+    expect(within(dialog).getByRole("table", { name: "左右差异对照" })).toBeVisible();
+  });
+
   it("未绑定服务器时窗口标题显示产品名称", async () => {
     const setTitle = vi.mocked(getCurrentWindow().setTitle);
     setTitle.mockClear();
