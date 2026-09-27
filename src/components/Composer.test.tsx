@@ -929,11 +929,12 @@ describe("Composer", () => {
     await user.click(projectPicker);
     expect(screen.getByRole("button", {
       name: "删除项目 project",
-    })).toBeVisible();
+    })).not.toBeVisible();
     const deleteButton = screen.getByRole("button", {
       name: "删除项目 other",
     });
 
+    await user.hover(screen.getByRole("option", { name: /other/u }));
     await user.click(deleteButton);
     const dialog = screen.getByRole("dialog", { name: "删除受信任项目？" });
     expect(dialog).toHaveTextContent("/workspace/other");
