@@ -4,6 +4,7 @@ use std::process::Stdio;
 
 use base64::engine::general_purpose::STANDARD;
 use base64::read::DecoderReader;
+use gtk::prelude::WidgetExt as _;
 
 const MAX_SAVE_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_BROWSER_HTML_BYTES: u64 = 256 * 1024 * 1024;
@@ -18,7 +19,7 @@ pub async fn pick_local_directory() -> Option<String> {
 }
 
 #[tauri::command]
-pub fn open_external_url(url: String) -> Result<(), String> {
+pub async fn open_external_url(window: tauri::WebviewWindow, url: String) -> Result<(), String> {
     let parsed = url::Url::parse(&url).map_err(|_| "网页地址格式无效".to_owned())?;
     if !matches!(parsed.scheme(), "http" | "https")
         || !parsed.username().is_empty()
@@ -27,14 +28,41 @@ pub fn open_external_url(url: String) -> Result<(), String> {
     {
         return Err("只允许打开不含认证信息的 HTTP 或 HTTPS 网页".to_owned());
     }
-    std::process::Command::new("xdg-open")
-        .arg(parsed.as_str())
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .map(|_| ())
-        .map_err(|_| "无法调用系统默认浏览器".to_owned())
+    let target_window = window.clone();
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    window
+        .run_on_main_thread(move || {
+            let context = target_window
+                .gtk_window()
+                .map_err(|_| "无法访问当前窗口".to_owned())
+                .and_then(|window| {
+                    window
+                        .display()
+                        .app_launch_context()
+                        .ok_or_else(|| "无法创建浏览器启动上下文".to_owned())
+                });
+            let context = match context {
+                Ok(context) => context,
+                Err(error) => {
+                    let _ = sender.send(Err(error));
+                    return;
+                }
+            };
+            // GDK 从桌面输入状态生成启动通知或 Wayland 激活令牌，允许浏览器取得焦点
+            context.set_timestamp(gtk::current_event_time());
+            gtk::gio::AppInfo::launch_default_for_uri_async(
+                parsed.as_str(),
+                Some(&context),
+                gtk::gio::Cancellable::NONE,
+                move |result| {
+                    let _ = sender.send(result.map_err(|_| "无法调用系统默认浏览器".to_owned()));
+                },
+            );
+        })
+        .map_err(|_| "无法调度浏览器启动".to_owned())?;
+    receiver
+        .await
+        .map_err(|_| "浏览器启动操作已中断".to_owned())?
 }
 
 #[tauri::command]
