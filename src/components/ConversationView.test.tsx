@@ -2250,8 +2250,20 @@ describe("ConversationView", () => {
   });
 
   describe("手动收起运行中工作流", () => {
-    function setup({ questionTop = 1_000, contentHeight = 1_450 } = {}) {
-      const layout = { contentHeight, groupHeight: 400, questionTop };
+    function setup({
+      questionTop = 1_000,
+      contentHeight = 1_450,
+      activity = {
+        id: "reasoning-manual-collapse",
+        summary: ["运行中的工作流内容"],
+        type: "reasoning",
+      },
+    }: {
+      questionTop?: number;
+      contentHeight?: number;
+      activity?: ThreadTurn["items"][number];
+    } = {}) {
+      const layout = { contentHeight, groupHeight: 400, itemHeight: 32, questionTop };
       const viewportHeight = 600;
       const observers: FakeResizeObserver[] = [];
       class FakeResizeObserver {
@@ -2320,6 +2332,9 @@ describe("ConversationView", () => {
           } else if (this.matches("[data-activity-group-header]")) {
             height = 36;
             top = layout.questionTop + 60 - scrollTop;
+          } else if (this.matches("section[data-expanded]:not([data-activity-group])")) {
+            height = layout.itemHeight;
+            top = layout.questionTop + 104 - scrollTop;
           } else {
             return originalBoundingRect.call(this);
           }
@@ -2344,11 +2359,7 @@ describe("ConversationView", () => {
             id: "question-manual-collapse",
             type: "userMessage" as const,
           },
-          {
-            id: "reasoning-manual-collapse",
-            summary: ["运行中的工作流内容"],
-            type: "reasoning" as const,
-          },
+          activity,
         ],
         itemsView: "full" as const,
         status: "inProgress" as const,
@@ -2385,7 +2396,7 @@ describe("ConversationView", () => {
       };
       updateTurn(turn);
       const group = scroller.querySelector<HTMLElement>("[data-activity-group]")!;
-      const header = within(group).getByRole("button");
+      const header = within(group).getByRole("button", { name: "正在运行" });
       const floor = scroller.querySelector<HTMLElement>(
         '[data-running-turn-floor="true"]',
       )!;
@@ -2398,9 +2409,10 @@ describe("ConversationView", () => {
           }
         });
       };
-      const groupObserver = () => observers.findLast(
-        (observer) => !observer.disconnected && observer.targets.has(group),
-      )!;
+      const observerFor = (target: Element) => observers.findLast(
+        (observer) => !observer.disconnected && observer.targets.has(target),
+      );
+      const groupObserver = () => observerFor(group)!;
       return {
         ...view,
         floor,
@@ -2409,11 +2421,257 @@ describe("ConversationView", () => {
         header,
         layout,
         notify,
+        observerFor,
         scroller,
         turn,
         updateTurn,
       };
     }
+
+    function setupItem(detail = "思考详情") {
+      vi.useFakeTimers();
+      const label = "运行中的工作流内容";
+      if (detail === "省略标题") {
+        mockOverflowingTitle(label);
+      }
+      const activity: ThreadTurn["items"][number] = detail === "命令输出"
+        ? TURN.items.find((item) => item.type === "commandExecution")!
+        : {
+            id: "reasoning-manual-collapse",
+            summary: [label],
+            type: "reasoning",
+            ...(detail === "思考详情" ? { content: ["详细检查过程"] } : {}),
+          };
+      const view = setup({ activity, contentHeight: 1_182 });
+      act(() => vi.advanceTimersByTime(20));
+      const itemHeader = within(view.group).getByRole("button", {
+        name: detail === "命令输出" ? "Ran pnpm test" : label,
+      });
+      const item = itemHeader.closest<HTMLElement>("section")!;
+      fireEvent.click(itemHeader);
+      view.layout.itemHeight = 300;
+      view.layout.contentHeight = 1_450;
+      view.notify(view.scroller.querySelector("[data-conversation-list]")!);
+      act(() => vi.advanceTimersByTime(270));
+      expect(item).toHaveAttribute("data-expanded", "true");
+      expect(view.floor).toHaveStyle({ minHeight: "1548px" });
+      return { ...view, item, itemHeader };
+    }
+
+    it.each(["命令输出", "思考详情", "省略标题"])(
+      "收起%s时逐帧回收占位，保留底部留白和未越界的阅读位置",
+      (detail) => {
+        const { floor, item, itemHeader, layout, notify, observerFor, scroller } = setupItem(detail);
+        userScroll(scroller, 650);
+        const bottomBlank = () => scroller.scrollHeight - 28 - layout.contentHeight;
+        const initialBlank = bottomBlank();
+        fireEvent.click(itemHeader);
+        const observer = observerFor(item)!;
+
+        layout.itemHeight = 100;
+        layout.groupHeight = 200;
+        layout.contentHeight = 1_250;
+        notify(item);
+        expect(floor).toHaveStyle({ minHeight: "1348px" });
+        expect(bottomBlank()).toBe(initialBlank);
+        expect(scroller.scrollTop).toBe(650);
+
+        layout.itemHeight = 32;
+        layout.groupHeight = 132;
+        layout.contentHeight = 1_182;
+        notify(item);
+        expect(floor).toHaveStyle({ minHeight: "1280px" });
+        expect(bottomBlank()).toBe(initialBlank);
+        expect(scroller.scrollTop).toBe(650);
+        act(() => vi.advanceTimersByTime(270));
+        expect(observer.disconnected).toBe(true);
+        expect(item.querySelector("[data-activity-detail]")).toBeNull();
+      },
+    );
+
+    it("单项收起只回收自身减少量，回答同时增长不会抵消回收", () => {
+      const { floor, item, itemHeader, layout, notify, scroller, turn, updateTurn } = setupItem();
+      fireEvent.click(itemHeader);
+      layout.itemHeight = 100;
+      layout.groupHeight = 200;
+      updateTurn({
+        ...turn,
+        items: [...turn.items, {
+          id: "answer-during-item-collapse",
+          type: "agentMessage",
+          text: "回答增长抵消单项收起高度",
+        }],
+      });
+      notify(item);
+      expect(floor).toHaveStyle({ minHeight: "1348px" });
+      expect(scroller.scrollTop).toBe(878);
+
+      layout.itemHeight = 150;
+      notify(item);
+      layout.itemHeight = 100;
+      notify(item);
+      expect(floor).toHaveStyle({ minHeight: "1348px" });
+    });
+
+    it("单项快速反向展开会结束旧观察，再次收起按新的高度回收", () => {
+      const { floor, item, itemHeader, layout, notify, observerFor } = setupItem();
+      fireEvent.click(itemHeader);
+      const previousObserver = observerFor(item)!;
+      layout.itemHeight = 200;
+      notify(item);
+      expect(floor).toHaveStyle({ minHeight: "1448px" });
+
+      fireEvent.click(itemHeader);
+      expect(previousObserver.disconnected).toBe(true);
+      layout.itemHeight = 300;
+      fireEvent.click(itemHeader);
+      layout.itemHeight = 100;
+      act(() => previousObserver.deliver());
+      expect(floor).toHaveStyle({ minHeight: "1448px" });
+      notify(item);
+      expect(floor).toHaveStyle({ minHeight: "1248px" });
+    });
+
+    it.each(["通知前", "通知后"])("单项高度变化%s收起整组，父级接管且不重复回收", (timing) => {
+      const { floor, group, header, item, itemHeader, layout, notify, observerFor } = setupItem();
+      fireEvent.click(itemHeader);
+      const itemObserver = observerFor(item)!;
+      layout.itemHeight = 200;
+      layout.groupHeight = 300;
+      layout.contentHeight = 1_350;
+      if (timing === "通知后") {
+        notify(item);
+      }
+      fireEvent.click(header);
+      expect(itemObserver.disconnected).toBe(false);
+      expect(floor).toHaveStyle({ minHeight: "1448px" });
+
+      layout.itemHeight = 32;
+      layout.groupHeight = 36;
+      layout.contentHeight = 1_086;
+      act(() => itemObserver.deliver());
+      expect(floor).toHaveStyle({ minHeight: "1448px" });
+      notify(group);
+      expect(floor).toHaveStyle({ minHeight: "1184px" });
+    });
+
+    it("整组和单项同时收起时只按父级减少量回收", () => {
+      const { floor, group, header, item, itemHeader, layout, notify, observerFor } = setupItem();
+      fireEvent.click(header);
+      fireEvent.click(itemHeader);
+      expect(observerFor(item)).toBeDefined();
+      layout.itemHeight = 32;
+      layout.groupHeight = 36;
+      layout.contentHeight = 1_086;
+      notify(item);
+      expect(floor).toHaveStyle({ minHeight: "1548px" });
+      notify(group);
+      expect(floor).toHaveStyle({ minHeight: "1184px" });
+    });
+
+    it("父级接管后反向展开，单项继续回收且不重复计算重叠期间的高度", () => {
+      const { floor, group, header, item, itemHeader, layout, notify, observerFor } = setupItem();
+      fireEvent.click(itemHeader);
+      const itemObserver = observerFor(item)!;
+      layout.itemHeight = 200;
+      layout.groupHeight = 300;
+      layout.contentHeight = 1_350;
+      notify(item);
+      fireEvent.click(header);
+      const parentObserver = observerFor(group)!;
+
+      layout.itemHeight = 100;
+      layout.groupHeight = 200;
+      layout.contentHeight = 1_250;
+      notify(group);
+      expect(floor).toHaveStyle({ minHeight: "1348px" });
+      fireEvent.click(header);
+      expect(parentObserver.disconnected).toBe(true);
+      expect(itemObserver.disconnected).toBe(false);
+      notify(item);
+      expect(floor).toHaveStyle({ minHeight: "1348px" });
+
+      layout.itemHeight = 32;
+      layout.groupHeight = 132;
+      layout.contentHeight = 1_182;
+      notify(item);
+      expect(floor).toHaveStyle({ minHeight: "1280px" });
+      act(() => vi.advanceTimersByTime(270));
+      expect(itemObserver.disconnected).toBe(true);
+    });
+
+    it("单项收起期间定位命令，父级程序展开不会中断单项回收", () => {
+      const { floor, item, itemHeader, layout, notify, observerFor, rerender, turn } = setupItem("命令输出");
+      fireEvent.click(itemHeader);
+      const observer = observerFor(item)!;
+      rerender(
+        <ConversationView
+          commandLocationRequest={{ itemId: "command", requestId: 1 }}
+          restoredThread={{ ...RESTORED, turns: [turn] }}
+        />,
+      );
+      expect(observer.disconnected).toBe(false);
+      layout.itemHeight = 32;
+      layout.groupHeight = 132;
+      layout.contentHeight = 1_182;
+      notify(item);
+      expect(floor).toHaveStyle({ minHeight: "1280px" });
+    });
+
+    it("单项收起中最终回答到达，立即结束回收并继续自动问题对齐", () => {
+      const { floor, group, item, itemHeader, layout, notify, observerFor, scroller, turn, updateTurn } = setupItem();
+      fireEvent.click(itemHeader);
+      const observer = observerFor(item)!;
+      layout.itemHeight = 200;
+      layout.groupHeight = 300;
+      layout.contentHeight = 1_350;
+      notify(item);
+      expect(floor).toHaveStyle({ minHeight: "1448px" });
+      updateTurn({
+        ...turn,
+        items: [...turn.items, {
+          id: "final-during-item-collapse",
+          phase: "final_answer",
+          type: "agentMessage",
+          text: "最终回答开始",
+        }],
+      });
+      expect(observer.disconnected).toBe(true);
+      layout.itemHeight = 32;
+      layout.groupHeight = 36;
+      layout.contentHeight = 1_100;
+      act(() => observer.deliver());
+      notify(scroller.querySelector("[data-conversation-list]")!);
+      act(() => vi.advanceTimersByTime(270));
+      expect(group).toHaveAttribute("data-content-mounted", "false");
+      expect(floor).toHaveStyle({ minHeight: "1548px" });
+      expect(scroller.scrollTop).toBe(948);
+    });
+
+    it("单项收起夹紧到滚动底部后仍保持用户暂停的跟随状态", () => {
+      const { item, itemHeader, layout, notify, scroller, turn, updateTurn } = setupItem();
+      userScroll(scroller, 900);
+      fireEvent.click(itemHeader);
+      layout.itemHeight = 32;
+      layout.groupHeight = 132;
+      layout.contentHeight = 1_182;
+      notify(item);
+      expect(scroller.scrollTop).toBe(680);
+      act(() => vi.advanceTimersByTime(270));
+      fireEvent.scroll(scroller);
+
+      layout.contentHeight = 1_800;
+      updateTurn({
+        ...turn,
+        items: [...turn.items, {
+          id: "answer-after-item-collapse",
+          type: "agentMessage",
+          text: "收起完成后回答继续增长",
+        }],
+      });
+      expect(scroller.scrollTop).toBe(680);
+      expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+    });
 
     it("只按工作流减少量回收占位，即使回答同时增长抵消会话高度变化", () => {
       const { floor, group, header, layout, notify, turn, updateTurn } = setup();

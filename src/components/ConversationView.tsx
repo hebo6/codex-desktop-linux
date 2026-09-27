@@ -106,13 +106,20 @@ const BOTTOM_THRESHOLD = 1;
 const HISTORY_LOAD_THRESHOLD = 96;
 const RUNNING_TURN_RESERVE_RATIO = 2 / 3;
 
-const ActivityExpansionContext = createContext<{
-  readonly start: () => void;
-  readonly finish: (expanded: boolean) => void;
+const ActivityTransitionContext = createContext<{
+  readonly startExpansion: () => void;
+  readonly finishExpansion: (expanded: boolean) => void;
+  readonly startCollapse: (element: HTMLElement) => void;
+  readonly finishCollapse: (element: HTMLElement, scope: "self" | "subtree") => void;
 } | null>(null);
 
 function useCollapsibleContent(initiallyExpanded: boolean) {
-  const activityExpansion = useContext(ActivityExpansionContext);
+  const activityTransition = useContext(ActivityTransitionContext);
+  const startExpansion = activityTransition?.startExpansion;
+  const finishExpansion = activityTransition?.finishExpansion;
+  const startCollapse = activityTransition?.startCollapse;
+  const finishCollapse = activityTransition?.finishCollapse;
+  const elementRef = useRef<HTMLElement>(null);
   const [expanded, setExpanded] = useState(initiallyExpanded);
   const [targetExpanded, setTargetExpanded] = useState(initiallyExpanded);
   const [contentMounted, setContentMounted] = useState(initiallyExpanded);
@@ -125,9 +132,9 @@ function useCollapsibleContent(initiallyExpanded: boolean) {
   const finishUserExpansion = useCallback((open: boolean) => {
     if (userExpansionActiveRef.current) {
       userExpansionActiveRef.current = false;
-      activityExpansion?.finish(open);
+      finishExpansion?.(open);
     }
-  }, [activityExpansion]);
+  }, [finishExpansion]);
 
   useEffect(() => {
     if (contentVisible) {
@@ -136,6 +143,21 @@ function useCollapsibleContent(initiallyExpanded: boolean) {
   }, [contentVisible, finishUserExpansion]);
 
   useEffect(() => () => finishUserExpansion(false), [finishUserExpansion]);
+
+  useLayoutEffect(() => {
+    if (!contentMounted && elementRef.current !== null) {
+      finishCollapse?.(elementRef.current, "subtree");
+    }
+  }, [contentMounted, finishCollapse]);
+
+  useEffect(() => {
+    const element = elementRef.current;
+    return () => {
+      if (element !== null) {
+        finishCollapse?.(element, "subtree");
+      }
+    };
+  }, [finishCollapse]);
 
   const cancelTransition = useCallback(() => {
     if (timerRef.current !== null) {
@@ -150,7 +172,10 @@ function useCollapsibleContent(initiallyExpanded: boolean) {
 
   useEffect(() => () => cancelTransition(), [cancelTransition]);
 
-  const setOpen = useCallback((open: boolean) => {
+  const setOpen = useCallback((open: boolean, userInitiated = false) => {
+    if (elementRef.current !== null) {
+      finishCollapse?.(elementRef.current, !open && !userInitiated ? "subtree" : "self");
+    }
     cancelTransition();
     if (!open) {
       finishUserExpansion(false);
@@ -179,19 +204,23 @@ function useCollapsibleContent(initiallyExpanded: boolean) {
         timerRef.current = null;
       }, panelTransitionDuration());
     });
-  }, [cancelTransition, finishUserExpansion]);
+  }, [cancelTransition, finishCollapse, finishUserExpansion]);
 
   const setUserOpen = useCallback((open: boolean) => {
     if (open && !userExpansionActiveRef.current) {
       userExpansionActiveRef.current = true;
-      activityExpansion?.start();
+      startExpansion?.();
     }
-    setOpen(open);
-  }, [activityExpansion, setOpen]);
+    setOpen(open, true);
+    if (!open && elementRef.current !== null) {
+      startCollapse?.(elementRef.current);
+    }
+  }, [setOpen, startCollapse, startExpansion]);
 
   return {
     contentMounted,
     contentVisible,
+    elementRef,
     expanded,
     setOpen,
     setUserOpen,
@@ -268,7 +297,10 @@ export function ConversationView({
   const userScrollTopRef = useRef<number | null>(null);
   const completedUserActivityExpansionRef = useRef(false);
   const userActivityExpansionCountRef = useRef(0);
-  const userActivityCollapsesRef = useRef(new Map<HTMLElement, () => void>());
+  const userActivityCollapsesRef = useRef(new Map<HTMLElement, {
+    readonly finish: () => void;
+    readonly reclaim: () => void;
+  }>());
   const scrollbarDragRef = useRef(false);
   const touchPositionRef = useRef<{ x: number; y: number } | null>(null);
   const observedThreadIdRef = useRef(restoredThread.metadata.id);
@@ -458,31 +490,51 @@ export function ConversationView({
     }
   }, []);
 
-  const activityExpansion = useMemo(() => ({
-    start: startUserActivityExpansion,
-    finish: finishUserActivityExpansion,
-  }), [startUserActivityExpansion, finishUserActivityExpansion]);
+  const finishUserActivityCollapse = useCallback((element: HTMLElement, scope: "self" | "subtree") => {
+    for (const [target, collapse] of userActivityCollapsesRef.current) {
+      if (element === target || (scope === "subtree" && element.contains(target))) {
+        collapse.finish();
+      }
+    }
+  }, []);
 
-  const startUserActivityCollapse = useCallback((group: HTMLElement) => {
+  const startUserActivityCollapse = useCallback((element: HTMLElement) => {
     const scroller = scrollerRef.current;
     const floorAtStart = runningTurnFloorVisible ? runningTurnFloor : null;
     const collapses = userActivityCollapsesRef.current;
+    // 父级接管前先结算子项已减少的高度，保留观察以支持父级反向展开
+    for (const [target, collapse] of collapses) {
+      if (element.contains(target)) {
+        collapse.reclaim();
+      }
+    }
     // 滚动范围缩短会产生延迟 scroll 事件，不能借此恢复已暂停的跟随
     userScrollTopRef.current = null;
     pendingFinalAnswerQuestionPositionRef.current = null;
-    let smallestHeight = group.getBoundingClientRect().height;
+    let smallestHeight = element.getBoundingClientRect().height;
     let observing = true;
     const reclaimFloor = () => {
-      if (!observing || scroller === null || !group.isConnected) {
+      if (!observing || scroller === null || !element.isConnected) {
         return;
       }
-      const height = group.getBoundingClientRect().height;
+      // 父级观察覆盖子项的尺寸变化；同步子项基线，避免恢复观察后重复回收
+      for (const [target, collapse] of collapses) {
+        if (target !== element && element.contains(target)) {
+          collapse.reclaim();
+        }
+      }
+      const height = element.getBoundingClientRect().height;
       // 活动更新可能让收起中的高度回弹，仅回收新减少的部分
       const reduction = smallestHeight - height;
       if (reduction <= 0) {
         return;
       }
       smallestHeight = height;
+      for (const target of collapses.keys()) {
+        if (target !== element && target.contains(element)) {
+          return;
+        }
+      }
       const contentHeight = contentRef.current?.getBoundingClientRect().height;
       setRunningTurnFloor((current) => {
         if (
@@ -517,12 +569,23 @@ export function ConversationView({
       if (scroller !== null) {
         updateBottomState(scroller);
       }
-      collapses.delete(group);
+      collapses.delete(element);
     };
-    collapses.set(group, finish);
-    observer?.observe(group);
-    return finish;
+    collapses.set(element, { finish, reclaim: reclaimFloor });
+    observer?.observe(element);
   }, [runningTurnFloor, runningTurnFloorVisible, updateBottomState]);
+
+  const activityTransition = useMemo(() => ({
+    startExpansion: startUserActivityExpansion,
+    finishExpansion: finishUserActivityExpansion,
+    startCollapse: startUserActivityCollapse,
+    finishCollapse: finishUserActivityCollapse,
+  }), [
+    startUserActivityExpansion,
+    finishUserActivityExpansion,
+    startUserActivityCollapse,
+    finishUserActivityCollapse,
+  ]);
 
   const positionPendingFinalAnswerQuestion = useCallback(
     (scroller: HTMLDivElement) => {
@@ -1018,8 +1081,8 @@ export function ConversationView({
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
-    for (const finish of userActivityCollapsesRef.current.values()) {
-      finish();
+    for (const collapse of userActivityCollapsesRef.current.values()) {
+      collapse.finish();
     }
     pendingQuestionPositionRef.current = null;
     pendingFinalAnswerQuestionPositionRef.current = null;
@@ -1268,7 +1331,7 @@ export function ConversationView({
             ref={contentRef}
             role="list"
           >
-            <ActivityExpansionContext value={activityExpansion}>
+            <ActivityTransitionContext value={activityTransition}>
               {rows.map((row, rowIndex) => (
                 <div
                   className={styles.conversationRow}
@@ -1286,7 +1349,6 @@ export function ConversationView({
                     actionError={actionError}
                     blobUrlFactory={blobUrlFactory}
                     commandLocationRequest={commandLocationRequest}
-                    onUserActivityCollapse={startUserActivityCollapse}
                     {...(onLoadTurnItemPage === undefined
                       ? {}
                       : { onLoadTurnItemPage })}
@@ -1310,7 +1372,7 @@ export function ConversationView({
                   />
                 </div>
               ))}
-            </ActivityExpansionContext>
+            </ActivityTransitionContext>
           </div>
         </div>
       </div>
@@ -1370,7 +1432,6 @@ function ConversationRowView({
   onOpenDiff,
   onOpenImage,
   onRunShellCommand,
-  onUserActivityCollapse,
   row,
   shellCommandDisabled,
   turnItemPage,
@@ -1384,7 +1445,6 @@ function ConversationRowView({
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenImage?: (url: string, name: string) => void;
   readonly onRunShellCommand?: (command: string) => Promise<boolean>;
-  readonly onUserActivityCollapse: (group: HTMLElement) => () => void;
   readonly row: ConversationRow;
   readonly shellCommandDisabled: boolean;
   readonly turnItemPage?: TurnItemPageState;
@@ -1423,7 +1483,6 @@ function ConversationRowView({
     <ActivityGroup
       commandLocationRequest={commandLocationRequest}
       items={row.segment.items}
-      onUserCollapse={onUserActivityCollapse}
       turn={row.turn}
       workRunning={row.segment.workRunning}
       {...(
@@ -1913,7 +1972,6 @@ function ActivityGroup({
   onLoadDetails,
   onOpenDiff,
   onOpenLink,
-  onUserCollapse,
   turn,
   workRunning,
 }: {
@@ -1923,7 +1981,6 @@ function ActivityGroup({
   readonly onLoadDetails?: () => Promise<boolean>;
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenLink?: (link: string) => void;
-  readonly onUserCollapse: (group: HTMLElement) => () => void;
   readonly turn: ThreadTurn;
   readonly workRunning: boolean;
 }) {
@@ -1942,8 +1999,6 @@ function ActivityGroup({
   );
   const initiallyExpanded = automaticallyExpanded || detailsHydrated;
   const transition = useCollapsibleContent(initiallyExpanded);
-  const groupRef = useRef<HTMLElement>(null);
-  const finishUserCollapseRef = useRef<(() => void) | null>(null);
   const previousAutomaticallyExpandedRef = useRef(automaticallyExpanded);
   const previousDetailsHydratedRef = useRef(detailsHydrated);
   const userExpansionPendingRef = useRef(false);
@@ -1951,15 +2006,6 @@ function ActivityGroup({
   const visibleItems = items;
   const setOpen = transition.setOpen;
   const setUserOpen = transition.setUserOpen;
-  const setGroupOpen = useCallback((open: boolean, userInitiated = false) => {
-    finishUserCollapseRef.current?.();
-    finishUserCollapseRef.current = null;
-    if (userInitiated) {
-      setUserOpen(open);
-    } else {
-      setOpen(open);
-    }
-  }, [setOpen, setUserOpen]);
   const canLoadDetails = onLoadDetails !== undefined &&
     turn.itemsView !== "full" && detailsPage?.complete !== true;
   const initialDetailsLoading = canLoadDetails && !detailsHydrated &&
@@ -1980,38 +2026,30 @@ function ActivityGroup({
     if (wasAutomaticallyExpanded === automaticallyExpanded) {
       return;
     }
-    setGroupOpen(automaticallyExpanded);
-  }, [automaticallyExpanded, setGroupOpen]);
+    setOpen(automaticallyExpanded);
+  }, [automaticallyExpanded, setOpen]);
 
   useEffect(() => {
     const wasHydrated = previousDetailsHydratedRef.current;
     previousDetailsHydratedRef.current = detailsHydrated;
     if (!wasHydrated && detailsHydrated) {
-      setGroupOpen(true, userExpansionPendingRef.current);
+      if (userExpansionPendingRef.current) {
+        setUserOpen(true);
+      } else {
+        setOpen(true);
+      }
       userExpansionPendingRef.current = false;
     }
-  }, [detailsHydrated, setGroupOpen]);
-
-  useLayoutEffect(() => {
-    if (!transition.contentMounted) {
-      finishUserCollapseRef.current?.();
-      finishUserCollapseRef.current = null;
-    }
-  }, [transition.contentMounted]);
-
-  useEffect(() => () => {
-    finishUserCollapseRef.current?.();
-    finishUserCollapseRef.current = null;
-  }, []);
+  }, [detailsHydrated, setOpen, setUserOpen]);
 
   useEffect(() => {
     if (
       commandLocationRequest !== null &&
       visibleItems.some(({ id }) => id === commandLocationRequest.itemId)
     ) {
-      setGroupOpen(true);
+      setOpen(true);
     }
-  }, [commandLocationRequestId, setGroupOpen]);
+  }, [commandLocationRequestId, setOpen]);
 
   const toggle = () => {
     const nextExpanded = !transition.targetExpandedRef.current;
@@ -2021,11 +2059,6 @@ function ActivityGroup({
       return;
     }
     userExpansionPendingRef.current = false;
-    finishUserCollapseRef.current?.();
-    finishUserCollapseRef.current = null;
-    if (!nextExpanded && groupRef.current !== null) {
-      finishUserCollapseRef.current = onUserCollapse(groupRef.current);
-    }
     transition.setUserOpen(nextExpanded);
   };
 
@@ -2036,7 +2069,7 @@ function ActivityGroup({
       data-content-mounted={transition.contentMounted}
       data-expanded={transition.expanded}
       data-status={runningCommandCount > 0 ? "inProgress" : groupStatus}
-      ref={groupRef}
+      ref={transition.elementRef}
     >
       <button
         aria-expanded={transition.targetExpanded}
@@ -2365,6 +2398,7 @@ function ActivityDisclosure({
   return (
     <section
       className={styles.activityDisclosure}
+      ref={transition.elementRef}
       {...(dataItemId === undefined
         ? {}
         : { "data-command-item-id": dataItemId })}
