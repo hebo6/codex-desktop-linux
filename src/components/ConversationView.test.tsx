@@ -24,18 +24,31 @@ const OriginalScrollWidth = Object.getOwnPropertyDescriptor(
   "scrollWidth",
 );
 
-function TestConversationWorkspace({ children }: { readonly children: ReactNode }) {
+function TestConversationWorkspace({
+  children,
+  scrollBleed,
+}: {
+  readonly children: ReactNode;
+  readonly scrollBleed: number;
+}) {
   return (
     <ConversationWorkspace
       composer={<div data-conversation-composer />}
     >
+      <style>{`[aria-label="会话消息"] { padding-bottom: ${scrollBleed}px; }`}</style>
       {children}
     </ConversationWorkspace>
   );
 }
 
-function render(ui: ReactElement) {
-  return testingLibraryRender(ui, { wrapper: TestConversationWorkspace });
+function render(ui: ReactElement, scrollBleed = 0) {
+  return testingLibraryRender(ui, {
+    wrapper: ({ children }) => (
+      <TestConversationWorkspace scrollBleed={scrollBleed}>
+        {children}
+      </TestConversationWorkspace>
+    ),
+  });
 }
 
 function userScroll(scroller: HTMLElement, scrollTop: number) {
@@ -63,7 +76,7 @@ function mockOverflowingTitle(text: string) {
   });
 }
 
-function observeConversationContentResize() {
+function observeConversationResize(selector = "[data-conversation-list]") {
   let notify: (() => void) | null = null;
 
   class FakeResizeObserver {
@@ -76,7 +89,7 @@ function observeConversationContentResize() {
     disconnect() {}
 
     observe(target: Element) {
-      if (target.matches("[data-conversation-list]")) {
+      if (target.matches(selector)) {
         notify = () => this.callback([], this as unknown as ResizeObserver);
       }
     }
@@ -1642,7 +1655,7 @@ describe("ConversationView", () => {
   it.each(["自动跟随", "手动阅读", "首帧前完成"])(
     "%s时回合完成仍定位到本轮最近问题，后续布局更新不重复定位",
     async (scenario) => {
-      const notifyResize = observeConversationContentResize();
+      const notifyResize = observeConversationResize();
       mockConversationContentBottom(() => 2_000, 600);
       const turn: ThreadTurn = {
         id: "turn-completion-position",
@@ -1801,7 +1814,7 @@ describe("ConversationView", () => {
 
   it("主动展开将内容底部推出视口时保持标题位置", async () => {
     let contentDocumentBottom = 880;
-    const contentResize = observeConversationContentResize();
+    const contentResize = observeConversationResize();
     mockConversationContentBottom(() => contentDocumentBottom, 200);
     render(
       <ConversationView
@@ -1835,7 +1848,7 @@ describe("ConversationView", () => {
 
   it("主动展开后内容底部仍可见时保留自动跟随", async () => {
     let contentDocumentBottom = 880;
-    const contentResize = observeConversationContentResize();
+    const contentResize = observeConversationResize();
     mockConversationContentBottom(() => contentDocumentBottom, 200);
     render(
       <ConversationView
@@ -1874,7 +1887,7 @@ describe("ConversationView", () => {
       vi.useFakeTimers();
       let contentDocumentBottom = 880;
       let scrollHeight = 1_000;
-      const notifyResize = observeConversationContentResize();
+      const notifyResize = observeConversationResize();
       mockConversationContentBottom(() => contentDocumentBottom, 200);
       if (detail === "省略标题") {
         mockOverflowingTitle("检查关键路径");
@@ -1928,16 +1941,17 @@ describe("ConversationView", () => {
     },
   );
 
-  it("按原生滚动范围判断是否位于底部", () => {
+  it.each([0, 28])("按原生滚动范围判断是否位于底部（绘制延伸 %ipx）", (scrollBleed) => {
     render(
       <ConversationView
         restoredThread={RESTORED}
       />,
+      scrollBleed,
     );
     const scroller = screen.getByLabelText("会话消息");
     Object.defineProperties(scroller, {
-      clientHeight: { configurable: true, value: 500 },
-      scrollHeight: { configurable: true, value: 1_500 },
+      clientHeight: { configurable: true, value: 500 + scrollBleed },
+      scrollHeight: { configurable: true, value: 1_500 + scrollBleed },
     });
 
     userScroll(scroller, 1_000);
@@ -2051,7 +2065,7 @@ describe("ConversationView", () => {
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });
 
-  it("新问题对齐首问位置并由流式内容消耗尾部留白", () => {
+  it.each([0, 28])("新问题对齐首问位置并由流式内容消耗尾部留白（绘制延伸 %ipx）", (scrollBleed) => {
     const viewportHeight = 600;
     let contentHeight = 850;
     let latestQuestionDocumentTop = 52;
@@ -2067,7 +2081,7 @@ describe("ConversationView", () => {
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get")
       .mockImplementation(function (this: HTMLElement) {
         return this.getAttribute("aria-label") === "会话消息"
-          ? viewportHeight
+          ? viewportHeight + scrollBleed
           : originalClientHeight?.call(this) ?? 0;
       });
     vi.spyOn(HTMLElement.prototype, "scrollHeight", "get")
@@ -2079,9 +2093,9 @@ describe("ConversationView", () => {
           '[data-running-turn-floor="true"]',
         );
         const naturalHeight = 28 + contentHeight;
-        return floor === null
+        return scrollBleed + (floor === null
           ? naturalHeight + 120
-          : Math.max(naturalHeight, Number.parseFloat(floor.style.minHeight));
+          : Math.max(naturalHeight, Number.parseFloat(floor.style.minHeight)));
       });
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function (this: HTMLElement) {
@@ -2089,8 +2103,8 @@ describe("ConversationView", () => {
         const scrollTop = scroller?.scrollTop ?? 0;
         if (this.getAttribute("aria-label") === "会话消息") {
           return {
-            bottom: viewportHeight,
-            height: viewportHeight,
+            bottom: viewportHeight + scrollBleed,
+            height: viewportHeight + scrollBleed,
             left: 0,
             right: 880,
             top: 0,
@@ -2157,6 +2171,7 @@ describe("ConversationView", () => {
       <ConversationView
         restoredThread={{ ...RESTORED, turns: [firstTurn] }}
       />,
+      scrollBleed,
     );
     const scroller = screen.getByLabelText("会话消息");
     let scrollTop = 100;
@@ -2640,9 +2655,10 @@ describe("ConversationView", () => {
     });
   });
 
-  it("运行中活动和回答填满留白后分段跟随，手动离底后暂停", () => {
+  it.each([0, 28])("运行中活动和回答填满留白后分段跟随，手动离底后暂停（绘制延伸 %ipx）", (scrollBleed) => {
+    const notifyViewportResize = observeConversationResize('[aria-label="会话消息"]');
     let contentDocumentBottom = 880;
-    const viewportHeight = 600;
+    let viewportHeight = 600;
     const originalBoundingRect = HTMLElement.prototype.getBoundingClientRect;
     const originalClientHeight = Object.getOwnPropertyDescriptor(
       HTMLElement.prototype,
@@ -2655,7 +2671,7 @@ describe("ConversationView", () => {
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get")
       .mockImplementation(function (this: HTMLElement) {
         return this.getAttribute("aria-label") === "会话消息"
-          ? viewportHeight
+          ? viewportHeight + scrollBleed
           : originalClientHeight?.call(this) ?? 0;
       });
     vi.spyOn(HTMLElement.prototype, "scrollHeight", "get")
@@ -2666,19 +2682,19 @@ describe("ConversationView", () => {
         const floor = this.querySelector<HTMLElement>(
           '[data-running-turn-floor="true"]',
         );
-        return floor === null
+        return scrollBleed + (floor === null
           ? contentDocumentBottom + 120
           : Math.max(
             contentDocumentBottom,
             Number.parseFloat(floor.style.minHeight),
-          );
+          ));
       });
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function (this: HTMLElement) {
         if (this.getAttribute("aria-label") === "会话消息") {
           return {
-            bottom: viewportHeight,
-            height: viewportHeight,
+            bottom: viewportHeight + scrollBleed,
+            height: viewportHeight + scrollBleed,
             left: 0,
             right: 880,
             top: 0,
@@ -2728,9 +2744,24 @@ describe("ConversationView", () => {
       <ConversationView
         restoredThread={{ ...RESTORED, turns: [completedTurn] }}
       />,
+      scrollBleed,
     );
     const scroller = screen.getByLabelText("会话消息");
     expect(scroller.scrollTop).toBe(400);
+    let currentScrollTop = scroller.scrollTop;
+    Object.defineProperty(scroller, "scrollTop", {
+      configurable: true,
+      get: () => {
+        currentScrollTop = Math.max(
+          0,
+          Math.min(currentScrollTop, scroller.scrollHeight - scroller.clientHeight),
+        );
+        return currentScrollTop;
+      },
+      set: (value: number) => {
+        currentScrollTop = value;
+      },
+    });
 
     const runningTurn = {
       id: "turn-paged-follow-running",
@@ -2805,7 +2836,7 @@ describe("ConversationView", () => {
       />,
     );
     expect(floor).toHaveStyle({ minHeight: "1530px" });
-    expect(scroller.scrollHeight).toBe(1_530);
+    expect(scroller.scrollHeight).toBe(1_530 + scrollBleed);
     expect(scroller.scrollTop).toBe(930);
     expect(scroller.scrollTop).toBe(
       scroller.scrollHeight - scroller.clientHeight,
@@ -2855,7 +2886,7 @@ describe("ConversationView", () => {
     expect(scroller.scrollTop).toBe(900);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
 
-    userScroll(scroller, 1_600);
+    userScroll(scroller, scroller.scrollHeight - scroller.clientHeight);
     contentDocumentBottom = 2_210;
     rerender(
       <ConversationView
@@ -2876,6 +2907,30 @@ describe("ConversationView", () => {
       />,
     );
     expect(scroller.scrollTop).toBe(2_010);
+
+    viewportHeight = 480;
+    act(() => notifyViewportResize());
+    expect(floor).toHaveStyle({ minHeight: "2530px" });
+    expect(scroller.scrollTop).toBe(2_010);
+
+    viewportHeight = 180;
+    act(() => notifyViewportResize());
+    expect(floor).toHaveStyle({ minHeight: "2330px" });
+    expect(scroller.scrollTop).toBe(2_150);
+    expect(scroller.scrollTop).toBe(scroller.scrollHeight - scroller.clientHeight);
+
+    viewportHeight = 600;
+    act(() => notifyViewportResize());
+    expect(floor).toHaveStyle({ minHeight: "2610px" });
+    // 原生范围先随视口扩大而缩短，随后更新留白不额外改变已夹紧的位置
+    expect(scroller.scrollTop).toBe(1_730);
+
+    userScroll(scroller, 1_900);
+    viewportHeight = 480;
+    act(() => notifyViewportResize());
+    expect(floor).toHaveStyle({ minHeight: "2530px" });
+    expect(scroller.scrollTop).toBe(1_900);
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
 
     Object.defineProperty(
       screen.getByText("检查分页跟随").closest<HTMLElement>("[data-row-index]")!,

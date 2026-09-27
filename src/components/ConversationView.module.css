@@ -2,7 +2,6 @@
   position: relative;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
 }
 
 .placeholder {
@@ -41,7 +40,9 @@
 }
 
 .scroller {
-  height: 100%;
+  /* 延伸绘制到输入区圆角外，等高内边距保持原有滚动范围 */
+  height: calc(100% + var(--radius-composer));
+  padding-bottom: var(--radius-composer);
   overflow: auto;
   overflow-anchor: none;
   overscroll-behavior: contain;

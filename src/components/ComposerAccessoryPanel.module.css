@@ -4,7 +4,7 @@
   padding-bottom: 16px;
   margin: 0 20px -16px;
   border: 1px solid var(--color-composer-border);
-  border-radius: 28px 28px 0 0;
+  border-radius: var(--radius-composer) var(--radius-composer) 0 0;
   color: var(--color-text-secondary);
   background: var(--color-composer-bg);
   box-shadow: var(--shadow-composer);
@@ -13,8 +13,8 @@
 
 .panel > :first-child,
 .panel > :first-child .summary {
-  border-top-left-radius: 27px;
-  border-top-right-radius: 27px;
+  border-top-left-radius: calc(var(--radius-composer) - 1px);
+  border-top-right-radius: calc(var(--radius-composer) - 1px);
 }
 
 .panel:empty {

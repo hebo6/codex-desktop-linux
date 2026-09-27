@@ -451,7 +451,7 @@ export function ConversationView({
       content !== null &&
       scroller !== null &&
       content.getBoundingClientRect().bottom >
-        scroller.getBoundingClientRect().bottom + BOTTOM_THRESHOLD
+        conversationViewportBottom(scroller) + BOTTOM_THRESHOLD
     ) {
       followBottomRef.current = false;
       setShowJumpToBottom(true);
@@ -498,7 +498,7 @@ export function ConversationView({
           ...current,
           contentHeight,
           floorHeight: Math.max(
-            scroller.clientHeight,
+            conversationViewportHeight(scroller),
             current.floorHeight - reduction,
           ),
         };
@@ -553,12 +553,13 @@ export function ConversationView({
         return true;
       }
       const contentRect = content.getBoundingClientRect();
-      const floorHeight = targetTop + scroller.clientHeight;
+      const viewportHeight = conversationViewportHeight(scroller);
+      const floorHeight = targetTop + viewportHeight;
       if (
         Math.abs(runningTurnFloor.floorHeight - floorHeight) >
           BOTTOM_THRESHOLD ||
         Math.abs(
-          runningTurnFloor.viewportHeight - scroller.clientHeight,
+          runningTurnFloor.viewportHeight - viewportHeight,
         ) > BOTTOM_THRESHOLD ||
         Math.abs(
           runningTurnFloor.contentHeight -
@@ -569,7 +570,7 @@ export function ConversationView({
           ...runningTurnFloor,
           contentHeight: contentRect.height,
           floorHeight,
-          viewportHeight: scroller.clientHeight,
+          viewportHeight,
         });
         return true;
       }
@@ -662,13 +663,14 @@ export function ConversationView({
       const activeFloor = runningTurnFloorVisible
         ? runningTurnFloor
         : null;
+      const viewportHeight = conversationViewportHeight(scroller);
       if (
         activeFloor !== null &&
-        Math.abs(activeFloor.viewportHeight - scroller.clientHeight) >
+        Math.abs(activeFloor.viewportHeight - viewportHeight) >
           BOTTOM_THRESHOLD
       ) {
         const viewportDelta =
-          scroller.clientHeight - activeFloor.viewportHeight;
+          viewportHeight - activeFloor.viewportHeight;
         const floorHeight = Math.max(
           0,
           activeFloor.floorHeight + viewportDelta * (
@@ -680,7 +682,7 @@ export function ConversationView({
         setRunningTurnFloor({
           ...activeFloor,
           floorHeight,
-          viewportHeight: scroller.clientHeight,
+          viewportHeight,
         });
         return;
       }
@@ -689,13 +691,13 @@ export function ConversationView({
         return;
       }
       const contentBottom = contentRect.bottom;
-      const viewportBottom = scrollerRect.bottom;
+      const viewportBottom = conversationViewportBottom(scroller);
       if (contentBottom < viewportBottom - BOTTOM_THRESHOLD) {
         return;
       }
       const floorHeight =
         naturalBottom +
-        scroller.clientHeight * RUNNING_TURN_RESERVE_RATIO;
+        viewportHeight * RUNNING_TURN_RESERVE_RATIO;
       if (
         activeFloor !== null &&
         activeFloor.kind !== "page" &&
@@ -716,7 +718,7 @@ export function ConversationView({
           floorHeight,
           kind: "page",
           turnId: runningTurnId,
-          viewportHeight: scroller.clientHeight,
+          viewportHeight,
         });
         return;
       }
@@ -775,12 +777,13 @@ export function ConversationView({
     pendingQuestionPositionRef.current = latestQuestion.itemId;
     followBottomRef.current = true;
     setShowJumpToBottom(false);
+    const viewportHeight = conversationViewportHeight(scroller);
     setRunningTurnFloor({
       contentHeight: contentRect.height,
-      floorHeight: naturalBottom + scroller.clientHeight,
+      floorHeight: naturalBottom + viewportHeight,
       kind: "question",
       turnId: runningTurnId,
-      viewportHeight: scroller.clientHeight,
+      viewportHeight,
     });
   }, [
     historyQuestions,
@@ -829,16 +832,17 @@ export function ConversationView({
     if (targetTop === null) {
       return;
     }
-    const floorHeight = targetTop + scroller.clientHeight;
+    const viewportHeight = conversationViewportHeight(scroller);
+    const floorHeight = targetTop + viewportHeight;
     if (
       Math.abs(runningTurnFloor.floorHeight - floorHeight) > BOTTOM_THRESHOLD ||
-      Math.abs(runningTurnFloor.viewportHeight - scroller.clientHeight) >
+      Math.abs(runningTurnFloor.viewportHeight - viewportHeight) >
         BOTTOM_THRESHOLD
     ) {
       setRunningTurnFloor({
         ...runningTurnFloor,
         floorHeight,
-        viewportHeight: scroller.clientHeight,
+        viewportHeight,
       });
       return;
     }
@@ -898,12 +902,13 @@ export function ConversationView({
       turnId: runningTurnId,
     };
     setShowJumpToBottom(false);
+    const viewportHeight = conversationViewportHeight(scroller);
     setRunningTurnFloor({
       contentHeight: content.getBoundingClientRect().height,
-      floorHeight: targetTop + scroller.clientHeight,
+      floorHeight: targetTop + viewportHeight,
       kind: "finalQuestion",
       turnId: runningTurnId,
-      viewportHeight: scroller.clientHeight,
+      viewportHeight,
     });
   }, [
     restoredThread.metadata.id,
@@ -966,8 +971,9 @@ export function ConversationView({
       return;
     }
     const updateLayout = () => {
+      const viewportHeight = conversationViewportHeight(scroller);
       setScrollerHeight((current) =>
-        current === scroller.clientHeight ? current : scroller.clientHeight
+        current === viewportHeight ? current : viewportHeight
       );
     };
     updateLayout();
@@ -1075,7 +1081,7 @@ export function ConversationView({
         scroller.scrollTop +
           commandRect.top -
           scrollerRect.top -
-          Math.max(24, (scroller.clientHeight - commandRect.height) / 2),
+          Math.max(24, (conversationViewportHeight(scroller) - commandRect.height) / 2),
       );
       updateBottomState(scroller, "user");
       command.querySelector<HTMLElement>("button, [tabindex]")?.focus({
@@ -2715,6 +2721,17 @@ function historyQuestionItems(
     });
   }
   return questions;
+}
+
+// 底部内边距仅用于圆角外的绘制，不计入完整可读的消息视口
+function conversationViewportHeight(scroller: HTMLElement): number {
+  return scroller.clientHeight
+    - Number.parseFloat(getComputedStyle(scroller).paddingBottom);
+}
+
+function conversationViewportBottom(scroller: HTMLElement): number {
+  return scroller.getBoundingClientRect().bottom
+    - Number.parseFloat(getComputedStyle(scroller).paddingBottom);
 }
 
 function conversationListTop(scroller: HTMLElement): number {
