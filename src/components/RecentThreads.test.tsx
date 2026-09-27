@@ -5,7 +5,8 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import type { ComponentProps } from "react";
+import userEvent from "@testing-library/user-event";
+import { createRef, type ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ThreadSummary } from "../app/useServerThreads";
@@ -123,6 +124,129 @@ function renderThreads(
 }
 
 describe("RecentThreads", () => {
+  it.each(["预览标题", "BETA", "第二行"])("搜索 %s 直接过滤原列表并复用会话行", (query) => {
+    renderThreads({ search: { inputRef: createRef(), onClose: vi.fn() } });
+    const list = screen.getByRole("list", { name: "最近会话" });
+    const second = getThreadRow("预览标题");
+    const input = screen.getByRole("searchbox", { name: "搜索会话" });
+    expect(input).toHaveFocus();
+    fireEvent.change(input, { target: { value: query } });
+    expect(screen.getByRole("list", { name: "最近会话" })).toBe(list);
+    expect(getThreadRow("预览标题")).toBe(second);
+    expect(queryThreadRow("服务端标题")).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "等待审批" })).toBeVisible();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "没有这个会话" } });
+    expect(screen.getByRole("status")).toHaveTextContent("没有匹配的会话");
+    expect(screen.getByRole("list", { name: "最近会话" })).toBe(list);
+  });
+
+  it("过滤期间保留置顶和项目分组，显示所有匹配项且不触发分页，清空后恢复折叠状态", () => {
+    const threads = Array.from({ length: 6 }, (_, index) => ({
+      ...THREAD_ONE,
+      id: `thread-${index + 10}`,
+      name: `匹配标题 ${index + 1}`,
+    }));
+    const actions = renderThreads({
+      currentThreadId: null,
+      grouped: true,
+      hasMore: true,
+      hasMorePinnedThreads: true,
+      pinnedThreads: [THREAD_TWO],
+      search: { inputRef: createRef(), onClose: vi.fn() },
+      threads: [...threads, THREAD_TWO],
+    });
+    expect(queryThreadRow("匹配标题 4")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "alpha" }));
+    fireEvent.click(screen.getByRole("button", { name: "已置顶" }));
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "标题" } });
+    expect(screen.getByRole("button", { name: "alpha" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "已置顶" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByRole("listitem")).toHaveLength(7);
+    expect(getThreadRow("匹配标题 6")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /加载/u })).not.toBeInTheDocument();
+    fireEvent.scroll(screen.getByRole("list", { name: "最近会话" }));
+    expect(actions.onLoadMore).not.toHaveBeenCalled();
+    expect(actions.onLoadMorePinnedThreads).not.toHaveBeenCalled();
+    expect(actions.onLoadProjectThreads).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: "" } });
+    expect(screen.getByRole("button", { name: "alpha" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "已置顶" })).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(screen.getByRole("button", { name: "alpha" }));
+    expect(getThreadRow("匹配标题 3")).toBeVisible();
+    expect(queryThreadRow("匹配标题 4")).not.toBeInTheDocument();
+  });
+
+  it("过滤结果沿用归档、删除、置顶和在新标签打开操作，Esc 优先关闭右键菜单", () => {
+    const onClose = vi.fn();
+    const actions = renderThreads({ search: { inputRef: createRef(), onClose } });
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "beta" } });
+    const row = getThreadRow("预览标题");
+    fireEvent.click(row, { ctrlKey: true });
+    fireEvent(row, new MouseEvent("auxclick", { bubbles: true, button: 1 }));
+    expect(actions.onOpenThreadInNewTab).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button", { name: "归档“预览标题”" }));
+    fireEvent.click(screen.getByRole("button", { name: "删除“预览标题”" }));
+    expect(actions.onArchiveThread).toHaveBeenCalledWith(THREAD_TWO.id);
+    expect(actions.onDeleteThread).toHaveBeenCalledWith(THREAD_TWO.id);
+    fireEvent.contextMenu(row);
+    fireEvent.keyDown(screen.getByRole("menuitem", { name: "在新标签打开" }), { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    fireEvent.contextMenu(row);
+    const input = screen.getByRole("searchbox");
+    input.focus();
+    expect(fireEvent.keyDown(input, { key: "Escape", isComposing: true })).toBe(true);
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    fireEvent.contextMenu(row);
+    fireEvent.click(screen.getByRole("menuitem", { name: "置顶会话" }));
+    expect(actions.onSetThreadPinned).toHaveBeenCalledWith(THREAD_TWO.id, true);
+  });
+
+  it("搜索键盘导航复用会话行、跳过禁用项且支持输入法和空结果", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const actions = renderThreads({
+      pendingThreadIds: [THREAD_ONE.id],
+      search: { inputRef: createRef(), onClose },
+    });
+    const input = screen.getByRole("searchbox");
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    fireEvent.keyDown(input, { key: "ArrowDown", isComposing: true });
+    expect(fireEvent.keyDown(input, { key: "Escape", isComposing: true })).toBe(true);
+    expect(input).toHaveFocus();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(actions.onOpenThread).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(actions.onOpenThread).toHaveBeenCalledWith(THREAD_TWO.id);
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(getThreadRow("预览标题")).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(actions.onOpenThread).toHaveBeenCalledTimes(2);
+    fireEvent.keyDown(getThreadRow("预览标题"), { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+    fireEvent.change(input, { target: { value: "不匹配" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(actions.onOpenThread).toHaveBeenCalledTimes(2);
+  });
+
+  it("已归档视图搜索后继续使用恢复行为", () => {
+    const actions = renderThreads({
+      search: { inputRef: createRef(), onClose: vi.fn() },
+      view: "archived",
+    });
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "beta" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(actions.onUnarchiveThread).toHaveBeenCalledWith(THREAD_TWO.id);
+    expect(actions.onOpenThread).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "恢复“预览标题”" })).toBeInTheDocument();
+  });
+
   it("重新加载期间保留已显示的会话列表", () => {
     renderThreads({ phase: "loading" });
 
@@ -612,7 +736,7 @@ describe("RecentThreads", () => {
     expect(onArchiveThread).not.toHaveBeenCalled();
   });
 
-  it("千条会话只挂载视口和过扫描行", () => {
+  it("千条会话搜索复用虚拟列表，查询后可导航到末项，退出恢复原滚动位置", async () => {
     class FakeResizeObserver {
       constructor(_callback: ResizeObserverCallback) {}
       disconnect() {}
@@ -630,12 +754,27 @@ describe("RecentThreads", () => {
       name: `会话 ${index}`,
       sessionId: `session-${index}`,
     }));
-    renderThreads({ currentThreadId: null, grouped: true, threads });
+    const { rerenderThreads } = renderThreads({ currentThreadId: null, grouped: true, threads });
     const scroller = screen.getByRole("list", { name: "最近会话" });
 
     expect(screen.getAllByRole("listitem").length).toBeLessThan(100);
     scroller.scrollTop = 5_000;
     fireEvent.scroll(scroller);
     expect(screen.getAllByRole("listitem").length).toBeLessThan(100);
+    const inputRef = createRef<HTMLInputElement>();
+    rerenderThreads({ search: { inputRef, onClose: vi.fn() } });
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "会话 99" } });
+    expect(scroller.scrollTop).toBe(0);
+    expect(getThreadRow("会话 99")).toBeVisible();
+    expect(screen.getAllByRole("listitem")).toHaveLength(11);
+    fireEvent.change(input, { target: { value: "会话" } });
+    expect(screen.getAllByRole("listitem").length).toBeLessThan(100);
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    await waitFor(() => expect(getThreadRow("会话 999")).toHaveFocus());
+    rerenderThreads({ search: null });
+    expect(scroller.scrollTop).toBe(5_000);
+    expect(screen.getAllByRole("listitem").length).toBeLessThan(100);
+    expect(queryThreadRow("会话 999")).not.toBeInTheDocument();
   });
 });

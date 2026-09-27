@@ -426,17 +426,17 @@ describe("App", () => {
     const composer = await screen.findByRole("textbox", { name: "任务输入" });
     fireEvent.keyDown(composer, { ctrlKey: true, key: "k" });
     const sidebar = screen.getByRole("complementary", { name: "会话侧栏" });
-    const input = within(sidebar).getByRole("combobox", { name: "搜索会话" });
+    const input = within(sidebar).getByRole("searchbox", { name: "搜索会话" });
     expect(input).toHaveFocus();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    await within(sidebar).findByRole("option", { name: new RegExp(SIDEBAR_THREAD.name) });
+    await within(sidebar).findByRole("button", { name: new RegExp(`^${SIDEBAR_THREAD.name}，`) });
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(tabsUpdater).toHaveBeenCalledWith({
       expectedVersion: 1,
       tabs: [{ id: "tab-new", threadId: SIDEBAR_THREAD.id }],
       activeTabId: "tab-new",
     }));
-    expect(screen.queryByRole("combobox", { name: "搜索会话" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("searchbox", { name: "搜索会话" })).not.toBeInTheDocument();
   });
 
   it("从本轮汇总打开单个文件差异，特殊文件名保持原样", async () => {
@@ -677,7 +677,7 @@ describe("App", () => {
     await waitFor(() => expect(composer).toHaveValue(""));
 
     fireEvent.keyDown(composer, { ctrlKey: true, key: "k" });
-    fireEvent.keyDown(screen.getByRole("combobox", { name: "搜索会话" }), { key: "Escape" });
+    fireEvent.keyDown(screen.getByRole("searchbox", { name: "搜索会话" }), { key: "Escape" });
     expect(requestMethods).not.toContain("turn/interrupt");
     fireEvent.keyDown(composer, { ctrlKey: true, key: "k" });
     composer.focus();

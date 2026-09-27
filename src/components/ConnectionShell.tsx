@@ -16,7 +16,6 @@ import type {
 import type { ReconnectViewState } from "../app/useConfiguredServerConnection";
 import type { ConnectionPhase } from "../store/connectionSlice";
 import { RecentThreads, type ThreadListView } from "./RecentThreads";
-import { ThreadSearch } from "./ThreadSearch";
 import {
   ComposeIcon,
   GroupIcon,
@@ -476,7 +475,7 @@ export function ConnectionShell({
               aria-pressed={groupThreads}
               className={styles.groupButton}
               disabled={
-                searchOpen || viewingArchivedThreads || threadListPhase !== "ready"
+                viewingArchivedThreads || threadListPhase !== "ready"
               }
               onClick={() => setGroupThreads((grouped) => !grouped)}
               title={groupThreads ? "取消按项目分组" : "按项目分组"}
@@ -554,17 +553,15 @@ export function ConnectionShell({
                     <span>已归档会话</span>
                   </button>
                   <div className={styles.threadActionsSeparator} role="separator" />
-                  {viewingArchivedThreads ? null : (
-                    <button
-                      onClick={openThreadSearch}
-                      role="menuitem"
-                      type="button"
-                    >
-                      <SearchIcon />
-                      <span>搜索会话</span>
-                      <small>Ctrl+K</small>
-                    </button>
-                  )}
+                  <button
+                    onClick={openThreadSearch}
+                    role="menuitem"
+                    type="button"
+                  >
+                    <SearchIcon />
+                    <span>搜索会话</span>
+                    <small>Ctrl+K</small>
+                  </button>
                   <button
                     data-refreshing={displayedRefreshingThreads}
                     disabled={
@@ -595,19 +592,6 @@ export function ConnectionShell({
             </div>
           </div>
         </header>
-        {searchOpen ? (
-          <ThreadSearch
-            currentThreadId={currentThreadId}
-            inputRef={searchInputRef}
-            onClose={closeThreadSearch}
-            onOpenThread={(threadId) => {
-              onOpenThread?.(threadId);
-              setSearchOpen(false);
-              setIsSidebarOpen(false);
-            }}
-            threads={threads}
-          />
-        ) : null}
         <RecentThreads
           archiveNotices={archiveNotices}
           {...(backgroundCommandCounts === undefined
@@ -621,7 +605,6 @@ export function ConnectionShell({
           hasMorePinnedThreads={
             !viewingArchivedThreads && hasMorePinnedThreads
           }
-          hidden={searchOpen}
           loadingMore={displayedLoadingMoreThreads}
           loadingMorePinnedThreads={
             !viewingArchivedThreads && loadingMorePinnedThreads
@@ -648,11 +631,13 @@ export function ConnectionShell({
             : {
                 onNewTaskInProject: (cwd: string) => {
                   onNewTaskInProject(cwd);
+                  setSearchOpen(false);
                   setIsSidebarOpen(false);
                 },
               })}
           onOpenThread={(threadId) => {
             onOpenThread?.(threadId);
+            setSearchOpen(false);
             setIsSidebarOpen(false);
           }}
           {...(onOpenThreadInNewTab === undefined
@@ -668,6 +653,10 @@ export function ConnectionShell({
           phase={displayedThreadListPhase}
           pinnedThreads={viewingArchivedThreads ? [] : pinnedThreads}
           readOnly={offline}
+          search={searchOpen ? {
+            inputRef: searchInputRef,
+            onClose: closeThreadSearch,
+          } : null}
           threads={displayedThreads}
           view={threadListView}
         />

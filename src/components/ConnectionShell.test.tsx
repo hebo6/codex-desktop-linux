@@ -135,7 +135,7 @@ describe("ConnectionShell", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /搜索会话/u }));
     expect(onRefreshThreads).toHaveBeenCalledTimes(1);
     expect(within(screen.getByRole("complementary", { name: "会话侧栏" }))
-      .getByRole("combobox", { name: "搜索会话" })).toHaveFocus();
+      .getByRole("searchbox", { name: "搜索会话" })).toHaveFocus();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "新建任务" }));
@@ -202,7 +202,7 @@ describe("ConnectionShell", () => {
     composer.focus();
     fireEvent.keyDown(composer, { ctrlKey: true, key: "k" });
     expect(shell).toHaveAttribute("data-sidebar-collapsed", "false");
-    const input = within(sidebar).getByRole("combobox", { name: "搜索会话" });
+    const input = within(sidebar).getByRole("searchbox", { name: "搜索会话" });
     expect(input).toHaveFocus();
     fireEvent.change(input, { target: { value: "项目" } });
     composer.focus();
@@ -218,19 +218,19 @@ describe("ConnectionShell", () => {
     const sidebar = screen.getByRole("complementary", { name: "会话侧栏" });
     fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
     expect(sidebar).toHaveAttribute("data-open", "true");
-    const input = screen.getByRole("combobox");
+    const input = screen.getByRole("searchbox");
     expect(input).toHaveFocus();
-    expect(screen.queryByRole("list", { name: "最近会话" })).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "最近会话" })).toBeVisible();
     fireEvent.keyDown(input, { key: "Escape" });
     expect(sidebar).toHaveAttribute("data-open", "true");
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
     expect(screen.getByRole("list", { name: "最近会话" })).toBeVisible();
     expect(screen.getByRole("button", { name: "最近会话操作" })).toHaveFocus();
     fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
-    fireEvent.click(screen.getByRole("option", { name: /项目/u }));
+    fireEvent.click(screen.getByRole("button", { name: /^项目，/u }));
     expect(onOpenThread).toHaveBeenCalledWith("项目");
     expect(sidebar).toHaveAttribute("data-open", "false");
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
   });
 
   it("模态对话框打开时 Ctrl+K 不抢焦点，Esc 不关闭侧栏", () => {
@@ -240,7 +240,7 @@ describe("ConnectionShell", () => {
     input.focus();
     fireEvent.keyDown(input, { ctrlKey: true, key: "k" });
     expect(input).toHaveFocus();
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
     fireEvent.keyDown(input, { key: "Escape" });
     expect(screen.getByRole("complementary", { name: "会话侧栏" })).toHaveAttribute("data-open", "true");
   });
@@ -256,7 +256,7 @@ describe("ConnectionShell", () => {
     const group = screen.getByRole("button", { name: "项目", expanded: true });
     fireEvent.click(group);
     fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
-    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
+    fireEvent.keyDown(screen.getByRole("searchbox"), { key: "Escape" });
     expect(screen.getByRole("button", { name: "项目", expanded: false })).toBeVisible();
   });
 

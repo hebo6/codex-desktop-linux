@@ -1,10 +1,13 @@
 import {
   useCallback,
   useEffect,
+  useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
+  type RefObject,
   type UIEvent,
 } from "react";
 import { createPortal } from "react-dom";
@@ -21,6 +24,7 @@ import {
   DraftIcon,
   PinIcon,
   RestoreIcon,
+  SearchIcon,
   TerminalIcon,
 } from "./SidebarIcons";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
@@ -32,7 +36,10 @@ export interface RecentThreadsProps {
   readonly draftThreadIds: ReadonlySet<string>;
   readonly error: string | null;
   readonly grouped: boolean;
-  readonly hidden?: boolean;
+  readonly search?: {
+    readonly inputRef: RefObject<HTMLInputElement | null>;
+    readonly onClose: () => void;
+  } | null;
   readonly hasMore: boolean;
   readonly hasMorePinnedThreads?: boolean;
   readonly loadingMore: boolean;
@@ -148,7 +155,7 @@ export function RecentThreads({
   draftThreadIds,
   error,
   grouped,
-  hidden = false,
+  search = null,
   hasMore,
   hasMorePinnedThreads = false,
   loadingMore,
@@ -175,6 +182,16 @@ export function RecentThreads({
   view,
 }: RecentThreadsProps) {
   const listRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const [query, setQuery] = useState("");
+  const searchOpen = search !== null;
+  const searchInputRef = search?.inputRef;
+  const normalizedQuery = searchOpen ? query.trim().toLocaleLowerCase() : "";
+  const filtering = normalizedQuery.length > 0;
+  const savedScrollTop = useRef<number | null>(null);
+  const [searchCollapsedGroupKeys, setSearchCollapsedGroupKeys] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -196,18 +213,32 @@ export function RecentThreads({
     () => groupThreads(threads, pinnedThreads, grouped),
     [grouped, pinnedThreads, threads],
   );
+  const filteredGroups = useMemo(
+    () => normalizedQuery.length === 0
+      ? groups
+      : groups.map((group) => ({
+          ...group,
+          threads: group.threads.filter((thread) =>
+            `${threadTitle(thread)}\n${thread.cwd}\n${thread.preview}`
+              .toLocaleLowerCase()
+              .includes(normalizedQuery),
+          ),
+        })).filter((group) => group.threads.length > 0),
+    [groups, normalizedQuery],
+  );
   const pinnedThreadIds = useMemo(
     () => new Set(pinnedThreads.map(({ id }) => id)),
     [pinnedThreads],
   );
   const entries = useMemo(
     () => recentThreadEntries({
-      collapsedGroupKeys,
+      collapsedGroupKeys: filtering ? searchCollapsedGroupKeys : collapsedGroupKeys,
       currentThreadId,
       failedProjectGroupKeys,
-      groups,
-      hasMore,
-      hasMorePinnedThreads,
+      filtering,
+      groups: filteredGroups,
+      hasMore: !filtering && hasMore,
+      hasMorePinnedThreads: !filtering && hasMorePinnedThreads,
       loadingProjectGroupKeys,
       projectGroupHasMore,
       view,
@@ -217,11 +248,13 @@ export function RecentThreads({
       collapsedGroupKeys,
       currentThreadId,
       failedProjectGroupKeys,
-      groups,
+      filtering,
+      filteredGroups,
       hasMore,
       hasMorePinnedThreads,
       loadingProjectGroupKeys,
       projectGroupHasMore,
+      searchCollapsedGroupKeys,
       view,
       visibleGroupThreadCounts,
     ],
@@ -268,9 +301,11 @@ export function RecentThreads({
     scrollerRef: listRef,
     overscan: 320,
   });
+  const { scrollToOffset } = virtual;
 
   const toggleGroup = useCallback((key: string) => {
-    setCollapsedGroupKeys((current) => {
+    const setCollapsed = filtering ? setSearchCollapsedGroupKeys : setCollapsedGroupKeys;
+    setCollapsed((current) => {
       const next = new Set(current);
       if (next.has(key)) {
         next.delete(key);
@@ -279,7 +314,21 @@ export function RecentThreads({
       }
       return next;
     });
-  }, []);
+  }, [filtering]);
+
+  useLayoutEffect(() => {
+    if (searchOpen) {
+      savedScrollTop.current = listRef.current?.scrollTop ?? 0;
+      searchInputRef?.current?.focus();
+    } else {
+      setQuery("");
+      setSearchCollapsedGroupKeys(new Set());
+      if (savedScrollTop.current !== null) {
+        scrollToOffset(savedScrollTop.current);
+      }
+      savedScrollTop.current = null;
+    }
+  }, [searchOpen, searchInputRef, scrollToOffset]);
 
   useEffect(() => {
     if (phase !== "loading") {
@@ -402,26 +451,9 @@ export function RecentThreads({
 
   useEffect(() => {
     setContextMenu(null);
-  }, [hidden, view]);
+  }, [normalizedQuery, searchOpen, view]);
 
-  const navigate = (threadId: string, direction: 1 | -1) => {
-    const threadEntries = entries.filter(
-      (entry): entry is Extract<RecentThreadEntry, { type: "thread" }> =>
-        entry.type === "thread",
-    );
-    const currentIndex = threadEntries.findIndex(
-      ({ thread }) => thread.id === threadId,
-    );
-    if (currentIndex < 0 || threadEntries.length === 0) {
-      return;
-    }
-    const target =
-      threadEntries[
-        (currentIndex + direction + threadEntries.length) % threadEntries.length
-      ];
-    if (target === undefined) {
-      return;
-    }
+  const focusThreadEntry = (target: Extract<RecentThreadEntry, { type: "thread" }>) => {
     const entryIndex = entries.findIndex(({ key }) => key === target.key);
     const renderedTarget = threadRowButtons(listRef.current).find(
       (button) => button.dataset.threadId === target.thread.id,
@@ -438,10 +470,34 @@ export function RecentThreads({
     });
   };
 
+  const navigableThreads = entries.filter(
+    (entry): entry is Extract<RecentThreadEntry, { type: "thread" }> =>
+      entry.type === "thread" &&
+      !pendingThreadIds.includes(entry.thread.id) &&
+      !removingThreadIds.includes(entry.thread.id),
+  );
+
+  const navigate = (threadId: string, direction: 1 | -1) => {
+    const currentIndex = navigableThreads.findIndex(
+      ({ thread }) => thread.id === threadId,
+    );
+    if (currentIndex < 0 || navigableThreads.length === 0) return;
+    const target = navigableThreads[
+      (currentIndex + direction + navigableThreads.length) % navigableThreads.length
+    ];
+    if (target !== undefined) focusThreadEntry(target);
+  };
+
+  const activateThread = (threadId: string) => {
+    if (view === "recent") onOpenThread(threadId);
+    else onUnarchiveThread(threadId);
+  };
+
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     setContextMenu(null);
     const element = event.currentTarget;
     if (
+      !filtering &&
       hasMore &&
       !loadingMore &&
       element.scrollHeight - element.scrollTop - element.clientHeight <= 120
@@ -451,12 +507,77 @@ export function RecentThreads({
   };
 
   return (
-    <section aria-label="会话" className={styles.section} hidden={hidden}>
-      {error === null ? null : (
-        <div className={styles.error} role="status">
-          <span>{error}</span>
-        </div>
-      )}
+    <section
+      aria-label="会话"
+      className={styles.section}
+      onKeyDown={(event) => {
+        if (
+          search === null ||
+          event.key !== "Escape" ||
+          event.defaultPrevented
+        ) return;
+        if (event.nativeEvent.isComposing) {
+          event.stopPropagation();
+          return;
+        }
+        if (contextMenu !== null) return;
+        event.stopPropagation();
+        event.preventDefault();
+        search.onClose();
+      }}
+    >
+      <div>
+        {search === null ? null : (
+          <div aria-label="搜索会话" className={styles.search} role="search">
+            <SearchIcon />
+            <input
+              aria-controls={listId}
+              aria-label="搜索会话"
+              onChange={(event) => {
+                scrollToOffset(0);
+                setQuery(event.target.value);
+                setSearchCollapsedGroupKeys(new Set());
+              }}
+              onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing) return;
+                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                  event.preventDefault();
+                  const target = event.key === "ArrowDown"
+                    ? navigableThreads[0]
+                    : navigableThreads.at(-1);
+                  if (target !== undefined) focusThreadEntry(target);
+                } else if (event.key === "Enter") {
+                  const target = navigableThreads[0];
+                  if (target !== undefined) {
+                    event.preventDefault();
+                    activateThread(target.thread.id);
+                  }
+                }
+              }}
+              placeholder="搜索标题、目录或内容"
+              ref={search.inputRef}
+              type="search"
+              value={query}
+            />
+            <button
+              aria-label="关闭会话搜索"
+              className={styles.closeSearch}
+              onClick={search.onClose}
+              title="关闭搜索（Esc）"
+              type="button"
+            >
+              <svg aria-hidden="true" height="16" viewBox="0 0 24 24" width="16">
+                <path d="m6 6 12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
+        )}
+        {error === null ? null : (
+          <div className={styles.error} role="status">
+            <span>{error}</span>
+          </div>
+        )}
+      </div>
       {phase === "idle" ? (
         <p className={styles.empty}>
           {view === "recent" ? "连接完成后加载会话" : "打开后加载已归档会话"}
@@ -479,7 +600,7 @@ export function RecentThreads({
         <p className={styles.empty}>
           {view === "recent" ? "最近会话暂时不可用" : "已归档会话暂时不可用"}
         </p>
-      ) : threads.length === 0 && pinnedThreads.length === 0 ? (
+      ) : !filtering && threads.length === 0 && pinnedThreads.length === 0 ? (
         <p className={styles.empty}>
           {view === "recent" ? "尚无最近会话，可新建任务开始" : "尚无已归档会话"}
         </p>
@@ -487,10 +608,14 @@ export function RecentThreads({
         <div
           aria-label={view === "recent" ? "最近会话" : "已归档会话"}
           className={styles.scroller}
+          id={listId}
           onScroll={handleScroll}
           ref={listRef}
           role="list"
         >
+          {filtering && filteredGroups.length === 0 ? (
+            <p className={styles.empty} role="status">没有匹配的会话</p>
+          ) : null}
           <div
             className={styles.virtualCanvas}
             style={{ height: virtual.totalSize } as CSSProperties}
@@ -552,13 +677,7 @@ export function RecentThreads({
                       onNavigate={(direction) =>
                         navigate(entry.thread.id, direction)
                       }
-                      onOpen={() => {
-                        if (view === "recent") {
-                          onOpenThread(entry.thread.id);
-                        } else {
-                          onUnarchiveThread(entry.thread.id);
-                        }
-                      }}
+                      onOpen={() => activateThread(entry.thread.id)}
                       nowMs={nowMs}
                       {...(view === "archived" || (
                         onOpenThreadInNewTab === undefined &&
@@ -1212,6 +1331,7 @@ function recentThreadEntries({
   collapsedGroupKeys,
   currentThreadId,
   failedProjectGroupKeys,
+  filtering,
   groups,
   hasMore,
   hasMorePinnedThreads,
@@ -1223,6 +1343,7 @@ function recentThreadEntries({
   readonly collapsedGroupKeys: ReadonlySet<string>;
   readonly currentThreadId: string | null;
   readonly failedProjectGroupKeys: ReadonlySet<string>;
+  readonly filtering: boolean;
   readonly groups: readonly ThreadGroup[];
   readonly hasMore: boolean;
   readonly hasMorePinnedThreads: boolean;
@@ -1259,7 +1380,7 @@ function recentThreadEntries({
       : group.threads.findIndex(({ id }) => id === currentThreadId);
     const visibleCount = collapsed
       ? 0
-      : group.kind === "project"
+      : group.kind === "project" && !filtering
         ? Math.max(
             visibleGroupThreadCounts.get(group.key) ?? INITIAL_GROUP_THREAD_COUNT,
             currentIndex + 1,
@@ -1272,6 +1393,7 @@ function recentThreadEntries({
       ?? (hasMore && group.threads.length >= INITIAL_GROUP_THREAD_COUNT);
     if (
       !collapsed &&
+      !filtering &&
       group.kind === "project" &&
       (group.threads.length > visibleCount || projectHasMore)
     ) {

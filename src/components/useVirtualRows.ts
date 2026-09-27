@@ -32,6 +32,7 @@ interface VirtualRowsResult {
   readonly measureElement: (key: string) => (element: HTMLElement | null) => void;
   readonly scrollToBottom: () => void;
   readonly scrollToIndex: (index: number) => void;
+  readonly scrollToOffset: (offset: number) => void;
   readonly keyAtOffset: (offset: number) => string | null;
 }
 
@@ -182,6 +183,16 @@ export function useVirtualRows({
     );
   }, [scrollerRef]);
 
+  const scrollToOffset = useCallback((offset: number) => {
+    const scroller = scrollerRef.current;
+    if (scroller === null) return;
+    scroller.scrollTop = Math.max(0, offset);
+    setViewport({
+      height: Math.max(1, scroller.clientHeight),
+      top: scroller.scrollTop,
+    });
+  }, [scrollerRef]);
+
   const scrollToIndex = useCallback(
     (index: number) => {
       const scroller = scrollerRef.current;
@@ -196,10 +207,9 @@ export function useVirtualRows({
       } else if (bottom > top + scroller.clientHeight) {
         top = bottom - scroller.clientHeight;
       }
-      scroller.scrollTop = Math.max(0, top);
-      setViewport((current) => ({ ...current, top: Math.max(0, top) }));
+      scrollToOffset(top);
     },
-    [layout.rows, scrollerRef],
+    [layout.rows, scrollToOffset, scrollerRef],
   );
 
   const keyAtOffset = useCallback(
@@ -216,6 +226,7 @@ export function useVirtualRows({
     measureElement,
     scrollToBottom,
     scrollToIndex,
+    scrollToOffset,
     keyAtOffset,
   };
 }

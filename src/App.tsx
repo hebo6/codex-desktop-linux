@@ -1716,7 +1716,7 @@ export function App({
     const handleGlobalShortcut = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         const blockingLayer = document.querySelector(
-          '[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"]:not([data-inline]), [aria-label="会话侧栏"][data-open="true"]',
+          '[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"], [aria-label="会话侧栏"][data-open="true"]',
         );
         if (
           !event.defaultPrevented &&
