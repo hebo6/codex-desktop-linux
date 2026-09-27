@@ -21,6 +21,8 @@ describe("KeyboardShortcutsDialog", () => {
     expect(screen.getByText("Ctrl+Shift+D")).toBeVisible();
     expect(screen.getByText("打开项目选择器（仅新会话）")).toBeVisible();
     expect(screen.getByText("显示或隐藏侧边栏")).toBeVisible();
+    expect(screen.getByText("聚焦侧边栏")).toBeVisible();
+    expect(screen.getByText("Ctrl+Shift+E")).toBeVisible();
     expect(screen.getByText("显示或隐藏限额详情")).toBeVisible();
     expect(screen.getByText("Alt+L")).toBeVisible();
     expect(screen.getByText("关闭当前窗口")).toBeVisible();

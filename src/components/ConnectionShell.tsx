@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -14,7 +15,7 @@ import type {
 } from "../app/useServerThreads";
 import type { ReconnectViewState } from "../app/useConfiguredServerConnection";
 import type { ConnectionPhase } from "../store/connectionSlice";
-import { RecentThreads, type ThreadListView } from "./RecentThreads";
+import { RecentThreads, type RecentThreadsHandle, type ThreadListView } from "./RecentThreads";
 import {
   ComposeIcon,
   GroupIcon,
@@ -222,6 +223,7 @@ export function ConnectionShell({
 }: ConnectionShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [sidebarFocusRequest, setSidebarFocusRequest] = useState(0);
   const [groupThreads, setGroupThreads] = useState(false);
   const [threadListView, setThreadListView] = useState<ThreadListView>("recent");
   const [threadActionsOpen, setThreadActionsOpen] = useState(false);
@@ -229,6 +231,9 @@ export function ConnectionShell({
   const titleId = useId();
   const threadActionsMenuId = useId();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const sidebarToggleRef = useRef<HTMLButtonElement>(null);
+  const newTaskButtonRef = useRef<HTMLButtonElement>(null);
+  const recentThreadsRef = useRef<RecentThreadsHandle>(null);
   const threadActionsRef = useRef<HTMLDivElement>(null);
   const threadActionsButtonRef = useRef<HTMLButtonElement>(null);
   const threadActionsMenuRef = useRef<HTMLDivElement>(null);
@@ -306,20 +311,27 @@ export function ConnectionShell({
   useEffect(() => {
     const handleNavigationShortcut = (event: KeyboardEvent) => {
       if (
+        event.defaultPrevented ||
+        event.isComposing ||
         !event.ctrlKey ||
-        event.shiftKey ||
         event.altKey ||
         event.metaKey ||
         document.querySelector('[aria-modal="true"]') !== null
       ) {
         return;
       }
-      if (event.key.toLowerCase() === "b") {
+      const key = event.key.toLowerCase();
+      if ((key === "b" && !event.shiftKey) || (key === "e" && event.shiftKey)) {
         event.preventDefault();
         const narrow =
           typeof window.matchMedia === "function" &&
           window.matchMedia("(max-width: 1099px)").matches;
-        if (narrow) {
+        if (key === "e") {
+          setIsSidebarCollapsed(false);
+          setIsSidebarOpen(narrow);
+          setThreadActionsOpen(false);
+          setSidebarFocusRequest((request) => request + 1);
+        } else if (narrow) {
           setIsSidebarOpen((open) => !open);
         } else {
           setIsSidebarCollapsed((collapsed) => !collapsed);
@@ -329,6 +341,18 @@ export function ConnectionShell({
     window.addEventListener("keydown", handleNavigationShortcut);
     return () => window.removeEventListener("keydown", handleNavigationShortcut);
   }, []);
+
+  useLayoutEffect(() => {
+    if (sidebarFocusRequest === 0 || recentThreadsRef.current?.focus()) {
+      return;
+    }
+    const newTaskButton = newTaskButtonRef.current;
+    if (newTaskButton !== null && !newTaskButton.disabled) {
+      newTaskButton.focus({ preventScroll: true });
+    } else {
+      sidebarToggleRef.current?.focus({ preventScroll: true });
+    }
+  }, [sidebarFocusRequest]);
 
   const closeSidebar = () => {
     setIsSidebarOpen(false);
@@ -411,6 +435,7 @@ export function ConnectionShell({
         id={sidebarId}
       >
         <RecentThreads
+          ref={recentThreadsRef}
           archiveNotices={archiveNotices}
           {...(backgroundCommandCounts === undefined
             ? {}
@@ -429,6 +454,7 @@ export function ConnectionShell({
               aria-expanded={true}
               aria-label="隐藏侧栏"
               className={styles.sidebarInnerToggle}
+              ref={sidebarToggleRef}
               onClick={() => {
                 if (isSidebarOpen) {
                   setIsSidebarOpen(false);
@@ -445,6 +471,7 @@ export function ConnectionShell({
             <div className={styles.taskActions}>
               <button
                 className={styles.newTaskButton}
+                ref={newTaskButtonRef}
                 disabled={phase !== "ready" || onNewTask === undefined}
                 onClick={() => {
                   onNewTask?.();

@@ -49,6 +49,7 @@ export const KEYBOARD_SHORTCUT_GROUPS: readonly KeyboardShortcutGroup[] = [
     title: "面板",
     shortcuts: [
       { label: "显示或隐藏侧边栏", keys: ["Ctrl+B"] },
+      { label: "聚焦侧边栏", keys: ["Ctrl+Shift+E"] },
       { label: "显示或隐藏限额详情", keys: ["Alt+L"] },
     ],
   },

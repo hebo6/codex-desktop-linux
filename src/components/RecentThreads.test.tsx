@@ -5,11 +5,11 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import type { ComponentProps } from "react";
+import { createRef, type ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ThreadSummary } from "../app/useServerThreads";
-import { RecentThreads } from "./RecentThreads";
+import { RecentThreads, type RecentThreadsHandle } from "./RecentThreads";
 
 const OriginalResizeObserver = globalThis.ResizeObserver;
 
@@ -299,6 +299,42 @@ describe("RecentThreads", () => {
     expect(second).toHaveFocus();
     fireEvent.click(second);
     expect(onOpenThread).toHaveBeenCalledWith(THREAD_TWO.id);
+  });
+
+  it.each([false, true])("聚焦当前会话时展开所属分组（置顶：%s）", (pinned) => {
+    const ref = createRef<RecentThreadsHandle>();
+    const { onOpenThread } = renderThreads({
+      ref,
+      grouped: true,
+      pinnedThreads: pinned ? [THREAD_ONE] : [],
+    });
+    const group = screen.getByRole("button", { name: pinned ? "已置顶" : "alpha" });
+    fireEvent.click(group);
+    expect(queryThreadRow("服务端标题")).not.toBeInTheDocument();
+
+    act(() => { ref.current?.focus(); });
+    expect(group).toHaveAttribute("aria-expanded", "true");
+    expect(getThreadRow("服务端标题")).toHaveFocus();
+    expect(onOpenThread).not.toHaveBeenCalled();
+  });
+
+  it("项目组前三条均不可操作时显示并聚焦下一条", () => {
+    const ref = createRef<RecentThreadsHandle>();
+    const threads = Array.from({ length: 4 }, (_, index) => ({
+      ...THREAD_ONE,
+      id: `pending-thread-${index}`,
+      name: `会话 ${index}`,
+    }));
+    renderThreads({
+      ref,
+      currentThreadId: null,
+      grouped: true,
+      pendingThreadIds: threads.slice(0, 3).map(({ id }) => id),
+      threads,
+    });
+    expect(queryThreadRow("会话 3")).not.toBeInTheDocument();
+    act(() => { ref.current?.focus(); });
+    expect(getThreadRow("会话 3")).toHaveFocus();
   });
 
   it("支持中键和键盘上下文菜单在新标签打开会话", () => {
@@ -610,6 +646,50 @@ describe("RecentThreads", () => {
     expect(onOpenThread).toHaveBeenCalledWith(THREAD_ONE.id);
     expect(screen.getByRole("button", { name: `归档“${THREAD_ONE.name}”` })).toBeDisabled();
     expect(onArchiveThread).not.toHaveBeenCalled();
+  });
+
+  it("聚焦虚拟列表中的当前会话后可跨未挂载行导航，再返回首条", () => {
+    class FakeResizeObserver {
+      constructor(_callback: ResizeObserverCallback) {}
+      disconnect() {}
+      observe() {}
+      unobserve() {}
+    }
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      value: FakeResizeObserver,
+    });
+    const ref = createRef<RecentThreadsHandle>();
+    const threads = Array.from({ length: 1_000 }, (_, index) => ({
+      ...THREAD_ONE,
+      id: `virtual-thread-${index}`,
+      name: `会话 ${index}`,
+    }));
+    const { rerenderThreads } = renderThreads({
+      ref,
+      currentThreadId: "virtual-thread-999",
+      threads,
+    });
+    const scroller = screen.getByRole("list", { name: "最近会话" });
+    Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 560 });
+    expect(queryThreadRow("会话 998")).not.toBeInTheDocument();
+
+    act(() => { ref.current?.focus(); });
+    expect(getThreadRow("会话 999")).toHaveFocus();
+    expect(scroller.scrollTop).toBe(32 + 1_000 * 56 - 560);
+    expect(queryThreadRow("会话 0")).not.toBeInTheDocument();
+    fireEvent.keyDown(getThreadRow("会话 999"), { key: "ArrowDown" });
+    expect(getThreadRow("会话 0")).toHaveFocus();
+    expect(scroller.scrollTop).toBe(32);
+
+    scroller.scrollTop = 5_000;
+    fireEvent.scroll(scroller);
+    rerenderThreads({ currentThreadId: null });
+    expect(queryThreadRow("会话 0")).not.toBeInTheDocument();
+    act(() => { ref.current?.focus(); });
+    expect(getThreadRow("会话 0")).toHaveFocus();
+    expect(scroller.scrollTop).toBe(32);
+    expect(screen.getAllByRole("listitem").length).toBeLessThan(100);
   });
 
   it("千条会话只挂载视口和过扫描行", () => {
