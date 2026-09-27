@@ -418,6 +418,27 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
 }
 
 describe("App", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("Ctrl+K 在侧边栏搜索并复用空白标签打开结果，不弹出对话框", async () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+    const { tabsUpdater } = renderSidebarThreadScenario();
+    const composer = await screen.findByRole("textbox", { name: "任务输入" });
+    fireEvent.keyDown(composer, { ctrlKey: true, key: "k" });
+    const sidebar = screen.getByRole("complementary", { name: "会话侧栏" });
+    const input = within(sidebar).getByRole("combobox", { name: "搜索会话" });
+    expect(input).toHaveFocus();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await within(sidebar).findByRole("option", { name: new RegExp(SIDEBAR_THREAD.name) });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(tabsUpdater).toHaveBeenCalledWith({
+      expectedVersion: 1,
+      tabs: [{ id: "tab-new", threadId: SIDEBAR_THREAD.id }],
+      activeTabId: "tab-new",
+    }));
+    expect(screen.queryByRole("combobox", { name: "搜索会话" })).not.toBeInTheDocument();
+  });
+
   it("从本轮汇总打开单个文件差异，特殊文件名保持原样", async () => {
     const serverEvents = new ServerEventStore();
     const path = "#notes%20.md:42";
@@ -522,6 +543,7 @@ describe("App", () => {
   });
 
   it("新建线程首次发送直接采用创建响应并可排队后续消息", async () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
     const user = userEvent.setup();
     const startedThread = {
       cliVersion: "1.0.0",
@@ -654,7 +676,12 @@ describe("App", () => {
     await waitFor(() => expect(requestMethods).toContain("thread/queue/add"));
     await waitFor(() => expect(composer).toHaveValue(""));
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(composer, { ctrlKey: true, key: "k" });
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "搜索会话" }), { key: "Escape" });
+    expect(requestMethods).not.toContain("turn/interrupt");
+    fireEvent.keyDown(composer, { ctrlKey: true, key: "k" });
+    composer.focus();
+    fireEvent.keyDown(composer, { key: "Escape" });
     await waitFor(() => expect(requestMethods).toContain("turn/interrupt"));
 
     act(() => {

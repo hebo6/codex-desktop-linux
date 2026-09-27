@@ -24,7 +24,7 @@
 | --- | --- |
 | 新建会话标签 | `Ctrl+N`、`Ctrl+T` |
 | 在服务器窗口新建会话 | `Ctrl+Shift+N` |
-| 快速切换会话 | `Ctrl+K` |
+| 侧边栏搜索会话 | `Ctrl+K` |
 | 切换到上一个标签 | `Ctrl+Shift+Tab`、`Ctrl+PageUp` |
 | 切换到下一个标签 | `Ctrl+Tab`、`Ctrl+PageDown` |
 | 转到标签 1 至 8 | `Ctrl+1` … `Ctrl+8` |

@@ -5,7 +5,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type ReactNode,
   type UIEvent,
 } from "react";
 import { createPortal } from "react-dom";
@@ -33,8 +32,7 @@ export interface RecentThreadsProps {
   readonly draftThreadIds: ReadonlySet<string>;
   readonly error: string | null;
   readonly grouped: boolean;
-  readonly headerActions?: ReactNode;
-  readonly sidebarToggle?: ReactNode;
+  readonly hidden?: boolean;
   readonly hasMore: boolean;
   readonly hasMorePinnedThreads?: boolean;
   readonly loadingMore: boolean;
@@ -150,8 +148,7 @@ export function RecentThreads({
   draftThreadIds,
   error,
   grouped,
-  headerActions,
-  sidebarToggle,
+  hidden = false,
   hasMore,
   hasMorePinnedThreads = false,
   loadingMore,
@@ -405,7 +402,7 @@ export function RecentThreads({
 
   useEffect(() => {
     setContextMenu(null);
-  }, [view]);
+  }, [hidden, view]);
 
   const navigate = (threadId: string, direction: 1 | -1) => {
     const threadEntries = entries.filter(
@@ -454,13 +451,7 @@ export function RecentThreads({
   };
 
   return (
-    <section aria-label="会话" className={styles.section}>
-      <header className={styles.sectionHeader}>
-        <div className={styles.titleGroup}>
-          {sidebarToggle}
-        </div>
-        {headerActions}
-      </header>
+    <section aria-label="会话" className={styles.section} hidden={hidden}>
       {error === null ? null : (
         <div className={styles.error} role="status">
           <span>{error}</span>

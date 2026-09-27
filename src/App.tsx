@@ -90,7 +90,6 @@ import {
   TabCloseDialog,
   type TabCloseConfirmation,
 } from "./components/TabCloseDialog";
-import { ThreadQuickSwitcher } from "./components/ThreadQuickSwitcher";
 import { ThreadTabs, type ThreadTabView } from "./components/ThreadTabs";
 import { WindowResizeHandles } from "./components/WindowResizeHandles";
 import type {
@@ -521,7 +520,6 @@ export function App({
   const [externalLinkError, setExternalLinkError] = useState<string | null>(null);
   const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
   const [recentConnectionError, setRecentConnectionError] = useState<string | null>(null);
-  const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [composerFocusTabId, setComposerFocusTabId] = useState<string | null>(null);
   const [draftThreadPresence, setDraftThreadPresence] =
@@ -1718,7 +1716,7 @@ export function App({
     const handleGlobalShortcut = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         const blockingLayer = document.querySelector(
-          '[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"], [aria-label="会话侧栏"][data-open="true"]',
+          '[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"]:not([data-inline]), [aria-label="会话侧栏"][data-open="true"]',
         );
         if (
           !event.defaultPrevented &&
@@ -1816,9 +1814,6 @@ export function App({
       ) {
         event.preventDefault();
         openNewWindowTask();
-      } else if (key === "k" && !event.shiftKey && !editing) {
-        event.preventDefault();
-        setQuickSwitcherOpen(true);
       } else if (key === "c" && event.shiftKey && !editing) {
         const markdown = latestAgentMarkdown(displayedRestoredThread);
         if (markdown !== null) {
@@ -2352,7 +2347,6 @@ export function App({
         onRefreshThreads={() => void serverThreads.refreshThreads()}
         onRefreshArchivedThreads={() =>
           void serverThreads.refreshArchivedThreads()}
-        onSearchThreads={() => setQuickSwitcherOpen(true)}
         onOpenThread={(threadId) => void openThreadFromSidebar(threadId)}
         onOpenThreadInNewTab={(threadId) =>
           void openThreadInNewTab(threadId, true)}
@@ -2571,14 +2565,6 @@ export function App({
         recentConnectionError={recentConnectionError}
         servers={servers}
         serverConnectionViews={serverConnectionViews}
-      />
-
-      <ThreadQuickSwitcher
-        currentThreadId={currentThreadId}
-        onClose={() => setQuickSwitcherOpen(false)}
-        onOpenThread={(threadId) => void openThreadInNewTab(threadId)}
-        open={quickSwitcherOpen}
-        threads={serverThreads.threads}
       />
 
       <KeyboardShortcutsDialog

@@ -1,10 +1,16 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ThreadSummary } from "../app/useServerThreads";
 import { ConnectionShell } from "./ConnectionShell";
 
 describe("ConnectionShell", () => {
+  beforeEach(() => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
   it("顶部栏使用深层窗口拖拽区域", () => {
     const { container } = render(<ConnectionShell phase="ready" />);
     const titlebar = container.querySelector(
@@ -95,12 +101,10 @@ describe("ConnectionShell", () => {
   it("连接就绪后支持新建入口和项目分组切换", () => {
     const onNewTask = vi.fn();
     const onRefreshThreads = vi.fn();
-    const onSearchThreads = vi.fn();
     render(
       <ConnectionShell
         onNewTask={onNewTask}
         onRefreshThreads={onRefreshThreads}
-        onSearchThreads={onSearchThreads}
         phase="ready"
         threadListPhase="ready"
       />,
@@ -130,7 +134,9 @@ describe("ConnectionShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "最近会话操作" }));
     fireEvent.click(screen.getByRole("menuitem", { name: /搜索会话/u }));
     expect(onRefreshThreads).toHaveBeenCalledTimes(1);
-    expect(onSearchThreads).toHaveBeenCalledTimes(1);
+    expect(within(screen.getByRole("complementary", { name: "会话侧栏" }))
+      .getByRole("combobox", { name: "搜索会话" })).toHaveFocus();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "新建任务" }));
     expect(onNewTask).toHaveBeenCalledOnce();
@@ -185,6 +191,73 @@ describe("ConnectionShell", () => {
     fireEvent.click(screen.getByRole("menuitemradio", { name: "已归档会话" }));
     fireEvent.click(screen.getByRole("button", { name: "恢复“归档会话”" }));
     expect(onUnarchiveThread).toHaveBeenCalledWith(archivedThread.id);
+  });
+
+  it("Ctrl+K 从输入框展开桌面侧栏，重复触发保留查询并重新聚焦", () => {
+    render(<ConnectionShell phase="ready" mainContent={<textarea aria-label="任务输入" />} />);
+    const sidebar = screen.getByRole("complementary", { name: "会话侧栏" });
+    const shell = sidebar.closest("[data-sidebar-collapsed]");
+    fireEvent.click(screen.getByRole("button", { name: "隐藏侧栏" }));
+    const composer = screen.getByRole("textbox", { name: "任务输入" });
+    composer.focus();
+    fireEvent.keyDown(composer, { ctrlKey: true, key: "k" });
+    expect(shell).toHaveAttribute("data-sidebar-collapsed", "false");
+    const input = within(sidebar).getByRole("combobox", { name: "搜索会话" });
+    expect(input).toHaveFocus();
+    fireEvent.change(input, { target: { value: "项目" } });
+    composer.focus();
+    fireEvent.keyDown(composer, { ctrlKey: true, key: "k" });
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue("项目");
+  });
+
+  it("窄窗口展开侧栏搜索，Esc 恢复列表，打开结果后关闭侧栏", () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true })));
+    const onOpenThread = vi.fn();
+    render(<ConnectionShell phase="ready" onOpenThread={onOpenThread} threadListPhase="ready" threads={[threadSummary("项目", 1)]} />);
+    const sidebar = screen.getByRole("complementary", { name: "会话侧栏" });
+    fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
+    expect(sidebar).toHaveAttribute("data-open", "true");
+    const input = screen.getByRole("combobox");
+    expect(input).toHaveFocus();
+    expect(screen.queryByRole("list", { name: "最近会话" })).not.toBeInTheDocument();
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(sidebar).toHaveAttribute("data-open", "true");
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "最近会话" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "最近会话操作" })).toHaveFocus();
+    fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
+    fireEvent.click(screen.getByRole("option", { name: /项目/u }));
+    expect(onOpenThread).toHaveBeenCalledWith("项目");
+    expect(sidebar).toHaveAttribute("data-open", "false");
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("模态对话框打开时 Ctrl+K 不抢焦点，Esc 不关闭侧栏", () => {
+    render(<ConnectionShell phase="ready" mainContent={<div aria-modal="true" role="dialog"><input aria-label="对话框输入" /></div>} />);
+    fireEvent.click(screen.getByLabelText("打开侧栏"));
+    const input = screen.getByRole("textbox", { name: "对话框输入" });
+    input.focus();
+    fireEvent.keyDown(input, { ctrlKey: true, key: "k" });
+    expect(input).toHaveFocus();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.getByRole("complementary", { name: "会话侧栏" })).toHaveAttribute("data-open", "true");
+  });
+
+  it("搜索关闭后保留项目折叠状态，进入搜索时清理会话右键菜单", () => {
+    render(<ConnectionShell phase="ready" threadListPhase="ready" threads={[threadSummary("项目", 1)]} onOpenThreadInNewTab={vi.fn()} />);
+    fireEvent.contextMenu(screen.getByRole("button", { name: /^项目，/u }));
+    expect(screen.getByRole("menuitem", { name: "在新标签打开" })).toBeVisible();
+    fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "关闭会话搜索" }));
+    fireEvent.click(screen.getByRole("button", { name: "按项目分组" }));
+    const group = screen.getByRole("button", { name: "项目", expanded: true });
+    fireEvent.click(group);
+    fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
+    expect(screen.getByRole("button", { name: "项目", expanded: false })).toBeVisible();
   });
 
   it("新建任务后关闭覆盖式侧栏", () => {

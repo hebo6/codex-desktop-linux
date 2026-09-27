@@ -14,7 +14,7 @@ export const KEYBOARD_SHORTCUT_GROUPS: readonly KeyboardShortcutGroup[] = [
     shortcuts: [
       { label: "新建会话标签", keys: ["Ctrl+N", "Ctrl+T"] },
       { label: "在服务器窗口新建会话", keys: ["Ctrl+Shift+N"] },
-      { label: "快速切换会话", keys: ["Ctrl+K"] },
+      { label: "侧边栏搜索会话", keys: ["Ctrl+K"] },
       {
         label: "切换到上一个标签",
         keys: ["Ctrl+Shift+Tab", "Ctrl+PageUp"],

@@ -1,0 +1,131 @@
+.section {
+  position: relative;
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.search {
+  display: flex;
+  min-width: 0;
+  min-height: 36px;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) var(--space-3);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  background: var(--color-fill-subtle);
+}
+
+.search:focus-within {
+  background: var(--color-fill-hover);
+}
+
+.search svg {
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.search input {
+  width: 0;
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: var(--color-text-primary);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+}
+
+.close {
+  display: grid;
+  width: 24px;
+  height: 28px;
+  flex: none;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.close:hover,
+.close:focus-visible {
+  color: var(--color-text-primary);
+  background: var(--color-fill-hover);
+}
+
+.results {
+  grid-area: 2 / 1;
+  min-height: 0;
+  padding: 0 var(--space-2) var(--space-3) var(--space-3);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.results button {
+  display: grid;
+  width: 100%;
+  height: 56px;
+  align-content: center;
+  gap: 3px;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.results button[data-selected="true"] {
+  background: var(--color-fill-hover);
+}
+
+.results button > span {
+  display: flex;
+  min-width: 0;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.results strong,
+.results small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.results strong {
+  font-size: 12px;
+}
+
+.results small,
+.results time,
+.empty {
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+}
+
+.results time {
+  flex: none;
+}
+
+.empty {
+  grid-area: 2 / 1;
+  align-self: start;
+  margin: 0 var(--space-3);
+  padding: var(--space-4) 0;
+  text-align: center;
+}

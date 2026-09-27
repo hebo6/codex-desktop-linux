@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useRef,
@@ -15,6 +16,7 @@ import type {
 import type { ReconnectViewState } from "../app/useConfiguredServerConnection";
 import type { ConnectionPhase } from "../store/connectionSlice";
 import { RecentThreads, type ThreadListView } from "./RecentThreads";
+import { ThreadSearch } from "./ThreadSearch";
 import {
   ComposeIcon,
   GroupIcon,
@@ -69,7 +71,6 @@ interface ConnectionShellProps {
   ) => Promise<ProjectThreadPage>;
   onRefreshThreads?: () => void;
   onRefreshArchivedThreads?: () => void;
-  onSearchThreads?: () => void;
   onNewTask?: () => void;
   onNewTaskInProject?: (cwd: string) => void;
   onOpenThread?: (threadId: string) => void;
@@ -197,7 +198,6 @@ export function ConnectionShell({
   onLoadProjectThreads,
   onRefreshThreads,
   onRefreshArchivedThreads,
-  onSearchThreads,
   onNewTask,
   onNewTaskInProject,
   onOpenThread,
@@ -225,6 +225,8 @@ export function ConnectionShell({
   const [groupThreads, setGroupThreads] = useState(false);
   const [threadListView, setThreadListView] = useState<ThreadListView>("recent");
   const [threadActionsOpen, setThreadActionsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const sidebarId = useId();
   const titleId = useId();
   const threadActionsMenuId = useId();
@@ -241,6 +243,21 @@ export function ConnectionShell({
     readonly startWidth: number;
     width: number;
   } | null>(null);
+
+  const openThreadSearch = useCallback(() => {
+    setIsSidebarCollapsed(false);
+    if (window.matchMedia("(max-width: 1099px)").matches) {
+      setIsSidebarOpen(true);
+    }
+    setThreadActionsOpen(false);
+    setSearchOpen(true);
+    searchInputRef.current?.focus();
+  }, []);
+
+  const closeThreadSearch = () => {
+    setSearchOpen(false);
+    threadActionsButtonRef.current?.focus();
+  };
 
   useEffect(() => {
     if (
@@ -292,8 +309,13 @@ export function ConnectionShell({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (
+        event.key === "Escape" &&
+        !event.defaultPrevented &&
+        document.querySelector('[aria-modal="true"]') === null
+      ) {
         event.preventDefault();
+        setSearchOpen(false);
         setIsSidebarOpen(false);
         menuButtonRef.current?.focus();
       }
@@ -306,6 +328,7 @@ export function ConnectionShell({
   useEffect(() => {
     const handleNavigationShortcut = (event: KeyboardEvent) => {
       if (
+        event.defaultPrevented ||
         !event.ctrlKey ||
         event.shiftKey ||
         event.altKey ||
@@ -316,6 +339,7 @@ export function ConnectionShell({
       }
       if (event.key.toLowerCase() === "b") {
         event.preventDefault();
+        setSearchOpen(false);
         const narrow =
           typeof window.matchMedia === "function" &&
           window.matchMedia("(max-width: 1099px)").matches;
@@ -324,13 +348,17 @@ export function ConnectionShell({
         } else {
           setIsSidebarCollapsed((collapsed) => !collapsed);
         }
+      } else if (event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        openThreadSearch();
       }
     };
     window.addEventListener("keydown", handleNavigationShortcut);
     return () => window.removeEventListener("keydown", handleNavigationShortcut);
-  }, []);
+  }, [openThreadSearch]);
 
   const closeSidebar = () => {
+    setSearchOpen(false);
     setIsSidebarOpen(false);
     menuButtonRef.current?.focus();
   };
@@ -410,6 +438,176 @@ export function ConnectionShell({
         data-open={isSidebarOpen}
         id={sidebarId}
       >
+        <header className={styles.sidebarHeader}>
+          <button
+            aria-controls={sidebarId}
+            aria-expanded={true}
+            aria-label="隐藏侧栏"
+            className={styles.sidebarInnerToggle}
+            onClick={() => {
+              setSearchOpen(false);
+              if (isSidebarOpen) {
+                setIsSidebarOpen(false);
+              } else {
+                setIsSidebarCollapsed(true);
+              }
+            }}
+            type="button"
+          >
+            <SidebarCollapseIcon collapsed={false} />
+          </button>
+          <div className={styles.taskActions}>
+            <button
+              className={styles.newTaskButton}
+              disabled={phase !== "ready" || onNewTask === undefined}
+              onClick={() => {
+                setSearchOpen(false);
+                onNewTask?.();
+                setIsSidebarOpen(false);
+              }}
+              title="新建任务（Ctrl+N）"
+              type="button"
+            >
+              <ComposeIcon />
+              <span className={styles.visuallyHidden}>新建任务</span>
+            </button>
+            <button
+              aria-label={groupThreads ? "取消按项目分组" : "按项目分组"}
+              aria-pressed={groupThreads}
+              className={styles.groupButton}
+              disabled={
+                searchOpen || viewingArchivedThreads || threadListPhase !== "ready"
+              }
+              onClick={() => setGroupThreads((grouped) => !grouped)}
+              title={groupThreads ? "取消按项目分组" : "按项目分组"}
+              type="button"
+            >
+              <GroupIcon />
+            </button>
+            <div className={styles.threadActions} ref={threadActionsRef}>
+              <button
+                aria-controls={threadActionsOpen ? threadActionsMenuId : undefined}
+                aria-expanded={threadActionsOpen}
+                aria-haspopup="menu"
+                aria-label={
+                  viewingArchivedThreads ? "已归档会话操作" : "最近会话操作"
+                }
+                className={styles.threadActionsButton}
+                data-refreshing={displayedRefreshingThreads}
+                onClick={() => setThreadActionsOpen((open) => !open)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && threadActionsOpen) {
+                    event.preventDefault();
+                    setThreadActionsOpen(false);
+                  }
+                }}
+                ref={threadActionsButtonRef}
+                title={
+                  viewingArchivedThreads ? "已归档会话操作" : "最近会话操作"
+                }
+                type="button"
+              >
+                {displayedRefreshingThreads ? <RefreshIcon /> : <MoreIcon />}
+              </button>
+              {threadActionsOpen ? (
+                <div
+                  aria-label={
+                    viewingArchivedThreads ? "已归档会话操作" : "最近会话操作"
+                  }
+                  className={styles.threadActionsMenu}
+                  id={threadActionsMenuId}
+                  onKeyDown={handleThreadActionsKeyDown}
+                  ref={threadActionsMenuRef}
+                  role="menu"
+                >
+                  <button
+                    aria-checked={!viewingArchivedThreads}
+                    onClick={() => {
+                      setThreadActionsOpen(false);
+                      setSearchOpen(false);
+                      setThreadListView("recent");
+                    }}
+                    role="menuitemradio"
+                    type="button"
+                  >
+                    <span aria-hidden="true" className={styles.menuSelectionMark}>
+                      {viewingArchivedThreads ? null : "✓"}
+                    </span>
+                    <span>最近会话</span>
+                  </button>
+                  <button
+                    aria-checked={viewingArchivedThreads}
+                    onClick={() => {
+                      setThreadActionsOpen(false);
+                      setSearchOpen(false);
+                      setThreadListView("archived");
+                      if (archivedThreadListPhase === "error") {
+                        onLoadArchivedThreads?.();
+                      }
+                    }}
+                    role="menuitemradio"
+                    type="button"
+                  >
+                    <span aria-hidden="true" className={styles.menuSelectionMark}>
+                      {viewingArchivedThreads ? "✓" : null}
+                    </span>
+                    <span>已归档会话</span>
+                  </button>
+                  <div className={styles.threadActionsSeparator} role="separator" />
+                  {viewingArchivedThreads ? null : (
+                    <button
+                      onClick={openThreadSearch}
+                      role="menuitem"
+                      type="button"
+                    >
+                      <SearchIcon />
+                      <span>搜索会话</span>
+                      <small>Ctrl+K</small>
+                    </button>
+                  )}
+                  <button
+                    data-refreshing={displayedRefreshingThreads}
+                    disabled={
+                      offline ||
+                      displayedRefreshingThreads ||
+                      (viewingArchivedThreads
+                        ? onRefreshArchivedThreads === undefined
+                        : onRefreshThreads === undefined)
+                    }
+                    onClick={() => {
+                      setThreadActionsOpen(false);
+                      if (viewingArchivedThreads) {
+                        onRefreshArchivedThreads?.();
+                      } else {
+                        onRefreshThreads?.();
+                      }
+                    }}
+                    role="menuitem"
+                    type="button"
+                  >
+                    <RefreshIcon />
+                    <span>
+                      {displayedRefreshingThreads ? "正在刷新" : "刷新会话"}
+                    </span>
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </header>
+        {searchOpen ? (
+          <ThreadSearch
+            currentThreadId={currentThreadId}
+            inputRef={searchInputRef}
+            onClose={closeThreadSearch}
+            onOpenThread={(threadId) => {
+              onOpenThread?.(threadId);
+              setSearchOpen(false);
+              setIsSidebarOpen(false);
+            }}
+            threads={threads}
+          />
+        ) : null}
         <RecentThreads
           archiveNotices={archiveNotices}
           {...(backgroundCommandCounts === undefined
@@ -423,165 +621,7 @@ export function ConnectionShell({
           hasMorePinnedThreads={
             !viewingArchivedThreads && hasMorePinnedThreads
           }
-          sidebarToggle={
-            <button
-              aria-controls={sidebarId}
-              aria-expanded={true}
-              aria-label="隐藏侧栏"
-              className={styles.sidebarInnerToggle}
-              onClick={() => {
-                if (isSidebarOpen) {
-                  setIsSidebarOpen(false);
-                } else {
-                  setIsSidebarCollapsed(true);
-                }
-              }}
-              type="button"
-            >
-              <SidebarCollapseIcon collapsed={false} />
-            </button>
-          }
-          headerActions={
-            <div className={styles.taskActions}>
-              <button
-                className={styles.newTaskButton}
-                disabled={phase !== "ready" || onNewTask === undefined}
-                onClick={() => {
-                  onNewTask?.();
-                  setIsSidebarOpen(false);
-                }}
-                title="新建任务（Ctrl+N）"
-                type="button"
-              >
-                <ComposeIcon />
-                <span className={styles.visuallyHidden}>新建任务</span>
-              </button>
-              <button
-                aria-label={groupThreads ? "取消按项目分组" : "按项目分组"}
-                aria-pressed={groupThreads}
-                className={styles.groupButton}
-                disabled={
-                  viewingArchivedThreads || threadListPhase !== "ready"
-                }
-                onClick={() => setGroupThreads((grouped) => !grouped)}
-                title={groupThreads ? "取消按项目分组" : "按项目分组"}
-                type="button"
-              >
-                <GroupIcon />
-              </button>
-              <div className={styles.threadActions} ref={threadActionsRef}>
-                <button
-                  aria-controls={threadActionsOpen ? threadActionsMenuId : undefined}
-                  aria-expanded={threadActionsOpen}
-                  aria-haspopup="menu"
-                  aria-label={
-                    viewingArchivedThreads ? "已归档会话操作" : "最近会话操作"
-                  }
-                  className={styles.threadActionsButton}
-                  data-refreshing={displayedRefreshingThreads}
-                  onClick={() => setThreadActionsOpen((open) => !open)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape" && threadActionsOpen) {
-                      event.preventDefault();
-                      setThreadActionsOpen(false);
-                    }
-                  }}
-                  ref={threadActionsButtonRef}
-                  title={
-                    viewingArchivedThreads ? "已归档会话操作" : "最近会话操作"
-                  }
-                  type="button"
-                >
-                  {displayedRefreshingThreads ? <RefreshIcon /> : <MoreIcon />}
-                </button>
-                {threadActionsOpen ? (
-                  <div
-                    aria-label={
-                      viewingArchivedThreads ? "已归档会话操作" : "最近会话操作"
-                    }
-                    className={styles.threadActionsMenu}
-                    id={threadActionsMenuId}
-                    onKeyDown={handleThreadActionsKeyDown}
-                    ref={threadActionsMenuRef}
-                    role="menu"
-                  >
-                    <button
-                      aria-checked={!viewingArchivedThreads}
-                      onClick={() => {
-                        setThreadActionsOpen(false);
-                        setThreadListView("recent");
-                      }}
-                      role="menuitemradio"
-                      type="button"
-                    >
-                      <span aria-hidden="true" className={styles.menuSelectionMark}>
-                        {viewingArchivedThreads ? null : "✓"}
-                      </span>
-                      <span>最近会话</span>
-                    </button>
-                    <button
-                      aria-checked={viewingArchivedThreads}
-                      onClick={() => {
-                        setThreadActionsOpen(false);
-                        setThreadListView("archived");
-                        if (archivedThreadListPhase === "error") {
-                          onLoadArchivedThreads?.();
-                        }
-                      }}
-                      role="menuitemradio"
-                      type="button"
-                    >
-                      <span aria-hidden="true" className={styles.menuSelectionMark}>
-                        {viewingArchivedThreads ? "✓" : null}
-                      </span>
-                      <span>已归档会话</span>
-                    </button>
-                    <div className={styles.threadActionsSeparator} role="separator" />
-                    {viewingArchivedThreads ? null : (
-                      <button
-                        disabled={onSearchThreads === undefined}
-                        onClick={() => {
-                          setThreadActionsOpen(false);
-                          onSearchThreads?.();
-                        }}
-                        role="menuitem"
-                        type="button"
-                      >
-                        <SearchIcon />
-                        <span>搜索会话</span>
-                        <small>Ctrl+K</small>
-                      </button>
-                    )}
-                    <button
-                      data-refreshing={displayedRefreshingThreads}
-                      disabled={
-                        offline ||
-                        displayedRefreshingThreads ||
-                        (viewingArchivedThreads
-                          ? onRefreshArchivedThreads === undefined
-                          : onRefreshThreads === undefined)
-                      }
-                      onClick={() => {
-                        setThreadActionsOpen(false);
-                        if (viewingArchivedThreads) {
-                          onRefreshArchivedThreads?.();
-                        } else {
-                          onRefreshThreads?.();
-                        }
-                      }}
-                      role="menuitem"
-                      type="button"
-                    >
-                      <RefreshIcon />
-                      <span>
-                        {displayedRefreshingThreads ? "正在刷新" : "刷新会话"}
-                      </span>
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          }
+          hidden={searchOpen}
           loadingMore={displayedLoadingMoreThreads}
           loadingMorePinnedThreads={
             !viewingArchivedThreads && loadingMorePinnedThreads
@@ -733,7 +773,10 @@ export function ConnectionShell({
             aria-expanded={isSidebarOpen}
             aria-label={isSidebarOpen ? "关闭侧栏" : "打开侧栏"}
             className={styles.menuButton}
-            onClick={() => setIsSidebarOpen((open) => !open)}
+            onClick={() => {
+              setSearchOpen(false);
+              setIsSidebarOpen((open) => !open);
+            }}
             ref={menuButtonRef}
             type="button"
           >
