@@ -1868,6 +1868,66 @@ describe("ConversationView", () => {
       .not.toBeInTheDocument();
   });
 
+  it.each(["命令输出", "思考详情", "省略标题"])(
+    "主动展开工作流内的%s时不自动翻页，回到底部后恢复跟随",
+    (detail) => {
+      vi.useFakeTimers();
+      let contentDocumentBottom = 880;
+      let scrollHeight = 1_000;
+      const notifyResize = observeConversationContentResize();
+      mockConversationContentBottom(() => contentDocumentBottom, 200);
+      if (detail === "省略标题") {
+        mockOverflowingTitle("检查关键路径");
+      }
+      const turn: ThreadTurn = {
+        ...TURN,
+        status: "inProgress",
+        items: TURN.items.filter((item) =>
+          item.type === "userMessage" || item.type === "commandExecution" ||
+          item.type === "reasoning"
+        ).map((item) => item.type === "reasoning" && detail === "思考详情"
+          ? { ...item, content: ["详细检查过程"] }
+          : item),
+      };
+      render(<ConversationView restoredThread={{ ...RESTORED, turns: [turn] }} />);
+      const scroller = screen.getByLabelText("会话消息");
+      Object.defineProperties(scroller, {
+        clientHeight: { configurable: true, value: 200 },
+        scrollHeight: { configurable: true, get: () => scrollHeight },
+      });
+      act(() => vi.advanceTimersByTime(20));
+      expect(scroller.scrollTop).toBe(800);
+
+      const header = screen.getByRole("button", {
+        name: detail === "命令输出" ? "Ran pnpm test" : "检查关键路径",
+      });
+      fireEvent.click(header);
+      act(() => vi.advanceTimersByTime(20));
+      contentDocumentBottom = 1_200;
+      scrollHeight = 1_400;
+      act(() => notifyResize());
+      expect(scroller.scrollTop).toBe(800);
+
+      act(() => vi.advanceTimersByTime(250));
+      act(() => notifyResize());
+      expect(header).toHaveAttribute("aria-expanded", "true");
+      expect(scroller.scrollTop).toBe(800);
+      expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+
+      contentDocumentBottom = 1_400;
+      scrollHeight = 1_600;
+      act(() => notifyResize());
+      expect(scroller.scrollTop).toBe(800);
+
+      fireEvent.click(screen.getByRole("button", { name: "回到底部" }));
+      expect(scroller.scrollTop).toBe(1_400);
+      contentDocumentBottom = 1_800;
+      scrollHeight = 2_000;
+      act(() => notifyResize());
+      expect(scroller.scrollTop).toBe(1_800);
+    },
+  );
+
   it("按原生滚动范围判断是否位于底部", () => {
     render(
       <ConversationView

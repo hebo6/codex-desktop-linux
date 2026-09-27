@@ -1,6 +1,8 @@
 import {
   Children,
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -104,7 +106,13 @@ const BOTTOM_THRESHOLD = 1;
 const HISTORY_LOAD_THRESHOLD = 96;
 const RUNNING_TURN_RESERVE_RATIO = 2 / 3;
 
+const ActivityExpansionContext = createContext<{
+  readonly start: () => void;
+  readonly finish: (expanded: boolean) => void;
+} | null>(null);
+
 function useCollapsibleContent(initiallyExpanded: boolean) {
+  const activityExpansion = useContext(ActivityExpansionContext);
   const [expanded, setExpanded] = useState(initiallyExpanded);
   const [targetExpanded, setTargetExpanded] = useState(initiallyExpanded);
   const [contentMounted, setContentMounted] = useState(initiallyExpanded);
@@ -112,6 +120,22 @@ function useCollapsibleContent(initiallyExpanded: boolean) {
   const targetExpandedRef = useRef(initiallyExpanded);
   const timerRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
+  const userExpansionActiveRef = useRef(false);
+
+  const finishUserExpansion = useCallback((open: boolean) => {
+    if (userExpansionActiveRef.current) {
+      userExpansionActiveRef.current = false;
+      activityExpansion?.finish(open);
+    }
+  }, [activityExpansion]);
+
+  useEffect(() => {
+    if (contentVisible) {
+      finishUserExpansion(true);
+    }
+  }, [contentVisible, finishUserExpansion]);
+
+  useEffect(() => () => finishUserExpansion(false), [finishUserExpansion]);
 
   const cancelTransition = useCallback(() => {
     if (timerRef.current !== null) {
@@ -128,6 +152,9 @@ function useCollapsibleContent(initiallyExpanded: boolean) {
 
   const setOpen = useCallback((open: boolean) => {
     cancelTransition();
+    if (!open) {
+      finishUserExpansion(false);
+    }
     targetExpandedRef.current = open;
     setTargetExpanded(open);
     if (open) {
@@ -152,13 +179,22 @@ function useCollapsibleContent(initiallyExpanded: boolean) {
         timerRef.current = null;
       }, panelTransitionDuration());
     });
-  }, [cancelTransition]);
+  }, [cancelTransition, finishUserExpansion]);
+
+  const setUserOpen = useCallback((open: boolean) => {
+    if (open && !userExpansionActiveRef.current) {
+      userExpansionActiveRef.current = true;
+      activityExpansion?.start();
+    }
+    setOpen(open);
+  }, [activityExpansion, setOpen]);
 
   return {
     contentMounted,
     contentVisible,
     expanded,
     setOpen,
+    setUserOpen,
     targetExpanded,
     targetExpandedRef,
   } as const;
@@ -421,6 +457,11 @@ export function ConversationView({
       setShowJumpToBottom(true);
     }
   }, []);
+
+  const activityExpansion = useMemo(() => ({
+    start: startUserActivityExpansion,
+    finish: finishUserActivityExpansion,
+  }), [startUserActivityExpansion, finishUserActivityExpansion]);
 
   const startUserActivityCollapse = useCallback((group: HTMLElement) => {
     const scroller = scrollerRef.current;
@@ -1221,49 +1262,49 @@ export function ConversationView({
             ref={contentRef}
             role="list"
           >
-            {rows.map((row, rowIndex) => (
-              <div
-                className={styles.conversationRow}
-                data-first-in-turn={row.type === "segment" && row.firstInTurn}
-                data-row-index={rowIndex}
-                data-row-key={row.key}
-                data-row-type={row.type}
-                data-status={row.type === "segment" ? row.turn.status : undefined}
-                data-question-index={questionIndexByRow.get(rowIndex)}
-                data-turn-id={row.type === "segment" ? row.turn.id : undefined}
-                key={row.key}
-                role="listitem"
-              >
-                <ConversationRowView
-                  actionError={actionError}
-                  blobUrlFactory={blobUrlFactory}
-                  commandLocationRequest={commandLocationRequest}
-                  onUserActivityCollapse={startUserActivityCollapse}
-                  onUserActivityExpansionFinish={finishUserActivityExpansion}
-                  onUserActivityExpansionStart={startUserActivityExpansion}
-                  {...(onLoadTurnItemPage === undefined
-                    ? {}
-                    : { onLoadTurnItemPage })}
-                  {...(onForkTurn === undefined ? {} : { onForkTurn })}
-                  {...(onOpenLink === undefined ? {} : { onOpenLink })}
-                  {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
-                  {...(onOpenImage === undefined ? {} : { onOpenImage })}
-                  {...(onRunShellCommand === undefined
-                    ? {}
-                    : { onRunShellCommand })}
-                  row={row}
-                  shellCommandDisabled={shellCommandDisabled}
-                  {...(
-                    row.type !== "segment" || !turnItemPages.has(row.turn.id)
+            <ActivityExpansionContext value={activityExpansion}>
+              {rows.map((row, rowIndex) => (
+                <div
+                  className={styles.conversationRow}
+                  data-first-in-turn={row.type === "segment" && row.firstInTurn}
+                  data-row-index={rowIndex}
+                  data-row-key={row.key}
+                  data-row-type={row.type}
+                  data-status={row.type === "segment" ? row.turn.status : undefined}
+                  data-question-index={questionIndexByRow.get(rowIndex)}
+                  data-turn-id={row.type === "segment" ? row.turn.id : undefined}
+                  key={row.key}
+                  role="listitem"
+                >
+                  <ConversationRowView
+                    actionError={actionError}
+                    blobUrlFactory={blobUrlFactory}
+                    commandLocationRequest={commandLocationRequest}
+                    onUserActivityCollapse={startUserActivityCollapse}
+                    {...(onLoadTurnItemPage === undefined
                       ? {}
-                      : {
-                          turnItemPage:
-                            turnItemPages.get(row.turn.id)!,
-                        }
-                  )}
-                />
-              </div>
-            ))}
+                      : { onLoadTurnItemPage })}
+                    {...(onForkTurn === undefined ? {} : { onForkTurn })}
+                    {...(onOpenLink === undefined ? {} : { onOpenLink })}
+                    {...(onOpenDiff === undefined ? {} : { onOpenDiff })}
+                    {...(onOpenImage === undefined ? {} : { onOpenImage })}
+                    {...(onRunShellCommand === undefined
+                      ? {}
+                      : { onRunShellCommand })}
+                    row={row}
+                    shellCommandDisabled={shellCommandDisabled}
+                    {...(
+                      row.type !== "segment" || !turnItemPages.has(row.turn.id)
+                        ? {}
+                        : {
+                            turnItemPage:
+                              turnItemPages.get(row.turn.id)!,
+                          }
+                    )}
+                  />
+                </div>
+              ))}
+            </ActivityExpansionContext>
           </div>
         </div>
       </div>
@@ -1324,8 +1365,6 @@ function ConversationRowView({
   onOpenImage,
   onRunShellCommand,
   onUserActivityCollapse,
-  onUserActivityExpansionFinish,
-  onUserActivityExpansionStart,
   row,
   shellCommandDisabled,
   turnItemPage,
@@ -1340,8 +1379,6 @@ function ConversationRowView({
   readonly onOpenImage?: (url: string, name: string) => void;
   readonly onRunShellCommand?: (command: string) => Promise<boolean>;
   readonly onUserActivityCollapse: (group: HTMLElement) => () => void;
-  readonly onUserActivityExpansionFinish: (expanded: boolean) => void;
-  readonly onUserActivityExpansionStart: () => void;
   readonly row: ConversationRow;
   readonly shellCommandDisabled: boolean;
   readonly turnItemPage?: TurnItemPageState;
@@ -1381,8 +1418,6 @@ function ConversationRowView({
       commandLocationRequest={commandLocationRequest}
       items={row.segment.items}
       onUserCollapse={onUserActivityCollapse}
-      onUserExpansionFinish={onUserActivityExpansionFinish}
-      onUserExpansionStart={onUserActivityExpansionStart}
       turn={row.turn}
       workRunning={row.segment.workRunning}
       {...(
@@ -1873,8 +1908,6 @@ function ActivityGroup({
   onOpenDiff,
   onOpenLink,
   onUserCollapse,
-  onUserExpansionFinish,
-  onUserExpansionStart,
   turn,
   workRunning,
 }: {
@@ -1885,8 +1918,6 @@ function ActivityGroup({
   readonly onOpenDiff?: (path: string, diff: string) => void;
   readonly onOpenLink?: (link: string) => void;
   readonly onUserCollapse: (group: HTMLElement) => () => void;
-  readonly onUserExpansionFinish: (expanded: boolean) => void;
-  readonly onUserExpansionStart: () => void;
   readonly turn: ThreadTurn;
   readonly workRunning: boolean;
 }) {
@@ -1909,16 +1940,20 @@ function ActivityGroup({
   const finishUserCollapseRef = useRef<(() => void) | null>(null);
   const previousAutomaticallyExpandedRef = useRef(automaticallyExpanded);
   const previousDetailsHydratedRef = useRef(detailsHydrated);
-  const userExpansionActiveRef = useRef(false);
   const userExpansionPendingRef = useRef(false);
   const duration = useTurnDuration(turn, workRunning);
   const visibleItems = items;
   const setOpen = transition.setOpen;
-  const setGroupOpen = useCallback((open: boolean) => {
+  const setUserOpen = transition.setUserOpen;
+  const setGroupOpen = useCallback((open: boolean, userInitiated = false) => {
     finishUserCollapseRef.current?.();
     finishUserCollapseRef.current = null;
-    setOpen(open);
-  }, [setOpen]);
+    if (userInitiated) {
+      setUserOpen(open);
+    } else {
+      setOpen(open);
+    }
+  }, [setOpen, setUserOpen]);
   const canLoadDetails = onLoadDetails !== undefined &&
     turn.itemsView !== "full" && detailsPage?.complete !== true;
   const initialDetailsLoading = canLoadDetails && !detailsHydrated &&
@@ -1946,29 +1981,10 @@ function ActivityGroup({
     const wasHydrated = previousDetailsHydratedRef.current;
     previousDetailsHydratedRef.current = detailsHydrated;
     if (!wasHydrated && detailsHydrated) {
-      if (userExpansionPendingRef.current) {
-        userExpansionPendingRef.current = false;
-        userExpansionActiveRef.current = true;
-        onUserExpansionStart();
-      }
-      setGroupOpen(true);
+      setGroupOpen(true, userExpansionPendingRef.current);
+      userExpansionPendingRef.current = false;
     }
-  }, [detailsHydrated, onUserExpansionStart, setGroupOpen]);
-
-  useEffect(() => {
-    if (!transition.contentVisible || !userExpansionActiveRef.current) {
-      return;
-    }
-    userExpansionActiveRef.current = false;
-    onUserExpansionFinish(true);
-  }, [onUserExpansionFinish, transition.contentVisible]);
-
-  useEffect(() => () => {
-    if (userExpansionActiveRef.current) {
-      userExpansionActiveRef.current = false;
-      onUserExpansionFinish(false);
-    }
-  }, [onUserExpansionFinish]);
+  }, [detailsHydrated, setGroupOpen]);
 
   useLayoutEffect(() => {
     if (!transition.contentMounted) {
@@ -2001,17 +2017,10 @@ function ActivityGroup({
     userExpansionPendingRef.current = false;
     finishUserCollapseRef.current?.();
     finishUserCollapseRef.current = null;
-    if (nextExpanded) {
-      userExpansionActiveRef.current = true;
-      onUserExpansionStart();
-    } else if (userExpansionActiveRef.current) {
-      userExpansionActiveRef.current = false;
-      onUserExpansionFinish(false);
-    }
     if (!nextExpanded && groupRef.current !== null) {
       finishUserCollapseRef.current = onUserCollapse(groupRef.current);
     }
-    transition.setOpen(nextExpanded);
+    transition.setUserOpen(nextExpanded);
   };
 
   return (
@@ -2335,7 +2344,7 @@ function ActivityDisclosure({
 
   const toggle = () => {
     const nextExpanded = !transition.targetExpandedRef.current;
-    transition.setOpen(nextExpanded);
+    transition.setUserOpen(nextExpanded);
   };
 
   const title = (
