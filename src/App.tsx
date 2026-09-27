@@ -265,6 +265,7 @@ export function App({
 }: AppProps = {}) {
   const configuration = useAppSelector(selectConfiguration);
   const windowState = useWindowState(windowStateOptions);
+  const boundServerId = windowState.windowState?.serverId ?? null;
   const windowTabs = windowState.windowState?.tabs ?? EMPTY_WINDOW_TABS;
   const activeTabId = windowState.windowState?.activeTabId ?? null;
   const activeTab = activeTabId === null
@@ -595,7 +596,6 @@ export function App({
     () => collectHighRiskServerIds(servers, proxies),
     [proxies, servers],
   );
-  const boundServerId = windowState.windowState?.serverId ?? null;
   const windowId = windowState.windowState?.windowId ?? null;
   const draftKeyPrefix = composerDraftKeyPrefix(windowId, boundServerId);
   const transientKeyPrefix = transientDraftKeyPrefix(windowId, boundServerId);
