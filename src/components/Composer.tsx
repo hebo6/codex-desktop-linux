@@ -1201,7 +1201,12 @@ export function Composer({
       void addFiles(files, "paste");
       return;
     }
-    if (clipboardContainsLocalFileUris(event.clipboardData)) {
+    const types = Array.from(event.clipboardData.types ?? []);
+    // WebKit 保留文件 URI 类型但向脚本隐藏内容，默认粘贴仍会插入路径
+    const hasHiddenFileUris = types.includes("text/uri-list")
+      && event.clipboardData.getData("text/uri-list").length === 0
+      && event.clipboardData.getData("text/plain").length === 0;
+    if (clipboardContainsLocalFileUris(event.clipboardData) || hasHiddenFileUris) {
       event.preventDefault();
       void addClipboardFiles(true);
       return;
@@ -1209,7 +1214,6 @@ export function Composer({
     if (event.clipboardData.getData("text/plain").length > 0) {
       return;
     }
-    const types = Array.from(event.clipboardData.types ?? []);
     const items = Array.from(event.clipboardData.items ?? []);
     if (
       types.some((type) => type.startsWith("image/"))

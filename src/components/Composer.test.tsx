@@ -1424,15 +1424,18 @@ describe("Composer", () => {
     expect(getAsFile).toHaveBeenCalledTimes(1);
   });
 
-  it("普通文本粘贴不阻止浏览器默认行为", () => {
+  it.each([
+    { types: ["text/plain", "image/png"] },
+    { types: ["text/plain", "text/uri-list"] },
+  ])("普通文本粘贴不阻止浏览器默认行为（$types）", ({ types }) => {
     const clipboardFilesReader = vi.fn(async () => []);
     renderComposer({ clipboardFilesReader });
     const editor = screen.getByRole("textbox", { name: "任务输入" });
     const event = createEvent.paste(editor, {
       clipboardData: {
-        getData: () => "普通文本",
+        getData: (type: string) => type === "text/plain" ? "普通文本" : "",
         items: [{ getAsFile: () => null, kind: "string", type: "text/plain" }],
-        types: ["text/plain", "image/png"],
+        types,
       },
     });
 
@@ -1529,15 +1532,83 @@ describe("Composer", () => {
     );
   });
 
-  it("URI 剪贴板中的网页链接不读取原生剪贴板", () => {
+  it("WebKit 隐藏文件 URI 时阻止路径粘贴并从原生剪贴板添加图片", async () => {
+    const user = userEvent.setup();
+    const clipboardImage = imageFile("linux-paste.png");
+    const clipboardFilesReader = vi.fn(async () => [{
+      name: clipboardImage.name,
+      size: clipboardImage.size,
+      file: clipboardImage,
+      error: null,
+    }]);
+    const { onSend } = renderComposer({ clipboardFilesReader, initialText: "查看图片" });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    const event = createEvent.paste(editor, {
+      clipboardData: {
+        getData: () => "",
+        files: [],
+        items: [{ getAsFile: () => null, kind: "string", type: "text/uri-list" }],
+        types: ["text/uri-list"],
+      },
+    });
+
+    fireEvent(editor, event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(clipboardFilesReader).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByLabelText("附件")).toHaveTextContent("linux-paste.png"));
+    expect(editor).toHaveValue("查看图片");
+    await waitFor(() => expect(screen.getByRole("button", { name: "发送" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "发送" }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith(
+      [
+        { type: "text", text: "查看图片" },
+        { type: "image", url: expect.stringMatching(/^data:image\/png;base64,/u) },
+      ],
+      { cwd: "/workspace/project" },
+    ));
+  });
+
+  it.each([
+    { fails: false, message: "剪贴板中没有可读取的图片" },
+    { fails: true, message: "无法读取系统剪贴板" },
+  ])("隐藏文件 URI 的原生读取异常保留草稿并提示：$message", async ({ fails, message }) => {
+    const clipboardFilesReader = vi.fn(async () => {
+      if (fails) throw new Error("clipboard read failed");
+      return [];
+    });
+    renderComposer({ clipboardFilesReader, initialText: "查看图片" });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    const event = createEvent.paste(editor, {
+      clipboardData: {
+        getData: () => "",
+        files: [],
+        items: [{ getAsFile: () => null, kind: "string", type: "text/uri-list" }],
+        types: ["text/uri-list"],
+      },
+    });
+
+    fireEvent(editor, event);
+
+    expect(event.defaultPrevented).toBe(true);
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(message));
+    expect(editor).toHaveValue("查看图片");
+    expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "发送" })).toBeEnabled();
+  });
+
+  it.each([
+    { types: ["text/plain", "text/uri-list"] },
+    { types: ["text/uri-list"] },
+  ])("URI 剪贴板中的网页链接不读取原生剪贴板（$types）", ({ types }) => {
     const clipboardFilesReader = vi.fn(async () => []);
     renderComposer({ clipboardFilesReader });
     const editor = screen.getByRole("textbox", { name: "任务输入" });
     const event = createEvent.paste(editor, {
       clipboardData: {
-        getData: () => "https://example.com/image.png",
+        getData: (type: string) => types.includes(type) ? "https://example.com/image.png" : "",
         items: [{ getAsFile: () => null, kind: "string", type: "text/uri-list" }],
-        types: ["text/plain", "text/uri-list"],
+        types,
       },
     });
 
