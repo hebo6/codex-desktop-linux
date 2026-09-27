@@ -285,7 +285,22 @@
   color: var(--color-status-danger);
 }
 
-.attachmentCard > button {
+.attachmentPreview {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.attachmentPreview:hover img,
+.attachmentPreview:focus-visible img {
+  filter: brightness(0.8);
+}
+
+.attachmentRemove {
   border: 0;
   color: var(--color-text-tertiary);
   background: transparent;

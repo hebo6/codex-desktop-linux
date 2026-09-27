@@ -60,9 +60,16 @@ export interface DataImagePreviewRequest {
   readonly name: string;
 }
 
+export interface BlobImagePreviewRequest {
+  readonly type: "blobImage";
+  readonly blob: Blob;
+  readonly name: string;
+}
+
 export type FilePreviewRequest =
   | RemoteFilePreviewRequest
-  | DataImagePreviewRequest;
+  | DataImagePreviewRequest
+  | BlobImagePreviewRequest;
 
 interface LoadedFile {
   readonly dataBase64: string;
@@ -108,7 +115,7 @@ export function FilePreviewDialog({
     readonly mode: FileViewMode;
     readonly request: FilePreviewRequest | null;
   }>(() => ({
-    mode: defaultFileView(request?.type === "dataImage" ? null : request),
+    mode: defaultFileView(request !== null && "path" in request ? request : null),
     request,
   }));
   const [zoom, setZoom] = useState(1);
@@ -139,9 +146,10 @@ export function FilePreviewDialog({
     readonly lines: HighlightedLines;
     readonly source: string;
   } | null>(null);
-  const fileRequest = request?.type === "dataImage" ? null : request;
+  const fileRequest = request !== null && "path" in request ? request : null;
   const dataImageRequest = request?.type === "dataImage" ? request : null;
-  const previewPath = dataImageRequest?.name ?? fileRequest?.path ?? null;
+  const blobImageRequest = request?.type === "blobImage" ? request : null;
+  const previewPath = blobImageRequest?.name ?? dataImageRequest?.name ?? fileRequest?.path ?? null;
   const diff = fileRequest?.diff ?? null;
   const isTopmostModal = useModalLayer(request !== null);
 
@@ -166,7 +174,7 @@ export function FilePreviewDialog({
     setOpeningHtml(false);
     setBrowserStatus(null);
     setSaveStatus(null);
-    if (request === null) {
+    if (request === null || blobImageRequest !== null) {
       setLoading(false);
       return;
     }
@@ -221,7 +229,7 @@ export function FilePreviewDialog({
     return () => {
       disposed = true;
     };
-  }, [attempt, client, dataImageRequest, defaultWrap, diff, fileRequest, request]);
+  }, [attempt, blobImageRequest, client, dataImageRequest, defaultWrap, diff, fileRequest, request]);
 
   useEffect(() => {
     if (request === null) return;
@@ -247,7 +255,7 @@ export function FilePreviewDialog({
       if (first === undefined || last === undefined) {
         return;
       }
-      if (event.shiftKey && document.activeElement === first) {
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -262,11 +270,13 @@ export function FilePreviewDialog({
     };
   }, [isTopmostModal, onClose, request]);
 
-  const decoded = useMemo(
-    () => previewPath === null || loaded === null
-      ? null
-      : decodePreview(previewPath, loaded.dataBase64),
-    [loaded, previewPath],
+  const decoded = useMemo<DecodedPreview | null>(
+    () => blobImageRequest !== null
+      ? { type: "image", blob: blobImageRequest.blob }
+      : previewPath === null || loaded === null
+        ? null
+        : decodePreview(previewPath, loaded.dataBase64),
+    [blobImageRequest, loaded, previewPath],
   );
   const sourceText = decoded?.type === "text"
     ? decoded.text
@@ -437,10 +447,15 @@ export function FilePreviewDialog({
   if (request === null) {
     return null;
   }
-  const name = dataImageRequest?.name ?? fileName(fileRequest?.path ?? "");
-  const relativePath = dataImageRequest === null
-    ? relativeRemotePath(fileRequest?.path ?? "", workspacePath)
-    : "用户消息中的图片";
+  const name = blobImageRequest?.name ?? dataImageRequest?.name ?? fileName(fileRequest?.path ?? "");
+  const relativePath = blobImageRequest !== null
+    ? "输入框中的图片"
+    : dataImageRequest !== null
+      ? "用户消息中的图片"
+      : relativeRemotePath(fileRequest?.path ?? "", workspacePath);
+  const previewSize = blobImageRequest !== null
+    ? blobImageRequest.blob.size
+    : loaded === null ? null : decodedBase64Size(loaded.dataBase64);
   const language = languageForPath(previewPath ?? "");
   const highlightedLines =
     highlightedSource?.source === displayedText &&
@@ -547,7 +562,7 @@ export function FilePreviewDialog({
         <header className={styles.header}>
           <div>
             <h2 id={titleId} title={fileRequest?.path}>{diff === null ? name : fileRequest?.path}</h2>
-            <p>{dataImageRequest === null ? `${serverName} · ${relativePath}` : relativePath}</p>
+            <p>{fileRequest !== null ? `${serverName} · ${relativePath}` : relativePath}</p>
           </div>
           <div className={styles.headerActions}>
             {diff === null && fileRequest !== null && isHtml(fileRequest.path) ? (
@@ -555,7 +570,7 @@ export function FilePreviewDialog({
                 {openingHtml ? "正在打开" : "在浏览器中打开"}
               </button>
             ) : null}
-            {diff === null ? <button disabled={loaded === null || saving} onClick={() => void save()} type="button">{saving ? "正在保存" : "另存为"}</button> : null}
+            {diff === null && blobImageRequest === null ? <button disabled={loaded === null || saving} onClick={() => void save()} type="button">{saving ? "正在保存" : "另存为"}</button> : null}
             <button aria-label="关闭文件预览" onClick={onClose} type="button">×</button>
           </div>
         </header>
@@ -564,7 +579,7 @@ export function FilePreviewDialog({
         <div className={styles.meta}>
           {diff !== null ? <span>文件差异</span> : <>
             <span>{decoded === null ? "正在识别" : kindLabel(decoded.type)}</span>
-            <span>{loaded === null ? "大小未知" : formatBytes(decodedBase64Size(loaded.dataBase64))}</span>
+            <span>{previewSize === null ? "大小未知" : formatBytes(previewSize)}</span>
             {sourceText === null ? null : <><span>{language}</span><span>UTF-8</span><span>{lineEnding(sourceText)}</span></>}
             {loaded !== null && loaded.modifiedAtMs > 0 ? <span>{new Date(loaded.modifiedAtMs).toLocaleString()}</span> : null}
           </>}

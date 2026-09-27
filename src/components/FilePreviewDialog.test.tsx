@@ -353,6 +353,35 @@ describe("FilePreviewDialog", () => {
     expect(create).toHaveBeenCalledWith(expect.any(Blob));
   });
 
+  it("按已验证的 Blob 预览草稿图片，不依赖扩展名或服务器读取", async () => {
+    const blob = new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" });
+    const create = vi.fn(() => "blob:draft-image");
+    const revoke = vi.fn();
+    const client = clientFor("unrelated");
+    const { unmount } = render(
+      <FilePreviewDialog
+        blobUrlFactory={{ create, revoke }}
+        client={client}
+        onClose={vi.fn()}
+        request={{ type: "blobImage", blob, name: "mislabeled.svg" }}
+        serverName="服务器"
+      />,
+    );
+
+    expect(await screen.findByRole("img", { name: "mislabeled.svg" })).toHaveAttribute("src", "blob:draft-image");
+    expect(create).toHaveBeenCalledWith(blob);
+    expect(screen.getByText("输入框中的图片")).toBeVisible();
+    expect(screen.getByText("4 B")).toBeVisible();
+    expect(screen.getByRole("button", { name: "原始尺寸" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "复制路径" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "文件视图" })).not.toBeInTheDocument();
+    expect(client.readFile).not.toHaveBeenCalled();
+    expect(client.getMetadata).not.toHaveBeenCalled();
+
+    unmount();
+    expect(revoke).toHaveBeenCalledWith("blob:draft-image");
+  });
+
   it("图片支持原始尺寸和以指针位置为中心缩放", async () => {
     render(
       <FilePreviewDialog

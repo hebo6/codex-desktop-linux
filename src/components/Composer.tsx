@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -43,6 +44,7 @@ import {
   ComposerAccessoryPanel,
   ComposerAccessoryRow,
 } from "./ComposerAccessoryPanel";
+import { FilePreviewDialog, type BlobImagePreviewRequest } from "./FilePreviewDialog";
 import { ProjectDeleteDialog } from "./ProjectDeleteDialog";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { SavedPromptManagerDialog } from "./SavedPromptManagerDialog";
@@ -1464,6 +1466,7 @@ export function Composer({
                 </span>
                 <button
                   aria-label={`移除 ${attachment.name}`}
+                  className={styles.attachmentRemove}
                   disabled={preparingAttachments || submitting}
                   onClick={() => setAttachments((current) =>
                     current.filter(({ id }) => id !== attachment.id)
@@ -3111,12 +3114,41 @@ function AttachmentThumbnail({
   readonly blobUrlFactory: BlobUrlFactory;
 }) {
   const url = useBlobUrl(attachment.blob, blobUrlFactory);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const closePreview = useCallback(() => setPreviewOpen(false), []);
+  const previewRequest = useMemo<BlobImagePreviewRequest | null>(
+    () => attachment.blob === null
+      ? null
+      : { type: "blobImage", blob: attachment.blob, name: attachment.name },
+    [attachment.blob, attachment.name],
+  );
   if (attachment.status === "preparing") {
     return <span aria-hidden="true" className={styles.attachmentPlaceholder}>…</span>;
   }
   return url === null
     ? <span aria-hidden="true" className={styles.attachmentPlaceholder}>!</span>
-    : <img alt="" src={url} />;
+    : <>
+        <button
+          aria-haspopup="dialog"
+          aria-label={`预览 ${attachment.name}`}
+          className={styles.attachmentPreview}
+          onClick={() => setPreviewOpen(true)}
+          title={`预览 ${attachment.name}`}
+          type="button"
+        >
+          <img alt="" src={url} />
+        </button>
+        {previewOpen ? createPortal(
+          <FilePreviewDialog
+            blobUrlFactory={blobUrlFactory}
+            client={null}
+            onClose={closePreview}
+            request={previewRequest}
+            serverName=""
+          />,
+          document.body,
+        ) : null}
+      </>;
 }
 
 function isAbsolutePath(path: string): boolean {

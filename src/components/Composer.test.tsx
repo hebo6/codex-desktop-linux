@@ -1581,6 +1581,7 @@ describe("Composer", () => {
         expect.stringContaining("second.webp"),
       ]);
     expect(attachmentArea).toHaveTextContent("正在读取图片");
+    expect(screen.queryByRole("button", { name: "预览 first.png" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "发送" })).toBeDisabled();
     await waitFor(() => expect(attachmentArea).toHaveTextContent("second.webp"));
 
@@ -1621,6 +1622,97 @@ describe("Composer", () => {
     await waitFor(() =>
       expect(screen.getByText("图片内容无效或无法解码")).toBeVisible(),
     );
+    expect(screen.queryByRole("button", { name: "预览 vector.svg" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "预览 invalid.png" })).not.toBeInTheDocument();
+  });
+
+  it("点击图片打开预览，关闭后恢复焦点并保留草稿和发送内容", async () => {
+    const user = userEvent.setup();
+    const { blobUrlFactory, onSend } = renderComposer({ initialText: "检查图片" });
+    const image = imageFile("screen.png");
+    fireEvent.change(screen.getByLabelText("选择图片附件"), { target: { files: [image] } });
+    const trigger = await screen.findByRole("button", { name: "预览 screen.png" });
+
+    await user.click(trigger);
+
+    const dialog = screen.getByRole("dialog", { name: "screen.png" });
+    expect(dialog).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(within(dialog).getByRole("button", { name: "旋转" })).toHaveFocus();
+    await user.tab();
+    expect(within(dialog).getByRole("button", { name: "关闭文件预览" })).toHaveFocus();
+    expect(within(dialog).getByRole("img", { name: "screen.png" })).toHaveAttribute("src", "blob:attachment-1");
+    expect(blobUrlFactory.create).toHaveBeenNthCalledWith(2, image);
+    await user.click(within(dialog).getByRole("button", { name: "放大" }));
+    expect(within(dialog).getByText("120%")).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "旋转" }));
+    expect(within(dialog).getByRole("img")).toHaveStyle({ transform: "translate(0px, 0px) scale(1.2) rotate(90deg)" });
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(blobUrlFactory.revoke).toHaveBeenCalledWith("blob:attachment-1");
+    expect(blobUrlFactory.revoke).not.toHaveBeenCalledWith("blob:attachment-0");
+    expect(screen.getByRole("textbox", { name: "任务输入" })).toHaveValue("检查图片");
+    expect(onSend).not.toHaveBeenCalled();
+
+    await user.keyboard("{Enter}");
+    const reopened = screen.getByRole("dialog", { name: "screen.png" });
+    expect(within(reopened).getByText("100%")).toBeVisible();
+    await user.click(within(reopened).getByRole("button", { name: "关闭文件预览" }));
+    expect(trigger).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "发送" }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith(
+      [
+        { type: "text", text: "检查图片" },
+        { type: "image", url: "data:image/png;base64,iVBORw0KGgo=" },
+      ],
+      { cwd: "/workspace/project" },
+    ));
+    expect(blobUrlFactory.revoke).toHaveBeenCalledWith("blob:attachment-0");
+  });
+
+  it("切换会话时关闭附件预览并释放缩略图和预览的 Blob URL", async () => {
+    const user = userEvent.setup();
+    let nextUrl = 0;
+    const blobUrlFactory = {
+      create: vi.fn(() => `blob:session-image-${nextUrl++}`),
+      revoke: vi.fn(),
+    };
+    const props: ComponentProps<typeof Composer> = {
+      activeTurn: false,
+      blobUrlFactory,
+      cwd: "/workspace/project",
+      draftStore: {
+        listKeys: vi.fn(async () => []),
+        load: vi.fn(async () => null),
+        save: vi.fn(async () => undefined),
+        delete: vi.fn(async () => undefined),
+        transition: vi.fn(async () => undefined),
+      },
+      error: null,
+      imageValidator: async () => undefined,
+      onQueue: vi.fn(async () => true),
+      onRunShellCommand: vi.fn(async () => true),
+      onSend: vi.fn(async () => true),
+      onStop: vi.fn(async () => true),
+      showProjectPicker: false,
+      stopping: false,
+      submitting: false,
+    };
+    const { rerender } = render(<Composer {...props} draftKey="tab:a" />);
+    fireEvent.change(screen.getByLabelText("选择图片附件"), {
+      target: { files: [imageFile("session.png")] },
+    });
+    await user.click(await screen.findByRole("button", { name: "预览 session.png" }));
+    expect(screen.getByRole("dialog", { name: "session.png" })).toBeVisible();
+
+    rerender(<Composer {...props} draftKey="tab:b" />);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+    expect(blobUrlFactory.revoke).toHaveBeenCalledWith("blob:session-image-0");
+    expect(blobUrlFactory.revoke).toHaveBeenCalledWith("blob:session-image-1");
   });
 
   it("为没有文件名的剪贴板图片生成稳定名称", async () => {
