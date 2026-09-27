@@ -1639,6 +1639,125 @@ describe("ConversationView", () => {
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });
 
+  it.each(["自动跟随", "手动阅读", "首帧前完成"])(
+    "%s时回合完成仍定位到本轮最近问题，后续布局更新不重复定位",
+    async (scenario) => {
+      const notifyResize = observeConversationContentResize();
+      mockConversationContentBottom(() => 2_000, 600);
+      const turn: ThreadTurn = {
+        id: "turn-completion-position",
+        items: [
+          {
+            content: [{ text: "本轮最初的问题", type: "text" }],
+            id: "user-completion-first",
+            type: "userMessage",
+          },
+          {
+            content: [{ text: "本轮最近的问题", type: "text" }],
+            id: "user-completion-latest",
+            type: "userMessage",
+          },
+          {
+            id: "answer-completion",
+            phase: "final_answer",
+            text: "回答仍在生成",
+            type: "agentMessage",
+          },
+        ],
+        itemsView: "full",
+        status: "inProgress",
+      };
+      const { rerender } = render(
+        <ConversationView restoredThread={{ ...RESTORED, turns: [turn] }} />,
+      );
+      const scroller = screen.getByLabelText("会话消息");
+      Object.defineProperties(scroller, {
+        clientHeight: { configurable: true, value: 600 },
+        scrollHeight: { configurable: true, value: 2_120 },
+      });
+      const latestQuestionRow = screen.getByText("本轮最近的问题")
+        .closest<HTMLElement>("[data-row-index]")!;
+      Object.defineProperty(latestQuestionRow, "offsetTop", {
+        configurable: true,
+        value: 824,
+      });
+      if (scenario !== "首帧前完成") {
+        await finishAnimationFrame();
+      }
+      if (scenario === "手动阅读") {
+        userScroll(scroller, 100);
+      }
+      const completedTurn: ThreadTurn = { ...turn, status: "completed" };
+      rerender(
+        <ConversationView restoredThread={{ ...RESTORED, turns: [completedTurn] }} />,
+      );
+
+      expect(scroller.scrollTop).toBe(800);
+      expect(scroller.querySelector('[data-running-turn-floor="true"]'))
+        .not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+      await finishAnimationFrame();
+      act(() => notifyResize());
+      expect(scroller.scrollTop).toBe(800);
+
+      userScroll(scroller, 1_000);
+      rerender(
+        <ConversationView
+          restoredThread={{ ...RESTORED, turns: [{ ...completedTurn, durationMs: 2_000 }] }}
+        />,
+      );
+      act(() => notifyResize());
+      expect(scroller.scrollTop).toBe(1_000);
+    },
+  );
+
+  it.each(["interrupted", "failed"] as const)(
+    "回合以 %s 结束时不触发成功完成的问题定位",
+    async (status) => {
+      const turn: ThreadTurn = { ...TURN, status: "inProgress" };
+      const { rerender } = render(
+        <ConversationView restoredThread={{ ...RESTORED, turns: [turn] }} />,
+      );
+      const scroller = screen.getByLabelText("会话消息");
+      Object.defineProperties(scroller, {
+        clientHeight: { configurable: true, value: 600 },
+        scrollHeight: { configurable: true, value: 2_000 },
+      });
+      await finishAnimationFrame();
+      userScroll(scroller, 500);
+      rerender(
+        <ConversationView restoredThread={{ ...RESTORED, turns: [{ ...turn, status }] }} />,
+      );
+      expect(scroller.scrollTop).toBe(500);
+    },
+  );
+
+  it("切换到已完成会话时仍定位底部，不误触发完成定位", async () => {
+    const { rerender } = render(
+      <ConversationView
+        restoredThread={{ ...RESTORED, turns: [{ ...TURN, status: "inProgress" }] }}
+      />,
+    );
+    const scroller = screen.getByLabelText("会话消息");
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 600 },
+      scrollHeight: { configurable: true, value: 2_000 },
+    });
+    await finishAnimationFrame();
+    userScroll(scroller, 500);
+    rerender(
+      <ConversationView
+        restoredThread={{
+          ...RESTORED,
+          metadata: { ...RESTORED.metadata, id: "thread-other-completed" },
+          turns: [TURN],
+        }}
+      />,
+    );
+    await finishAnimationFrame();
+    expect(scroller.scrollTop).toBe(1_400);
+  });
+
   it("位于底部时内容增长后继续跟随底部", () => {
     const { rerender } = render(
       <ConversationView
@@ -2698,6 +2817,11 @@ describe("ConversationView", () => {
     );
     expect(scroller.scrollTop).toBe(2_010);
 
+    Object.defineProperty(
+      screen.getByText("检查分页跟随").closest<HTMLElement>("[data-row-index]")!,
+      "offsetTop",
+      { configurable: true, value: 900 },
+    );
     rerender(
       <ConversationView
         restoredThread={{
@@ -2711,7 +2835,7 @@ describe("ConversationView", () => {
     );
     expect(scroller.querySelector('[data-running-turn-floor="true"]'))
       .not.toBeInTheDocument();
-    expect(scroller.scrollTop).toBe(1_730);
+    expect(scroller.scrollTop).toBe(900);
   });
 
   it("思考项目没有摘要时显示占位，工具到达后不保留占位", async () => {

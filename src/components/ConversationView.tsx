@@ -266,6 +266,10 @@ export function ConversationView({
     restoredThread.turns.findLast(({ status }) => status === "inProgress") ??
     null;
   const runningTurnId = runningTurn?.id ?? null;
+  const observedRunningTurnRef = useRef({
+    threadId: restoredThread.metadata.id,
+    turnId: runningTurnId,
+  });
   const runningFinalAnswer =
     runningTurn?.items.find(isFinalAnswer) ?? null;
   const runningQuestion =
@@ -869,6 +873,53 @@ export function ConversationView({
   ]);
 
   useLayoutEffect(() => {
+    const observed = observedRunningTurnRef.current;
+    observedRunningTurnRef.current = {
+      threadId: restoredThread.metadata.id,
+      turnId: runningTurnId,
+    };
+    if (
+      observed.threadId !== restoredThread.metadata.id ||
+      observed.turnId === null ||
+      runningTurnId !== null
+    ) {
+      return;
+    }
+    const finishedTurn = restoredThread.turns.find(
+      (turn) => turn.id === observed.turnId,
+    );
+    if (finishedTurn?.status !== "completed") {
+      return;
+    }
+    const question = historyQuestions.findLast((question) => {
+      const row = rows[question.rowIndex];
+      return row?.type === "segment" && row.turn.id === finishedTurn.id;
+    });
+    const scroller = scrollerRef.current;
+    if (question === undefined || scroller === null) {
+      return;
+    }
+    const targetTop = questionTargetTop(scroller, question);
+    if (targetTop === null) {
+      return;
+    }
+    pendingQuestionPositionRef.current = null;
+    pendingFinalAnswerQuestionPositionRef.current = null;
+    userScrollTopRef.current = null;
+    followBottomRef.current = false;
+    scroller.scrollTop = targetTop;
+    updateBottomState(scroller);
+  }, [
+    historyQuestions,
+    questionTargetTop,
+    restoredThread.metadata.id,
+    restoredThread.turns,
+    rows,
+    runningTurnId,
+    updateBottomState,
+  ]);
+
+  useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     if (scroller === null) {
       return;
@@ -936,7 +987,9 @@ export function ConversationView({
     }
     scrollToBottom(scroller);
     const frame = window.requestAnimationFrame(() => {
-      scrollToBottom(scroller);
+      if (followBottomRef.current) {
+        scrollToBottom(scroller);
+      }
     });
     return () => window.cancelAnimationFrame(frame);
   }, [restoredThread.metadata.id, scrollToBottom]);
