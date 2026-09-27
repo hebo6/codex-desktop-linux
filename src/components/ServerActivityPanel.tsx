@@ -6,6 +6,7 @@ import type { QueueInputPreview, ServerEventRecord, ServerEventSnapshot, ServerE
 import { parseTurnDiff } from "../content/turnDiff";
 import type { ThreadGoal, ThreadRealtimeAudioChunk, ThreadTokenUsage } from "../protocol/generated/types/ServerNotification";
 import { ComposerAccessoryDisclosure } from "./ComposerAccessoryPanel";
+import { commandActivityTitle } from "./commandDisplay";
 import { formatTokenCount } from "./formatTokenCount";
 import { formatTerminalInput } from "./formatTerminalInput";
 import styles from "./ServerActivityPanel.module.css";
@@ -280,25 +281,28 @@ function pcmWave(chunks: readonly ThreadRealtimeAudioChunk[]): Blob {
 function Records({ records, turns }: { readonly records: readonly ServerEventRecord[]; readonly turns: readonly ThreadTurn[] }) {
   // 终端输入可以发生在后续回合，itemId 始终指向最初启动的命令
   const commands = useMemo(() => new Map(turns.flatMap((turn) => turn.items.flatMap((item) =>
-    item.type === "commandExecution" ? [[item.id, item.command] as const] : [],
+    item.type === "commandExecution" ? [[item.id, item] as const] : [],
   ))), [turns]);
-  return <ul className={styles.records}>{[...records].reverse().map((record) => <li className={styles.card} data-status={record.status} key={record.id}>
-    <header><h4>{record.title}</h4><span>{record.terminalInput === undefined ? STATUS_LABELS[record.status] : "已发送"}</span></header>
-    {record.terminalInput === undefined ? <>
-      {record.detail ? <p>{record.detail}</p> : null}
-      {record.text || record.params !== undefined ? <Detail title="查看详情">{() => <>
-        {record.text ? <pre className={styles.output}>{record.text}</pre> : null}
-        {record.params === undefined ? null : <pre className={styles.output}>{formatDetails(record.params)}</pre>}
-      </>}</Detail> : null}
-    </> : <>
-      {commands.has(record.terminalInput.itemId)
-        ? <pre aria-label="对应命令" className={styles.terminalCommand}>{commands.get(record.terminalInput.itemId)}</pre>
-        : <p className={styles.muted}>命令记录未加载</p>}
-      <p className={styles.muted}>进程 {record.terminalInput.processId}</p>
-      <pre aria-label="已发送的终端输入" className={styles.output}>{formatTerminalInput(record.text ?? "")}</pre>
-    </>}
-    {record.truncated ? <Truncated /> : null}
-  </li>)}</ul>;
+  return <ul className={styles.records}>{[...records].reverse().map((record) => {
+    const command = record.terminalInput === undefined ? undefined : commands.get(record.terminalInput.itemId);
+    return <li className={styles.card} data-status={record.status} key={record.id}>
+      <header><h4>{record.title}</h4><span>{record.terminalInput === undefined ? STATUS_LABELS[record.status] : "已发送"}</span></header>
+      {record.terminalInput === undefined ? <>
+        {record.detail ? <p>{record.detail}</p> : null}
+        {record.text || record.params !== undefined ? <Detail title="查看详情">{() => <>
+          {record.text ? <pre className={styles.output}>{record.text}</pre> : null}
+          {record.params === undefined ? null : <pre className={styles.output}>{formatDetails(record.params)}</pre>}
+        </>}</Detail> : null}
+      </> : <>
+        {command === undefined
+          ? <p className={styles.muted}>命令记录未加载</p>
+          : <p aria-label="对应命令" className={styles.terminalCommand} data-status={command.status}>{commandActivityTitle(command)}</p>}
+        <p className={styles.muted}>进程 {record.terminalInput.processId}</p>
+        <pre aria-label="已发送的终端输入" className={styles.output}>{formatTerminalInput(record.text ?? "")}</pre>
+      </>}
+      {record.truncated ? <Truncated /> : null}
+    </li>;
+  })}</ul>;
 }
 
 function Failures({ failures }: { readonly failures: readonly RequestFailure[] }) {

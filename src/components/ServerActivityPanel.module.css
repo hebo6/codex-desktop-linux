@@ -187,9 +187,14 @@ button.diffFile:focus-visible {
   margin: 0;
   overflow: auto;
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: 13px;
+  line-height: 20px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.terminalCommand[data-status="failed"] {
+  color: var(--color-status-danger);
 }
 
 .output {

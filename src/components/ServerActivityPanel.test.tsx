@@ -20,13 +20,13 @@ function openPanel() {
 const UPDATED_FILE_DIFF = "diff --git a/src/App.tsx b/src/App.tsx\nindex abc..def\n--- a/src/App.tsx\n+++ b/src/App.tsx\n@@ -1 +1 @@\n-old line\n+new line\n";
 const DELETED_FILE_DIFF = "diff --git a/old.txt b/old.txt\ndeleted file mode 100644\nindex abc..000\n--- a/old.txt\n+++ /dev/null\n@@ -1 +0,0 @@\n-removed line\n";
 
-const COMMAND_TURN: ThreadTurn = {
+const COMMAND_TURN = {
   id: "earlier-turn", status: "completed", itemsView: "full",
   items: [{
-    type: "commandExecution", id: "command-1", command: "pnpm dev --host 127.0.0.1",
-    cwd: "/workspace", commandActions: [], processId: "2557", status: "inProgress",
+    type: "commandExecution", id: "command-1", command: "/usr/bin/zsh -lc 'pnpm dev --host 127.0.0.1'",
+    cwd: "/workspace", commandActions: [{ type: "unknown", command: "pnpm dev --host 127.0.0.1" }], processId: "2557", status: "inProgress",
   }],
-};
+} satisfies ThreadTurn;
 
 function terminalInput(store: ServerEventStore, stdin: string) {
   store.consume({ method: "item/commandExecution/terminalInteraction", params: {
@@ -52,12 +52,45 @@ describe("ServerActivityPanel", () => {
     terminalInput(store, "\u0003");
     render(<ServerActivityPanel store={store} threadId="thread-1" turns={[COMMAND_TURN]} />);
     openPanel();
-    expect(screen.getByLabelText("对应命令")).toHaveTextContent("pnpm dev --host 127.0.0.1");
+    expect(screen.getByLabelText("对应命令")).toHaveTextContent(/^Running pnpm dev --host 127\.0\.0\.1$/u);
+    expect(screen.queryByText(/\/usr\/bin\/zsh/u)).not.toBeInTheDocument();
     expect(screen.getByText("进程 2557")).toBeVisible();
     expect(screen.getByText("已发送")).toBeVisible();
     expect(screen.getByLabelText("已发送的终端输入")).toHaveTextContent("⟦Ctrl+C：请求中断⟧");
     expect(document.body.textContent).not.toContain("\u0003");
     expect(screen.queryByText("已停止")).not.toBeInTheDocument();
+  });
+
+  it("命令状态变化沿用工作流文案，不改变输入的已发送状态", () => {
+    const store = new ServerEventStore();
+    terminalInput(store, "\u0003");
+    const { rerender } = render(<ServerActivityPanel store={store} threadId="thread-1" turns={[COMMAND_TURN]} />);
+    openPanel();
+    for (const [status, title] of [
+      ["completed", "Ran"], ["failed", "Failed to run"], ["declined", "Did not run"],
+    ] as const) {
+      const turn: ThreadTurn = { ...COMMAND_TURN, items: [{ ...COMMAND_TURN.items[0]!, status }] };
+      rerender(<ServerActivityPanel store={store} threadId="thread-1" turns={[turn]} />);
+      expect(screen.getByLabelText("对应命令").textContent).toBe(`${title} pnpm dev --host 127.0.0.1`);
+      expect(screen.getByLabelText("对应命令")).toHaveAttribute("data-status", status);
+      expect(screen.getByText("已发送")).toBeVisible();
+    }
+  });
+
+  it("命令摘要沿用工作流的读取、列目录和搜索格式", () => {
+    const store = new ServerEventStore();
+    terminalInput(store, "\u0003");
+    const turn: ThreadTurn = { ...COMMAND_TURN, items: [{
+      type: "commandExecution", id: "command-1", command: "/usr/bin/zsh -lc 'cat README.md; ls src; rg terminal src'",
+      cwd: "/workspace", status: "completed", commandActions: [
+        { type: "read", command: "cat README.md", name: "README.md", path: "/workspace/README.md" },
+        { type: "listFiles", command: "ls src", path: "src" },
+        { type: "search", command: "rg terminal src", query: "terminal", path: "src" },
+      ],
+    }] };
+    render(<ServerActivityPanel store={store} threadId="thread-1" turns={[turn]} />);
+    openPanel();
+    expect(screen.getByLabelText("对应命令").textContent).toBe("Read README.md · Listed src · Searched “terminal” in src");
   });
 
   it("命令未加载时不借用同进程号的其他命令，历史加载后自动显示对应命令", () => {
