@@ -29,6 +29,12 @@ describe("KeyboardShortcutsDialog", () => {
     expect(screen.getByText("Ctrl+Q")).toBeVisible();
 
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索键盘快捷键" }), {
+      target: { value: "F6" },
+    });
+    expect(screen.getByText("在输入框与消息区之间切换焦点")).toBeVisible();
+    expect(screen.getByText("F6")).toBeVisible();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索键盘快捷键" }), {
       target: { value: "Ctrl+O" },
     });
     expect(screen.getByText("打开项目选择器（仅新会话）")).toBeVisible();

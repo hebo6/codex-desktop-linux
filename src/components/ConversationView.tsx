@@ -1201,6 +1201,15 @@ export function ConversationView({
   };
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (
+      event.defaultPrevented ||
+      event.nativeEvent.isComposing ||
+      event.altKey ||
+      event.metaKey ||
+      (event.ctrlKey && (event.key === "PageUp" || event.key === "PageDown"))
+    ) {
+      return;
+    }
     const target = event.target;
     if (
       target instanceof HTMLElement &&
@@ -1278,6 +1287,7 @@ export function ConversationView({
       <div
         aria-label="会话消息"
         className={styles.scroller}
+        data-conversation-scroller
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
         onScroll={handleScroll}
@@ -1287,6 +1297,8 @@ export function ConversationView({
         onTouchStart={handleTouchStart}
         onWheel={handleWheel}
         ref={scrollerRef}
+        role="region"
+        tabIndex={0}
       >
         <div
           className={`${styles.messageColumn}${

@@ -48,6 +48,10 @@
   overscroll-behavior: contain;
 }
 
+.scroller:focus-visible {
+  background: var(--color-fill-subtle);
+}
+
 .messageColumn {
   width: min(100%, 880px);
   min-height: 100%;

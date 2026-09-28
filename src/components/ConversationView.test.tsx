@@ -1771,7 +1771,7 @@ describe("ConversationView", () => {
     expect(scroller.scrollTop).toBe(1_400);
   });
 
-  it("位于底部时内容增长后继续跟随底部", () => {
+  it.each([null, "PageUp", "PageDown"])("位于底部时内容增长后继续跟随底部，Ctrl+%s 不触发滚动意图", (key) => {
     const { rerender } = render(
       <ConversationView
         restoredThread={RESTORED}
@@ -1785,6 +1785,13 @@ describe("ConversationView", () => {
     });
     scroller.scrollTop = 800;
     fireEvent.scroll(scroller);
+    scroller.focus();
+    expect(scroller).toHaveFocus();
+    if (key !== null) {
+      expect(fireEvent.keyDown(scroller, { key, ctrlKey: true })).toBe(true);
+      expect(screen.queryByRole("button", { name: "回到底部" }))
+        .not.toBeInTheDocument();
+    }
 
     const expandedTurn = {
       ...TURN,
@@ -2009,7 +2016,7 @@ describe("ConversationView", () => {
       .not.toBeInTheDocument();
   });
 
-  it("离开底部后内容增长保持当前滚动位置", () => {
+  it.each(["滚轮", "PageUp", "Home", "ArrowUp"])("%s 离开底部后内容增长保持当前滚动位置", (scrollMethod) => {
     const activeTurn = {
       id: "turn-standard-scroll",
       items: [
@@ -2043,7 +2050,15 @@ describe("ConversationView", () => {
       scrollHeight: { configurable: true, get: () => scrollHeight },
     });
 
-    userScroll(scroller, 400);
+    if (scrollMethod === "滚轮") {
+      userScroll(scroller, 400);
+    } else {
+      scroller.scrollTop = 1_000;
+      scroller.focus();
+      expect(fireEvent.keyDown(scroller, { key: scrollMethod })).toBe(true);
+      scroller.scrollTop = 400;
+      fireEvent.scroll(scroller);
+    }
     scrollHeight = 1_900;
     rerender(
       <ConversationView

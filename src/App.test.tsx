@@ -551,6 +551,104 @@ describe("App", () => {
     expect(screen.getByRole("dialog", { name: "账户剩余限额详情" })).toBeVisible();
   });
 
+  it("F6 在输入框和消息区之间切换，保留草稿选区与滚动位置，Ctrl+L 直接返回输入框", async () => {
+    const user = userEvent.setup();
+    renderSidebarThreadScenario();
+    fireEvent.click(await screen.findByRole("button", { name: /侧边栏目标，线程空闲/u }));
+    const messages = await screen.findByRole("region", { name: "会话消息" });
+    const composer = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+    await user.type(composer, "保留草稿和光标选区");
+    composer.setSelectionRange(2, 6, "backward");
+    composer.scrollTop = 24;
+    messages.scrollTop = 320;
+    const focusMessages = vi.spyOn(messages, "focus");
+    const focusComposer = vi.spyOn(composer, "focus");
+
+    await user.keyboard("{F6}");
+    expect(messages).toHaveFocus();
+    expect(focusMessages).toHaveBeenLastCalledWith({ preventScroll: true });
+    expect(messages.scrollTop).toBe(320);
+
+    await user.keyboard("{F6}");
+    expect(composer).toHaveFocus();
+    expect(focusComposer).toHaveBeenLastCalledWith({ preventScroll: true });
+    expect(composer).toHaveValue("保留草稿和光标选区");
+    expect([composer.selectionStart, composer.selectionEnd, composer.selectionDirection])
+      .toEqual([2, 6, "backward"]);
+    expect(composer.scrollTop).toBe(24);
+    expect(messages.scrollTop).toBe(320);
+
+    await user.keyboard("{F6}{Control>}l{/Control}");
+    expect(composer).toHaveFocus();
+    expect(messages.scrollTop).toBe(320);
+
+    screen.getByRole("button", { name: "打开设置" }).focus();
+    await user.keyboard("{F6}");
+    expect(messages).toHaveFocus();
+  });
+
+  it("F6 和 Ctrl+L 不会把焦点移出模态对话框", async () => {
+    const user = userEvent.setup();
+    renderSidebarThreadScenario();
+    fireEvent.click(await screen.findByRole("button", { name: /侧边栏目标，线程空闲/u }));
+    await screen.findByRole("region", { name: "会话消息" });
+    const composer = screen.getByRole("textbox", { name: "任务输入" });
+    composer.focus();
+
+    await user.keyboard("{Control>}/{/Control}");
+    const search = screen.getByRole("searchbox", { name: "搜索键盘快捷键" });
+    await user.keyboard("{F6}");
+    expect(search).toHaveFocus();
+    await user.keyboard("{Control>}l{/Control}");
+    expect(search).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(composer).toHaveFocus();
+    await user.keyboard("{F6}");
+    expect(screen.getByRole("region", { name: "会话消息" })).toHaveFocus();
+  });
+
+  it("区域焦点快捷键忽略长按、输入法合成、修饰键及已处理事件", async () => {
+    renderSidebarThreadScenario();
+    fireEvent.click(await screen.findByRole("button", { name: /侧边栏目标，线程空闲/u }));
+    await screen.findByRole("region", { name: "会话消息" });
+    const composer = screen.getByRole("textbox", { name: "任务输入" });
+    composer.focus();
+
+    for (const modifiers of [
+      { repeat: true }, { isComposing: true }, { shiftKey: true },
+      { ctrlKey: true }, { altKey: true }, { metaKey: true },
+    ]) {
+      expect(fireEvent.keyDown(composer, { key: "F6", ...modifiers })).toBe(true);
+      expect(composer).toHaveFocus();
+    }
+    const handledEvent = new KeyboardEvent("keydown", {
+      key: "F6", bubbles: true, cancelable: true,
+    });
+    handledEvent.preventDefault();
+    fireEvent(composer, handledEvent);
+    expect(composer).toHaveFocus();
+
+    fireEvent.keyDown(composer, { key: "F6" });
+    const messages = screen.getByRole("region", { name: "会话消息" });
+    expect(messages).toHaveFocus();
+    fireEvent.keyDown(messages, { key: "F6", repeat: true });
+    fireEvent.keyDown(messages, { key: "l", ctrlKey: true, isComposing: true });
+    expect(messages).toHaveFocus();
+  });
+
+  it("空白会话没有消息区时 F6 不拦截按键，Ctrl+L 仍可聚焦输入框", async () => {
+    renderSidebarThreadScenario();
+    const composer = await screen.findByRole("textbox", { name: "任务输入" });
+    composer.focus();
+    expect(screen.queryByRole("region", { name: "会话消息" })).not.toBeInTheDocument();
+    expect(fireEvent.keyDown(composer, { key: "F6" })).toBe(true);
+    expect(composer).toHaveFocus();
+    const settings = screen.getByRole("button", { name: "打开设置" });
+    settings.focus();
+    fireEvent.keyDown(settings, { key: "l", ctrlKey: true });
+    expect(composer).toHaveFocus();
+  });
+
   it("通过 Ctrl+Shift+D 打开协议检查器", () => {
     const protocolDebugWindowOpener = vi.fn(async () => undefined);
     renderApp(() => ({ servers: [], proxies: [] }), {

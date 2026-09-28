@@ -48,6 +48,10 @@ export const KEYBOARD_SHORTCUT_GROUPS: readonly KeyboardShortcutGroup[] = [
   {
     title: "面板",
     shortcuts: [
+      { label: "在输入框与消息区之间切换焦点", keys: ["F6"] },
+      { label: "消息区向上或向下翻页（聚焦后）", keys: ["PageUp", "PageDown"] },
+      { label: "消息区向上或向下滚动（聚焦后）", keys: ["↑", "↓"] },
+      { label: "转到已加载消息顶部或底部（聚焦后）", keys: ["Home", "End"] },
       { label: "显示或隐藏侧边栏", keys: ["Ctrl+B"] },
       { label: "显示或隐藏限额详情", keys: ["Alt+L"] },
     ],

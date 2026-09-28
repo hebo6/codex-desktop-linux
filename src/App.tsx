@@ -1800,12 +1800,6 @@ export function App({
       } else if (key === "d" && event.shiftKey) {
         event.preventDefault();
         openProtocolDebugger();
-      } else if (key === "l") {
-        const composer = document.querySelector<HTMLTextAreaElement>("[data-composer-input]");
-        if (composer !== null && !composer.disabled) {
-          event.preventDefault();
-          composer.focus();
-        }
       } else if (
         key === "n" &&
         event.shiftKey &&
