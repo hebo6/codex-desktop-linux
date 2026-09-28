@@ -253,10 +253,10 @@ export function ConnectionShell({
     searchInputRef.current?.focus();
   }, []);
 
-  const closeThreadSearch = () => {
+  const closeThreadSearch = useCallback(() => {
     setSearchOpen(false);
     threadActionsButtonRef.current?.focus();
-  };
+  }, []);
 
   useEffect(() => {
     if (
@@ -349,12 +349,17 @@ export function ConnectionShell({
         }
       } else if (event.key.toLowerCase() === "k") {
         event.preventDefault();
-        openThreadSearch();
+        if (event.repeat) return;
+        if (searchOpen) {
+          closeThreadSearch();
+        } else {
+          openThreadSearch();
+        }
       }
     };
     window.addEventListener("keydown", handleNavigationShortcut);
     return () => window.removeEventListener("keydown", handleNavigationShortcut);
-  }, [openThreadSearch]);
+  }, [closeThreadSearch, openThreadSearch, searchOpen]);
 
   const closeSidebar = () => {
     setSearchOpen(false);

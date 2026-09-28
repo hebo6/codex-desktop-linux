@@ -193,7 +193,7 @@ describe("ConnectionShell", () => {
     expect(onUnarchiveThread).toHaveBeenCalledWith(archivedThread.id);
   });
 
-  it("Ctrl+K 从输入框展开桌面侧栏，重复触发保留查询并重新聚焦", () => {
+  it("Ctrl+K 切换会话搜索，关闭后清空查询，长按不重复切换", () => {
     render(<ConnectionShell phase="ready" mainContent={<textarea aria-label="任务输入" />} />);
     const sidebar = screen.getByRole("complementary", { name: "会话侧栏" });
     const shell = sidebar.closest("[data-sidebar-collapsed]");
@@ -205,10 +205,24 @@ describe("ConnectionShell", () => {
     const input = within(sidebar).getByRole("searchbox", { name: "搜索会话" });
     expect(input).toHaveFocus();
     fireEvent.change(input, { target: { value: "项目" } });
-    composer.focus();
-    fireEvent.keyDown(composer, { ctrlKey: true, key: "k" });
+    fireEvent.keyDown(input, { ctrlKey: true, key: "k", repeat: true });
     expect(input).toHaveFocus();
     expect(input).toHaveValue("项目");
+    composer.focus();
+    fireEvent.keyDown(composer, { ctrlKey: true, key: "k" });
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(shell).toHaveAttribute("data-sidebar-collapsed", "false");
+    const menuButton = screen.getByRole("button", { name: "最近会话操作" });
+    expect(menuButton).toHaveFocus();
+    fireEvent.keyDown(menuButton, { ctrlKey: true, key: "k", repeat: true });
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    fireEvent.keyDown(menuButton, { ctrlKey: true, key: "k" });
+    const reopenedInput = within(sidebar).getByRole("searchbox", { name: "搜索会话" });
+    expect(reopenedInput).toHaveFocus();
+    expect(reopenedInput).toHaveValue("");
+    fireEvent.keyDown(reopenedInput, { ctrlKey: true, key: "k" });
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(menuButton).toHaveFocus();
   });
 
   it("窄窗口展开侧栏搜索，Esc 恢复列表，打开结果后关闭侧栏", () => {
@@ -222,6 +236,12 @@ describe("ConnectionShell", () => {
     expect(input).toHaveFocus();
     expect(screen.getByRole("list", { name: "最近会话" })).toBeVisible();
     fireEvent.keyDown(input, { key: "Escape" });
+    expect(sidebar).toHaveAttribute("data-open", "true");
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "最近会话" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "最近会话操作" })).toHaveFocus();
+    fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
+    fireEvent.keyDown(screen.getByRole("searchbox"), { ctrlKey: true, key: "k" });
     expect(sidebar).toHaveAttribute("data-open", "true");
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
     expect(screen.getByRole("list", { name: "最近会话" })).toBeVisible();
