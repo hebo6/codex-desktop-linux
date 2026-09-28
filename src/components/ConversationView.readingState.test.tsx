@@ -74,7 +74,7 @@ function mockLayout() {
   });
   vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
     const column = this.querySelector<HTMLElement>("[data-running-turn-floor]");
-    const reserve = column?.dataset.runningTurnFloor === "true" ? 0 : 120;
+    const reserve = column?.dataset.runningTurnFloor === "true" ? 0 : 32;
     return Math.max(contentHeight(this) + reserve, Number.parseFloat(column?.style.minHeight || "0"));
   });
   Object.defineProperty(HTMLElement.prototype, "scrollTop", {
@@ -192,10 +192,10 @@ describe("标签阅读位置恢复", () => {
     await nextFrame();
     const scroller = screen.getByLabelText("会话消息");
     fireEvent.wheel(scroller, { deltaY: -100 });
-    scroller.scrollTop = 1_260;
+    scroller.scrollTop = 1_160;
     fireEvent.scroll(scroller);
     first.unmount();
-    expect(state.current?.anchor).toEqual({ turnId: "running", itemId: "reasoning", offset: -300 });
+    expect(state.current?.anchor).toEqual({ turnId: "running", itemId: "reasoning", offset: -200 });
 
     layout.heights.set("reasoning", 72);
     render(view({

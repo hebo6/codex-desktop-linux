@@ -1404,7 +1404,7 @@ describe("ConversationView", () => {
         );
         const naturalHeight = 28 + contentHeight;
         return floor === null
-          ? naturalHeight + 120
+          ? naturalHeight + 32
           : Math.max(naturalHeight, Number.parseFloat(floor.style.minHeight));
       });
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
@@ -1686,7 +1686,7 @@ describe("ConversationView", () => {
       const scroller = screen.getByLabelText("会话消息");
       Object.defineProperties(scroller, {
         clientHeight: { configurable: true, value: 600 },
-        scrollHeight: { configurable: true, value: 2_120 },
+        scrollHeight: { configurable: true, value: 2_032 },
       });
       const latestQuestionRow = screen.getByText("本轮最近的问题")
         .closest<HTMLElement>("[data-row-index]")!;
@@ -2109,7 +2109,7 @@ describe("ConversationView", () => {
         );
         const naturalHeight = 28 + contentHeight;
         return scrollBleed + (floor === null
-          ? naturalHeight + 120
+          ? naturalHeight + 32
           : Math.max(naturalHeight, Number.parseFloat(floor.style.minHeight)));
       });
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
@@ -2956,7 +2956,7 @@ describe("ConversationView", () => {
           '[data-running-turn-floor="true"]',
         );
         return scrollBleed + (floor === null
-          ? contentDocumentBottom + 120
+          ? contentDocumentBottom + 32
           : Math.max(
             contentDocumentBottom,
             Number.parseFloat(floor.style.minHeight),
@@ -3020,7 +3020,7 @@ describe("ConversationView", () => {
       scrollBleed,
     );
     const scroller = screen.getByLabelText("会话消息");
-    expect(scroller.scrollTop).toBe(400);
+    expect(scroller.scrollTop).toBe(312);
     let currentScrollTop = scroller.scrollTop;
     Object.defineProperty(scroller, "scrollTop", {
       configurable: true,
@@ -3063,7 +3063,7 @@ describe("ConversationView", () => {
       />,
     );
 
-    expect(scroller.scrollTop).toBe(520);
+    expect(scroller.scrollTop).toBe(432);
     expect(scroller.querySelector('[data-running-turn-floor="true"]'))
       .not.toBeInTheDocument();
 

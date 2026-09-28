@@ -55,7 +55,7 @@
 .messageColumn {
   width: min(100%, 880px);
   min-height: 100%;
-  padding: 28px 24px 120px;
+  padding: 28px 24px 32px;
   margin: 0 auto;
 }
 
