@@ -831,6 +831,15 @@ button.fileChangeRow {
   background-color: var(--color-bg-hover);
 }
 
+.jumpToNewContent {
+  width: auto;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border-radius: 18px;
+  font: inherit;
+  font-size: 12px;
+}
+
 @media (min-width: 928px) {
   .jumpToBottom {
     right: calc(50% - 440px);

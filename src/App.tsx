@@ -22,6 +22,7 @@ import {
 import { useTurnPlan } from "./app/useTurnPlan";
 import { useSubAgents } from "./app/useSubAgents";
 import { useTabAttachments } from "./app/useTabAttachments";
+import { useTabReadingStates } from "./app/useTabReadingStates";
 import {
   useServerProfileMutations,
   type ServerProfileMutationCommands,
@@ -268,6 +269,7 @@ export function App({
   const boundServerId = windowState.windowState?.serverId ?? null;
   const windowTabs = windowState.windowState?.tabs ?? EMPTY_WINDOW_TABS;
   const activeTabId = windowState.windowState?.activeTabId ?? null;
+  const tabReadingStates = useTabReadingStates(boundServerId, windowTabs);
   const activeTab = activeTabId === null
     ? null
     : windowTabs.find(({ id }) => id === activeTabId) ?? null;
@@ -641,11 +643,12 @@ export function App({
       : ({
           ...restoredThread,
           turns:
-            conversation.turns.length === 0 && restoredThread.turns.length > 0
+            conversation.threadId !== restoredThread.metadata.id ||
+              (conversation.turns.length === 0 && restoredThread.turns.length > 0)
               ? restoredThread.turns
               : conversation.turns,
         }),
-    [conversation.turns, restoredThread],
+    [conversation.threadId, conversation.turns, restoredThread],
   );
   const pendingThreadResults = usePendingThreadResults({
     activeThreadId: currentThreadId,
@@ -2253,6 +2256,10 @@ export function App({
           >
             {displayedRestoredThread !== null ? (
               <ConversationView
+                key={`${boundServerId}:${activeTabId}:${currentThreadId}`}
+                {...(activeTabId === null ? {} : {
+                  readingState: tabReadingStates.get(activeTabId)!,
+                })}
                 actionError={
                   forkError ?? contentError ?? threadRestoreError
                 }

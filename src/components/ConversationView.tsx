@@ -28,8 +28,16 @@ import { recordConversationFirstCommit } from "../diagnostics/conversationLoadDi
 import { AnsiCommandOutput } from "./AnsiCommandOutput";
 import { commandActivityTitle, commandDisplayText } from "./commandDisplay";
 import { markdownToPlainText, SafeMarkdown } from "./SafeMarkdown";
+import {
+  captureReadingAnchor,
+  hasNewConversationContent,
+  restoreReadingAnchor,
+  type ConversationReadingStateStore,
+} from "./conversationReadingState";
 import { TerminalIcon } from "./SidebarIcons";
 import styles from "./ConversationView.module.css";
+
+export type { ConversationReadingStateStore } from "./conversationReadingState";
 
 const EMPTY_TURN_ITEM_PAGES: ReadonlyMap<string, TurnItemPageState> = new Map();
 
@@ -40,6 +48,7 @@ export interface CommandLocationRequest {
 
 export interface ConversationViewProps {
   readonly restoredThread: RestoredThread;
+  readonly readingState?: ConversationReadingStateStore;
   readonly blobUrlFactory?: BlobUrlFactory;
   readonly commandLocationRequest?: CommandLocationRequest | null;
   readonly hasOlderTurns?: boolean;
@@ -279,9 +288,11 @@ export function ConversationView({
   onOpenImage,
   onRunShellCommand,
   restoredThread,
+  readingState,
   shellCommandDisabled = false,
   turnItemPages = EMPTY_TURN_ITEM_PAGES,
 }: ConversationViewProps) {
+  const [initialReadingState] = useState(() => readingState?.current ?? null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pendingQuestionPositionRef = useRef<string | null>(null);
@@ -293,7 +304,7 @@ export function ConversationView({
     readonly scrollTop: number;
   } | null>(null);
   const historyLoadRef = useRef<Promise<boolean> | null>(null);
-  const followBottomRef = useRef(true);
+  const followBottomRef = useRef(initialReadingState?.following ?? true);
   const userScrollTopRef = useRef<number | null>(null);
   const completedUserActivityExpansionRef = useRef(false);
   const userActivityExpansionCountRef = useRef(0);
@@ -305,6 +316,12 @@ export function ConversationView({
   const touchPositionRef = useRef<{ x: number; y: number } | null>(null);
   const observedThreadIdRef = useRef(restoredThread.metadata.id);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+  const [hasUnreadContent, setHasUnreadContent] = useState(false);
+  const latestReadingContentRef = useRef({
+    latestTurn: restoredThread.turns.at(-1) ?? null,
+    runningTurnId: null as string | null,
+    hasUnreadContent,
+  });
   const [scrollerHeight, setScrollerHeight] = useState(0);
   useLayoutEffect(() => {
     recordConversationFirstCommit(restoredThread.metadata);
@@ -409,6 +426,7 @@ export function ConversationView({
       if (atBottom) {
         if (source === "user") {
           followBottomRef.current = true;
+          setHasUnreadContent(false);
         }
         setShowJumpToBottom(false);
       } else if (source !== "layout" || !followBottomRef.current) {
@@ -457,6 +475,7 @@ export function ConversationView({
     );
     followBottomRef.current = true;
     setShowJumpToBottom(false);
+    setHasUnreadContent(false);
   }, []);
 
   const startUserActivityExpansion = useCallback(() => {
@@ -1079,6 +1098,7 @@ export function ConversationView({
     scrollerHeight,
   ]);
 
+  // 仅在视图激活时恢复；同一标签的数据更新由跟随逻辑处理
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     for (const collapse of userActivityCollapsesRef.current.values()) {
@@ -1095,6 +1115,34 @@ export function ConversationView({
     if (scroller === null) {
       return;
     }
+    const saved = initialReadingState;
+    if (saved !== null && !saved.following) {
+      followBottomRef.current = false;
+      if (restoreReadingAnchor(scroller, saved.anchor)) {
+        setHasUnreadContent(saved.hasUnreadContent || hasNewConversationContent(
+          saved.latestTurn,
+          restoredThread.turns.at(-1) ?? null,
+        ));
+        updateBottomState(scroller);
+        return;
+      }
+    }
+    const finishedTurn = saved?.following && saved.runningTurnId !== null
+      ? restoredThread.turns.find((turn) => turn.id === saved.runningTurnId)
+      : undefined;
+    if (runningTurnId === null && finishedTurn?.status === "completed") {
+      const question = historyQuestions.findLast((question) => {
+        const row = rows[question.rowIndex];
+        return row?.type === "segment" && row.turn.id === finishedTurn.id;
+      });
+      const top = question === undefined ? null : questionTargetTop(scroller, question);
+      if (top !== null) {
+        followBottomRef.current = false;
+        scroller.scrollTop = top;
+        updateBottomState(scroller);
+        return;
+      }
+    }
     scrollToBottom(scroller);
     const frame = window.requestAnimationFrame(() => {
       if (followBottomRef.current) {
@@ -1102,7 +1150,28 @@ export function ConversationView({
       }
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [restoredThread.metadata.id, scrollToBottom]);
+  }, [restoredThread.metadata.id, initialReadingState, scrollToBottom]);
+
+  useLayoutEffect(() => {
+    latestReadingContentRef.current = {
+      latestTurn: restoredThread.turns.at(-1) ?? null,
+      runningTurnId,
+      hasUnreadContent,
+    };
+  });
+
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    return () => {
+      if (readingState === undefined || scroller === null) return;
+      // layout cleanup 在节点移除前读取几何位置；普通 effect cleanup 已经太晚
+      readingState.current = {
+        ...latestReadingContentRef.current,
+        anchor: captureReadingAnchor(scroller),
+        following: followBottomRef.current,
+      };
+    };
+  }, [readingState]);
 
   useEffect(() => {
     const finishScrollbarDrag = () => {
@@ -1354,6 +1423,11 @@ export function ConversationView({
                   data-status={row.type === "segment" ? row.turn.status : undefined}
                   data-question-index={questionIndexByRow.get(rowIndex)}
                   data-turn-id={row.type === "segment" ? row.turn.id : undefined}
+                  data-reading-item-id={row.type !== "segment"
+                    ? undefined
+                    : row.segment.type === "item"
+                      ? row.segment.item.id
+                      : row.segment.items[0]?.id}
                   key={row.key}
                   role="listitem"
                 >
@@ -1405,7 +1479,7 @@ export function ConversationView({
       ) : null}
       {showJumpToBottom ? (
         <button
-          className={styles.jumpToBottom}
+          className={`${styles.jumpToBottom}${hasUnreadContent ? ` ${styles.jumpToNewContent}` : ""}`}
           onClick={() => {
             const scroller = scrollerRef.current;
             if (scroller !== null) {
@@ -1413,8 +1487,9 @@ export function ConversationView({
             }
           }}
           type="button"
-          aria-label="回到底部"
+          aria-label={hasUnreadContent ? "有新内容，回到底部" : "回到底部"}
         >
+          {hasUnreadContent ? <span>有新内容</span> : null}
           <svg
             width="16"
             height="16"

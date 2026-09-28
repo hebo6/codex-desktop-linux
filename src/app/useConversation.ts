@@ -17,6 +17,8 @@ export interface ConversationState {
 }
 
 export interface ConversationControls extends ConversationState {
+  /** 当前消息投影所属会话，切换期间可能仍指向旧会话 */
+  readonly threadId: string | null;
   readonly shellCommandActive: boolean;
   readonly sendInput: (
     input: TurnStartParams["input"],
@@ -590,6 +592,9 @@ export function useConversation({
 
   return {
     ...state,
+    threadId: stateSourceRef.current.client === client
+      ? stateSourceRef.current.threadId
+      : null,
     shellCommandActive,
     sendInput,
     queueInput,

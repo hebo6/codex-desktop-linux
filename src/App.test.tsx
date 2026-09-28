@@ -1187,8 +1187,48 @@ describe("App", () => {
     ).queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("连接后恢复当前绑定周期的全部标签且关闭后立即退订", async () => {
+  it("连接后恢复全部标签，切回时保留阅读位置且关闭后立即退订", async () => {
     const user = userEvent.setup();
+    render(<style>{"[data-conversation-scroller] { padding-bottom: 0px; }"}</style>);
+    let questionHeight = 120;
+    let contentHeight = 1_600;
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        return this.matches("[data-conversation-scroller]") ? 600 : 0;
+      });
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        if (!this.matches("[data-conversation-scroller]")) return 0;
+        const height = this.querySelector('[data-turn-id="turn-a"]') === null
+          ? 100
+          : contentHeight;
+        const floor = this.querySelector<HTMLElement>("[data-running-turn-floor]");
+        return Math.max(600, height, Number.parseFloat(floor?.style.minHeight || "0"));
+      });
+    const originalBoundingRect = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        const scroller = this.closest<HTMLElement>("[data-conversation-scroller]");
+        if (scroller === null) return originalBoundingRect.call(this);
+        let top = 0;
+        let height = 600;
+        if (this.matches("[data-conversation-list]")) {
+          top = -scroller.scrollTop;
+          height = this.querySelector('[data-turn-id="turn-a"]') === null
+            ? 100
+            : contentHeight;
+        } else if (this.matches('[data-turn-id="turn-a"]')) {
+          const first = this.dataset.rowIndex === "0";
+          top = (first ? 0 : questionHeight) - scroller.scrollTop;
+          height = first ? questionHeight : contentHeight - questionHeight;
+        } else if (!this.matches("[data-conversation-scroller]")) {
+          return originalBoundingRect.call(this);
+        }
+        return {
+          bottom: top + height, height, left: 0, right: 880,
+          top, width: 880, x: 0, y: top, toJSON: () => ({}),
+        };
+      });
     const threads = [
       {
         cliVersion: "1.0.0",
@@ -1202,8 +1242,22 @@ describe("App", () => {
         preview: "任务 A",
         sessionId: "session-a",
         source: "appServer",
-        status: { type: "idle" },
-        turns: [],
+        status: { type: "active", activeFlags: [] },
+        turns: [{
+          id: "turn-a",
+          items: [
+            {
+              id: "user-a", type: "userMessage",
+              content: [{ type: "text", text: "会话 A 的问题" }],
+            },
+            {
+              id: "agent-a", type: "agentMessage", phase: "final_answer",
+              text: "会话 A 正在生成",
+            },
+          ],
+          itemsView: "full",
+          status: "inProgress",
+        }],
         updatedAt: 200,
       },
       {
@@ -1346,7 +1400,7 @@ describe("App", () => {
           reasoningEffort: null,
           sandbox: { type: "readOnly" },
           serviceTier: null,
-          initialTurnsPage: { data: [], nextCursor: null },
+          initialTurnsPage: { data: thread.turns, nextCursor: null },
           thread,
         });
       }
@@ -1362,6 +1416,18 @@ describe("App", () => {
       "turn-b",
     );
 
+    const originalScroller = screen.getByLabelText("会话消息");
+    const originalAnswer = screen.getByText("会话 A 正在生成")
+      .closest<HTMLElement>('[role="listitem"]')!;
+    await act(async () => {
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    });
+    fireEvent.wheel(originalScroller, { deltaY: -1 });
+    originalScroller.scrollTop = 350;
+    fireEvent.scroll(originalScroller);
+    const originalAnswerTop = originalAnswer.getBoundingClientRect().top;
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+
     fireEvent.keyDown(window, { ctrlKey: true, key: "PageDown" });
     await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(1));
     expect(tabsUpdater.mock.calls.at(-1)?.[0].activeTabId).toBe("tab-b");
@@ -1375,10 +1441,51 @@ describe("App", () => {
       "thread-b",
       "turn-b",
     );
+    expect(originalScroller).not.toBeInTheDocument();
+    expect(screen.getByLabelText("会话消息")).not.toBe(originalScroller);
+
+    // 模拟后台期间问题区域重新换行，同时同一条回答继续增长
+    questionHeight += 60;
+    contentHeight += 160;
+    await act(async () => {
+      for (const handler of notificationHandlers) {
+        handler({
+          method: "item/agentMessage/delta",
+          params: {
+            threadId: "thread-a", turnId: "turn-a", itemId: "agent-a",
+            delta: "，后台新增",
+          },
+        });
+      }
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    });
 
     fireEvent.keyDown(window, { ctrlKey: true, key: "PageUp" });
     await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(2));
     expect(tabsUpdater.mock.calls.at(-1)?.[0].activeTabId).toBe("tab-a");
+    const restoredAnswer = await screen.findByText("会话 A 正在生成，后台新增");
+    const restoredScroller = screen.getByLabelText("会话消息");
+    expect(restoredScroller).not.toBe(originalScroller);
+    expect(restoredScroller.scrollTop).toBe(410);
+    expect(restoredAnswer.closest('[role="listitem"]')?.getBoundingClientRect().top)
+      .toBe(originalAnswerTop);
+    expect(screen.getByRole("button", { name: "有新内容，回到底部" })).toBeVisible();
+
+    contentHeight += 100;
+    await act(async () => {
+      for (const handler of notificationHandlers) {
+        handler({
+          method: "item/agentMessage/delta",
+          params: {
+            threadId: "thread-a", turnId: "turn-a", itemId: "agent-a",
+            delta: "，继续生成",
+          },
+        });
+      }
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    });
+    expect(await screen.findByText("会话 A 正在生成，后台新增，继续生成")).toBeVisible();
+    expect(restoredScroller.scrollTop).toBe(410);
 
     fireEvent.keyDown(window, { ctrlKey: true, key: "Tab" });
     await waitFor(() => expect(tabsUpdater).toHaveBeenCalledTimes(3));
