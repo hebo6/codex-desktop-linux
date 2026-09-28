@@ -269,7 +269,8 @@
   cursor: pointer;
 }
 
-.rowActions button:hover:not(:disabled) {
+.rowActions button:hover:not(:disabled),
+.rowActions button:focus-visible:not(:disabled) {
   color: var(--color-text-primary);
   background: var(--color-fill-hover);
 }
@@ -325,8 +326,7 @@
   content: "";
 }
 
-.threadRow:hover,
-.threadRow:focus-visible {
+.threadRow:hover {
   background: var(--color-fill-hover);
 }
 
@@ -337,6 +337,10 @@
 
 .threadRow[data-current="true"]::before {
   background: currentColor;
+}
+
+.threadRowContainer:focus-within .threadRow {
+  background: var(--color-fill-hover);
 }
 
 .threadTitleLine {

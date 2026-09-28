@@ -183,6 +183,8 @@ export function RecentThreads({
 }: RecentThreadsProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const listId = useId();
+  const [focusedEntryKey, setFocusedEntryKey] = useState<string | null>(null);
+  const [pendingFocusThreadId, setPendingFocusThreadId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const searchOpen = search !== null;
   const searchInputRef = search?.inputRef;
@@ -264,6 +266,12 @@ export function RecentThreads({
     if (currentThreadId !== null) {
       keys.add(`thread:${currentThreadId}`);
     }
+    if (focusedEntryKey !== null) {
+      keys.add(focusedEntryKey);
+    }
+    if (pendingFocusThreadId !== null) {
+      keys.add(`thread:${pendingFocusThreadId}`);
+    }
     if (contextMenu !== null) {
       keys.add(`thread:${contextMenu.threadId}`);
     }
@@ -271,7 +279,7 @@ export function RecentThreads({
       keys.add(`thread:${threadId}`);
     }
     return keys;
-  }, [contextMenu, currentThreadId, pendingThreadIds]);
+  }, [contextMenu, currentThreadId, focusedEntryKey, pendingFocusThreadId, pendingThreadIds]);
   const getEntryKey = useCallback(
     (index: number) => entries[index]?.key ?? `missing:${index}`,
     [entries],
@@ -302,6 +310,15 @@ export function RecentThreads({
     overscan: 320,
   });
   const { scrollToOffset } = virtual;
+
+  useLayoutEffect(() => {
+    if (pendingFocusThreadId === null) return;
+    const target = threadRowButtons(listRef.current)
+      .find((button) => button.dataset.threadId === pendingFocusThreadId);
+    target?.scrollIntoView({ block: "nearest" });
+    target?.focus({ preventScroll: true });
+    setPendingFocusThreadId(null);
+  }, [pendingFocusThreadId]);
 
   const toggleGroup = useCallback((key: string) => {
     const setCollapsed = filtering ? setSearchCollapsedGroupKeys : setCollapsedGroupKeys;
@@ -454,20 +471,7 @@ export function RecentThreads({
   }, [normalizedQuery, searchOpen, view]);
 
   const focusThreadEntry = (target: Extract<RecentThreadEntry, { type: "thread" }>) => {
-    const entryIndex = entries.findIndex(({ key }) => key === target.key);
-    const renderedTarget = threadRowButtons(listRef.current).find(
-      (button) => button.dataset.threadId === target.thread.id,
-    );
-    if (renderedTarget !== undefined) {
-      renderedTarget.focus();
-      return;
-    }
-    virtual.scrollToIndex(entryIndex);
-    requestAnimationFrame(() => {
-      threadRowButtons(listRef.current)
-        .find((button) => button.dataset.threadId === target.thread.id)
-        ?.focus();
-    });
+    setPendingFocusThreadId(target.thread.id);
   };
 
   const navigableThreads = entries.filter(
@@ -609,6 +613,19 @@ export function RecentThreads({
           aria-label={view === "recent" ? "最近会话" : "已归档会话"}
           className={styles.scroller}
           id={listId}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              setFocusedEntryKey(null);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Home" && event.key !== "End") return;
+            event.preventDefault();
+            const target = event.key === "Home"
+              ? navigableThreads[0]
+              : navigableThreads.at(-1);
+            if (target !== undefined) focusThreadEntry(target);
+          }}
           onScroll={handleScroll}
           ref={listRef}
           role="list"
@@ -634,6 +651,7 @@ export function RecentThreads({
                   data-removing={removing}
                   data-virtual-key={row.key}
                   key={row.key}
+                  onFocusCapture={() => setFocusedEntryKey(row.key)}
                   ref={virtual.measureElement(row.key)}
                   style={{
                     height: removing ? 0 : row.size,

@@ -247,6 +247,49 @@ describe("RecentThreads", () => {
     expect(screen.getByRole("button", { name: "恢复“预览标题”" })).toBeInTheDocument();
   });
 
+  it.each(["recent", "archived"] as const)("%s 列表的 Home/End 聚焦可用首尾项，跳过禁用和移除中的会话", async (view) => {
+    const user = userEvent.setup();
+    const threads = Array.from({ length: 5 }, (_, index) => ({
+      ...THREAD_ONE,
+      id: `navigation-${index}`,
+      name: `导航会话 ${index}`,
+    }));
+    const actions = renderThreads({
+      currentThreadId: null,
+      pendingThreadIds: ["navigation-0", "navigation-4"],
+      removingThreadIds: ["navigation-1"],
+      search: { inputRef: createRef(), onClose: vi.fn() },
+      threads,
+      view,
+    });
+    const input = screen.getByRole("searchbox");
+    // 搜索框仍保留 Home/End 的文本编辑行为
+    expect(fireEvent.keyDown(input, { key: "Home" })).toBe(true);
+    expect(fireEvent.keyDown(input, { key: "End" })).toBe(true);
+    expect(input).toHaveFocus();
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    const first = getThreadRow("导航会话 2");
+    const last = getThreadRow("导航会话 3");
+    expect(last).toHaveFocus();
+    expect(fireEvent.keyDown(last, { key: "Home" })).toBe(false);
+    expect(first).toHaveFocus();
+    expect(fireEvent.keyDown(first, { key: "End" })).toBe(false);
+    expect(last).toHaveFocus();
+    expect(actions.onOpenThread).not.toHaveBeenCalled();
+    expect(actions.onUnarchiveThread).not.toHaveBeenCalled();
+    await user.tab();
+    expect(screen.getByRole("button", {
+      name: `${view === "recent" ? "归档" : "恢复"}“导航会话 3”`,
+    })).toHaveFocus();
+    await user.keyboard("{Home}");
+    expect(first).toHaveFocus();
+    await user.keyboard("{End}");
+    expect(last).toHaveFocus();
+    await user.keyboard("{Enter}");
+    const activate = view === "recent" ? actions.onOpenThread : actions.onUnarchiveThread;
+    expect(activate).toHaveBeenCalledWith("navigation-3");
+  });
+
   it("重新加载期间保留已显示的会话列表", () => {
     renderThreads({ phase: "loading" });
 
@@ -772,6 +815,34 @@ describe("RecentThreads", () => {
     expect(screen.getAllByRole("listitem").length).toBeLessThan(100);
     fireEvent.keyDown(input, { key: "ArrowUp" });
     await waitFor(() => expect(getThreadRow("会话 999")).toHaveFocus());
+    scroller.scrollTop = 66_000;
+    fireEvent.scroll(scroller);
+    expect(queryThreadRow("会话 0")).not.toBeInTheDocument();
+    expect(fireEvent.keyDown(getThreadRow("会话 999"), { key: "Home" })).toBe(false);
+    expect(getThreadRow("会话 0")).toHaveFocus();
+    scroller.scrollTop = 0;
+    fireEvent.scroll(scroller);
+    expect(queryThreadRow("会话 999")).not.toBeInTheDocument();
+    expect(fireEvent.keyDown(getThreadRow("会话 0"), { key: "End" })).toBe(false);
+    const last = getThreadRow("会话 999");
+    expect(last).toHaveFocus();
+    const scrollIntoView = vi.mocked(Element.prototype.scrollIntoView);
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ block: "nearest" });
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(last);
+    // 手动滚动也不卸载仍持有焦点的会话或行内操作
+    scroller.scrollTop = 0;
+    fireEvent.scroll(scroller);
+    expect(last).toHaveFocus();
+    expect(screen.getAllByRole("listitem").length).toBeLessThan(100);
+    const archive = screen.getByRole("button", { name: "归档“会话 999”" });
+    act(() => archive.focus({ preventScroll: true }));
+    expect(archive).toHaveFocus();
+    scroller.scrollTop = 5_000;
+    fireEvent.scroll(scroller);
+    expect(archive).toHaveFocus();
+    // 离开列表后释放焦点行，恢复正常虚拟化
+    act(() => input.focus());
+    expect(queryThreadRow("会话 999")).not.toBeInTheDocument();
     rerenderThreads({ search: null });
     expect(scroller.scrollTop).toBe(5_000);
     expect(screen.getAllByRole("listitem").length).toBeLessThan(100);
