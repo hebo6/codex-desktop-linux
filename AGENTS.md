@@ -2,7 +2,7 @@
 
 - Codex 源码仓库位于当前项目同级目录 `../codex`
 - 需要了解 Codex 或 `app-server` 的协议与实现细节时，优先参考该仓库源码
-- 查看 Codex 源码前，先执行 `git -C ../codex pull` 更新仓库
+- 每次对话首次查看 Codex 源码前，执行一次 `git --no-pager -C ../codex pull` 更新仓库，同一对话内后续查看无需重复拉取
 - 除上述拉取更新外，Codex 源码仓库仅供只读参考，禁止修改
 
 # app-server 协议
