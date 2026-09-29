@@ -103,8 +103,7 @@ export function ThreadQueuePanel({ client, store, threadId, canEdit, onEdit }: {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [canEdit, ready, store, threadId, withdraw, withdrawn]);
 
-  if (entries.length === 0 && feedback === null
-    && (queue === undefined || queue.status === "ready")) return null;
+  if (entries.length === 0) return null;
 
   return <ComposerAccessoryDisclosure
     expanded={expanded}
