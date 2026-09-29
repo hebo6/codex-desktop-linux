@@ -884,10 +884,19 @@ button.fileChangeRow {
   border-radius: 999px;
   background: currentColor;
   transition:
-    width 140ms var(--ease-standard),
+    width var(--duration-panel) var(--ease-standard),
     color 140ms ease;
 }
 
+.questionMarker[data-current-distance="2"] .questionMarkerLine {
+  width: 18px;
+}
+
+.questionMarker[data-current-distance="1"] .questionMarkerLine {
+  width: 28px;
+}
+
+.questionMarker[aria-current="location"] .questionMarkerLine,
 .questionMarker:hover .questionMarkerLine,
 .questionMarker:focus-visible .questionMarkerLine {
   width: 40px;

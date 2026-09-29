@@ -132,6 +132,68 @@ async function nextFrame() {
   });
 }
 
+describe("历史问题导航阅读标记", () => {
+  it("跟随顶部问题或回答，并在跳转、布局变化和阅读位置恢复后更新", async () => {
+    const layout = mockLayout();
+    const turns: ThreadTurn[] = Array.from({ length: 4 }, (_, index) => ({
+      id: `turn-${index + 1}`,
+      status: "completed",
+      itemsView: "full",
+      items: [
+        { id: `q${index + 1}`, type: "userMessage", content: [{ type: "text", text: `问题 ${index + 1}` }] },
+        { id: `a${index + 1}`, type: "agentMessage", phase: "final_answer", text: `回答 ${index + 1}` },
+      ],
+    }));
+    layout.heights.set("a1", 320);
+    layout.heights.set("a2", 520);
+    layout.heights.set("q3", 80);
+    layout.heights.set("a3", 920);
+    layout.heights.set("q4", 80);
+    layout.heights.set("a4", 420);
+    const thread = { ...THREAD, turns };
+    const state: ConversationReadingStateStore = { current: null };
+    const rendered = render(view(thread, state));
+    await nextFrame();
+    const scroller = screen.getByLabelText("会话消息");
+    const expectCurrent = (index: number) => {
+      expect(screen.getByRole("button", { current: "location" }))
+        .toHaveAccessibleName(`跳转到问题 ${index}：问题 ${index}`);
+    };
+    const scroll = (top: number) => {
+      fireEvent.wheel(scroller, { deltaY: top - scroller.scrollTop });
+      scroller.scrollTop = top;
+      fireEvent.scroll(scroller);
+    };
+
+    // 底部同时可见两个回合时，仍以顶部所在的第三个回答为准
+    expectCurrent(3);
+    scroll(0);
+    expectCurrent(1);
+    scroll(200);
+    expectCurrent(1);
+    scroll(400);
+    expectCurrent(2);
+    scroll(1_300);
+    expectCurrent(3);
+
+    fireEvent.click(screen.getByRole("button", { name: "跳转到问题 2：问题 2" }));
+    fireEvent.scroll(scroller);
+    expectCurrent(2);
+    scroll(1_300);
+
+    // 前面的内容展开后，即使没有滚动事件，也重新判断顶部所属问题
+    layout.heights.set("a1", 920);
+    layout.resize();
+    expect(scroller.scrollTop).toBe(1_300);
+    expectCurrent(2);
+
+    rendered.unmount();
+    render(view(thread, state));
+    await nextFrame();
+    expectCurrent(2);
+  });
+});
+
 describe("标签阅读位置恢复", () => {
   it.each(["流式增长", "后台完成"])("手动阅读后%s，恢复消息锚点并提示新内容", async (change) => {
     const layout = mockLayout();

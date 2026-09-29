@@ -325,6 +325,7 @@ export function ConversationView({
   const observedThreadIdRef = useRef(restoredThread.metadata.id);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [hasUnreadContent, setHasUnreadContent] = useState(false);
+  const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(null);
   const latestReadingContentRef = useRef({
     latestTurn: restoredThread.turns.at(-1) ?? null,
     runningTurnId: null as string | null,
@@ -1161,6 +1162,38 @@ export function ConversationView({
   }, [restoredThread.metadata.id, initialReadingState, scrollToBottom]);
 
   useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    const content = contentRef.current;
+    if (scroller === null || content === null || historyQuestions.length < 4) {
+      return;
+    }
+    const updateCurrentQuestion = () => {
+      const viewportTop = scroller.getBoundingClientRect().top;
+      const firstVisibleRow = Array.from(
+        content.querySelectorAll<HTMLElement>('[data-row-type="segment"]'),
+      ).find((row) => row.getBoundingClientRect().bottom > viewportTop);
+      // 回答和活动沿用其前一个问题，问题气泡离开视口后仍保持阅读标记
+      const question = firstVisibleRow === undefined
+        ? undefined
+        : historyQuestions.findLast(
+          ({ rowIndex }) => rowIndex <= Number(firstVisibleRow.dataset.rowIndex),
+        );
+      setCurrentQuestionId(question?.itemId ?? null);
+    };
+    updateCurrentQuestion();
+    scroller.addEventListener("scroll", updateCurrentQuestion);
+    const observer = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(updateCurrentQuestion);
+    observer?.observe(scroller);
+    observer?.observe(content);
+    return () => {
+      scroller.removeEventListener("scroll", updateCurrentQuestion);
+      observer?.disconnect();
+    };
+  }, [historyQuestions]);
+
+  useLayoutEffect(() => {
     latestReadingContentRef.current = {
       latestTurn: restoredThread.turns.at(-1) ?? null,
       runningTurnId,
@@ -1497,6 +1530,7 @@ export function ConversationView({
       </div>
       {historyQuestions.length >= 4 ? (
         <HistoryQuestionNavigation
+          currentQuestionId={currentQuestionId}
           onSelect={(question) => {
             const scroller = scrollerRef.current;
             const top = questionTop(question);
@@ -1627,21 +1661,26 @@ function ConversationRowView({
 }
 
 function HistoryQuestionNavigation({
+  currentQuestionId,
   onSelect,
   questions,
 }: {
+  readonly currentQuestionId: string | null;
   readonly onSelect: (question: HistoryQuestion) => void;
   readonly questions: readonly HistoryQuestion[];
 }) {
+  const currentIndex = questions.findIndex(({ itemId }) => itemId === currentQuestionId);
   return (
     <nav aria-label="历史问题快速导航" className={styles.questionNavigation}>
       {questions.map((question, index) => {
         const previewId = `history-question-preview-${index}`;
         return (
           <button
+            aria-current={question.itemId === currentQuestionId ? "location" : undefined}
             aria-describedby={previewId}
             aria-label={`跳转到问题 ${index + 1}：${question.question}`}
             className={styles.questionMarker}
+            data-current-distance={currentIndex < 0 ? undefined : Math.abs(index - currentIndex)}
             key={question.itemId}
             onClick={() => onSelect(question)}
             type="button"
