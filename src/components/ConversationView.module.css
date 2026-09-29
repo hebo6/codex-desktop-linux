@@ -362,10 +362,6 @@ button.userShellHeader:hover {
   opacity: 1;
 }
 
-.agentMessage[data-final-answer="true"][data-latest-turn="true"] .agentActions .messageActionButton {
-  opacity: 1;
-}
-
 .messageTimestamp {
   color: var(--color-text-tertiary);
   font-size: 11px;

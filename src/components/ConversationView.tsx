@@ -1546,7 +1546,6 @@ function ConversationRowView({
     <ItemView
       blobUrlFactory={blobUrlFactory}
       item={row.segment.item}
-      isLatestTurn={row.isLatestTurn}
       {...(row.turn.completedAt === undefined
         ? {}
         : { turnCompletedAt: row.turn.completedAt })}
@@ -1623,7 +1622,6 @@ function HistoryQuestionNavigation({
 function ItemView({
   blobUrlFactory = browserBlobUrls,
   item,
-  isLatestTurn = false,
   onFork,
   onOpenLink,
   onOpenDiff,
@@ -1635,7 +1633,6 @@ function ItemView({
 }: {
   readonly blobUrlFactory?: BlobUrlFactory;
   readonly item: ThreadItem;
-  readonly isLatestTurn?: boolean;
   readonly onFork?: () => void;
   readonly onOpenLink?: (link: string) => void;
   readonly onOpenDiff?: (path: string, diff: string) => void;
@@ -1678,7 +1675,6 @@ function ItemView({
     case "agentMessage":
       return (
         <AgentMessage
-          isLatestTurn={isLatestTurn}
           item={item}
           {...(turnCompletedAt === undefined ? {} : { turnCompletedAt })}
           {...(onFork === undefined ? {} : { onFork })}
@@ -1977,7 +1973,6 @@ function UserImageAttachment({
 }
 
 function AgentMessage({
-  isLatestTurn,
   item,
   onFork,
   onOpenLink,
@@ -1985,7 +1980,6 @@ function AgentMessage({
   shellCommandDisabled,
   turnCompletedAt,
 }: {
-  readonly isLatestTurn: boolean;
   readonly item: Extract<ThreadItem, { type: "agentMessage" }>;
   readonly onFork?: () => void;
   readonly onOpenLink?: (link: string) => void;
@@ -2006,7 +2000,6 @@ function AgentMessage({
       className={styles.agentMessage}
       data-final-answer={isFinalAnswer}
       data-item-id={item.id}
-      data-latest-turn={isLatestTurn}
       tabIndex={0}
       onMouseEnter={() => setNow(Date.now())}
     >

@@ -3879,7 +3879,7 @@ describe("ConversationView", () => {
     expect(onForkTurn).toHaveBeenCalledWith("turn-1", true);
   });
 
-  it("消息操作使用图标并按消息状态显示时间点", () => {
+  it("最新与历史回答的操作图标和时间点默认隐藏", () => {
     const turns = [
       {
         completedAt: new Date(2026, 6, 19, 12, 10).getTime() / 1_000,
@@ -3952,14 +3952,11 @@ describe("ConversationView", () => {
     const latestCopyTooltip = within(latestCopy).getByText("复制");
     const latestContinueTooltip = within(latestContinue).getByText("在新会话中继续");
 
-
-    expect(historicalAnswer).toHaveAttribute("data-latest-turn", "false");
-    expect(latestAnswer).toHaveAttribute("data-latest-turn", "true");
     expect(historicalQuestionCopy).not.toBeVisible();
     expect(historicalQuestionTime).not.toBeVisible();
     expect(historicalCopy).not.toBeVisible();
-    expect(latestCopy).toBeVisible();
-    expect(latestContinue).toBeVisible();
+    expect(latestCopy).not.toBeVisible();
+    expect(latestContinue).not.toBeVisible();
     expect(historicalTime).not.toBeVisible();
     expect(latestTime).not.toBeVisible();
     expect(latestCopy.querySelector("svg")).toBeInTheDocument();
