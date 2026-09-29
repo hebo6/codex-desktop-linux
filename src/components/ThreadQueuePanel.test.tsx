@@ -19,14 +19,15 @@ function setup(entries = [ENTRY]) {
   const onEdit = vi.fn(async (_entry: QueuedSubmission) => ({ ok: true, message: "已撤回到输入框" }));
   const props = { client, store, threadId: "thread-1", canEdit: true, onEdit };
   const view = render(<ThreadQueuePanel {...props} />);
-  const open = () => fireEvent.click(screen.getByRole("button", { name: /^待发送队列/u }));
-  return { ...props, ...view, open };
+  const toggle = () => fireEvent.click(screen.getByRole("button", { name: /^待发送队列/u }));
+  return { ...props, ...view, toggle };
 }
 
 describe("ThreadQueuePanel", () => {
   it("Alt+↑ 在队列收起时编辑最新队尾，等待结果期间不重复撤回", async () => {
     const latest = { ...ENTRY, id: "queued-2", clientUserMessageId: "client-2" };
     const h = setup();
+    h.toggle();
     const result = deferred<{ ok: boolean; message: string }>();
     h.onEdit.mockReturnValue(result.promise);
     // The store updates before the batched React subscription renders.
@@ -47,10 +48,11 @@ describe("ThreadQueuePanel", () => {
 
   it("快捷键撤回失败时在收起的摘要中显示原因并保留消息", async () => {
     const h = setup();
+    h.toggle();
     h.onEdit.mockResolvedValue({ ok: false, message: "未撤回：消息已开始执行" });
     fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
     expect(await screen.findByRole("alert")).toHaveTextContent("未撤回：消息已开始执行");
-    h.open();
+    h.toggle();
     expect(screen.getByText("1. 下一项任务")).toBeVisible();
   });
 
@@ -107,8 +109,7 @@ describe("ThreadQueuePanel", () => {
   });
 
   it("只为队尾编辑按钮标注快捷键", () => {
-    const h = setup([ENTRY, { ...ENTRY, id: "queued-2" }]);
-    h.open();
+    setup([ENTRY, { ...ENTRY, id: "queued-2" }]);
     expect(screen.getByRole("button", { name: "编辑排队消息 1" })).not.toHaveAttribute("aria-keyshortcuts");
     expect(screen.getByRole("button", { name: "编辑排队消息 2" })).toHaveAttribute("aria-keyshortcuts", "Alt+ArrowUp");
   });
@@ -117,7 +118,6 @@ describe("ThreadQueuePanel", () => {
     const h = setup();
     const result = deferred<{ deleted: boolean }>();
     h.client.deleteQueuedSubmission.mockReturnValue(handle(result.promise));
-    h.open();
     fireEvent.click(screen.getByRole("button", { name: "撤销排队消息 1" }));
     expect(screen.getByText("1. 下一项任务")).toBeVisible();
     expect(screen.getByRole("button", { name: "撤销排队消息 1" })).toBeDisabled();
@@ -132,7 +132,6 @@ describe("ThreadQueuePanel", () => {
   it("消息已被取走时不声称撤销成功，也不进入编辑", async () => {
     const h = setup();
     h.client.deleteQueuedSubmission.mockReturnValue(handle(Promise.resolve({ deleted: false })));
-    h.open();
     fireEvent.click(screen.getByRole("button", { name: "撤销排队消息 1" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("未撤销");
     expect(screen.getByText("1. 下一项任务")).toBeVisible();
@@ -142,7 +141,6 @@ describe("ThreadQueuePanel", () => {
   it("网络失败保留队列内容并说明结果不确定", async () => {
     const h = setup();
     h.client.deleteQueuedSubmission.mockImplementation(() => handle(Promise.reject(new Error("connection closed"))));
-    h.open();
     fireEvent.click(screen.getByRole("button", { name: "撤销排队消息 1" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("撤销结果不确定");
     expect(screen.getByText("1. 下一项任务")).toBeVisible();
@@ -158,7 +156,6 @@ describe("ThreadQueuePanel", () => {
     const h = setup([{ ...ENTRY, input }]);
     const result = deferred<{ ok: boolean; message: string }>();
     h.onEdit.mockReturnValue(result.promise);
-    h.open();
     fireEvent.click(screen.getByRole("button", { name: "编辑排队消息 1" }));
     expect(h.onEdit).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ input }));
     expect(h.client.deleteQueuedSubmission).not.toHaveBeenCalled();
@@ -171,7 +168,6 @@ describe("ThreadQueuePanel", () => {
   it("已有草稿时只禁用编辑，撤销仍可用", () => {
     const h = setup();
     h.rerender(<ThreadQueuePanel {...h} canEdit={false} />);
-    h.open();
     expect(screen.getByRole("button", { name: "编辑排队消息 1" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "撤销排队消息 1" })).toBeEnabled();
     expect(fireEvent.keyDown(window, { key: "ArrowUp", altKey: true })).toBe(true);
@@ -180,7 +176,6 @@ describe("ThreadQueuePanel", () => {
 
   it("通知已使队列失效但 UI 尚未刷新时，不发送删除请求", () => {
     const h = setup();
-    h.open();
     act(() => h.store.consume({ method: "thread/queue/changed", params: { threadId: "thread-1" } }));
     fireEvent.click(screen.getByRole("button", { name: "撤销排队消息 1" }));
     expect(h.client.deleteQueuedSubmission).not.toHaveBeenCalled();
@@ -190,7 +185,6 @@ describe("ThreadQueuePanel", () => {
     const h = setup();
     const result = deferred<{ deleted: boolean }>();
     h.client.deleteQueuedSubmission.mockReturnValue(handle(result.promise));
-    h.open();
     fireEvent.click(screen.getByRole("button", { name: "撤销排队消息 1" }));
     h.rerender(<ThreadQueuePanel {...h} client={null} />);
     await act(async () => result.resolve({ deleted: true }));
@@ -200,12 +194,11 @@ describe("ThreadQueuePanel", () => {
   });
 
   it("仅附件消息展示输入类型，不展开媒体载荷", () => {
-    const h = setup([{ ...ENTRY, input: [
+    setup([{ ...ENTRY, input: [
       { type: "image", url: "data:image/png;base64,PRIVATE" },
       { type: "localAudio", path: "/tmp/voice.wav" },
       { type: "skill", name: "review", path: "/workspace/review" },
     ] }]);
-    h.open();
     expect(screen.getByText("1. 图片附件、音频附件、技能 review")).toBeVisible();
     expect(document.body.textContent).not.toContain("PRIVATE");
   });

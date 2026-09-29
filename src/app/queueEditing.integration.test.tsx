@@ -62,7 +62,7 @@ async function setup(expanded = true) {
     />;
   }
   const view = await act(async () => render(<Harness />));
-  if (expanded) fireEvent.click(screen.getByRole("button", { name: /^待发送队列/u }));
+  if (!expanded) fireEvent.click(screen.getByRole("button", { name: /^待发送队列/u }));
   return { ...view, store, client, drafts, draftStore, onQueue, onSend, onRunShellCommand, resolveDelete };
 }
 

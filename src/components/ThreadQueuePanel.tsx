@@ -16,7 +16,7 @@ export function ThreadQueuePanel({ client, store, threadId, canEdit, onEdit }: {
 }) {
   const snapshot = useServerEvents(store);
   const queue = snapshot?.queuesByThread[threadId];
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [pending, setPending] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ readonly error: boolean; readonly text: string } | null>(null);
   const [withdrawn, setWithdrawn] = useState<ReadonlySet<string>>(new Set());
