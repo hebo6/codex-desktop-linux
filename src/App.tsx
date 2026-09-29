@@ -10,7 +10,7 @@ import {
   type ConfiguredServerConnectionControllerOptions,
 } from "./app/useConfiguredServerConnection";
 import { useConversation } from "./app/useConversation";
-import { useAsyncQuestions } from "./app/useAsyncQuestions";
+import { recentAsyncQuestion } from "./app/asyncQuestions";
 import { useBackgroundTerminals } from "./app/useBackgroundTerminals";
 import { ServerActivityPanel } from "./components/ServerActivityPanel";
 import { useComposerCapabilities } from "./app/useComposerCapabilities";
@@ -65,12 +65,12 @@ import { ConnectionShell } from "./components/ConnectionShell";
 import {
   ConversationPlaceholder,
   ConversationView,
-  type CommandLocationRequest,
+  type ItemLocationRequest,
 } from "./components/ConversationView";
 import { ConversationWorkspace } from "./components/ConversationWorkspace";
 import { Composer } from "./components/Composer";
 import { ApprovalPanel } from "./components/ApprovalPanel";
-import { AsyncQuestionPanel } from "./components/AsyncQuestionPanel";
+import { RecentQuestionLink } from "./components/RecentQuestionLink";
 import { BackgroundCommandPanel } from "./components/BackgroundCommandPanel";
 import { TaskPlanPanel } from "./components/TaskPlanPanel";
 import { SubAgentPanel } from "./components/SubAgentPanel";
@@ -106,10 +106,6 @@ import type {
   ServerProfile,
 } from "./configuration";
 import type { ThreadStartResponse } from "./protocol/generated";
-import {
-  asyncQuestionResponseStore as persistentAsyncQuestionResponseStore,
-  type AsyncQuestionResponseStore,
-} from "./transport/asyncQuestionResponses";
 import { resolveLink, type ExtractedLink } from "./content/linkResolver";
 import type {
   ServerEditorMode,
@@ -185,7 +181,6 @@ export interface AppProps {
   readonly configuredServerStatusSubscriber?: ConfiguredServerStatusSubscriber;
   readonly draftStore?: DraftStore;
   readonly pendingThreadResultStore?: PendingThreadResultStore;
-  readonly asyncQuestionResponseStore?: AsyncQuestionResponseStore;
   readonly windowFocusSource?: WindowFocusSource;
   readonly protocolDebugWindowOpener?: () => Promise<void>;
   readonly externalUrlOpener?: ExternalUrlOpener;
@@ -267,7 +262,6 @@ export function App({
   configuredServerStatusSubscriber = subscribeConfiguredServerStatuses,
   draftStore = persistentDraftStore,
   pendingThreadResultStore = persistentPendingThreadResultStore,
-  asyncQuestionResponseStore = persistentAsyncQuestionResponseStore,
   windowFocusSource = defaultWindowFocusSource,
   protocolDebugWindowOpener = openProtocolDebugWindow,
   externalUrlOpener = openExternalUrl,
@@ -545,7 +539,9 @@ export function App({
   const [bulkTabsClosing, setBulkTabsClosing] = useState(false);
   const [shortcutStatus, setShortcutStatus] = useState<string | null>(null);
   const [commandLocationRequest, setCommandLocationRequest] =
-    useState<CommandLocationRequest | null>(null);
+    useState<ItemLocationRequest | null>(null);
+  const [questionLocationRequest, setQuestionLocationRequest] =
+    useState<ItemLocationRequest | null>(null);
   const [notificationPermission, setNotificationPermission] =
     useState<DesktopNotificationPermission>("default");
   const [openingExternalLink, setOpeningExternalLink] = useState(false);
@@ -589,6 +585,7 @@ export function App({
   }, [protocolDebugWindowOpener]);
   const deepLinkInFlightRef = useRef(false);
   const commandLocationSequenceRef = useRef(0);
+  const questionLocationSequenceRef = useRef(0);
 
   const servers = useMemo(
     () =>
@@ -672,19 +669,12 @@ export function App({
     || conversation.threadId !== currentThreadId
     || threadRestorePhase !== "ready"
     || conversation.submitting || conversation.stopping || conversation.shellCommandActive;
-  const asyncQuestions = useAsyncQuestions({
-    client: connection.conversationClient,
-    serverId: boundServerId,
-    threadId: currentThreadId,
-    turns: displayedRestoredThread?.turns ?? EMPTY_THREAD_TURNS,
-    disabled: asyncQuestionSendingDisabled,
-    sendAnswer: (text) => conversation.sendInput([{ type: "text", text }]),
-    store: asyncQuestionResponseStore,
-  });
+  const recentQuestion = recentAsyncQuestion(displayedRestoredThread?.turns ?? EMPTY_THREAD_TURNS);
 
   useEffect(() => {
     setCommandLocationRequest(null);
-  }, [currentThreadId]);
+    setQuestionLocationRequest(null);
+  }, [boundServerId, currentThreadId]);
 
   useEffect(() => {
     if (
@@ -2182,21 +2172,15 @@ export function App({
                   error={conversation.error}
                   accessoryPanel={
                     <>
-                      <AsyncQuestionPanel
-                        key={JSON.stringify([boundServerId, currentThreadId])}
-                        questions={asyncQuestions.questions}
-                        selectedKey={asyncQuestions.selectedKey}
-                        expanded={asyncQuestions.expanded}
-                        disabled={asyncQuestionSendingDisabled}
-                        error={asyncQuestions.error}
-                        onExpandedChange={asyncQuestions.setExpanded}
-                        onSelect={asyncQuestions.select}
-                        onDraftChange={asyncQuestions.setDraft}
-                        onCustomAnswerChange={asyncQuestions.setCustomAnswer}
-                        onAnswer={(key, answer) => { void asyncQuestions.answer(key, answer); }}
-                        onIgnore={asyncQuestions.ignore}
-                        onRetry={asyncQuestions.retry}
-                      />
+                      {recentQuestion === null ? null : (
+                        <RecentQuestionLink onClick={() => {
+                          questionLocationSequenceRef.current += 1;
+                          setQuestionLocationRequest({
+                            itemId: recentQuestion.id,
+                            requestId: questionLocationSequenceRef.current,
+                          });
+                        }} />
+                      )}
                       <ServerActivityPanel
                         store={connection.serverEvents}
                         threadId={currentThreadId}
@@ -2300,6 +2284,9 @@ export function App({
                   forkError ?? contentError ?? threadRestoreError
                 }
                 commandLocationRequest={commandLocationRequest}
+                questionLocationRequest={questionLocationRequest}
+                asyncQuestionReplyDisabled={asyncQuestionSendingDisabled}
+                onReplyToAsyncQuestion={(text) => conversation.sendInput([{ type: "text", text }])}
                 hasOlderTurns={
                   !activeThreadSession?.offline &&
                   typeof activeThreadSession?.olderTurnsCursor === "string"

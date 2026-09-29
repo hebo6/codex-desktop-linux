@@ -59,7 +59,6 @@ import type { DeepLinkTargetSubscriber } from "./transport/deepLink";
 import type { ConfiguredServerStatusSubscriber } from "./transport/configuredServerStatuses";
 import * as clipboard from "./transport/clipboard";
 import type { DraftStore } from "./transport/drafts";
-import type { AsyncQuestionResponse, AsyncQuestionResponseStore } from "./transport/asyncQuestionResponses";
 import type { ThreadTurn } from "./app/useServerThreads";
 import type {
   PendingThreadResult,
@@ -199,7 +198,6 @@ function renderApp(
     readonly configuredServerStatusSubscriber?: ConfiguredServerStatusSubscriber;
     readonly draftStore?: DraftStore;
     readonly pendingThreadResultStore?: PendingThreadResultStore;
-    readonly asyncQuestionResponseStore?: AsyncQuestionResponseStore;
     readonly windowFocusSource?: WindowFocusSource;
     readonly protocolDebugWindowOpener?: () => Promise<void>;
     readonly externalUrlOpener?: ExternalUrlOpener;
@@ -294,9 +292,6 @@ function renderApp(
         pendingThreadResultStore={
           options.pendingThreadResultStore ?? createPendingThreadResultStore()
         }
-        {...(options.asyncQuestionResponseStore === undefined
-          ? {}
-          : { asyncQuestionResponseStore: options.asyncQuestionResponseStore })}
         {...(options.windowFocusSource === undefined
           ? {}
           : { windowFocusSource: options.windowFocusSource })}
@@ -333,13 +328,6 @@ const SIDEBAR_THREAD = {
 function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: ServerEventStore) {
   const notificationHandlers = new Set<(notification: ServerNotification) => void>();
   const requests: Array<{ readonly method: string; readonly params?: Record<string, unknown> }> = [];
-  const questionResponses = new Map<string, AsyncQuestionResponse>();
-  const asyncQuestionResponseStore: AsyncQuestionResponseStore = {
-    list: vi.fn(async () => [...questionResponses.values()]),
-    record: vi.fn(async (_serverId, _threadId, response) => {
-      questionResponses.set(response.questionKey, response);
-    }),
-  };
   const requestSession = {
     sendRequest(request: { readonly method: string; readonly params?: Record<string, unknown> }) {
       requests.push(request);
@@ -421,7 +409,6 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
     transition: vi.fn(async () => undefined),
   };
   renderApp(() => ({ servers: [localServer()], proxies: [] }), {
-    asyncQuestionResponseStore,
     draftStore,
     sessionFactory,
     windowStateOptions: {
@@ -431,7 +418,6 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
   });
   return {
     requests,
-    questionResponses,
     tabsUpdater,
     emitNotification(notification: ServerNotification) {
       for (const handler of notificationHandlers) handler(notification);
@@ -440,9 +426,9 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
 }
 
 describe("App", () => {
-  it("异步提问点击发送原文并保留草稿，回合结束后仍可回答下一题", async () => {
+  it("异步提问在消息内发送原文并保留草稿，新用户消息隐藏入口但历史选项可复用", async () => {
     const user = userEvent.setup();
-    const { emitNotification, requests, questionResponses } = renderSidebarThreadScenario();
+    const { emitNotification, requests } = renderSidebarThreadScenario();
     await user.click(await screen.findByRole("button", { name: /^侧边栏目标，/u }));
     const composer = await screen.findByRole("textbox", { name: "任务输入" });
     await user.type(composer, "保留这份草稿");
@@ -472,6 +458,11 @@ describe("App", () => {
     });
     const panel = await screen.findByRole("region", { name: "异步提问" });
     expect(composer).toHaveFocus();
+    expect(screen.getByRole("button", { name: "查看最近提问" })).toBeVisible();
+    expect(panel.closest("[data-conversation-list]")).not.toBeNull();
+    expect(panel.closest("[data-composer-accessory-panel]")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "查看最近提问" }));
+    await waitFor(() => expect(panel.closest("article")).toHaveFocus());
     await user.click(within(panel).getByRole("button", { name: "简洁" }));
     await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
       method: "turn/steer",
@@ -489,15 +480,31 @@ describe("App", () => {
         params: { threadId: SIDEBAR_THREAD.id, turn: { ...turn, status: "completed" } },
       });
     });
-    await user.type(within(panel).getByRole("textbox", { name: "自定义回答" }), "  保留原始措辞  ");
-    await user.click(within(panel).getByRole("button", { name: "发送回答" }));
+    const customQuestion = within(panel).getByRole("region", { name: "还有什么需要补充？" });
+    await user.type(within(customQuestion).getByRole("textbox", { name: "自定义回复" }), "  保留原始措辞  ");
+    await user.click(within(customQuestion).getByRole("button", { name: "发送回复" }));
     await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
       method: "turn/start",
       params: expect.objectContaining({ input: [{ type: "text", text: "  保留原始措辞  " }] }),
     })));
     expect(composer).toHaveValue("保留这份草稿");
-    await waitFor(() => expect(questionResponses.size).toBe(2));
-    expect(screen.queryByRole("region", { name: "异步提问" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看最近提问" })).toBeVisible();
+    act(() => {
+      emitNotification({
+        method: "item/completed",
+        params: {
+          threadId: SIDEBAR_THREAD.id, turnId: "turn-reply", completedAtMs: 2,
+          item: { type: "userMessage", id: "reply-1", content: [{ type: "text", text: "  保留原始措辞  " }] },
+        },
+      });
+    });
+    expect(screen.queryByRole("button", { name: "查看最近提问" })).not.toBeInTheDocument();
+    await user.click(within(panel).getByRole("button", { name: "详细" }));
+    await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
+      method: "turn/steer",
+      params: expect.objectContaining({ input: [{ type: "text", text: "详细" }] }),
+    })));
+    expect(within(panel).getByRole("button", { name: "简洁" })).toBeEnabled();
   });
 
   afterEach(() => vi.unstubAllGlobals());

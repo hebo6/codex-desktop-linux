@@ -212,7 +212,6 @@ impl PreferencesRepository {
         for statement in [
             "DELETE FROM drafts",
             "DELETE FROM pending_thread_results",
-            "DELETE FROM async_question_responses",
             "DELETE FROM window_states",
             "DELETE FROM servers",
             "DELETE FROM proxies",
@@ -444,16 +443,6 @@ mod tests {
         .await
         .unwrap();
 
-        sqlx::query(
-            "INSERT INTO async_question_responses (
-                server_id, thread_id, question_key, disposition
-             ) VALUES (?, 'thread-1', 'question-1', 'sent')",
-        )
-        .bind(server_id.to_string())
-        .execute(&repository.pool)
-        .await
-        .unwrap();
-
         repository.clear_all_local_data().await.unwrap();
 
         assert_eq!(repository.load().await.unwrap(), json!({}));
@@ -463,7 +452,6 @@ mod tests {
             "window_states",
             "drafts",
             "pending_thread_results",
-            "async_question_responses",
         ] {
             let count: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM {table}"))
                 .fetch_one(&repository.pool)

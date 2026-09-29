@@ -257,6 +257,52 @@ const RESTORED = {
 } satisfies RestoredThread;
 
 describe("ConversationView", () => {
+  it("异步提问使用结构化内容，按需定位后保持阅读位置", async () => {
+    const onReply = vi.fn(async () => true);
+    const question = {
+      id: "async-question", type: "agentMessage", delivery: "async",
+      phase: "final_answer", text: "原始文本不重复展示",
+      questions: [{ title: "选择说明方式", options: ["简洁", "详细"] }],
+    } satisfies ThreadTurn["items"][number];
+    const restored = { ...RESTORED, turns: [{ ...TURN, items: [TURN.items[0]!, question] }] };
+    const view = render(<ConversationView restoredThread={restored} onReplyToAsyncQuestion={onReply} />);
+    expect(screen.queryByText(question.text)).not.toBeInTheDocument();
+    const message = screen.getByRole("region", { name: "异步提问" }).closest("article")!;
+    const scroller = screen.getByRole("region", { name: "会话消息" });
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 600 },
+      scrollHeight: { configurable: true, value: 2000 },
+    });
+    vi.spyOn(scroller, "getBoundingClientRect").mockImplementation(() => new DOMRect(0, 0, 800, 600));
+    vi.spyOn(message, "getBoundingClientRect").mockImplementation(() => new DOMRect(0, 400 - scroller.scrollTop, 800, 200));
+    scroller.scrollTop = 900;
+    const request = { itemId: question.id, requestId: 1 };
+    view.rerender(<ConversationView
+      restoredThread={restored} onReplyToAsyncQuestion={onReply} questionLocationRequest={request}
+    />);
+    await waitFor(() => expect(message).toHaveFocus());
+    expect(scroller.scrollTop).toBe(376);
+    view.rerender(<ConversationView
+      restoredThread={{ ...restored, turns: [{ ...TURN, items: [
+        ...restored.turns[0]!.items,
+        { id: "later", type: "agentMessage", text: "继续输出" },
+      ] }] }}
+      onReplyToAsyncQuestion={onReply} questionLocationRequest={request}
+    />);
+    expect(scroller.scrollTop).toBe(376);
+    fireEvent.click(screen.getByRole("button", { name: "简洁" }));
+    await waitFor(() => expect(onReply).toHaveBeenCalledWith("简洁"));
+    expect(screen.getByRole("button", { name: "简洁" })).toBeEnabled();
+  });
+
+  it("无结构化问题的异步消息沿用普通消息渲染", () => {
+    render(<ConversationView restoredThread={{ ...RESTORED, turns: [{ ...TURN, items: [{
+      id: "async-text", type: "agentMessage", delivery: "async", text: "普通异步通知",
+    }] }] }} />);
+    expect(screen.getByText("普通异步通知")).toBeVisible();
+    expect(screen.queryByRole("region", { name: "异步提问" })).not.toBeInTheDocument();
+  });
+
   it("函数调用输出归入工作流并可展开查看", async () => {
     render(
       <ConversationView restoredThread={{
@@ -1525,10 +1571,25 @@ describe("ConversationView", () => {
     userScroll(scroller, 800);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
 
+    const questioningTurn = {
+      ...runningTurn,
+      items: [...runningTurn.items, {
+        id: "async-question-before-answer", type: "agentMessage" as const,
+        phase: "final_answer" as const, delivery: "async" as const,
+        text: "你希望怎么继续？",
+        questions: [{ title: "你希望怎么继续？", options: ["继续检查", "先看结果"] }],
+      }],
+    } satisfies ThreadTurn;
+    rerender(<ConversationView restoredThread={{ ...RESTORED, turns: [questioningTurn] }} />);
+    act(() => contentResize?.());
+    expect(scroller.scrollTop).toBe(800);
+    expect(scroller.querySelector("[data-activity-group]"))
+      .toHaveAttribute("data-expanded", "true");
+
     const answeringTurn = {
       ...runningTurn,
       items: [
-        ...runningTurn.items,
+        ...questioningTurn.items,
         {
           id: "answer-final-position",
           phase: "final_answer" as const,

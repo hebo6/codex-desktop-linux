@@ -16,6 +16,8 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 
+import { isAsyncQuestionMessage } from "../app/asyncQuestions";
+import { AsyncQuestionMessage } from "./AsyncQuestionMessage";
 import type { RestoredThread, ThreadTurn } from "../app/useServerThreads";
 import type { TurnItemPageState } from "../app/useThreadSession";
 import { decodeDataImageUrl } from "../content/dataImage";
@@ -41,7 +43,7 @@ export type { ConversationReadingStateStore } from "./conversationReadingState";
 
 const EMPTY_TURN_ITEM_PAGES: ReadonlyMap<string, TurnItemPageState> = new Map();
 
-export interface CommandLocationRequest {
+export interface ItemLocationRequest {
   readonly itemId: string;
   readonly requestId: number;
 }
@@ -50,7 +52,10 @@ export interface ConversationViewProps {
   readonly restoredThread: RestoredThread;
   readonly readingState?: ConversationReadingStateStore;
   readonly blobUrlFactory?: BlobUrlFactory;
-  readonly commandLocationRequest?: CommandLocationRequest | null;
+  readonly commandLocationRequest?: ItemLocationRequest | null;
+  readonly questionLocationRequest?: ItemLocationRequest | null;
+  readonly onReplyToAsyncQuestion?: (text: string) => Promise<boolean>;
+  readonly asyncQuestionReplyDisabled?: boolean;
   readonly hasOlderTurns?: boolean;
   readonly loadingOlderTurns?: boolean;
   readonly olderTurnsError?: string | null;
@@ -276,6 +281,9 @@ type ConversationRow =
 export function ConversationView({
   blobUrlFactory = browserBlobUrls,
   commandLocationRequest = null,
+  questionLocationRequest = null,
+  onReplyToAsyncQuestion,
+  asyncQuestionReplyDisabled = false,
   hasOlderTurns = false,
   loadingOlderTurns = false,
   olderTurnsError = null,
@@ -1234,6 +1242,29 @@ export function ConversationView({
     };
   }, [commandLocationRequest, updateBottomState]);
 
+  useEffect(() => {
+    if (questionLocationRequest === null) return;
+    const frame = window.requestAnimationFrame(() => {
+      const scroller = scrollerRef.current;
+      if (scroller === null) return;
+      const question = Array.from(
+        scroller.querySelectorAll<HTMLElement>("[data-item-id]"),
+      ).find((element) => element.dataset.itemId === questionLocationRequest.itemId);
+      if (question === undefined) return;
+      userScrollTopRef.current = null;
+      pendingQuestionPositionRef.current = null;
+      pendingFinalAnswerQuestionPositionRef.current = null;
+      scroller.scrollTop = Math.max(
+        0,
+        scroller.scrollTop + question.getBoundingClientRect().top
+          - scroller.getBoundingClientRect().top - 24,
+      );
+      updateBottomState(scroller, "user");
+      question.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [questionLocationRequest, updateBottomState]);
+
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     const scroller = event.currentTarget;
     const previousTop = userScrollTopRef.current;
@@ -1432,6 +1463,8 @@ export function ConversationView({
                   role="listitem"
                 >
                   <ConversationRowView
+                    asyncQuestionReplyDisabled={asyncQuestionReplyDisabled}
+                    {...(onReplyToAsyncQuestion === undefined ? {} : { onReplyToAsyncQuestion })}
                     actionError={actionError}
                     blobUrlFactory={blobUrlFactory}
                     commandLocationRequest={commandLocationRequest}
@@ -1510,6 +1543,8 @@ export function ConversationView({
 }
 
 function ConversationRowView({
+  onReplyToAsyncQuestion,
+  asyncQuestionReplyDisabled,
   actionError,
   blobUrlFactory,
   commandLocationRequest,
@@ -1523,9 +1558,11 @@ function ConversationRowView({
   shellCommandDisabled,
   turnItemPage,
 }: {
+  readonly onReplyToAsyncQuestion?: (text: string) => Promise<boolean>;
+  readonly asyncQuestionReplyDisabled: boolean;
   readonly actionError: string | null;
   readonly blobUrlFactory: BlobUrlFactory;
-  readonly commandLocationRequest: CommandLocationRequest | null;
+  readonly commandLocationRequest: ItemLocationRequest | null;
   readonly onLoadTurnItemPage?: (turnId: string) => Promise<boolean>;
   readonly onForkTurn?: (turnId: string, isLatest: boolean) => void;
   readonly onOpenLink?: (link: string) => void;
@@ -1544,6 +1581,8 @@ function ConversationRowView({
   }
   return row.segment.type === "item" ? (
     <ItemView
+      asyncQuestionReplyDisabled={asyncQuestionReplyDisabled}
+      {...(onReplyToAsyncQuestion === undefined ? {} : { onReplyToAsyncQuestion })}
       blobUrlFactory={blobUrlFactory}
       item={row.segment.item}
       {...(row.turn.completedAt === undefined
@@ -1620,6 +1659,8 @@ function HistoryQuestionNavigation({
 }
 
 function ItemView({
+  onReplyToAsyncQuestion,
+  asyncQuestionReplyDisabled = false,
   blobUrlFactory = browserBlobUrls,
   item,
   onFork,
@@ -1631,6 +1672,8 @@ function ItemView({
   turnCompletedAt,
   turnStartedAt,
 }: {
+  readonly onReplyToAsyncQuestion?: (text: string) => Promise<boolean>;
+  readonly asyncQuestionReplyDisabled?: boolean;
   readonly blobUrlFactory?: BlobUrlFactory;
   readonly item: ThreadItem;
   readonly onFork?: () => void;
@@ -1675,6 +1718,8 @@ function ItemView({
     case "agentMessage":
       return (
         <AgentMessage
+          asyncQuestionReplyDisabled={asyncQuestionReplyDisabled}
+          {...(onReplyToAsyncQuestion === undefined ? {} : { onReplyToAsyncQuestion })}
           item={item}
           {...(turnCompletedAt === undefined ? {} : { turnCompletedAt })}
           {...(onFork === undefined ? {} : { onFork })}
@@ -1973,6 +2018,8 @@ function UserImageAttachment({
 }
 
 function AgentMessage({
+  onReplyToAsyncQuestion,
+  asyncQuestionReplyDisabled,
   item,
   onFork,
   onOpenLink,
@@ -1980,6 +2027,8 @@ function AgentMessage({
   shellCommandDisabled,
   turnCompletedAt,
 }: {
+  readonly onReplyToAsyncQuestion?: (text: string) => Promise<boolean>;
+  readonly asyncQuestionReplyDisabled: boolean;
   readonly item: Extract<ThreadItem, { type: "agentMessage" }>;
   readonly onFork?: () => void;
   readonly onOpenLink?: (link: string) => void;
@@ -2004,16 +2053,24 @@ function AgentMessage({
       onMouseEnter={() => setNow(Date.now())}
     >
       <div className={styles.agentText}>
-        <SafeMarkdown
-          shellCommandDisabled={shellCommandDisabled}
-          source={item.text}
-          {...(onOpenLink === undefined ? {} : { onOpenLink })}
-          {...(
-            !isFinalAnswer || onRunShellCommand === undefined
-              ? {}
-              : { onRunShellCommand }
-          )}
-        />
+        {isAsyncQuestionMessage(item) ? (
+          <AsyncQuestionMessage
+            questions={item.questions}
+            disabled={asyncQuestionReplyDisabled}
+            {...(onReplyToAsyncQuestion === undefined ? {} : { onReply: onReplyToAsyncQuestion })}
+          />
+        ) : (
+          <SafeMarkdown
+            shellCommandDisabled={shellCommandDisabled}
+            source={item.text}
+            {...(onOpenLink === undefined ? {} : { onOpenLink })}
+            {...(
+              !isFinalAnswer || onRunShellCommand === undefined
+                ? {}
+                : { onRunShellCommand }
+            )}
+          />
+        )}
       </div>
       {isFinalAnswer ? (
         <div className={styles.agentActions}>
@@ -2055,7 +2112,7 @@ function ActivityGroup({
   turn,
   workRunning,
 }: {
-  readonly commandLocationRequest: CommandLocationRequest | null;
+  readonly commandLocationRequest: ItemLocationRequest | null;
   readonly detailsPage?: TurnItemPageState;
   readonly items: readonly ThreadItem[];
   readonly onLoadDetails?: () => Promise<boolean>;
@@ -2815,9 +2872,7 @@ function historyQuestionItems(
         (followingItem): followingItem is Extract<ThreadItem, { type: "agentMessage" }> =>
           followingItem.type === "agentMessage",
       );
-      const finalAnswer = responseItems.find(
-        (responseItem) => responseItem.phase === "final_answer",
-      );
+      const finalAnswer = responseItems.find(isFinalAnswer);
       const question = singleLinePreview(
         markdownToPlainText(item.content.map(userInputText).join(" ")),
       );
@@ -2942,7 +2997,9 @@ function isUserShellCommand(
 function isFinalAnswer(
   item: ThreadItem,
 ): item is Extract<ThreadItem, { type: "agentMessage" }> {
-  return item.type === "agentMessage" && item.phase === "final_answer";
+  return item.type === "agentMessage"
+    && item.phase === "final_answer"
+    && !isAsyncQuestionMessage(item);
 }
 
 function groupTurnItems(
