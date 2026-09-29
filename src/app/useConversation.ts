@@ -264,11 +264,13 @@ export function useConversation({
         client === null ||
         input.length === 0 ||
         state.submitting ||
+        submissionRef.current !== null ||
         shellCommandActive
       ) {
         return false;
       }
       const operation = Symbol("conversation-submit");
+      let targetThreadId = currentThreadIdRef.current;
       submissionRef.current = operation;
       setState((current) => ({ ...current, submitting: true, error: null }));
       try {
@@ -276,6 +278,7 @@ export function useConversation({
         if (threadId === null) {
           return false;
         }
+        targetThreadId = threadId;
         const options = {
           clientUserMessageId: crypto.randomUUID(),
           input,
@@ -296,7 +299,7 @@ export function useConversation({
             clientRef.current !== client ||
             currentThreadIdRef.current !== threadId
           ) {
-            return false;
+            return true;
           }
           setState((current) => ({
             ...withTurn(current, response.turn),
@@ -310,13 +313,14 @@ export function useConversation({
             clientRef.current !== client ||
             currentThreadIdRef.current !== threadId
           ) {
-            return false;
+            return true;
           }
           setState((current) => ({ ...current, submitting: false, error: null }));
         }
         return true;
       } catch {
-        if (submissionRef.current === operation) {
+        if (submissionRef.current === operation
+          && clientRef.current === client && currentThreadIdRef.current === targetThreadId) {
           setState((current) => ({
             ...current,
             submitting: false,
@@ -327,6 +331,7 @@ export function useConversation({
       } finally {
         if (submissionRef.current === operation) {
           submissionRef.current = null;
+          setState((current) => current.submitting ? { ...current, submitting: false } : current);
         }
       }
     }, [

@@ -130,6 +130,80 @@ function restored(turns: readonly ThreadTurn[]): RestoredThread {
 }
 
 describe("useConversation", () => {
+  it.each(["inProgress", "completed"] as const)("%s 回合发送期间切换会话仍返回已受理且释放发送状态", async (status) => {
+    const client = new FakeConversationClient();
+    const firstSnapshot = restored([{ ...RUNNING_TURN, status }]);
+    const secondSnapshot = restored([]);
+    secondSnapshot.metadata.id = "thread-2";
+    let finish!: (response: TurnStartResponse) => void;
+    const pending = new Promise<TurnStartResponse>((resolve) => { finish = resolve; });
+    const send = status === "inProgress"
+      ? vi.spyOn(client, "steerTurn").mockReturnValue(handle(pending.then(() => ({ turnId: "turn-1" }))))
+      : vi.spyOn(client, "startTurn").mockReturnValue(handle(pending));
+    const { result, rerender } = renderHook(({ threadId }) => useConversation({
+      client,
+      currentThreadId: threadId,
+      restoredThread: threadId === "thread-1" ? firstSnapshot : secondSnapshot,
+      onThreadCreated: vi.fn(async () => undefined),
+    }), { initialProps: { threadId: "thread-1" } });
+    let submission!: Promise<boolean>;
+    act(() => { submission = result.current.sendInput([{ type: "text", text: "选项原文" }]); });
+    await waitFor(() => expect(send).toHaveBeenCalledOnce());
+    rerender({ threadId: "thread-2" });
+    await act(async () => {
+      finish({ turn: RUNNING_TURN });
+      expect(await submission).toBe(true);
+    });
+    expect(result.current.threadId).toBe("thread-2");
+    expect(result.current.turns).toEqual([]);
+    expect(result.current.submitting).toBe(false);
+  });
+
+  it("同一事件循环的重复发送只受理一次", async () => {
+    const client = new FakeConversationClient();
+    const snapshot = restored([RUNNING_TURN]);
+    const { result } = renderHook(() => useConversation({
+      client,
+      currentThreadId: "thread-1",
+      restoredThread: snapshot,
+      onThreadCreated: vi.fn(async () => undefined),
+    }));
+    await act(async () => {
+      const first = result.current.sendInput([{ type: "text", text: "选项原文" }]);
+      const duplicate = result.current.sendInput([{ type: "text", text: "选项原文" }]);
+      expect(await duplicate).toBe(false);
+      expect(await first).toBe(true);
+    });
+    expect(client.steerCalls).toHaveLength(1);
+  });
+
+  it("旧会话的迟到发送失败不会污染新会话错误状态", async () => {
+    const client = new FakeConversationClient();
+    const firstSnapshot = restored([RUNNING_TURN]);
+    const secondSnapshot = restored([]);
+    secondSnapshot.metadata.id = "thread-2";
+    let fail!: (error: Error) => void;
+    const pending = new Promise<TurnSteerResponse>((_resolve, reject) => { fail = reject; });
+    const send = vi.spyOn(client, "steerTurn").mockReturnValue(handle(pending));
+    const { result, rerender } = renderHook(({ threadId }) => useConversation({
+      client,
+      currentThreadId: threadId,
+      restoredThread: threadId === "thread-1" ? firstSnapshot : secondSnapshot,
+      onThreadCreated: vi.fn(async () => undefined),
+    }), { initialProps: { threadId: "thread-1" } });
+    let submission!: Promise<boolean>;
+    act(() => { submission = result.current.sendInput([{ type: "text", text: "回答" }]); });
+    await waitFor(() => expect(send).toHaveBeenCalledOnce());
+    rerender({ threadId: "thread-2" });
+    await act(async () => {
+      fail(new Error("connection lost"));
+      expect(await submission).toBe(false);
+    });
+    expect(result.current.threadId).toBe("thread-2");
+    expect(result.current.error).toBeNull();
+    expect(result.current.submitting).toBe(false);
+  });
+
   it("按增量追加并以完成快照校正且保持 ID 幂等", () => {
     const initial: ConversationState = {
       turns: [RUNNING_TURN],

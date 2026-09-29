@@ -59,6 +59,8 @@ import type { DeepLinkTargetSubscriber } from "./transport/deepLink";
 import type { ConfiguredServerStatusSubscriber } from "./transport/configuredServerStatuses";
 import * as clipboard from "./transport/clipboard";
 import type { DraftStore } from "./transport/drafts";
+import type { AsyncQuestionResponse, AsyncQuestionResponseStore } from "./transport/asyncQuestionResponses";
+import type { ThreadTurn } from "./app/useServerThreads";
 import type {
   PendingThreadResult,
   PendingThreadResultStore,
@@ -197,6 +199,7 @@ function renderApp(
     readonly configuredServerStatusSubscriber?: ConfiguredServerStatusSubscriber;
     readonly draftStore?: DraftStore;
     readonly pendingThreadResultStore?: PendingThreadResultStore;
+    readonly asyncQuestionResponseStore?: AsyncQuestionResponseStore;
     readonly windowFocusSource?: WindowFocusSource;
     readonly protocolDebugWindowOpener?: () => Promise<void>;
     readonly externalUrlOpener?: ExternalUrlOpener;
@@ -291,6 +294,9 @@ function renderApp(
         pendingThreadResultStore={
           options.pendingThreadResultStore ?? createPendingThreadResultStore()
         }
+        {...(options.asyncQuestionResponseStore === undefined
+          ? {}
+          : { asyncQuestionResponseStore: options.asyncQuestionResponseStore })}
         {...(options.windowFocusSource === undefined
           ? {}
           : { windowFocusSource: options.windowFocusSource })}
@@ -326,8 +332,17 @@ const SIDEBAR_THREAD = {
 
 function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: ServerEventStore) {
   const notificationHandlers = new Set<(notification: ServerNotification) => void>();
+  const requests: Array<{ readonly method: string; readonly params?: Record<string, unknown> }> = [];
+  const questionResponses = new Map<string, AsyncQuestionResponse>();
+  const asyncQuestionResponseStore: AsyncQuestionResponseStore = {
+    list: vi.fn(async () => [...questionResponses.values()]),
+    record: vi.fn(async (_serverId, _threadId, response) => {
+      questionResponses.set(response.questionKey, response);
+    }),
+  };
   const requestSession = {
-    sendRequest(request: { readonly method: string }) {
+    sendRequest(request: { readonly method: string; readonly params?: Record<string, unknown> }) {
+      requests.push(request);
       const result = request.method === "thread/list"
         ? { data: [SIDEBAR_THREAD], nextCursor: null }
         : request.method === "thread/resume"
@@ -345,6 +360,10 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
             }
           : request.method === "thread/backgroundTerminals/list"
             ? { data: [], nextCursor: null }
+            : request.method === "turn/start"
+              ? { turn: { id: "turn-reply", items: [], itemsView: "full", status: "inProgress" } }
+              : request.method === "turn/steer"
+                ? { turnId: request.params?.expectedTurnId }
             : {};
       return {
         cancel: () => undefined,
@@ -402,6 +421,7 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
     transition: vi.fn(async () => undefined),
   };
   renderApp(() => ({ servers: [localServer()], proxies: [] }), {
+    asyncQuestionResponseStore,
     draftStore,
     sessionFactory,
     windowStateOptions: {
@@ -410,6 +430,8 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
     },
   });
   return {
+    requests,
+    questionResponses,
     tabsUpdater,
     emitNotification(notification: ServerNotification) {
       for (const handler of notificationHandlers) handler(notification);
@@ -418,6 +440,66 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
 }
 
 describe("App", () => {
+  it("异步提问点击发送原文并保留草稿，回合结束后仍可回答下一题", async () => {
+    const user = userEvent.setup();
+    const { emitNotification, requests, questionResponses } = renderSidebarThreadScenario();
+    await user.click(await screen.findByRole("button", { name: /^侧边栏目标，/u }));
+    const composer = await screen.findByRole("textbox", { name: "任务输入" });
+    await user.type(composer, "保留这份草稿");
+    const question = {
+      id: "async-question-1",
+      type: "agentMessage",
+      text: "你希望怎么说明？\n- 简洁\n- 详细",
+      phase: "final_answer",
+      delivery: "async",
+      questions: [
+        { title: "你希望怎么说明？", options: ["简洁", "详细"] },
+        { title: "还有什么需要补充？", options: null },
+      ],
+    } satisfies ThreadTurn["items"][number];
+    const turn = {
+      id: "turn-question",
+      items: [question],
+      itemsView: "full",
+      status: "inProgress",
+    } satisfies ThreadTurn;
+    act(() => {
+      emitNotification({ method: "turn/started", params: { threadId: SIDEBAR_THREAD.id, turn } });
+      emitNotification({
+        method: "item/completed",
+        params: { threadId: SIDEBAR_THREAD.id, turnId: turn.id, item: question, completedAtMs: 1 },
+      });
+    });
+    const panel = await screen.findByRole("region", { name: "异步提问" });
+    expect(composer).toHaveFocus();
+    await user.click(within(panel).getByRole("button", { name: "简洁" }));
+    await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
+      method: "turn/steer",
+      params: expect.objectContaining({
+        threadId: SIDEBAR_THREAD.id,
+        expectedTurnId: turn.id,
+        input: [{ type: "text", text: "简洁" }],
+      }),
+    })));
+    expect(composer).toHaveValue("保留这份草稿");
+    expect(within(panel).getByText("还有什么需要补充？")).toBeVisible();
+    act(() => {
+      emitNotification({
+        method: "turn/completed",
+        params: { threadId: SIDEBAR_THREAD.id, turn: { ...turn, status: "completed" } },
+      });
+    });
+    await user.type(within(panel).getByRole("textbox", { name: "自定义回答" }), "  保留原始措辞  ");
+    await user.click(within(panel).getByRole("button", { name: "发送回答" }));
+    await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
+      method: "turn/start",
+      params: expect.objectContaining({ input: [{ type: "text", text: "  保留原始措辞  " }] }),
+    })));
+    expect(composer).toHaveValue("保留这份草稿");
+    await waitFor(() => expect(questionResponses.size).toBe(2));
+    expect(screen.queryByRole("region", { name: "异步提问" })).not.toBeInTheDocument();
+  });
+
   afterEach(() => vi.unstubAllGlobals());
 
   it("Ctrl+K 在侧边栏搜索并复用空白标签打开结果，不弹出对话框", async () => {

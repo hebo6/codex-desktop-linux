@@ -1,3 +1,4 @@
+mod async_question_responses;
 mod authentication_policy;
 mod clipboard;
 mod configuration;
@@ -123,10 +124,16 @@ pub fn run() {
                 .into());
             }
             if !app.manage(pending_thread_results::PendingThreadResultRepository::new(
-                pool,
+                pool.clone(),
             )) {
                 return Err(std::io::Error::other(
                     "pending thread result repository was already initialized",
+                )
+                .into());
+            }
+            if !app.manage(async_question_responses::AsyncQuestionResponseRepository::new(pool)) {
+                return Err(std::io::Error::other(
+                    "async question response repository was already initialized",
                 )
                 .into());
             }
@@ -278,6 +285,8 @@ pub fn run() {
             pending_thread_results::record_pending_thread_result,
             pending_thread_results::acknowledge_pending_thread_result,
             pending_thread_results::clear_pending_thread_result,
+            async_question_responses::list_async_question_responses,
+            async_question_responses::record_async_question_response,
             preferences::load_preferences,
             preferences::load_theme_preference,
             preferences::save_preferences,
