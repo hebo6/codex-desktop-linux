@@ -17,13 +17,14 @@ import { markdownToPlainText, SafeMarkdown } from "./SafeMarkdown";
 
 describe("SafeMarkdown", () => {
   it("渲染 GFM 常用块并忽略原始 HTML", () => {
-    render(<SafeMarkdown source={'# 标题\n\n- [x] 完成\n- [ ] 待办\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\n> 引用\n\n```ts\nconst x = 1\n```\n\n<script>危险</script>正文'} />);
+    render(<SafeMarkdown source={'# 标题\n\n- [x] 完成\n- [ ] 待办\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\n> 引用\n\n```ts\nconst x = 1\n```\n\n<script>危险</script>\n\n正文'} />);
     expect(screen.getByRole("heading", { name: "标题" })).toBeVisible();
     expect(screen.getByRole("checkbox", { name: "已完成" })).toBeChecked();
     expect(screen.getByRole("table")).toBeVisible();
     expect(screen.getByText("const x = 1")).toBeVisible();
     expect(document.querySelector("script")).toBeNull();
-    expect(screen.getByText("危险正文")).toBeVisible();
+    expect(screen.queryByText("危险")).not.toBeInTheDocument();
+    expect(screen.getByText("正文")).toBeVisible();
   });
 
   it("所有链接统一交给调用者处理", () => {
@@ -273,5 +274,168 @@ describe("SafeMarkdown", () => {
     expect(trigger).toBeDisabled();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(onRunShellCommand).not.toHaveBeenCalled();
+  });
+
+  it("按标准语法渲染嵌套列表、嵌套强调和带括号的引用链接", () => {
+    const onOpenLink = vi.fn();
+    const { container } = render(<SafeMarkdown onOpenLink={onOpenLink} source={[
+      "3. **重点含 *斜体***",
+      "   - 子项",
+      "",
+      "[文档][ref]",
+      "",
+      "[ref]: https://example.com/a_(b)",
+    ].join("\n")} />);
+    expect(container.querySelector("ol")).toHaveAttribute("start", "3");
+    expect(container.querySelector("ol > li > ul > li")).toHaveTextContent("子项");
+    expect(container.querySelector("strong em")).toHaveTextContent("斜体");
+    fireEvent.click(screen.getByRole("button", { name: "文档" }));
+    expect(onOpenLink).toHaveBeenCalledWith("https://example.com/a_(b)");
+  });
+
+  it.each([
+    ["$2^n$", false],
+    ["\\(2^n\\)", false],
+    ["$$\n2^n\n$$", true],
+    ["\\[\n2^n\n\\]", true],
+    ["```math\n2^n\n```", true],
+  ])("渲染公式 %s", (source, display) => {
+    const { container } = render(<SafeMarkdown source={source} />);
+    expect(container.querySelectorAll(".katex")).toHaveLength(1);
+    expect(container.querySelectorAll(".katex-display")).toHaveLength(display ? 1 : 0);
+    expect(container.querySelector("annotation")).toHaveTextContent("2^n");
+    expect(container.querySelector(".katex-error")).toBeNull();
+  });
+
+  it("渲染截图中的下括号和中文注释，并只复制一次公式源码", () => {
+    const formula = String.raw`\underbrace{2 \times 2 \times \cdots \times 2}_{n\text{ 个}} = 2^n`;
+    const source = "\\[\n" + formula + "\n\\]";
+    const { container } = render(<SafeMarkdown source={source} />);
+    expect(container.querySelector(".katex-display .katex")).not.toBeNull();
+    expect(container.querySelector(".katex-error")).toBeNull();
+    expect(markdownToPlainText(source)).toBe(formula);
+  });
+
+  it("代码区域内保留公式源码，latex 代码块仍展示源码", () => {
+    const { container } = render(<SafeMarkdown source={[
+      "`$2^n$` 与 `\\(2^n\\)`",
+      "",
+      "```latex",
+      "\\[2^n\\]",
+      "```",
+    ].join("\n")} />);
+    expect(container.querySelector(".katex")).toBeNull();
+    expect(container.querySelector("pre code")).toHaveTextContent("\\[2^n\\]");
+    expect(screen.getByText("$2^n$")).toBeVisible();
+  });
+
+  it.each([
+    ["$$\n2^n", "$$\n2^n\n$$"],
+    ["\\[\n2^n", "\\[\n2^n\n\\]"],
+    ["```math\n2^n", "```math\n2^n\n```"],
+  ])("流式公式闭合前保留源码：%s", (partial, complete) => {
+    const { container, rerender } = render(<SafeMarkdown source={partial} />);
+    expect(container.querySelector(".katex")).toBeNull();
+    expect(container).toHaveTextContent("2^n");
+    rerender(<SafeMarkdown source={complete} />);
+    expect(container.querySelector(".katex")).not.toBeNull();
+    expect(container.querySelector(".katex-error")).toBeNull();
+  });
+
+  it("不执行公式中的链接或 HTML 命令，错误公式不影响后续正文", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { container } = render(<SafeMarkdown source={[
+      String.raw`$\href{javascript:alert(1)}{x}$`,
+      "",
+      String.raw`$\htmlClass{attack}{x}$`,
+      "",
+      String.raw`$\frac{1}$`,
+      "",
+      "后续正文",
+    ].join("\n")} />);
+    expect(container.querySelector("a, .attack, script")).toBeNull();
+    expect(container.querySelector(".katex-error")).not.toBeNull();
+    expect(screen.getByText("后续正文")).toBeVisible();
+  });
+
+  it("链接和图片不产生浏览器导航或资源加载，文件定位仍交给统一解析器", () => {
+    const onOpenLink = vi.fn();
+    const { container } = render(<SafeMarkdown onOpenLink={onOpenLink} source={[
+      "[相对](App.tsx:42)",
+      "[绝对](file:///workspace/App.tsx#L42)",
+      "[危险](javascript:alert%281%29)",
+      "![外部](https://example.com/image.png)",
+    ].join(" ")} />);
+    expect(container.querySelector("a, img, [href], [src]")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "相对" }));
+    fireEvent.click(screen.getByRole("button", { name: "绝对" }));
+    fireEvent.click(screen.getByRole("button", { name: "危险" }));
+    expect(onOpenLink).toHaveBeenNthCalledWith(1, "App.tsx:42");
+    expect(onOpenLink).toHaveBeenNthCalledWith(2, "file:///workspace/App.tsx#L42");
+    expect(resolveLink(onOpenLink.mock.calls[2]?.[0], "/workspace").type).toBe("blocked");
+  });
+
+  it("紧凑摘要保留行内格式与数学排版，不产生块级元素或交互入口", () => {
+    const { container } = render(<SafeMarkdown onOpenLink={vi.fn()} variant="compact" source={[
+      "# **摘要**",
+      "",
+      "- [x] [来源](https://example.com)",
+      "- 第二项",
+      "",
+      "\\[",
+      "2^n",
+      "\\]",
+      "",
+      "```ts",
+      "const n = 2;",
+      "```",
+    ].join("\n")} />);
+    expect(container.firstElementChild?.tagName).toBe("SPAN");
+    expect(container.querySelector("p, div, pre, ul, li, h1, button, input, .katex-display")).toBeNull();
+    expect(container.querySelector("strong")).toHaveTextContent("摘要");
+    expect(container.querySelector(".katex")).not.toBeNull();
+    expect(container).toHaveTextContent("• ☑ 来源 · • 第二项");
+  });
+
+  it("math 围栏在紧凑摘要中也按公式排版", () => {
+    const { container } = render(<SafeMarkdown variant="compact" source={"```math\n2^n\n```"} />);
+    expect(container.querySelector(".katex")).not.toBeNull();
+    expect(container.querySelector(".katex-display, pre")).toBeNull();
+  });
+
+  it("链接内的图片只由外层链接处理点击", () => {
+    const onOpenLink = vi.fn();
+    const { container } = render(<SafeMarkdown onOpenLink={onOpenLink} source="[![图](image.png)](https://example.com)" />);
+    expect(container.querySelector("button button")).toBeNull();
+    fireEvent.click(screen.getByText("图片：图"));
+    expect(onOpenLink).toHaveBeenCalledExactlyOnceWith("https://example.com");
+  });
+
+  it("流式更新保持代码块组件和折行状态，较长围栏闭合后才高亮", async () => {
+    const highlighter: SyntaxHighlighter = { highlight: vi.fn(async () => []) };
+    const { container, rerender } = render(<SafeMarkdown syntaxHighlighter={highlighter} source={"````ts\nfirst\n```"} />);
+    const pre = container.querySelector("pre");
+    fireEvent.click(screen.getByRole("button", { name: "折行" }));
+    expect(highlighter.highlight).not.toHaveBeenCalled();
+    rerender(<SafeMarkdown syntaxHighlighter={highlighter} source={"````ts\nfirst\n```\nsecond\n````"} />);
+    expect(container.querySelector("pre")).toBe(pre);
+    expect(pre).toHaveAttribute("data-wrapped", "true");
+    await waitFor(() => expect(highlighter.highlight).toHaveBeenCalledWith("first\n```\nsecond", "typescript"));
+  });
+
+  it("引用和列表中的波浪线代码围栏沿用标准闭合规则", async () => {
+    const highlighter: SyntaxHighlighter = { highlight: vi.fn(async () => []) };
+    render(<SafeMarkdown syntaxHighlighter={highlighter} source={"> - ~~~ts\n>   const n = 2;\n>   ~~~"} />);
+    await waitFor(() => expect(highlighter.highlight).toHaveBeenCalledWith("const n = 2;", "typescript"));
+  });
+
+  it("标题与脚注生成可定位的锚点", () => {
+    const onOpenLink = vi.fn();
+    const { container } = render(<SafeMarkdown onOpenLink={onOpenLink} source={"# 标题\n\n[跳转](#标题) 和脚注[^note]\n\n[^note]: 注释内容"} />);
+    expect(screen.getByRole("heading", { name: "标题" })).toHaveAttribute("id", "标题");
+    fireEvent.click(screen.getByRole("button", { name: "1" }));
+    const target = onOpenLink.mock.calls[0]?.[0] as string;
+    expect(target.startsWith("#")).toBe(true);
+    expect(container.querySelector(`[id="${target.slice(1)}"]`)).not.toBeNull();
   });
 });

@@ -39,6 +39,9 @@
 .markdown blockquote,
 .markdown :is(ul, ol) {
   margin: 0.75em 0;
+}
+
+.markdown p {
   white-space: pre-wrap;
 }
 
@@ -244,4 +247,23 @@ span.imageReference {
 
 .markdown th {
   background: var(--color-fill-subtle);
+}
+
+.markdown :global(.katex-display) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25em 0;
+}
+
+.markdown :global(.katex) {
+  white-space: normal;
+  overflow-wrap: normal;
+}
+
+.markdown :global(.katex-display) > :global(.katex) {
+  white-space: nowrap;
+}
+
+.markdown :global(.katex-error) {
+  color: var(--color-text-primary) !important;
 }

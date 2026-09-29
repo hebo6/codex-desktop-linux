@@ -84,7 +84,7 @@ describe("FilePreviewDialog", () => {
   it("Markdown 预览不执行原始 HTML", async () => {
     render(
       <FilePreviewDialog
-        client={clientFor("# 文档\n\n<script>bad()</script>内容")}
+        client={clientFor("# 文档\n\n<script>bad()</script>\n\n内容")}
         onClose={vi.fn()}
         request={{ path: "/remote/README.md" }}
         serverName="服务器"
@@ -92,13 +92,14 @@ describe("FilePreviewDialog", () => {
     );
     await waitFor(() => expect(screen.getByRole("heading", { name: "文档" })).toBeVisible());
     expect(document.querySelector("script")).toBeNull();
-    expect(screen.getByText("bad()内容")).toBeVisible();
+    expect(screen.queryByText("bad()")).not.toBeInTheDocument();
+    expect(screen.getByText("内容")).toBeVisible();
     expect(screen.getByRole("button", { name: "预览" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
     fireEvent.click(screen.getByRole("button", { name: "源码" }));
-    expect(screen.getByText("<script>bad()</script>内容")).toBeVisible();
+    expect(screen.getByText("<script>bad()</script>")).toBeVisible();
     expect(screen.getByRole("searchbox", { name: "在文件中查找" })).toBeVisible();
   });
 

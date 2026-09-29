@@ -1,11 +1,22 @@
 import {
+  createContext,
+  useContext,
   useEffect,
   useId,
   useRef,
   useState,
+  type ComponentProps,
   type ReactNode,
 } from "react";
+import Markdown, { type Components, type ExtraProps } from "react-markdown";
+import "katex/dist/katex.min.css";
 
+import {
+  compactMarkdownRemarkPlugins,
+  markdownRehypeOptions,
+  markdownRehypePlugins,
+  markdownRemarkPlugins,
+} from "../content/markdown";
 import {
   syntaxHighlighter as sharedSyntaxHighlighter,
   type HighlightedLines,
@@ -18,6 +29,23 @@ import {
 import syntaxTokenStyles from "./SyntaxToken.module.css";
 import { isEscapeDismissal } from "./keyboardEvents";
 import styles from "./SafeMarkdown.module.css";
+
+export { markdownToPlainText } from "../content/markdown";
+
+interface MarkdownContextValue {
+  readonly onOpenLink?: (link: string) => void;
+  readonly onRunShellCommand?: (command: string) => Promise<boolean>;
+  readonly shellCommandDisabled: boolean;
+  readonly syntaxHighlighter: SyntaxHighlighter;
+  readonly variant: "compact" | "document";
+}
+
+const MarkdownContext = createContext<MarkdownContextValue>({
+  shellCommandDisabled: false,
+  syntaxHighlighter: sharedSyntaxHighlighter,
+  variant: "document",
+});
+const LinkLabelContext = createContext(false);
 
 export function SafeMarkdown({
   onOpenLink,
@@ -34,199 +62,81 @@ export function SafeMarkdown({
   readonly syntaxHighlighter?: SyntaxHighlighter;
   readonly variant?: "compact" | "document";
 }) {
-  if (variant === "compact") {
-    return (
-      <span className={`${styles.markdown} ${styles.compact}`}>
-        {parseBlocks(source).map((block, index) => (
-          <CompactMarkdownBlock
-            block={block}
-            key={`${block.type}:${index}`}
-            leading={index > 0}
-          />
-        ))}
-      </span>
-    );
-  }
+  const Container = variant === "compact" ? "span" : "div";
   return (
-    <div className={styles.markdown}>
-      {parseBlocks(source).map((block, index) => (
-        <MarkdownBlock
-          block={block}
-          key={`${block.type}:${index}`}
-          shellCommandDisabled={shellCommandDisabled}
-          syntaxHighlighter={syntaxHighlighter}
-          {...(onOpenLink === undefined ? {} : { onOpenLink })}
-          {...(onRunShellCommand === undefined ? {} : { onRunShellCommand })}
-        />
-      ))}
-    </div>
+    <MarkdownContext value={{
+      shellCommandDisabled,
+      syntaxHighlighter,
+      variant,
+      ...(onOpenLink === undefined ? {} : { onOpenLink }),
+      ...(onRunShellCommand === undefined ? {} : { onRunShellCommand }),
+    }}>
+      <Container className={styles.markdown + (variant === "compact" ? " " + styles.compact : "")}>
+        <Markdown
+          components={markdownComponents}
+          rehypePlugins={markdownRehypePlugins}
+          remarkPlugins={variant === "compact" ? compactMarkdownRemarkPlugins : markdownRemarkPlugins}
+          remarkRehypeOptions={markdownRehypeOptions}
+          skipHtml
+        >
+          {source}
+        </Markdown>
+      </Container>
+    </MarkdownContext>
   );
 }
 
-export function markdownToPlainText(source: string): string {
-  return parseBlocks(source).map(blockPlainText).filter(Boolean).join("\n").trim();
+// 组件类型保持稳定，流式更新不会重挂载代码块并清空折行/确认状态
+const markdownComponents: Components = {
+  pre: MarkdownPre,
+  p: MarkdownParagraph,
+  span: MarkdownSpan,
+  table: MarkdownTable,
+  input: MarkdownCheckbox,
+};
+
+function MarkdownPre({ node, children }: ComponentProps<"pre"> & ExtraProps) {
+  const context = useContext(MarkdownContext);
+  const code = node?.data?.markdownCode;
+  if (code === undefined) return <pre>{children}</pre>;
+  return (
+    <CodeBlock
+      closed={code.closed}
+      language={code.language}
+      shellCommandDisabled={context.shellCommandDisabled}
+      source={code.source}
+      syntaxHighlighter={context.syntaxHighlighter}
+      {...(context.onRunShellCommand === undefined ? {} : { onRunShellCommand: context.onRunShellCommand })}
+    />
+  );
 }
 
-function blockPlainText(block: Block): string {
-  switch (block.type) {
-    case "paragraph":
-    case "quote":
-    case "heading":
-      return inlinePlainText(block.text);
-    case "code":
-      return block.text;
-    case "list":
-      return block.items.map((item, index) => {
-        const marker = block.ordered ? `${index + 1}.` : "•";
-        const checked = item.checked === null ? "" : item.checked ? " ☑" : " ☐";
-        return `${marker}${checked} ${inlinePlainText(item.text)}`;
-      }).join("\n");
-    case "table":
-      return [block.header, ...block.rows]
-        .map((row) => row.map(inlinePlainText).join("\t"))
-        .join("\n");
-    case "rule":
-      return "—";
-  }
+function MarkdownParagraph({ node: _node, children, ...props }: ComponentProps<"p"> & ExtraProps) {
+  const { variant } = useContext(MarkdownContext);
+  return variant === "compact" ? <span>{children}</span> : <p {...props}>{children}</p>;
 }
 
-function inlinePlainText(source: string): string {
-  return source
-    .replace(/!\[([^\]]*)\]\([^)]*\)/gu, "图片：$1")
-    .replace(/\[([^\]]*)\]\([^)]*\)/gu, "$1")
-    .replace(/`([^`]*)`/gu, "$1")
-    .replace(/\*\*([^*]+)\*\*|__([^_]+)__|~~([^~]+)~~|\*([^*]+)\*|_([^_]+)_/gu, "$1$2$3$4$5")
-    .replace(/<(https?:\/\/[^>]+)>/giu, "$1");
+function MarkdownSpan({ node, children, ...props }: ComponentProps<"span"> & ExtraProps) {
+  const { onOpenLink, variant } = useContext(MarkdownContext);
+  const insideLink = useContext(LinkLabelContext);
+  const link = node?.data?.markdownLink;
+  if (link === undefined) return <span {...props}>{children}</span>;
+  const className = link.image ? styles.imageReference : styles.link;
+  return onOpenLink === undefined || variant === "compact" || insideLink
+    ? <span className={className} id={props.id}>{children}</span>
+    : (
+      <button aria-label={props["aria-label"]} className={className} id={props.id} onClick={() => onOpenLink(link.target)} type="button">
+        <LinkLabelContext value>{children}</LinkLabelContext>
+      </button>
+    );
 }
 
-function CompactMarkdownBlock({
-  block,
-  leading,
-}: {
-  readonly block: Block;
-  readonly leading: boolean;
-}) {
-  const prefix = leading ? " " : "";
-  const inline = (text: string) => renderInline(text, undefined, false);
-  switch (block.type) {
-    case "paragraph":
-      return <>{prefix}{inline(block.text)}</>;
-    case "quote":
-      return <>{prefix}{inline(block.text)}</>;
-    case "heading":
-      return <>{prefix}<strong>{inline(block.text)}</strong></>;
-    case "code":
-      return <>{prefix}<code>{block.text}</code></>;
-    case "list":
-      return (
-        <>
-          {prefix}
-          {block.items.map((item, index) => (
-            <span key={index}>
-              {index > 0 ? " · " : ""}
-              {block.ordered ? `${index + 1}. ` : "• "}
-              {item.checked === null ? "" : item.checked ? "☑ " : "☐ "}
-              {inline(item.text)}
-            </span>
-          ))}
-        </>
-      );
-    case "table":
-      return (
-        <>
-          {prefix}
-          {[block.header, ...block.rows].map((row, rowIndex) => (
-            <span key={rowIndex}>
-              {rowIndex > 0 ? " · " : ""}
-              {row.map((cell, cellIndex) => (
-                <span key={cellIndex}>
-                  {cellIndex > 0 ? " | " : ""}
-                  {inline(cell)}
-                </span>
-              ))}
-            </span>
-          ))}
-        </>
-      );
-    case "rule":
-      return <>{prefix}—</>;
-  }
+function MarkdownTable({ node: _node, ...props }: ComponentProps<"table"> & ExtraProps) {
+  return <div className={styles.tableScroller}><table {...props} /></div>;
 }
 
-type Block =
-  | { readonly type: "paragraph" | "quote"; readonly text: string }
-  | { readonly type: "heading"; readonly level: number; readonly text: string }
-  | { readonly type: "code"; readonly closed: boolean; readonly language: string; readonly text: string }
-  | { readonly type: "list"; readonly ordered: boolean; readonly items: readonly ListItem[] }
-  | { readonly type: "table"; readonly header: readonly string[]; readonly rows: readonly (readonly string[])[] }
-  | { readonly type: "rule" };
-
-interface ListItem {
-  readonly text: string;
-  readonly checked: boolean | null;
-}
-
-function MarkdownBlock({
-  block,
-  onOpenLink,
-  onRunShellCommand,
-  shellCommandDisabled,
-  syntaxHighlighter,
-}: {
-  readonly block: Block;
-  readonly onOpenLink?: (link: string) => void;
-  readonly onRunShellCommand?: (command: string) => Promise<boolean>;
-  readonly shellCommandDisabled: boolean;
-  readonly syntaxHighlighter: SyntaxHighlighter;
-}) {
-  const inline = (text: string) => renderInline(text, onOpenLink, onOpenLink !== undefined);
-  switch (block.type) {
-    case "paragraph":
-      return <p>{inline(block.text)}</p>;
-    case "quote":
-      return <blockquote>{inline(block.text)}</blockquote>;
-    case "heading": {
-      const content = inline(block.text);
-      const id = headingId(block.text);
-      if (block.level === 1) return <h1 id={id}>{content}</h1>;
-      if (block.level === 2) return <h2 id={id}>{content}</h2>;
-      if (block.level === 3) return <h3 id={id}>{content}</h3>;
-      if (block.level === 4) return <h4 id={id}>{content}</h4>;
-      if (block.level === 5) return <h5 id={id}>{content}</h5>;
-      return <h6 id={id}>{content}</h6>;
-    }
-    case "code":
-      return (
-        <CodeBlock
-          closed={block.closed}
-          language={block.language}
-          shellCommandDisabled={shellCommandDisabled}
-          source={block.text}
-          syntaxHighlighter={syntaxHighlighter}
-          {...(onRunShellCommand === undefined ? {} : { onRunShellCommand })}
-        />
-      );
-    case "list": {
-      const items = block.items.map((item, index) => (
-        <li key={index}>
-          {item.checked === null ? null : <input aria-label={item.checked ? "已完成" : "未完成"} checked={item.checked} disabled readOnly type="checkbox" />}
-          {inline(item.text)}
-        </li>
-      ));
-      return block.ordered ? <ol>{items}</ol> : <ul>{items}</ul>;
-    }
-    case "table":
-      return (
-        <div className={styles.tableScroller}>
-          <table>
-            <thead><tr>{block.header.map((cell, index) => <th key={index}>{inline(cell)}</th>)}</tr></thead>
-            <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{inline(cell)}</td>)}</tr>)}</tbody>
-          </table>
-        </div>
-      );
-    case "rule":
-      return <hr />;
-  }
+function MarkdownCheckbox({ node: _node, ...props }: ComponentProps<"input"> & ExtraProps) {
+  return <input {...props} aria-label={props.checked ? "已完成" : "未完成"} disabled readOnly type="checkbox" />;
 }
 
 const EXECUTABLE_SHELL_LANGUAGES = new Set(["bash", "sh", "zsh"]);
@@ -455,175 +365,4 @@ function renderHighlightedLines(lines: HighlightedLines): readonly ReactNode[] {
     }
   }
   return nodes;
-}
-
-function parseBlocks(source: string): readonly Block[] {
-  const lines = source.replace(/\r\n?/gu, "\n").split("\n");
-  const blocks: Block[] = [];
-  let index = 0;
-  while (index < lines.length) {
-    const line = lines[index] ?? "";
-    if (line.trim().length === 0) {
-      index += 1;
-      continue;
-    }
-    const fence = /^\s*```([^`]*)$/u.exec(line);
-    if (fence !== null) {
-      const content: string[] = [];
-      let closed = false;
-      index += 1;
-      while (index < lines.length && !/^\s*```\s*$/u.test(lines[index] ?? "")) {
-        content.push(lines[index] ?? "");
-        index += 1;
-      }
-      if (index < lines.length) {
-        closed = true;
-        index += 1;
-      }
-      blocks.push({
-        type: "code",
-        closed,
-        language: (fence[1] ?? "").trim(),
-        text: content.join("\n"),
-      });
-      continue;
-    }
-    const heading = /^(#{1,6})\s+(.+)$/u.exec(line);
-    if (heading !== null) {
-      blocks.push({ type: "heading", level: heading[1]?.length ?? 1, text: stripRawHtml(heading[2] ?? "") });
-      index += 1;
-      continue;
-    }
-    if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/u.test(line)) {
-      blocks.push({ type: "rule" });
-      index += 1;
-      continue;
-    }
-    if (line.includes("|") && isTableDivider(lines[index + 1] ?? "")) {
-      const header = splitTableRow(line);
-      const rows: string[][] = [];
-      index += 2;
-      while (index < lines.length && (lines[index] ?? "").includes("|")) {
-        rows.push(splitTableRow(lines[index] ?? ""));
-        index += 1;
-      }
-      blocks.push({ type: "table", header, rows });
-      continue;
-    }
-    const listMatch = /^\s*(?:(\d+)[.)]|[-+*])\s+(.+)$/u.exec(line);
-    if (listMatch !== null) {
-      const ordered = listMatch[1] !== undefined;
-      const items: ListItem[] = [];
-      while (index < lines.length) {
-        const match = /^\s*(?:(\d+)[.)]|[-+*])\s+(.+)$/u.exec(lines[index] ?? "");
-        if (match === null || (match[1] !== undefined) !== ordered) break;
-        const task = /^\[([ xX])\]\s+(.+)$/u.exec(match[2] ?? "");
-        items.push({
-          text: stripRawHtml(task?.[2] ?? match[2] ?? ""),
-          checked: task === null ? null : task[1]?.toLocaleLowerCase() === "x",
-        });
-        index += 1;
-      }
-      blocks.push({ type: "list", ordered, items });
-      continue;
-    }
-    if (/^\s*>/u.test(line)) {
-      const quote: string[] = [];
-      while (index < lines.length && /^\s*>/u.test(lines[index] ?? "")) {
-        quote.push((lines[index] ?? "").replace(/^\s*>\s?/u, ""));
-        index += 1;
-      }
-      blocks.push({ type: "quote", text: stripRawHtml(quote.join("\n")) });
-      continue;
-    }
-    const paragraph = [line];
-    index += 1;
-    while (index < lines.length && (lines[index] ?? "").trim().length > 0 && !startsBlock(lines, index)) {
-      paragraph.push(lines[index] ?? "");
-      index += 1;
-    }
-    blocks.push({ type: "paragraph", text: stripRawHtml(paragraph.join("\n")) });
-  }
-  return blocks;
-}
-
-function startsBlock(lines: readonly string[], index: number): boolean {
-  const line = lines[index] ?? "";
-  return /^\s*```/u.test(line)
-    || /^(#{1,6})\s+/u.test(line)
-    || /^\s*(?:\d+[.)]|[-+*])\s+/u.test(line)
-    || /^\s*>/u.test(line)
-    || /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/u.test(line)
-    || (line.includes("|") && isTableDivider(lines[index + 1] ?? ""));
-}
-
-function renderInline(
-  source: string,
-  onOpenLink?: (link: string) => void,
-  interactiveLinks = true,
-): readonly ReactNode[] {
-  const pattern = /(!?\[[^\]]*\]\([^)]*\)|`[^`]*`|\*\*[^*]+\*\*|__[^_]+__|~~[^~]+~~|\*[^*]+\*|_[^_]+_|<https?:\/\/[^>]+>)/giu;
-  const nodes: ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(source)) !== null) {
-    if (match.index > lastIndex) nodes.push(source.slice(lastIndex, match.index));
-    const token = match[0];
-    const key = `${match.index}:${token}`;
-    const link = /^(!?)\[([^\]]*)\]\(([^)]*)\)$/u.exec(token);
-    if (link !== null) {
-      const image = link[1] === "!";
-      const label = link[2] || link[3] || "链接";
-      const target = markdownLinkDestination(link[3] ?? "");
-      const content = image ? `图片：${label}` : label;
-      nodes.push(interactiveLinks
-        ? (
-          <button className={image ? styles.imageReference : styles.link} key={key} onClick={() => onOpenLink?.(target)} type="button">
-            {content}
-          </button>
-        )
-        : <span className={image ? styles.imageReference : styles.link} key={key}>{content}</span>);
-    } else if (token.startsWith("`")) {
-      nodes.push(<code key={key}>{token.slice(1, -1)}</code>);
-    } else if (token.startsWith("**") || token.startsWith("__")) {
-      nodes.push(<strong key={key}>{token.slice(2, -2)}</strong>);
-    } else if (token.startsWith("~~")) {
-      nodes.push(<del key={key}>{token.slice(2, -2)}</del>);
-    } else if (token.startsWith("<")) {
-      const target = token.slice(1, -1);
-      nodes.push(interactiveLinks
-        ? <button className={styles.link} key={key} onClick={() => onOpenLink?.(target)} type="button">{target}</button>
-        : <span className={styles.link} key={key}>{target}</span>);
-    } else {
-      nodes.push(<em key={key}>{token.slice(1, -1)}</em>);
-    }
-    lastIndex = pattern.lastIndex;
-  }
-  if (lastIndex < source.length) nodes.push(source.slice(lastIndex));
-  return nodes;
-}
-
-function markdownLinkDestination(value: string): string {
-  return value.startsWith("<") && value.endsWith(">")
-    ? value.slice(1, -1)
-    : value;
-}
-
-function stripRawHtml(source: string): string {
-  return source.replace(
-    /(!?\[[^\]]*\]\(<[^<>]*>\))|<\/?[A-Za-z][A-Za-z\d-]*(?:\s[^<>]*?)?\s*\/?>/gu,
-    (token, markdownLink: string | undefined) => markdownLink === undefined ? "" : token,
-  );
-}
-
-function isTableDivider(line: string): boolean {
-  return /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/u.test(line);
-}
-
-function splitTableRow(line: string): string[] {
-  return line.trim().replace(/^\||\|$/gu, "").split("|").map((cell) => stripRawHtml(cell.trim()));
-}
-
-function headingId(text: string): string {
-  return text.trim().toLocaleLowerCase().replace(/\s+/gu, "-").replace(/[^\p{Letter}\p{Number}_-]/gu, "");
 }

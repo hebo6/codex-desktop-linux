@@ -29,7 +29,8 @@ Tauri 主进程负责进程生命周期、网络连接、文件访问、凭据�
 | 无障碍组件 | Radix UI Primitives | 外观由项目样式控制 |
 | 长列表 | 项目内置 `useVirtualRows` | 会话列表按需虚拟化 |
 | 样式 | CSS Modules 与 CSS Variables | 不以运行时 CSS 注入为基础方案 |
-| Markdown | react-markdown 与 remark-gfm | 禁止渲染原始 HTML |
+| Markdown | react-markdown、unified 与 remark-gfm | 采用标准 CommonMark 与 GFM 语法树 |
+| 数学公式 | remark-math 与 rehype-katex / KaTeX | 样式和字体随应用本地打包 |
 | 消毒 | rehype-sanitize | 使用项目自定义白名单 |
 | 代码高亮 | Shiki Web Worker | 避免阻塞 UI 主线程 |
 | 图标 | 单一 SVG 图标集 | 统一视觉尺寸和风格 |
@@ -304,11 +305,15 @@ HTML 不在 WebView 中渲染；用户显式打开时，Rust 层将 app-server �
 
 ### Markdown 与链接
 
-Markdown 禁止原始 HTML，并通过项目白名单移除脚本、事件属性、嵌入对象和任意内联样式
+正文、紧凑摘要与复制纯文本共用 remark 插件配置，布局转换和文本提取均基于同一套语法树，不单独扫描 Markdown 字符串
+
+Markdown 禁止原始 HTML，rehype-sanitize 先通过项目白名单移除脚本、事件属性、嵌入对象和输入中的内联样式，再由 rehype-katex 在 `trust: false` 下生成公式
+
+公式 HTML 使用 `hast-util-from-html-isomorphic` 的默认纯解析器转换为语法树，避免浏览器入口通过临时 DOM 解析时触发 CSP 拦截；KaTeX 的受信输出经 React 逐属性应用样式，生产环境 CSP 保持 `style-src 'self'`
 
 URL 只允许明确白名单协议，远程内容不得访问应用内部 Tauri 地址或携带本地凭据
 
-所有链接经过统一 LinkResolver，组件不得自行打开浏览器或文件系统
+链接和图片的 URL 存于语法树元数据，通过按钮回调交给统一 LinkResolver，不写入可导航的 `href` 或可加载资源的 `src`，组件不得自行打开浏览器或文件系统
 
 外部网页由 Rust 层调用系统默认浏览器，WebView 不导航到远程网站
 
