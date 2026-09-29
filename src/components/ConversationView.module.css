@@ -866,6 +866,8 @@ button.fileChangeRow {
 }
 
 .questionMarker {
+  --question-marker-width: 12px;
+
   position: relative;
   display: flex;
   width: 52px;
@@ -879,28 +881,22 @@ button.fileChangeRow {
 }
 
 .questionMarkerLine {
-  width: 12px;
+  width: var(--question-marker-width);
   height: 2px;
   border-radius: 999px;
   background: currentColor;
-  transition:
-    width var(--duration-panel) var(--ease-standard),
-    color 140ms ease;
-}
-
-.questionMarker[data-current-distance="2"] .questionMarkerLine {
-  width: 18px;
-}
-
-.questionMarker[data-current-distance="1"] .questionMarkerLine {
-  width: 28px;
+  transition: color 140ms ease;
 }
 
 .questionMarker[aria-current="location"] .questionMarkerLine,
 .questionMarker:hover .questionMarkerLine,
 .questionMarker:focus-visible .questionMarkerLine {
-  width: 40px;
   color: var(--color-text-secondary);
+}
+
+.questionMarker:hover .questionMarkerLine,
+.questionMarker:focus-visible .questionMarkerLine {
+  width: 40px;
 }
 
 .questionPreview {

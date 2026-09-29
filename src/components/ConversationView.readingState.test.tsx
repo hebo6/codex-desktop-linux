@@ -133,7 +133,7 @@ async function nextFrame() {
 }
 
 describe("历史问题导航阅读标记", () => {
-  it("跟随顶部问题或回答，并在跳转、布局变化和阅读位置恢复后更新", async () => {
+  it("波形随区段内滚动连续变化，保持顶部问题最长并在布局变化和恢复后更新", async () => {
     const layout = mockLayout();
     const turns: ThreadTurn[] = Array.from({ length: 4 }, (_, index) => ({
       id: `turn-${index + 1}`,
@@ -155,9 +155,15 @@ describe("历史问题导航阅读标记", () => {
     const rendered = render(view(thread, state));
     await nextFrame();
     const scroller = screen.getByLabelText("会话消息");
+    const widths = () => Array.from(
+      screen.getByRole("navigation", { name: "历史问题快速导航" }).querySelectorAll("button"),
+      (marker) => Number.parseFloat(marker.style.getPropertyValue("--question-marker-width")),
+    );
     const expectCurrent = (index: number) => {
       expect(screen.getByRole("button", { current: "location" }))
         .toHaveAccessibleName(`跳转到问题 ${index}：问题 ${index}`);
+      expect(widths()[index - 1]).toBe(40);
+      expect(widths().every((width) => width <= 40 && width >= 12)).toBe(true);
     };
     const scroll = (top: number) => {
       fireEvent.wheel(scroller, { deltaY: top - scroller.scrollTop });
@@ -169,16 +175,46 @@ describe("历史问题导航阅读标记", () => {
     expectCurrent(3);
     scroll(0);
     expectCurrent(1);
+    const initialWidths = widths();
     scroll(200);
     expectCurrent(1);
-    scroll(400);
-    expectCurrent(2);
+    const middleWidths = widths();
+    scroll(300);
+    expectCurrent(1);
+    expect(widths()[1]).toBeGreaterThan(middleWidths[1]!);
+    expect(middleWidths[1]).toBeGreaterThan(initialWidths[1]!);
+    scroll(200);
+    expect(widths()).toEqual(middleWidths);
+
+    // 跨越区段边界时逐像素衔接，最长条不能提前切到下一个问题
+    for (const boundary of [400, 1_000]) {
+      scroll(boundary - 0.1);
+      const before = widths();
+      scroll(boundary);
+      const atBoundary = widths();
+      scroll(boundary + 0.1);
+      expectCurrent(boundary === 400 ? 2 : 3);
+      widths().forEach((width, index) => {
+        expect(Math.abs(width - before[index]!)).toBeLessThan(0.02);
+        expect(Math.abs(width - atBoundary[index]!)).toBeLessThan(0.02);
+      });
+    }
     scroll(1_300);
     expectCurrent(3);
 
     fireEvent.click(screen.getByRole("button", { name: "跳转到问题 2：问题 2" }));
     fireEvent.scroll(scroller);
     expectCurrent(2);
+
+    // 最后一个问题没有后继问题，使用内容末端计算进度
+    layout.heights.set("a4", 1_020);
+    layout.resize();
+    scroll(2_100);
+    expectCurrent(4);
+    const lastQuestionWidths = widths();
+    scroll(2_400);
+    expectCurrent(4);
+    expect(widths()[2]).toBeLessThan(lastQuestionWidths[2]!);
     scroll(1_300);
 
     // 前面的内容展开后，即使没有滚动事件，也重新判断顶部所属问题

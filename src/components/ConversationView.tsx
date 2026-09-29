@@ -11,6 +11,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type RefObject,
   type TouchEvent as ReactTouchEvent,
   type UIEvent,
   type WheelEvent as ReactWheelEvent,
@@ -303,6 +304,7 @@ export function ConversationView({
   const [initialReadingState] = useState(() => readingState?.current ?? null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const questionNavigationRef = useRef<HTMLElement>(null);
   const pendingQuestionPositionRef = useRef<string | null>(null);
   const pendingFinalAnswerQuestionPositionRef =
     useRef<PendingFinalAnswerQuestionPosition | null>(null);
@@ -1164,21 +1166,43 @@ export function ConversationView({
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     const content = contentRef.current;
-    if (scroller === null || content === null || historyQuestions.length < 4) {
+    const navigation = questionNavigationRef.current;
+    if (scroller === null || content === null || navigation === null) {
       return;
     }
+    const questionRows = Array.from(
+      content.querySelectorAll<HTMLElement>("[data-question-index]"),
+    );
+    const markers = navigation.querySelectorAll<HTMLButtonElement>("button");
     const updateCurrentQuestion = () => {
       const viewportTop = scroller.getBoundingClientRect().top;
       const firstVisibleRow = Array.from(
         content.querySelectorAll<HTMLElement>('[data-row-type="segment"]'),
       ).find((row) => row.getBoundingClientRect().bottom > viewportTop);
       // 回答和活动沿用其前一个问题，问题气泡离开视口后仍保持阅读标记
-      const question = firstVisibleRow === undefined
-        ? undefined
-        : historyQuestions.findLast(
+      const currentIndex = firstVisibleRow === undefined
+        ? -1
+        : historyQuestions.findLastIndex(
           ({ rowIndex }) => rowIndex <= Number(firstVisibleRow.dataset.rowIndex),
         );
-      setCurrentQuestionId(question?.itemId ?? null);
+      const currentRow = questionRows[currentIndex];
+      let position: number | null = null;
+      if (currentRow !== undefined) {
+        const top = currentRow.getBoundingClientRect().top;
+        const nextRow = questionRows[currentIndex + 1];
+        const bottom = nextRow === undefined
+          ? content.getBoundingClientRect().bottom
+          : nextRow.getBoundingClientRect().top;
+        const progress = Math.max(0, Math.min(1, (viewportTop - top) / (bottom - top)));
+        // 在当前标记的前后半格内连续移动，保证当前问题始终对应最长条
+        position = currentIndex - 0.5 + progress;
+      }
+      // 逐像素更新仅修改导航的 CSS 变量，不让整段消息随每次滚动重新渲染
+      markers.forEach((marker, index) => {
+        const width = position === null ? 12 : questionMarkerWidth(Math.abs(index - position));
+        marker.style.setProperty("--question-marker-width", `${width}px`);
+      });
+      setCurrentQuestionId(historyQuestions[currentIndex]?.itemId ?? null);
     };
     updateCurrentQuestion();
     scroller.addEventListener("scroll", updateCurrentQuestion);
@@ -1531,6 +1555,7 @@ export function ConversationView({
       {historyQuestions.length >= 4 ? (
         <HistoryQuestionNavigation
           currentQuestionId={currentQuestionId}
+          navigationRef={questionNavigationRef}
           onSelect={(question) => {
             const scroller = scrollerRef.current;
             const top = questionTop(question);
@@ -1660,18 +1685,30 @@ function ConversationRowView({
   );
 }
 
+function questionMarkerWidth(distance: number): number {
+  if (distance <= 0.5) return 40;
+  if (distance >= 3) return 12;
+  const widths = [40, 28, 18, 12] as const;
+  const segment = Math.floor(distance);
+  const start = segment === 0 ? 0.5 : segment;
+  const progress = (distance - start) / (segment + 1 - start);
+  const eased = progress * progress * (3 - 2 * progress);
+  return widths[segment]! + (widths[segment + 1]! - widths[segment]!) * eased;
+}
+
 function HistoryQuestionNavigation({
   currentQuestionId,
+  navigationRef,
   onSelect,
   questions,
 }: {
   readonly currentQuestionId: string | null;
+  readonly navigationRef: RefObject<HTMLElement | null>;
   readonly onSelect: (question: HistoryQuestion) => void;
   readonly questions: readonly HistoryQuestion[];
 }) {
-  const currentIndex = questions.findIndex(({ itemId }) => itemId === currentQuestionId);
   return (
-    <nav aria-label="历史问题快速导航" className={styles.questionNavigation}>
+    <nav aria-label="历史问题快速导航" className={styles.questionNavigation} ref={navigationRef}>
       {questions.map((question, index) => {
         const previewId = `history-question-preview-${index}`;
         return (
@@ -1680,7 +1717,6 @@ function HistoryQuestionNavigation({
             aria-describedby={previewId}
             aria-label={`跳转到问题 ${index + 1}：${question.question}`}
             className={styles.questionMarker}
-            data-current-distance={currentIndex < 0 ? undefined : Math.abs(index - currentIndex)}
             key={question.itemId}
             onClick={() => onSelect(question)}
             type="button"
