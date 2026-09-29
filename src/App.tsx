@@ -50,6 +50,7 @@ import { useAccountRateLimits } from "./app/useAccountRateLimits";
 import { useAccountTokenUsage } from "./app/useAccountTokenUsage";
 import { usePreferences } from "./app/usePreferences";
 import { usePendingThreadResults } from "./app/usePendingThreadResults";
+import { useUserInputNotifications } from "./app/useUserInputNotifications";
 import { collectHighRiskServerIds } from "./app/highRiskServerIds";
 import { threadIndicatorStatus } from "./app/threadIndicatorStatus";
 import {
@@ -670,6 +671,14 @@ export function App({
     || threadRestorePhase !== "ready"
     || conversation.submitting || conversation.stopping || conversation.shellCommandActive;
   const recentQuestion = recentAsyncQuestion(displayedRestoredThread?.turns ?? EMPTY_THREAD_TURNS);
+  useUserInputNotifications({
+    client: connection.threadClient,
+    enabled: !preferences.loading && preferences.preferences.notifyUserInput,
+    notificationService,
+    pending: serverInteractions.pending,
+    subscribedThreadIds,
+    windowId,
+  });
 
   useEffect(() => {
     setCommandLocationRequest(null);
@@ -840,7 +849,8 @@ export function App({
   useEffect(() => {
     const currentKeys = new Set(serverInteractions.pending.map(({ key }) => key));
     const hasNewRequest = serverInteractions.pending.some(
-      ({ key }) => !notifiedApprovalKeysRef.current.has(key),
+      ({ key, request }) => request.method !== "item/tool/requestUserInput"
+        && !notifiedApprovalKeysRef.current.has(key),
     );
     if (hasNewRequest && preferences.preferences.notifyApproval) {
       void notificationService.show({
@@ -1855,6 +1865,7 @@ export function App({
     const notificationKeys = [
       "notifyTaskComplete",
       "notifyApproval",
+      "notifyUserInput",
       "notifyConnectionFailure",
     ] as const;
     const enabling = notificationKeys.some((key) => patch[key] === true);
@@ -2727,6 +2738,7 @@ function disableRequestedNotifications(
     ...patch,
     ...(patch.notifyTaskComplete === true ? { notifyTaskComplete: false } : {}),
     ...(patch.notifyApproval === true ? { notifyApproval: false } : {}),
+    ...(patch.notifyUserInput === true ? { notifyUserInput: false } : {}),
     ...(patch.notifyConnectionFailure === true
       ? { notifyConnectionFailure: false }
       : {}),

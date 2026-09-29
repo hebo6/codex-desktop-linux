@@ -59,6 +59,14 @@ function renderSettings(overrides: Partial<Parameters<typeof SettingsDialog>[0]>
 }
 
 describe("SettingsDialog", () => {
+  it("提问通知默认开启且可以独立关闭", () => {
+    const { props } = renderSettings({ initialSection: "notifications" });
+    const toggle = screen.getByRole("checkbox", { name: "向用户提问" });
+    expect(toggle).toBeChecked();
+    fireEvent.click(toggle);
+    expect(props.onUpdatePreferences).toHaveBeenCalledExactlyOnceWith({ notifyUserInput: false });
+  });
+
   it("提供全部设置分区并立即提交主题选择", () => {
     const { props } = renderSettings();
     expect(screen.getAllByRole("button", { name: /外观|通用|通知|服务器|代理|权限|数据与隐私|快捷键|诊断|开发者/u })).toHaveLength(10);

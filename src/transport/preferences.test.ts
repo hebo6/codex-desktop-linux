@@ -4,6 +4,11 @@ import { createPreferencesStore, DEFAULT_APP_PREFERENCES, parsePreferences } fro
 import type { TauriIpc } from "./tauriIpc";
 
 describe("preferences transport", () => {
+  it("提问通知缺省开启，并保留用户明确关闭的选择", () => {
+    expect(parsePreferences({}).notifyUserInput).toBe(true);
+    expect(parsePreferences({ notifyUserInput: false }).notifyUserInput).toBe(false);
+  });
+
   it("缺失字段使用稳定默认值", () => {
     expect(parsePreferences({ theme: "dark", enterToSend: false })).toEqual({
       ...DEFAULT_APP_PREFERENCES,

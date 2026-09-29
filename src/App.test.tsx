@@ -23,6 +23,7 @@ import type { WindowStateControllerOptions } from "./app/useWindowState";
 import {
   AppServerCapabilityClient,
   AppServerConversationClient,
+  AppServerInteractionClient,
   AppServerThreadClient,
   type ServerConnectionTestProbe,
 } from "./appServer";
@@ -48,7 +49,8 @@ import {
   configurationSnapshotReplaced,
 } from "./store/configurationSlice";
 import { connectionReducer } from "./store/connectionSlice";
-import type { ServerNotification } from "./protocol/generated";
+import type { ServerNotification, ServerRequest } from "./protocol/generated";
+import { DEFAULT_APP_PREFERENCES } from "./transport/preferences";
 import type {
   UpdateWindowTabsRequest,
   WindowServerReferenceSubscriber,
@@ -201,6 +203,7 @@ function renderApp(
     readonly windowFocusSource?: WindowFocusSource;
     readonly protocolDebugWindowOpener?: () => Promise<void>;
     readonly externalUrlOpener?: ExternalUrlOpener;
+    readonly notificationOptions?: Pick<NonNullable<Parameters<typeof App>[0]>, "notificationService" | "preferencesStore">;
   } = {},
 ) {
   const testStore = createTestStore();
@@ -302,10 +305,29 @@ function renderApp(
           ? {}
           : { externalUrlOpener: options.externalUrlOpener })}
         windowStateOptions={windowStateOptions}
+        {...options.notificationOptions}
       />
     </Provider>,
   );
   return { loader, testStore, windowOpener, unmount: view.unmount };
+}
+
+function questionNotificationOptions(notifyUserInput: boolean) {
+  return {
+    notificationService: {
+      permission: vi.fn(async () => "granted" as const),
+      requestPermission: vi.fn(async () => "granted" as const),
+      show: vi.fn(async () => true),
+    },
+    preferencesStore: {
+      load: vi.fn(async () => ({ ...DEFAULT_APP_PREFERENCES, notifyUserInput, notifyApproval: true })),
+      save: vi.fn(async (value) => value),
+      clearApplicationLogs: vi.fn(),
+      clearTemporaryFiles: vi.fn(),
+      clearAllLocalData: vi.fn(),
+      readDiagnostics: vi.fn(),
+    },
+  };
 }
 
 const SIDEBAR_THREAD = {
@@ -325,10 +347,19 @@ const SIDEBAR_THREAD = {
   updatedAt: 200,
 } as const;
 
-function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: ServerEventStore) {
+function renderSidebarThreadScenario(
+  existingThreadTab = false,
+  serverEvents?: ServerEventStore,
+  notificationOptions?: Pick<NonNullable<Parameters<typeof App>[0]>, "notificationService" | "preferencesStore">,
+) {
   const notificationHandlers = new Set<(notification: ServerNotification) => void>();
+  const requestHandlers = new Map<ServerRequest["method"], (request: ServerRequest) => unknown>();
   const requests: Array<{ readonly method: string; readonly params?: Record<string, unknown> }> = [];
   const requestSession = {
+    registerServerRequestHandler(method: ServerRequest["method"], handler: (request: ServerRequest) => unknown) {
+      requestHandlers.set(method, handler);
+      return () => { requestHandlers.delete(method); };
+    },
     sendRequest(request: { readonly method: string; readonly params?: Record<string, unknown> }) {
       requests.push(request);
       const result = request.method === "thread/list"
@@ -368,6 +399,7 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
     ...(serverEvents === undefined ? {} : { serverEvents }),
     conversationClient: new AppServerConversationClient(requestSession as never),
     threadClient: new AppServerThreadClient(requestSession as never),
+    interactionClient: new AppServerInteractionClient(requestSession),
     async start() {
       options.onStateChange({
         phase: "ready",
@@ -411,6 +443,7 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
   renderApp(() => ({ servers: [localServer()], proxies: [] }), {
     draftStore,
     sessionFactory,
+    ...(notificationOptions === undefined ? {} : { notificationOptions }),
     windowStateOptions: {
       loader: vi.fn(async () => authoritative),
       tabsUpdater,
@@ -419,6 +452,9 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
   return {
     requests,
     tabsUpdater,
+    emitRequest(request: ServerRequest) {
+      return requestHandlers.get(request.method)?.(request);
+    },
     emitNotification(notification: ServerNotification) {
       for (const handler of notificationHandlers) handler(notification);
     },
@@ -426,6 +462,66 @@ function renderSidebarThreadScenario(existingThreadTab = false, serverEvents?: S
 }
 
 describe("App", () => {
+  it.each([true, false])("后台标签的异步提问遵循独立通知开关（%s）", async (notifyUserInput) => {
+    const notificationOptions = questionNotificationOptions(notifyUserInput);
+    const { emitNotification } = renderSidebarThreadScenario(true, undefined, notificationOptions);
+    await screen.findByRole("button", { name: /^侧边栏目标，/u });
+    await waitFor(() => expect(notificationOptions.preferencesStore.load).toHaveBeenCalled());
+
+    act(() => emitNotification({
+      method: "item/completed",
+      params: {
+        threadId: SIDEBAR_THREAD.id, turnId: "question-turn", completedAtMs: 1,
+        item: {
+          type: "agentMessage", id: "question-item", text: "问题正文", delivery: "async",
+          questions: [{ title: "私人问题", options: ["私人选项"] }],
+        },
+      },
+    }));
+
+    if (notifyUserInput) {
+      expect(notificationOptions.notificationService.show).toHaveBeenCalledExactlyOnceWith({
+        title: "Codex 需要你的回答",
+        body: "返回对应窗口查看并回答问题",
+        tag: `question:main:${SIDEBAR_THREAD.id}`,
+      });
+    } else {
+      expect(notificationOptions.notificationService.show).not.toHaveBeenCalled();
+    }
+  });
+
+  it.each([true, false])("同步提问遵循提问开关且不会误发审批通知（%s）", async (notifyUserInput) => {
+    const notificationOptions = questionNotificationOptions(notifyUserInput);
+    const { emitRequest, emitNotification } = renderSidebarThreadScenario(true, undefined, notificationOptions);
+    await screen.findByRole("button", { name: /^侧边栏目标，/u });
+    const request: ServerRequest = {
+      id: "question-request", method: "item/tool/requestUserInput",
+      params: {
+        threadId: SIDEBAR_THREAD.id, turnId: "question-turn", itemId: "question-item", isBlocking: true,
+        questions: [{ id: "question-1", header: "方案", question: "私人问题" }],
+      },
+    };
+    act(() => { emitRequest(request); });
+    expect(notificationOptions.notificationService.show).toHaveBeenCalledTimes(notifyUserInput ? 1 : 0);
+    expect(notificationOptions.notificationService.show).not.toHaveBeenCalledWith(expect.objectContaining({
+      title: "Codex 正在等待审批",
+    }));
+
+    act(() => emitNotification({
+      method: "serverRequest/resolved",
+      params: { threadId: SIDEBAR_THREAD.id, requestId: request.id },
+    }));
+    act(() => { emitRequest({
+      id: "approval-request", method: "item/fileChange/requestApproval",
+      params: { threadId: SIDEBAR_THREAD.id, turnId: "question-turn", itemId: "file-item", startedAtMs: 2 },
+    }); });
+    expect(notificationOptions.notificationService.show).toHaveBeenLastCalledWith({
+      title: "Codex 正在等待审批",
+      body: "返回对应窗口查看并处理请求",
+      tag: "approval:main",
+    });
+  });
+
   it("异步提问在消息内发送原文并保留草稿，新用户消息隐藏入口但历史选项可复用", async () => {
     const user = userEvent.setup();
     const { emitNotification, requests } = renderSidebarThreadScenario();

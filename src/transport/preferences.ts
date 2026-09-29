@@ -8,6 +8,7 @@ export interface AppPreferences {
   readonly sidebarWidth: number;
   readonly notifyTaskComplete: boolean;
   readonly notifyApproval: boolean;
+  readonly notifyUserInput: boolean;
   readonly notifyConnectionFailure: boolean;
 }
 
@@ -27,6 +28,7 @@ export const DEFAULT_APP_PREFERENCES = Object.freeze({
   sidebarWidth: 288,
   notifyTaskComplete: false,
   notifyApproval: false,
+  notifyUserInput: true,
   notifyConnectionFailure: false,
 }) satisfies AppPreferences;
 
@@ -76,6 +78,7 @@ export function parsePreferences(value: unknown): AppPreferences {
     sidebarWidth: sidebarWidthOrDefault(value.sidebarWidth),
     notifyTaskComplete: booleanOrDefault(value.notifyTaskComplete, DEFAULT_APP_PREFERENCES.notifyTaskComplete),
     notifyApproval: booleanOrDefault(value.notifyApproval, DEFAULT_APP_PREFERENCES.notifyApproval),
+    notifyUserInput: booleanOrDefault(value.notifyUserInput, DEFAULT_APP_PREFERENCES.notifyUserInput),
     notifyConnectionFailure: booleanOrDefault(value.notifyConnectionFailure, DEFAULT_APP_PREFERENCES.notifyConnectionFailure),
   };
 }
