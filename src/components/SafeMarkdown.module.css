@@ -2,6 +2,7 @@
   color: var(--color-text-primary);
   line-height: 1.72;
   overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .compact {
