@@ -86,16 +86,25 @@ export function RateLimitIndicator({
       }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        buttonRef.current?.focus();
+      if (
+        event.key !== "Escape" ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        document.querySelector('[aria-modal="true"]') !== null
+      ) {
+        return;
       }
+      event.preventDefault();
+      setOpen(false);
+      buttonRef.current?.focus();
     };
     document.addEventListener("pointerdown", closeOnOutside);
-    window.addEventListener("keydown", closeOnEscape);
+    // 在冒泡到 window 的全局快捷键前消费 Esc，避免关闭浮层后继续触发底层操作
+    document.addEventListener("keydown", closeOnEscape);
     return () => {
       document.removeEventListener("pointerdown", closeOnOutside);
-      window.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("keydown", closeOnEscape);
     };
   }, [open]);
 

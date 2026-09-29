@@ -1753,12 +1753,13 @@ export function App({
 
   useEffect(() => {
     const handleGlobalShortcut = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing) return;
       if (event.key === "Escape") {
+        if (event.repeat) return;
         const blockingLayer = document.querySelector(
           '[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"], [aria-label="会话侧栏"][data-open="true"]',
         );
         if (
-          !event.defaultPrevented &&
           blockingLayer === null &&
           conversation.activeTurnId !== null &&
           !conversation.stopping

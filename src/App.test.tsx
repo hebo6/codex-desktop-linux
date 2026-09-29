@@ -736,6 +736,76 @@ describe("App", () => {
     expect(screen.getByRole("dialog", { name: "账户剩余限额详情" })).toBeVisible();
   });
 
+  it.each(["点击", "Alt+L"])("%s 打开限额后 Esc 只关闭浮层，长按不停止生成，再次按下才停止", async (openWith) => {
+    const user = userEvent.setup();
+    const { emitNotification, requests } = renderSidebarThreadScenario();
+    await user.click(await screen.findByRole("button", { name: /^侧边栏目标，/u }));
+    const composer = await screen.findByRole("textbox", { name: "任务输入" });
+    act(() => emitNotification({
+      method: "turn/started",
+      params: {
+        threadId: SIDEBAR_THREAD.id,
+        turn: { id: "turn-escape", items: [], status: "inProgress" },
+      },
+    }));
+    const trigger = screen.getByRole("button", { name: "账户剩余限额未知" });
+    if (openWith === "点击") {
+      await user.click(trigger);
+    } else {
+      composer.focus();
+      await user.keyboard("{Alt>}l{/Alt}");
+    }
+    expect(screen.getByRole("dialog", { name: "账户剩余限额详情" })).toBeVisible();
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "账户剩余限额详情" })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(requests.filter(({ method }) => method === "turn/interrupt")).toHaveLength(0);
+    fireEvent.keyDown(trigger, { key: "Escape", repeat: true });
+    fireEvent.keyDown(trigger, { key: "Escape", isComposing: true });
+    expect(requests.filter(({ method }) => method === "turn/interrupt")).toHaveLength(0);
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(requests.filter(({ method }) => method === "turn/interrupt")).toEqual([
+      expect.objectContaining({
+        method: "turn/interrupt", params: { threadId: SIDEBAR_THREAD.id, turnId: "turn-escape" },
+      }),
+    ]));
+  });
+
+  it("限额上方打开模态对话框时，每次 Esc 只关闭最上层", async () => {
+    const user = userEvent.setup();
+    renderSidebarThreadScenario();
+    const composer = await screen.findByRole("textbox", { name: "任务输入" });
+    composer.focus();
+    await user.keyboard("{Alt>}l{/Alt}{Control>}/{/Control}");
+    expect(screen.getByRole("dialog", { name: "键盘快捷键" })).toBeVisible();
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "键盘快捷键" })).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "账户剩余限额详情" })).toBeVisible();
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "账户剩余限额详情" })).not.toBeInTheDocument();
+  });
+
+  it("全局快捷键不重复处理已被控件消费的事件", async () => {
+    renderSidebarThreadScenario();
+    const composer = await screen.findByRole("textbox", { name: "任务输入" });
+    const event = new KeyboardEvent("keydown", {
+      ctrlKey: true, key: "/", bubbles: true, cancelable: true,
+    });
+    event.preventDefault();
+
+    fireEvent(composer, event);
+
+    expect(screen.queryByRole("dialog", { name: "键盘快捷键" })).not.toBeInTheDocument();
+  });
+
   it("F6 在输入框和消息区之间切换，保留草稿选区与滚动位置，Ctrl+L 直接返回输入框", async () => {
     const user = userEvent.setup();
     renderSidebarThreadScenario();

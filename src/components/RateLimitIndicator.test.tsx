@@ -34,7 +34,7 @@ describe("RateLimitIndicator", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     fireEvent.keyDown(window, { altKey: true, key: "l" });
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(trigger, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
 
@@ -74,6 +74,45 @@ describe("RateLimitIndicator", () => {
     fireEvent(window, event);
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("Escape 关闭限额后，同一事件不再触发全局操作", () => {
+    const onGlobalEscape = vi.fn();
+    const handleGlobalShortcut = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented) onGlobalEscape();
+    };
+    window.addEventListener("keydown", handleGlobalShortcut);
+    try {
+      render(
+        <RateLimitIndicator data={null} error={null} loading={false} onRefresh={vi.fn()} refreshing={false} updatedAt={null} />,
+      );
+      const trigger = screen.getByRole("button", { name: "账户剩余限额未知" });
+      fireEvent.click(trigger);
+
+      fireEvent.keyDown(screen.getByRole("button", { name: "刷新" }), { key: "Escape" });
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+      expect(onGlobalEscape).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("keydown", handleGlobalShortcut);
+    }
+  });
+
+  it.each(["已处理", "输入法合成", "长按重复"])("Escape 在%s时不关闭限额", (reason) => {
+    render(
+      <RateLimitIndicator data={null} error={null} loading={false} onRefresh={vi.fn()} refreshing={false} updatedAt={null} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "账户剩余限额未知" }));
+    const event = new KeyboardEvent("keydown", {
+      key: "Escape", bubbles: true, cancelable: true,
+      isComposing: reason === "输入法合成", repeat: reason === "长按重复",
+    });
+    if (reason === "已处理") event.preventDefault();
+
+    fireEvent(screen.getByRole("button", { name: "刷新" }), event);
+
+    expect(screen.getByRole("dialog", { name: "账户剩余限额详情" })).toBeVisible();
   });
 
   it("圆环优先展示普通 5 小时限额，详情展示所有窗口", () => {
