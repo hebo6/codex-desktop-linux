@@ -16,6 +16,7 @@ import {
   sourceLanguageForMarkdownFence,
 } from "../content/syntaxLanguages";
 import syntaxTokenStyles from "./SyntaxToken.module.css";
+import { isEscapeDismissal } from "./keyboardEvents";
 import styles from "./SafeMarkdown.module.css";
 
 export function SafeMarkdown({
@@ -317,7 +318,7 @@ function CodeBlock({
       setConfirmationOpen(false);
     };
     const closeFromEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") {
+      if (!isEscapeDismissal(event)) {
         return;
       }
       event.preventDefault();

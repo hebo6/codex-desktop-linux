@@ -5,6 +5,7 @@ import {
   type KeyboardShortcutGroup,
 } from "./keyboardShortcuts";
 import { useModalLayer } from "./modalStack";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import styles from "./KeyboardShortcutsDialog.module.css";
 
 interface KeyboardShortcutsDialogProps {
@@ -45,12 +46,12 @@ function KeyboardShortcutsDialogContent({
       if (!isTopmostModal()) {
         return;
       }
-      if (event.key === "Escape") {
+      if (isEscapeDismissal(event)) {
         event.preventDefault();
         onClose();
         return;
       }
-      if (event.key !== "Tab" || dialogRef.current === null) {
+      if (!isFocusTraversal(event) || dialogRef.current === null) {
         return;
       }
       const focusable = [

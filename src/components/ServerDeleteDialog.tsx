@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef } from "react";
 
 import type { ServerId, ServerProfile } from "../configuration";
 import { useModalLayer } from "./modalStack";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import styles from "./ServerDeleteDialog.module.css";
 
 export interface ServerDeleteDialogProps {
@@ -67,7 +68,7 @@ export function ServerDeleteDialog({
       if (!isTopmostModal()) {
         return;
       }
-      if (event.key === "Tab") {
+      if (isFocusTraversal(event)) {
         const dialog = dialogRef.current;
         if (!dialog) {
           return;
@@ -100,7 +101,7 @@ export function ServerDeleteDialog({
         return;
       }
 
-      if (event.key !== "Escape") {
+      if (!isEscapeDismissal(event)) {
         return;
       }
 

@@ -1213,6 +1213,76 @@ describe("Composer", () => {
     expect(trigger).toHaveFocus();
   });
 
+  it("项目浮层忽略长按 Escape 的重复事件，独立按键才关闭", () => {
+    renderComposer({ onCwdChange: vi.fn() });
+    const trigger = screen.getByRole("button", { name: "项目" });
+    fireEvent.click(trigger);
+    const search = screen.getByRole("searchbox", { name: "搜索项目" });
+
+    fireEvent.keyDown(search, { key: "Escape", repeat: true });
+    expect(screen.getByRole("dialog", { name: "项目设置" })).toBeVisible();
+    expect(search).toHaveFocus();
+
+    fireEvent.keyDown(search, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "项目设置" })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it("自定义工作目录的 Escape 只取消编辑，不触发后台停止快捷键", () => {
+    const { rerender } = renderComposer({ onCwdChange: vi.fn() });
+    fireEvent.click(screen.getByRole("button", { name: "项目" }));
+    fireEvent.click(screen.getByRole("button", { name: "输入自定义目录…" }));
+    rerender({ activeTurn: true });
+    const stopFromShortcut = vi.fn();
+    const handleBackgroundShortcut = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented) {
+        stopFromShortcut();
+      }
+    };
+    window.addEventListener("keydown", handleBackgroundShortcut);
+    try {
+      fireEvent.keyDown(screen.getByRole("textbox", { name: "服务器工作目录" }), {
+        key: "Escape",
+      });
+
+      expect(screen.queryByRole("textbox", { name: "服务器工作目录" })).not.toBeInTheDocument();
+      expect(stopFromShortcut).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("keydown", handleBackgroundShortcut);
+    }
+  });
+
+  it.each(["Enter", "Escape"])("自定义工作目录不重复处理已消费或输入法合成中的 %s", (key) => {
+    const onCwdChange = vi.fn();
+    renderComposer({ onCwdChange });
+    fireEvent.click(screen.getByRole("button", { name: "项目" }));
+    fireEvent.click(screen.getByRole("button", { name: "输入自定义目录…" }));
+    const input = screen.getByRole("textbox", { name: "服务器工作目录" });
+    const handledEvent = createEvent.keyDown(input, { key });
+    handledEvent.preventDefault();
+
+    fireEvent(input, handledEvent);
+    expect(input).toBeVisible();
+    expect(onCwdChange).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key, isComposing: true });
+    expect(input).toBeVisible();
+    expect(onCwdChange).not.toHaveBeenCalled();
+  });
+
+  it("自定义工作目录不响应长按 Escape 的重复事件", () => {
+    renderComposer({ onCwdChange: vi.fn() });
+    fireEvent.click(screen.getByRole("button", { name: "项目" }));
+    fireEvent.click(screen.getByRole("button", { name: "输入自定义目录…" }));
+    const input = screen.getByRole("textbox", { name: "服务器工作目录" });
+
+    fireEvent.keyDown(input, { key: "Escape", repeat: true });
+    expect(input).toBeVisible();
+
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(input).not.toBeInTheDocument();
+  });
+
   it("项目名溢出时渐隐并在悬浮或键盘聚焦时显示全文", async () => {
     const longName = "这是一个超过项目下拉框可用宽度的项目名称";
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get")

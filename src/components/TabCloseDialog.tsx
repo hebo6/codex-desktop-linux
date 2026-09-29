@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef } from "react";
 
 import { useModalLayer } from "./modalStack";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import styles from "./DeleteDialog.module.css";
 
 export interface TabCloseConfirmation {
@@ -49,14 +50,14 @@ export function TabCloseDialog({
       if (!isTopmostModal()) {
         return;
       }
-      if (event.key === "Escape") {
+      if (isEscapeDismissal(event)) {
         event.preventDefault();
         if (!closing) {
           onCancel();
         }
         return;
       }
-      if (event.key !== "Tab") {
+      if (!isFocusTraversal(event)) {
         return;
       }
       const buttons = Array.from(

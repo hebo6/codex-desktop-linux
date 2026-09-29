@@ -806,6 +806,45 @@ describe("App", () => {
     expect(screen.queryByRole("dialog", { name: "键盘快捷键" })).not.toBeInTheDocument();
   });
 
+  it.each(["服务器选择器", "会话右键菜单"])("%s上方打开模态后 Esc 不关闭底层浮层", async (layer) => {
+    const user = userEvent.setup();
+    renderSidebarThreadScenario();
+    await screen.findByRole("textbox", { name: "任务输入" });
+    if (layer === "服务器选择器") {
+      await user.click(screen.getByRole("button", { name: "本机开发，已连接，打开服务器选择器" }));
+    } else {
+      fireEvent.contextMenu(screen.getByRole("button", { name: /^侧边栏目标，/u }));
+    }
+    const lowerLayer = layer === "服务器选择器"
+      ? screen.getByRole("dialog")
+      : screen.getByRole("menu");
+    await user.keyboard("{Control>}/{/Control}");
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "键盘快捷键" })).not.toBeInTheDocument();
+    expect(lowerLayer).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(lowerLayer).not.toBeInTheDocument();
+  });
+
+  it("长按 Esc 关闭上层弹窗后不继续关闭下层设置", async () => {
+    const user = userEvent.setup();
+    renderSidebarThreadScenario();
+    const composer = await screen.findByRole("textbox", { name: "任务输入" });
+    composer.focus();
+    await user.keyboard("{Control>},{/Control}{Control>}/{/Control}");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "键盘快捷键" })).not.toBeInTheDocument();
+    const settings = screen.getByRole("dialog", { name: "设置" });
+
+    fireEvent.keyDown(document.activeElement!, { key: "Escape", repeat: true });
+
+    expect(settings).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(settings).not.toBeInTheDocument();
+  });
+
   it("F6 在输入框和消息区之间切换，保留草稿选区与滚动位置，Ctrl+L 直接返回输入框", async () => {
     const user = userEvent.setup();
     renderSidebarThreadScenario();

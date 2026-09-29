@@ -47,6 +47,7 @@ import {
   ComposerAccessoryRow,
 } from "./ComposerAccessoryPanel";
 import { FilePreviewDialog, type BlobImagePreviewRequest } from "./FilePreviewDialog";
+import { isEscapeDismissal } from "./keyboardEvents";
 import { ProjectDeleteDialog } from "./ProjectDeleteDialog";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { SavedPromptManagerDialog } from "./SavedPromptManagerDialog";
@@ -1034,7 +1035,7 @@ export function Composer({
         setSelectedIndex((current) => nextSelectableIndex(suggestions, current, event.key === "ArrowDown" ? 1 : -1));
         return;
       }
-      if (event.key === "Escape") {
+      if (isEscapeDismissal(event.nativeEvent)) {
         event.preventDefault();
         setTrigger(null);
         return;
@@ -1394,10 +1395,12 @@ export function Composer({
                     <label>
                       <span>服务器工作目录</span>
                       <input autoFocus onChange={(event) => setCwdInput(event.target.value)} onKeyDown={(event) => {
+                        if (event.defaultPrevented || event.nativeEvent.isComposing) return;
                         if (event.key === "Enter") {
                           event.preventDefault();
                           applyCwd();
-                        } else if (event.key === "Escape") {
+                        } else if (isEscapeDismissal(event.nativeEvent)) {
+                          event.preventDefault();
                           setEditingCwd(false);
                         }
                       }} placeholder="/workspace/project" value={cwdInput} />
@@ -1752,7 +1755,7 @@ export function Composer({
                   aria-label="选择常用提示词"
                   className={styles.savedPromptPicker}
                   onKeyDown={(event) => {
-                    if (event.key === "Escape") {
+                    if (isEscapeDismissal(event.nativeEvent)) {
                       event.preventDefault();
                       setSavedPromptPickerOpen(false);
                       restoreComposerSelection();
@@ -2165,7 +2168,7 @@ function ProjectPicker({
           } else if (event.key === "Enter" && open) {
             event.preventDefault();
             choose(focusedIndex);
-          } else if (event.key === "Escape" && open) {
+          } else if (isEscapeDismissal(event.nativeEvent) && open) {
             event.preventDefault();
             close(true);
           }
@@ -2198,7 +2201,7 @@ function ProjectPicker({
                 } else if (event.key === "Enter") {
                   event.preventDefault();
                   choose(focusedIndex);
-                } else if (event.key === "Escape") {
+                } else if (isEscapeDismissal(event.nativeEvent)) {
                   event.preventDefault();
                   close(true);
                 }
@@ -2511,7 +2514,7 @@ function ModelPicker({
           } else if (event.key === "Enter" && open) {
             event.preventDefault();
             choose(focusedIndex);
-          } else if (event.key === "Escape" && open) {
+          } else if (isEscapeDismissal(event.nativeEvent) && open) {
             event.preventDefault();
             setOpen(false);
           }
@@ -2669,7 +2672,7 @@ function PermissionPicker({
           } else if (event.key === "Enter" && open) {
             event.preventDefault();
             choose(focusedIndex);
-          } else if (event.key === "Escape" && open) {
+          } else if (isEscapeDismissal(event.nativeEvent) && open) {
             event.preventDefault();
             setOpen(false);
           }

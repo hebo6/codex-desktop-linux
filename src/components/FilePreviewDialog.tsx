@@ -39,6 +39,7 @@ import {
   saveRemoteFile,
 } from "../transport/systemDialog";
 import { useModalLayer } from "./modalStack";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import { SafeMarkdown } from "./SafeMarkdown";
 import syntaxTokenStyles from "./SyntaxToken.module.css";
 import styles from "./FilePreviewDialog.module.css";
@@ -239,12 +240,12 @@ export function FilePreviewDialog({
       if (!isTopmostModal()) {
         return;
       }
-      if (event.key === "Escape") {
+      if (isEscapeDismissal(event)) {
         event.preventDefault();
         onClose();
         return;
       }
-      if (event.key !== "Tab" || dialogRef.current === null) {
+      if (!isFocusTraversal(event) || dialogRef.current === null) {
         return;
       }
       const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>(

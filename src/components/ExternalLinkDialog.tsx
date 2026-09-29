@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import type { ExtractedLink } from "../content/linkResolver";
 import { useModalLayer } from "./modalStack";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import styles from "./DeleteDialog.module.css";
 
 export function ExternalLinkDialog({
@@ -55,12 +56,12 @@ export function ExternalLinkDialog({
       if (!isTopmostModal()) {
         return;
       }
-      if (event.key === "Escape" && !opening) {
+      if (isEscapeDismissal(event) && !opening) {
         event.preventDefault();
         onCancel();
         return;
       }
-      if (event.key !== "Tab" || dialogRef.current === null) {
+      if (!isFocusTraversal(event) || dialogRef.current === null) {
         return;
       }
       const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>(

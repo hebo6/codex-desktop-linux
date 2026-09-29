@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef } from "react";
 
 import type { ThreadSummary } from "../app/useServerThreads";
 import { useModalLayer } from "./modalStack";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import styles from "./DeleteDialog.module.css";
 
 export interface ThreadDeleteDialogProps {
@@ -48,14 +49,14 @@ export function ThreadDeleteDialog({
       if (!isTopmostModal()) {
         return;
       }
-      if (event.key === "Escape") {
+      if (isEscapeDismissal(event)) {
         event.preventDefault();
         if (!deleting) {
           onCancel();
         }
         return;
       }
-      if (event.key !== "Tab") {
+      if (!isFocusTraversal(event)) {
         return;
       }
       const buttons = [...(dialogRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])];

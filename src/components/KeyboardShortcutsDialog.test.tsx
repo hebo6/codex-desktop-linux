@@ -63,4 +63,30 @@ describe("KeyboardShortcutsDialog", () => {
     expect(trigger).toHaveFocus();
     trigger.remove();
   });
+
+  it.each(["已处理", "输入法合成", "长按重复"])("%s的 Esc 不关闭弹窗", (reason) => {
+    const onClose = vi.fn();
+    render(<KeyboardShortcutsDialog onClose={onClose} open />);
+    const event = new KeyboardEvent("keydown", {
+      key: "Escape", bubbles: true, cancelable: true,
+      isComposing: reason === "输入法合成", repeat: reason === "长按重复",
+    });
+    if (reason === "已处理") event.preventDefault();
+
+    fireEvent(screen.getByRole("searchbox"), event);
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it.each([{ ctrlKey: true }, { altKey: true }, { metaKey: true }])("焦点循环不抢占带修饰键的 Tab：%j", (modifiers) => {
+    render(<KeyboardShortcutsDialog onClose={vi.fn()} open />);
+    const list = screen.getByRole("region", { name: "快捷键列表" });
+    list.focus();
+
+    expect(fireEvent.keyDown(list, { key: "Tab", ...modifiers })).toBe(true);
+    expect(list).toHaveFocus();
+
+    fireEvent.keyDown(list, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "关闭键盘快捷键" })).toHaveFocus();
+  });
 });

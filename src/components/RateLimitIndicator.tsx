@@ -11,6 +11,7 @@ import {
   selectIndicatorLimitWindow,
 } from "../app/rateLimits";
 import { formatTokenCount } from "./formatTokenCount";
+import { isEscapeDismissal } from "./keyboardEvents";
 import styles from "./RateLimitIndicator.module.css";
 
 export interface RateLimitIndicatorProps {
@@ -87,10 +88,7 @@ export function RateLimitIndicator({
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (
-        event.key !== "Escape" ||
-        event.defaultPrevented ||
-        event.isComposing ||
-        event.repeat ||
+        !isEscapeDismissal(event) ||
         document.querySelector('[aria-modal="true"]') !== null
       ) {
         return;

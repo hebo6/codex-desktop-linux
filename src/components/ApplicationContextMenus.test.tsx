@@ -93,6 +93,10 @@ describe("ApplicationContextMenus", () => {
     expect(restore).toHaveFocus();
     fireEvent.keyDown(restore, { key: "ArrowDown" });
     expect(minimizeItem).toHaveFocus();
+    fireEvent.keyDown(minimizeItem, { key: "Escape", repeat: true });
+    fireEvent.keyDown(minimizeItem, { key: "Tab", ctrlKey: true });
+    expect(screen.getByRole("menu")).toBeVisible();
+    expect(minimizeItem).toHaveFocus();
     fireEvent.keyDown(minimizeItem, { key: "Escape" });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(returnFocus).toHaveFocus();

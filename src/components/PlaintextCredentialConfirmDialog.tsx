@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef } from "react";
 
 import { useModalLayer } from "./modalStack";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import styles from "./PlaintextCredentialConfirmDialog.module.css";
 
 export interface PlaintextCredentialConfirmDialogProps {
@@ -36,13 +37,13 @@ export function PlaintextCredentialConfirmDialog({
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isTopmostModal()) return;
-      if (event.key === "Escape") {
+      if (isEscapeDismissal(event)) {
         event.preventDefault();
         event.stopImmediatePropagation();
         onCancel();
         return;
       }
-      if (event.key !== "Tab" || dialogRef.current === null) return;
+      if (!isFocusTraversal(event) || dialogRef.current === null) return;
       const buttons = Array.from(
         dialogRef.current.querySelectorAll<HTMLButtonElement>(
           "button:not(:disabled)",

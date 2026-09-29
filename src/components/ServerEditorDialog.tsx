@@ -16,6 +16,7 @@ import {
 import { ServerEditorLocalFields } from "./ServerEditorLocalFields";
 import { ServerEditorRemoteFields } from "./ServerEditorRemoteFields";
 import { useModalLayer } from "./modalStack";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import {
   buildServerEditorSubmission,
   createServerEditorDraft,
@@ -208,7 +209,7 @@ function ServerEditorDialogContent({
       if (!isTopmostModal()) {
         return;
       }
-      if (event.key === "Escape") {
+      if (isEscapeDismissal(event)) {
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation();
@@ -217,7 +218,7 @@ function ServerEditorDialogContent({
         }
         return;
       }
-      if (event.key !== "Tab") {
+      if (!isFocusTraversal(event)) {
         return;
       }
       const panel = panelRef.current;

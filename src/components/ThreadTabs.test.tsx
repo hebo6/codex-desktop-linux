@@ -170,6 +170,10 @@ describe("ThreadTabs", () => {
     expect(close).toHaveFocus();
     fireEvent.keyDown(close, { key: "ArrowDown" });
     expect(closeOthers).toHaveFocus();
+    fireEvent.keyDown(closeOthers, { key: "Escape", repeat: true });
+    fireEvent.keyDown(closeOthers, { key: "Tab", ctrlKey: true });
+    expect(screen.getByRole("menu")).toBeVisible();
+    expect(closeOthers).toHaveFocus();
     fireEvent.keyDown(closeOthers, { key: "Escape" });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(first).toHaveFocus();

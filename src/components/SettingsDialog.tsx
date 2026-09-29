@@ -16,6 +16,7 @@ import {
 import { KEYBOARD_SHORTCUT_GROUPS } from "./keyboardShortcuts";
 import type { ServerConnectionView } from "./ServerSwitcher";
 import { useModalLayer } from "./modalStack";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import styles from "./SettingsDialog.module.css";
 
 export type SettingsSection = "appearance" | "general" | "notifications" | "servers" | "proxies" | "permissions" | "privacy" | "shortcuts" | "diagnostics" | "developer";
@@ -143,12 +144,12 @@ function SettingsDialogContent({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isTopmostModal()) return;
-      if (event.key === "Escape") {
+      if (isEscapeDismissal(event)) {
         event.preventDefault();
         onClose();
         return;
       }
-      if (event.key !== "Tab" || panelRef.current === null) return;
+      if (!isFocusTraversal(event) || panelRef.current === null) return;
       const focusable = [...panelRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])')];
       const first = focusable[0];
       const last = focusable.at(-1);

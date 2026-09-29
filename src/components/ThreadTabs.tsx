@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 
 import {
   ThreadStatusIndicator,
@@ -163,7 +164,7 @@ export function ThreadTabs({
       nextIndex = 0;
     } else if (event.key === "End") {
       nextIndex = menuItems.length - 1;
-    } else if (event.key === "Escape" || event.key === "Tab") {
+    } else if (isEscapeDismissal(event.nativeEvent) || isFocusTraversal(event.nativeEvent)) {
       event.preventDefault();
       event.stopPropagation();
       closeContextMenuAndRestoreFocus();

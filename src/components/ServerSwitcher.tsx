@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import type { ServerId, ServerProfile } from "../configuration";
 import type { ConnectionPhase } from "../store/connectionSlice";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import styles from "./ServerSwitcher.module.css";
 
 export interface ServerSwitcherProps {
@@ -282,7 +283,7 @@ export function ServerSwitcher({
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") {
+      if (!isEscapeDismissal(event) || document.querySelector('[aria-modal="true"]') !== null) {
         return;
       }
 
@@ -444,7 +445,7 @@ export function ServerSwitcher({
       nextIndex = 0;
     } else if (event.key === "End") {
       nextIndex = menuItems.length - 1;
-    } else if (event.key === "Escape") {
+    } else if (isEscapeDismissal(event.nativeEvent)) {
       event.preventDefault();
       event.stopPropagation();
       const menuServerId = openMenuServerId;
@@ -453,7 +454,7 @@ export function ServerSwitcher({
         menuButtonRefs.current.get(menuServerId)?.focus();
       }
       return;
-    } else if (event.key === "Tab") {
+    } else if (isFocusTraversal(event.nativeEvent)) {
       event.preventDefault();
       event.stopPropagation();
       const menuServerId = openMenuServerId;

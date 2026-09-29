@@ -18,6 +18,7 @@ import {
 } from "./proxyEditorModel";
 import type { ServerEditorTestState, SshHostKeyPrompt } from "./serverEditorModel";
 import { useModalLayer } from "./modalStack";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import serverStyles from "./ServerEditorDialog.module.css";
 import styles from "./ProxyEditorDialog.module.css";
 
@@ -71,12 +72,12 @@ function ProxyEditorDialogContent({
     panelRef.current?.querySelector<HTMLElement>("input")?.focus();
     const keydown = (event: KeyboardEvent) => {
       if (!isTopmostModal()) return;
-      if (event.key === "Escape" && !saving && !testing) {
+      if (isEscapeDismissal(event) && !saving && !testing) {
         event.preventDefault();
         onCancel();
         return;
       }
-      if (event.key !== "Tab" || panelRef.current === null) return;
+      if (!isFocusTraversal(event) || panelRef.current === null) return;
       const focusable = [...panelRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])')];
       const first = focusable[0];
       const last = focusable.at(-1);

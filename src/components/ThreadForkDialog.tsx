@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef } from "react";
 
 import { useModalLayer } from "./modalStack";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import styles from "./DeleteDialog.module.css";
 
 export function ThreadForkDialog({
@@ -43,11 +44,11 @@ export function ThreadForkDialog({
       if (!isTopmostModal()) {
         return;
       }
-      if (event.key === "Escape" && !forking) {
+      if (isEscapeDismissal(event) && !forking) {
         event.preventDefault();
         onCancel();
       }
-      if (event.key !== "Tab") {
+      if (!isFocusTraversal(event)) {
         return;
       }
       const buttons = [...(dialogRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])];

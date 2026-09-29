@@ -28,6 +28,7 @@ import {
   TerminalIcon,
 } from "./SidebarIcons";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
+import { isEscapeDismissal } from "./keyboardEvents";
 import styles from "./RecentThreads.module.css";
 
 export interface RecentThreadsProps {
@@ -450,7 +451,7 @@ export function RecentThreads({
       setContextMenu(null);
     };
     const closeFromKeyboard = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (isEscapeDismissal(event) && document.querySelector('[aria-modal="true"]') === null) {
         event.preventDefault();
         setContextMenu(null);
       }
@@ -520,7 +521,7 @@ export function RecentThreads({
           event.key !== "Escape" ||
           event.defaultPrevented
         ) return;
-        if (event.nativeEvent.isComposing) {
+        if (!isEscapeDismissal(event.nativeEvent)) {
           event.stopPropagation();
           return;
         }

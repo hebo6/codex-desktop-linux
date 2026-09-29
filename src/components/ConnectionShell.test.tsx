@@ -265,6 +265,21 @@ describe("ConnectionShell", () => {
     expect(screen.getByRole("complementary", { name: "会话侧栏" })).toHaveAttribute("data-open", "true");
   });
 
+  it("长按 Esc 关闭搜索后不继续关闭覆盖式侧栏", () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true })));
+    render(<ConnectionShell phase="ready" />);
+    fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
+    fireEvent.keyDown(screen.getByRole("searchbox"), { key: "Escape" });
+    const sidebar = screen.getByRole("complementary", { name: "会话侧栏" });
+    const trigger = screen.getByRole("button", { name: "最近会话操作" });
+
+    fireEvent.keyDown(trigger, { key: "Escape", repeat: true });
+
+    expect(sidebar).toHaveAttribute("data-open", "true");
+    fireEvent.keyDown(trigger, { key: "Escape" });
+    expect(sidebar).toHaveAttribute("data-open", "false");
+  });
+
   it("搜索关闭后保留项目折叠状态，进入搜索时清理会话右键菜单", () => {
     render(<ConnectionShell phase="ready" threadListPhase="ready" threads={[threadSummary("项目", 1)]} onOpenThreadInNewTab={vi.fn()} />);
     fireEvent.contextMenu(screen.getByRole("button", { name: /^项目，/u }));

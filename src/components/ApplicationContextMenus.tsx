@@ -7,6 +7,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 
 import styles from "./ApplicationContextMenus.module.css";
 
@@ -137,7 +138,7 @@ export function ApplicationContextMenus() {
       nextIndex = 0;
     } else if (event.key === "End") {
       nextIndex = menuItems.length - 1;
-    } else if (event.key === "Escape" || event.key === "Tab") {
+    } else if (isEscapeDismissal(event.nativeEvent) || isFocusTraversal(event.nativeEvent)) {
       event.preventDefault();
       event.stopPropagation();
       closeMenuAndRestoreFocus(setMenu, returnFocusRef.current);

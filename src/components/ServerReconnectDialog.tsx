@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef } from "react";
 
 import { useModalLayer } from "./modalStack";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import styles from "./ServerReconnectDialog.module.css";
 
 export interface ServerReconnectDialogProps {
@@ -47,7 +48,7 @@ export function ServerReconnectDialog({
       if (!isTopmostModal()) {
         return;
       }
-      if (event.key === "Tab") {
+      if (isFocusTraversal(event)) {
         const dialog = dialogRef.current;
         if (dialog === null) {
           return;
@@ -73,7 +74,7 @@ export function ServerReconnectDialog({
         return;
       }
 
-      if (event.key !== "Escape") {
+      if (!isEscapeDismissal(event)) {
         return;
       }
 

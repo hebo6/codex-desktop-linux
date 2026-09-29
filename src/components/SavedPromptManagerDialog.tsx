@@ -10,6 +10,7 @@ import {
 
 import type { SavedPrompt, SavedPromptDraft } from "../transport/savedPrompts";
 import { useModalLayer } from "./modalStack";
+import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import styles from "./SavedPromptManagerDialog.module.css";
 
 interface SavedPromptManagerDialogProps {
@@ -89,7 +90,7 @@ function SavedPromptManagerDialogContent({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isTopmostModal()) return;
-      if (event.key === "Escape") {
+      if (isEscapeDismissal(event)) {
         event.preventDefault();
         if (saving) return;
         if (editor !== null) {
@@ -101,7 +102,7 @@ function SavedPromptManagerDialogContent({
         }
         return;
       }
-      if (event.key !== "Tab") return;
+      if (!isFocusTraversal(event)) return;
       const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
         'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
       ) ?? []);

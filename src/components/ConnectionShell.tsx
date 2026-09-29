@@ -27,6 +27,7 @@ import {
   SidebarCollapseIcon,
 } from "./SidebarIcons";
 import { WindowControls } from "./WindowControls";
+import { isEscapeDismissal } from "./keyboardEvents";
 import styles from "./ConnectionShell.module.css";
 
 export type { ConnectionPhase } from "../store/connectionSlice";
@@ -309,8 +310,7 @@ export function ConnectionShell({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
-        event.key === "Escape" &&
-        !event.defaultPrevented &&
+        isEscapeDismissal(event) &&
         document.querySelector('[aria-modal="true"]') === null
       ) {
         event.preventDefault();
@@ -390,7 +390,7 @@ export function ConnectionShell({
       nextIndex = 0;
     } else if (event.key === "End") {
       nextIndex = items.length - 1;
-    } else if (event.key === "Escape") {
+    } else if (isEscapeDismissal(event.nativeEvent)) {
       event.preventDefault();
       event.stopPropagation();
       setThreadActionsOpen(false);
@@ -500,7 +500,7 @@ export function ConnectionShell({
                 data-refreshing={displayedRefreshingThreads}
                 onClick={() => setThreadActionsOpen((open) => !open)}
                 onKeyDown={(event) => {
-                  if (event.key === "Escape" && threadActionsOpen) {
+                  if (isEscapeDismissal(event.nativeEvent) && threadActionsOpen) {
                     event.preventDefault();
                     setThreadActionsOpen(false);
                   }
