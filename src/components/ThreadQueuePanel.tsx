@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useServerEvents } from "../app/useServerEvents";
 import type { QueueClient } from "../appServer/conversationClient";
@@ -36,7 +36,7 @@ export function ThreadQueuePanel({ client, store, threadId, canEdit, onEdit }: {
   const entries = queue?.entries.filter((entry) => !withdrawn.has(entry.id)) ?? [];
   const ready = client !== null && snapshot?.connected === true && queue?.status === "ready";
 
-  const withdraw = async (entryId: string, edit: boolean) => {
+  const withdraw = useCallback(async (entryId: string, edit: boolean) => {
     if (!ready || client === null || operationRef.current !== null || (edit && !canEdit)) return;
     // Notifications reach the store before its batched UI subscription updates.
     const latest = store?.getSnapshot();
@@ -75,7 +75,33 @@ export function ThreadQueuePanel({ client, store, threadId, canEdit, onEdit }: {
         setPending(null);
       }
     }
-  };
+  }, [canEdit, client, onEdit, ready, store, threadId]);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (
+        event.key !== "ArrowUp" || !event.altKey || event.ctrlKey || event.shiftKey || event.metaKey
+        || event.defaultPrevented || event.repeat || event.isComposing
+        || !ready || !canEdit || operationRef.current !== null
+        || document.querySelector('[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"]') !== null
+      ) return;
+      if (event.target instanceof HTMLElement && (
+        event.target.matches('input, select, textarea:not([data-composer-input])')
+        || event.target.isContentEditable
+      )) return;
+
+      const latest = store?.getSnapshot();
+      const latestQueue = latest?.queuesByThread[threadId];
+      if (!latest?.connected || latestQueue?.status !== "ready") return;
+      const entry = latestQueue.entries.findLast((item) => !withdrawn.has(item.id));
+      if (entry === undefined) return;
+
+      event.preventDefault();
+      void withdraw(entry.id, true);
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [canEdit, ready, store, threadId, withdraw, withdrawn]);
 
   if (entries.length === 0 && feedback === null
     && (queue === undefined || queue.status === "ready")) return null;
@@ -85,7 +111,10 @@ export function ThreadQueuePanel({ client, store, threadId, canEdit, onEdit }: {
     icon={<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" /></svg>}
     label="待发送队列"
     onExpandedChange={setExpanded}
-    summary={`待发送队列 · ${entries.length} 条`}
+    summary={<>
+      {`待发送队列 · ${entries.length} 条`}
+      {!expanded && feedback !== null ? <span role={feedback.error ? "alert" : "status"} title={feedback.text}> · {feedback.text}</span> : null}
+    </>}
   >
     <div className={styles.content}>
       {queue?.status === "pending" ? <p className={styles.hint}>正在刷新队列</p> : null}
@@ -100,9 +129,12 @@ export function ThreadQueuePanel({ client, store, threadId, canEdit, onEdit }: {
           <span className={styles.preview} title={entry.text}>{index + 1}. {entry.text || entry.inputs.map(inputLabel).join("、")}</span>
           <button
             aria-label={`编辑排队消息 ${index + 1}`}
+            aria-keyshortcuts={index === entries.length - 1 ? "Alt+ArrowUp" : undefined}
             disabled={!ready || !canEdit || pending !== null}
             onClick={() => void withdraw(entry.id, true)}
-            title={canEdit ? "撤回到输入框，修改后重新排队" : "请先处理输入框中的草稿，并等待当前操作完成"}
+            title={canEdit
+              ? `撤回到输入框，修改后重新排队${index === entries.length - 1 ? "（Alt+↑）" : ""}`
+              : "请先处理输入框中的草稿，并等待当前操作完成"}
             type="button"
           >编辑</button>
           <button aria-label={`撤销排队消息 ${index + 1}`} disabled={!ready || pending !== null} onClick={() => void withdraw(entry.id, false)} type="button">{pending === entry.id ? "处理中…" : "撤销"}</button>

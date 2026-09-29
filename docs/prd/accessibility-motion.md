@@ -39,6 +39,7 @@
 | 聚焦输入框 | `Ctrl+L` |
 | 发送或追加 | `Enter` |
 | 排队发送（仅运行中） | `Ctrl+Enter` |
+| 编辑队尾消息（输入框为空时） | `Alt+↑` |
 | 换行 | `Shift+Enter` |
 | 复制当前 AI 回答 Markdown | `Ctrl+Shift+C` |
 

@@ -16,6 +16,8 @@ describe("KeyboardShortcutsDialog", () => {
     expect(screen.getByText("发送或追加")).toBeVisible();
     expect(screen.getByText("排队发送（仅运行中）")).toBeVisible();
     expect(screen.getByText("Ctrl+Enter")).toBeVisible();
+    expect(screen.getByText("编辑队尾消息（输入框为空时）")).toBeVisible();
+    expect(screen.getByText("Alt+↑")).toBeVisible();
     expect(screen.getByText("Shift+Enter")).toBeVisible();
     expect(screen.getByText("打开协议检查器")).toBeVisible();
     expect(screen.getByText("Ctrl+Shift+D")).toBeVisible();

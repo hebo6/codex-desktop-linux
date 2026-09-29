@@ -35,6 +35,7 @@ export const KEYBOARD_SHORTCUT_GROUPS: readonly KeyboardShortcutGroup[] = [
       { label: "聚焦输入框", keys: ["Ctrl+L"] },
       { label: "发送或追加", keys: ["Enter"] },
       { label: "排队发送（仅运行中）", keys: ["Ctrl+Enter"] },
+      { label: "编辑队尾消息（输入框为空时）", keys: ["Alt+↑"] },
       { label: "换行", keys: ["Shift+Enter"] },
       { label: "复制当前 AI 回答 Markdown", keys: ["Ctrl+Shift+C"] },
     ],

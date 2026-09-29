@@ -17,7 +17,7 @@ const ENTRY: QueuedSubmission = {
   ],
 };
 
-function setup() {
+async function setup(expanded = true) {
   const store = new ServerEventStore();
   store.hydrateQueue("thread-1", 0, [ENTRY]);
   let resolveDelete!: (value: { deleted: boolean }) => void;
@@ -61,18 +61,24 @@ function setup() {
       accessoryPanel={<ThreadQueuePanel client={client} store={store} threadId="thread-1" canEdit={editing.available} onEdit={editing.edit} />}
     />;
   }
-  const view = render(<Harness />);
-  fireEvent.click(screen.getByRole("button", { name: /^待发送队列/u }));
+  const view = await act(async () => render(<Harness />));
+  if (expanded) fireEvent.click(screen.getByRole("button", { name: /^待发送队列/u }));
   return { ...view, store, client, drafts, draftStore, onQueue, onSend, onRunShellCommand, resolveDelete };
 }
 
 describe("队列撤回与输入框协作", () => {
-  it("收到删除确认后恢复草稿并聚焦，空闲时提交也重新排队且保留附件", async () => {
-    const h = setup();
-    const edit = screen.getByRole("button", { name: "编辑排队消息 1" });
-    await waitFor(() => expect(edit).toBeEnabled());
-    fireEvent.click(edit);
+  it.each(["按钮", "Alt+↑"])("通过 %s 收到删除确认后恢复草稿并聚焦，空闲时提交也重新排队且保留附件", async (trigger) => {
+    const h = await setup(trigger === "按钮");
     const input = screen.getByRole("textbox", { name: "任务输入" });
+    await waitFor(() => expect(input).toBeEnabled());
+    if (trigger === "按钮") {
+      const edit = screen.getByRole("button", { name: "编辑排队消息 1" });
+      await waitFor(() => expect(edit).toBeEnabled());
+      fireEvent.click(edit);
+    } else {
+      fireEvent.keyDown(input, { key: "ArrowUp", altKey: true });
+    }
+    expect(h.client.deleteQueuedSubmission).toHaveBeenCalledExactlyOnceWith("thread-1", ENTRY.id);
     expect(input).toBeDisabled();
     expect(input).toHaveValue("");
     expect(h.drafts.size).toBe(0);
@@ -94,8 +100,18 @@ describe("队列撤回与输入框协作", () => {
     expect(h.drafts.has("draft-1")).toBe(false);
   });
 
+  it("Alt+↑ 不覆盖输入框已有的草稿", async () => {
+    const h = await setup(false);
+    const input = screen.getByRole("textbox", { name: "任务输入" });
+    await waitFor(() => expect(input).toBeEnabled());
+    fireEvent.change(input, { target: { value: "正在撰写" } });
+    expect(fireEvent.keyDown(input, { key: "ArrowUp", altKey: true })).toBe(true);
+    expect(h.client.deleteQueuedSubmission).not.toHaveBeenCalled();
+    expect(input).toHaveValue("正在撰写");
+  });
+
   it("deleted:false 不产生恢复草稿，解锁输入并保持原消息状态", async () => {
-    const h = setup();
+    const h = await setup();
     const edit = screen.getByRole("button", { name: "编辑排队消息 1" });
     await waitFor(() => expect(edit).toBeEnabled());
     fireEvent.click(edit);

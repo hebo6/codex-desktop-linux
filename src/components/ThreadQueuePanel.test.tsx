@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ServerEventStore, type QueuedSubmission } from "../appServer/serverEventState";
@@ -24,6 +24,95 @@ function setup(entries = [ENTRY]) {
 }
 
 describe("ThreadQueuePanel", () => {
+  it("Alt+↑ 在队列收起时编辑最新队尾，等待结果期间不重复撤回", async () => {
+    const latest = { ...ENTRY, id: "queued-2", clientUserMessageId: "client-2" };
+    const h = setup();
+    const result = deferred<{ ok: boolean; message: string }>();
+    h.onEdit.mockReturnValue(result.promise);
+    // The store updates before the batched React subscription renders.
+    act(() => { h.store.hydrateQueue("thread-1", 0, [ENTRY, latest]); });
+
+    expect(fireEvent.keyDown(window, { key: "ArrowUp", altKey: true })).toBe(false);
+    fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
+    expect(h.onEdit).toHaveBeenCalledExactlyOnceWith(latest);
+    expect(h.client.deleteQueuedSubmission).not.toHaveBeenCalled();
+    await act(async () => result.resolve({ ok: true, message: "已撤回到输入框" }));
+    expect(screen.getByRole("status")).toHaveTextContent("已撤回到输入框");
+
+    // A successful withdrawal must not be selected again before the next notification.
+    fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
+    expect(h.onEdit).toHaveBeenLastCalledWith(ENTRY);
+    await act(async () => {});
+  });
+
+  it("快捷键撤回失败时在收起的摘要中显示原因并保留消息", async () => {
+    const h = setup();
+    h.onEdit.mockResolvedValue({ ok: false, message: "未撤回：消息已开始执行" });
+    fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
+    expect(await screen.findByRole("alert")).toHaveTextContent("未撤回：消息已开始执行");
+    h.open();
+    expect(screen.getByText("1. 下一项任务")).toBeVisible();
+  });
+
+  it.each([
+    { key: "ArrowUp" },
+    { key: "ArrowLeft", shiftKey: true },
+    { key: "ArrowUp", altKey: true, ctrlKey: true },
+    { key: "ArrowUp", altKey: true, shiftKey: true },
+    { key: "ArrowUp", altKey: true, metaKey: true },
+    { key: "ArrowUp", altKey: true, repeat: true },
+    { key: "ArrowUp", altKey: true, isComposing: true },
+  ])("不响应不匹配、长按或合成按键 %j", (key) => {
+    const h = setup();
+    expect(fireEvent.keyDown(window, key)).toBe(true);
+    expect(h.onEdit).not.toHaveBeenCalled();
+  });
+
+  it("忽略已处理的按键", () => {
+    const h = setup();
+    const event = createEvent.keyDown(window, { key: "ArrowUp", altKey: true });
+    event.preventDefault();
+    fireEvent(window, event);
+    expect(h.onEdit).not.toHaveBeenCalled();
+  });
+
+  it.each(["dialog", "menu", "listbox"])("%s 打开时不编辑队列", (role) => {
+    const h = setup();
+    render(<div role={role} />);
+    expect(fireEvent.keyDown(window, { key: "ArrowUp", altKey: true })).toBe(true);
+    expect(h.onEdit).not.toHaveBeenCalled();
+  });
+
+  it("其他输入控件使用 Alt+↑ 时不编辑队列", () => {
+    const h = setup();
+    render(<><input aria-label="搜索" /><textarea aria-label="其他草稿" /><select aria-label="选项" /></>);
+    for (const name of ["搜索", "其他草稿", "选项"]) {
+      expect(fireEvent.keyDown(screen.getByLabelText(name), { key: "ArrowUp", altKey: true })).toBe(true);
+    }
+    expect(h.onEdit).not.toHaveBeenCalled();
+  });
+
+  it("队列状态失效但界面尚未刷新时，快捷键不编辑消息", () => {
+    const h = setup();
+    act(() => h.store.consume({ method: "thread/queue/changed", params: { threadId: "thread-1" } }));
+    expect(fireEvent.keyDown(window, { key: "ArrowUp", altKey: true })).toBe(true);
+    expect(h.onEdit).not.toHaveBeenCalled();
+  });
+
+  it("断开连接后立即停止响应快捷键", () => {
+    const h = setup();
+    act(() => h.store.disconnect());
+    expect(fireEvent.keyDown(window, { key: "ArrowUp", altKey: true })).toBe(true);
+    expect(h.onEdit).not.toHaveBeenCalled();
+  });
+
+  it("只为队尾编辑按钮标注快捷键", () => {
+    const h = setup([ENTRY, { ...ENTRY, id: "queued-2" }]);
+    h.open();
+    expect(screen.getByRole("button", { name: "编辑排队消息 1" })).not.toHaveAttribute("aria-keyshortcuts");
+    expect(screen.getByRole("button", { name: "编辑排队消息 2" })).toHaveAttribute("aria-keyshortcuts", "Alt+ArrowUp");
+  });
+
   it("等待删除成功后移除消息，并阻止重复点击", async () => {
     const h = setup();
     const result = deferred<{ deleted: boolean }>();
@@ -85,6 +174,8 @@ describe("ThreadQueuePanel", () => {
     h.open();
     expect(screen.getByRole("button", { name: "编辑排队消息 1" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "撤销排队消息 1" })).toBeEnabled();
+    expect(fireEvent.keyDown(window, { key: "ArrowUp", altKey: true })).toBe(true);
+    expect(h.onEdit).not.toHaveBeenCalled();
   });
 
   it("通知已使队列失效但 UI 尚未刷新时，不发送删除请求", () => {
@@ -120,7 +211,9 @@ describe("ThreadQueuePanel", () => {
   });
 
   it("空队列不产生面板", () => {
-    setup([]);
+    const h = setup([]);
     expect(screen.queryByRole("button", { name: /^待发送队列/u })).not.toBeInTheDocument();
+    expect(fireEvent.keyDown(window, { key: "ArrowUp", altKey: true })).toBe(true);
+    expect(h.onEdit).not.toHaveBeenCalled();
   });
 });
