@@ -163,6 +163,13 @@ export function VisualRegressionFixture({ state, theme }: VisualRegressionQuery)
     let frame = 0;
     let cancelled = false;
     const reveal = () => {
+      if (state === "slash") {
+        const input = document.querySelector<HTMLTextAreaElement>("textarea[data-composer-input]");
+        if (input !== null) {
+          input.setSelectionRange(input.value.length, input.value.length);
+          input.click();
+        }
+      }
       if (state === "model") {
         const button = document.querySelector<HTMLButtonElement>('button[aria-label="模型"]');
         if (button?.getAttribute("aria-expanded") !== "true") {

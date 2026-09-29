@@ -742,6 +742,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: /侧边栏目标，线程空闲/u }));
     const messages = await screen.findByRole("region", { name: "会话消息" });
     const composer = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+    await waitFor(() => expect(composer).toBeEnabled());
     await user.type(composer, "保留草稿和光标选区");
     composer.setSelectionRange(2, 6, "backward");
     composer.scrollTop = 24;
@@ -778,6 +779,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: /侧边栏目标，线程空闲/u }));
     await screen.findByRole("region", { name: "会话消息" });
     const composer = screen.getByRole("textbox", { name: "任务输入" });
+    await waitFor(() => expect(composer).toBeEnabled());
     composer.focus();
 
     await user.keyboard("{Control>}/{/Control}");
@@ -797,6 +799,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: /侧边栏目标，线程空闲/u }));
     await screen.findByRole("region", { name: "会话消息" });
     const composer = screen.getByRole("textbox", { name: "任务输入" });
+    await waitFor(() => expect(composer).toBeEnabled());
     composer.focus();
 
     for (const modifiers of [
