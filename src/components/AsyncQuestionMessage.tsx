@@ -70,85 +70,112 @@ function Question({
   readonly onReply: (text: string) => Promise<boolean>;
 }) {
   const titleId = useId();
+  const contentId = useId();
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(true);
   const [customReply, setCustomReply] = useState(false);
   const [draft, setDraft] = useState("");
   const hasOptions = (question.options?.length ?? 0) > 0;
 
+  const reply = async (text: string): Promise<boolean> => {
+    if (!await onReply(text)) return false;
+    if (contentRef.current?.contains(document.activeElement)) {
+      toggleRef.current?.focus({ preventScroll: true });
+    }
+    setExpanded(false);
+    return true;
+  };
+
   const submitDraft = async () => {
-    if (await onReply(draft)) setDraft("");
+    if (await reply(draft)) setDraft("");
   };
 
   return (
     <section aria-labelledby={titleId} className={styles.question}>
-      <h3 className={styles.title} dir="auto" id={titleId}>{question.title}</h3>
-      {hasOptions ? (
-        <div aria-label="回复选项" className={styles.options} role="group">
-          {question.options?.map((option, index) => (
-            <button
-              className={styles.option}
-              dir="auto"
-              disabled={disabled}
-              key={`${index}:${option}`}
-              onClick={() => { void onReply(option); }}
-              type="button"
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-      ) : null}
-      {customReply || !hasOptions ? (
-        <div className={styles.customReply}>
-          <label>
-            <span>自定义回复</span>
-            <textarea
-              dir="auto"
-              disabled={sending}
-              onChange={(event) => setDraft(event.currentTarget.value)}
-              rows={3}
-              value={draft}
-            />
-          </label>
-          <div className={styles.actions}>
-            {hasOptions ? (
+      <h3 className={styles.title} id={titleId}>
+        <button
+          aria-controls={contentId}
+          aria-expanded={expanded}
+          className={styles.toggle}
+          onClick={() => setExpanded((open) => !open)}
+          ref={toggleRef}
+          type="button"
+        >
+          <span dir="auto">{question.title}</span>
+          <span aria-hidden="true" className={styles.chevron}>›</span>
+        </button>
+      </h3>
+      <div className={styles.content} hidden={!expanded} id={contentId} ref={contentRef}>
+        {hasOptions ? (
+          <div aria-label="回复选项" className={styles.options} role="group">
+            {question.options?.map((option, index) => (
               <button
-                className={styles.action}
-                disabled={sending}
-                onClick={() => setCustomReply(false)}
+                className={styles.option}
+                dir="auto"
+                disabled={disabled}
+                key={`${index}:${option}`}
+                onClick={() => { void reply(option); }}
                 type="button"
               >
-                收起自定义回复
+                {option}
               </button>
-            ) : null}
+            ))}
+          </div>
+        ) : null}
+        {customReply || !hasOptions ? (
+          <div className={styles.customReply}>
+            <label>
+              <span>自定义回复</span>
+              <textarea
+                dir="auto"
+                disabled={sending}
+                onChange={(event) => setDraft(event.currentTarget.value)}
+                rows={3}
+                value={draft}
+              />
+            </label>
+            <div className={styles.actions}>
+              {hasOptions ? (
+                <button
+                  className={styles.action}
+                  disabled={sending}
+                  onClick={() => setCustomReply(false)}
+                  type="button"
+                >
+                  收起自定义回复
+                </button>
+              ) : null}
+              <button
+                className={styles.sendAction}
+                disabled={disabled || draft.trim() === ""}
+                onClick={() => { void submitDraft(); }}
+                type="button"
+              >
+                发送回复
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className={styles.actions}>
             <button
-              className={styles.sendAction}
-              disabled={disabled || draft.trim() === ""}
-              onClick={() => { void submitDraft(); }}
+              className={styles.action}
+              disabled={sending}
+              onClick={() => setCustomReply(true)}
               type="button"
             >
-              发送回复
+              自定义回复
             </button>
+            <span className={styles.hint}>点击选项直接发送</span>
           </div>
-        </div>
-      ) : (
-        <div className={styles.actions}>
-          <button
-            className={styles.action}
-            disabled={sending}
-            onClick={() => setCustomReply(true)}
-            type="button"
-          >
-            自定义回复
-          </button>
-          <span className={styles.hint}>点击选项直接发送</span>
-        </div>
-      )}
-      {sending ? <p className={styles.hint} role="status">发送中…</p> : null}
-      {error ? (
-        <p className={styles.error} role="status">
-          发送结果未确认，请检查聊天记录后再重试
-        </p>
-      ) : null}
+        )}
+        {sending ? <p className={styles.hint} role="status">发送中…</p> : null}
+        {error ? (
+          <p className={styles.error} role="status">
+            发送结果未确认，请检查聊天记录后再重试
+          </p>
+        ) : null}
+      </div>
     </section>
   );
 }

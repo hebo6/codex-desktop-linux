@@ -568,6 +568,8 @@ describe("App", () => {
         input: [{ type: "text", text: "简洁" }],
       }),
     })));
+    await waitFor(() => expect(within(panel).getByRole("button", { name: "你希望怎么说明？" }))
+      .toHaveAttribute("aria-expanded", "false"));
     expect(composer).toHaveValue("保留这份草稿");
     expect(within(panel).getByText("还有什么需要补充？")).toBeVisible();
     act(() => {
@@ -595,12 +597,14 @@ describe("App", () => {
       });
     });
     expect(screen.queryByRole("button", { name: "查看最近提问" })).not.toBeInTheDocument();
+    await user.click(within(panel).getByRole("button", { name: "你希望怎么说明？" }));
     await user.click(within(panel).getByRole("button", { name: "详细" }));
     await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
       method: "turn/steer",
       params: expect.objectContaining({ input: [{ type: "text", text: "详细" }] }),
     })));
-    expect(within(panel).getByRole("button", { name: "简洁" })).toBeEnabled();
+    await waitFor(() => expect(within(panel).getByRole("button", { name: "你希望怎么说明？" }))
+      .toHaveAttribute("aria-expanded", "false"));
   });
 
   afterEach(() => vi.unstubAllGlobals());

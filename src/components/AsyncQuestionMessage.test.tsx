@@ -42,7 +42,27 @@ describe("AsyncQuestionMessage", () => {
     expect(screen.queryByRole("button", { name: "忽略此问题" })).not.toBeInTheDocument();
   });
 
-  it("选项可通过键盘原样发送，发送后不保留已选状态且可再次点击", async () => {
+  it("每题可通过标题独立折叠，键盘展开后保留未提交草稿", async () => {
+    const user = userEvent.setup();
+    render(<AsyncQuestionMessage disabled={false} questions={QUESTIONS} />);
+    const first = screen.getByRole("region", { name: QUESTIONS[0]!.title });
+    const toggle = within(first).getByRole("button", { name: QUESTIONS[0]!.title });
+    await user.click(within(first).getByRole("button", { name: "自定义回复" }));
+    await user.type(within(first).getByRole("textbox"), "保留草稿");
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(within(first).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "SQLite" })).toBeVisible();
+
+    await user.keyboard("{Enter}");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(within(first).getByRole("textbox")).toHaveValue("保留草稿");
+    await user.keyboard(" ");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("选项通过键盘原样发送，成功折叠并将焦点移到标题，展开后可再次点击", async () => {
     const user = userEvent.setup();
     const onReply = vi.fn(async () => true);
     const optionText = "  适中：原理加一个示例\n保留格式  ";
@@ -60,8 +80,13 @@ describe("AsyncQuestionMessage", () => {
     expect(onReply).toHaveBeenCalledExactlyOnceWith(optionText);
     expect(option).toBeEnabled();
     expect(option).not.toHaveAttribute("aria-pressed");
+    expect(option).not.toBeVisible();
+    const toggle = screen.getByRole("button", { name: "讲解方式" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveFocus();
     expect(screen.getByRole("heading", { name: "讲解方式" })).toBeVisible();
 
+    await user.click(toggle);
     await user.click(option);
     expect(onReply).toHaveBeenCalledTimes(2);
     expect(onReply).toHaveBeenLastCalledWith(optionText);
@@ -81,10 +106,35 @@ describe("AsyncQuestionMessage", () => {
     expect(screen.getByRole("button", { name: "简洁" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "PostgreSQL" })).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent("发送中");
+    expect(screen.getByRole("button", { name: QUESTIONS[0]!.title }))
+      .toHaveAttribute("aria-expanded", "true");
 
     await act(async () => pending.resolve(true));
+    expect(screen.getByRole("button", { name: QUESTIONS[0]!.title }))
+      .toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "简洁" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "PostgreSQL" })).toBeEnabled();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("等待发送结果时转去编辑其他内容，成功折叠不会抢走焦点", async () => {
+    const user = userEvent.setup();
+    const pending = deferred<boolean>();
+    render(
+      <>
+        <AsyncQuestionMessage disabled={false} onReply={() => pending.promise} questions={QUESTIONS} />
+        <textarea aria-label="任务输入" />
+      </>,
+    );
+    await user.click(screen.getByRole("button", { name: "简洁" }));
+    const composer = screen.getByRole("textbox", { name: "任务输入" });
+    await user.type(composer, "继续编辑");
+    await act(async () => pending.resolve(true));
+
+    expect(screen.getByRole("button", { name: QUESTIONS[0]!.title }))
+      .toHaveAttribute("aria-expanded", "false");
+    expect(composer).toHaveFocus();
+    expect(composer).toHaveValue("继续编辑");
   });
 
   it.each(["false", "throw"])("发送返回 %s 后保留选项，由用户显式重试", async (outcome) => {
@@ -101,6 +151,8 @@ describe("AsyncQuestionMessage", () => {
     });
     expect(onReply).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: "简洁" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: QUESTIONS[0]!.title }))
+      .toHaveAttribute("aria-expanded", "true");
 
     onReply.mockResolvedValue(true);
     fireEvent.click(screen.getByRole("button", { name: "简洁" }));
@@ -131,7 +183,13 @@ describe("AsyncQuestionMessage", () => {
     await user.click(within(first).getByRole("button", { name: "发送回复" }));
     expect(onReply).toHaveBeenCalledExactlyOnceWith("  原始回复\n保留格式  ");
     expect(firstDraft).toHaveValue("");
+    expect(firstDraft).not.toBeVisible();
+    expect(within(first).getByRole("button", { name: QUESTIONS[0]!.title }))
+      .toHaveAttribute("aria-expanded", "false");
     expect(secondDraft).toHaveValue("另一题草稿");
+    expect(secondDraft).toBeVisible();
+    await user.click(within(first).getByRole("button", { name: QUESTIONS[0]!.title }));
+    expect(within(first).getByRole("textbox")).toHaveValue("");
     expect(within(first).getByRole("button", { name: "简洁" })).toBeEnabled();
   });
 

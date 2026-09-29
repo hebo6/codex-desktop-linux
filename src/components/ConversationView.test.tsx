@@ -292,6 +292,10 @@ describe("ConversationView", () => {
     expect(scroller.scrollTop).toBe(376);
     fireEvent.click(screen.getByRole("button", { name: "简洁" }));
     await waitFor(() => expect(onReply).toHaveBeenCalledWith("简洁"));
+    const toggle = screen.getByRole("button", { name: "选择说明方式" });
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-expanded", "false"));
+    expect(screen.queryByRole("button", { name: "简洁" })).not.toBeInTheDocument();
+    fireEvent.click(toggle);
     expect(screen.getByRole("button", { name: "简洁" })).toBeEnabled();
   });
 
