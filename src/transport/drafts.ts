@@ -1,4 +1,5 @@
 import type { TurnStartParams } from "../protocol/generated";
+import { validateUserInput } from "../protocol/validation";
 import { tauriIpc, type TauriIpc } from "./tauriIpc";
 
 type StructuredInput = Extract<
@@ -9,6 +10,7 @@ type StructuredInput = Extract<
 export interface StoredDraft {
   readonly text: string;
   readonly tokens: readonly StructuredInput[];
+  readonly restoredInput?: TurnStartParams["input"];
 }
 
 export interface DraftStore {
@@ -120,7 +122,7 @@ export function createTransientDraftStore(
           return;
         }
         transient.set(draftKey, Object.freeze({
-          text: draft.text,
+          ...draft,
           tokens: Object.freeze([...draft.tokens]),
         }));
         return;
@@ -143,7 +145,7 @@ export function createTransientDraftStore(
         transient.delete(sourceDraftKey);
         if (draft !== null) {
           transient.set(targetDraftKey, Object.freeze({
-            text: draft.text,
+            ...draft,
             tokens: Object.freeze([...draft.tokens]),
           }));
         }
@@ -169,7 +171,7 @@ export function createTransientDraftStore(
         transient.delete(targetDraftKey);
       } else {
         transient.set(targetDraftKey, Object.freeze({
-          text: draft.text,
+          ...draft,
           tokens: Object.freeze([...draft.tokens]),
         }));
       }
@@ -193,7 +195,23 @@ export function parseStoredDraft(value: unknown): StoredDraft | null {
     throw new TypeError("invalid stored draft");
   }
   const tokens = value.tokens.map(parseStructuredInput);
-  return Object.freeze({ text: value.text, tokens: Object.freeze(tokens) });
+  const restoredInput = value.restoredInput === undefined
+    ? undefined
+    : parseRestoredInput(value.restoredInput);
+  return Object.freeze({
+    text: value.text,
+    tokens: Object.freeze(tokens),
+    ...(restoredInput === undefined ? {} : { restoredInput }),
+  });
+}
+
+function parseRestoredInput(value: unknown): TurnStartParams["input"] {
+  if (!Array.isArray(value)) throw new TypeError("invalid restored draft input");
+  return value.map((input: unknown) => {
+    const result = validateUserInput(input);
+    if (!result.ok) throw new TypeError("invalid restored draft input");
+    return result.value;
+  });
 }
 
 function parseStructuredInput(value: unknown): StructuredInput {

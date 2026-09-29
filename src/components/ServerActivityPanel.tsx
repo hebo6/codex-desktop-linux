@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useServerEvents } from "../app/useServerEvents";
 import type { ThreadTurn } from "../app/useServerThreads";
-import type { QueueInputPreview, ServerEventRecord, ServerEventSnapshot, ServerEventStore } from "../appServer/serverEventState";
+import type { ServerEventRecord, ServerEventSnapshot, ServerEventStore } from "../appServer/serverEventState";
 import { parseTurnDiff } from "../content/turnDiff";
 import type { ThreadGoal, ThreadRealtimeAudioChunk, ThreadTokenUsage } from "../protocol/generated/types/ServerNotification";
 import { ComposerAccessoryDisclosure } from "./ComposerAccessoryPanel";
@@ -50,13 +50,11 @@ export function ServerActivityPanel({ store, threadId, turns = EMPTY_TURNS, fail
   const goal = snapshot?.goalsByThread[threadId];
   const diffs = Object.values(snapshot?.diffsByTurn ?? {}).filter((diff) => diff.threadId === threadId);
   const realtime = snapshot?.realtimeByThread[threadId];
-  const queue = snapshot?.queuesByThread[threadId];
   const hasGoal = goal?.goal != null && goal.goal.status !== "complete";
   const hasRealtime = realtime !== undefined && (realtime.status !== "completed" || realtime.transcripts.length > 0 || realtime.chunks.length > 0);
-  const hasQueue = queue !== undefined && (queue.entries.length > 0 || queue.status !== "ready");
   const attention = threadRecords.filter((record) => record.status === "warning" || record.status === "failed").length
-    + threadFailures.length + (queue?.status === "error" ? 1 : 0);
-  const hasThread = threadRecords.length > 0 || threadFailures.length > 0 || usage !== undefined || hasGoal || diffs.length > 0 || hasRealtime || hasQueue;
+    + threadFailures.length;
+  const hasThread = threadRecords.length > 0 || threadFailures.length > 0 || usage !== undefined || hasGoal || diffs.length > 0 || hasRealtime;
 
   if (!hasThread) return null;
 
@@ -79,7 +77,6 @@ export function ServerActivityPanel({ store, threadId, turns = EMPTY_TURNS, fail
           <h3>当前会话</h3>
           {usage === undefined ? null : <TokenUsage usage={usage.tokenUsage} stale={usage.stale} />}
           {hasGoal ? <GoalStatus goal={goal.goal} stale={goal.stale} /> : null}
-          {hasQueue && queue !== undefined ? <QueueStatus queue={queue} /> : null}
           {diffs.map((diff) => <TurnDiffSummary diff={diff} key={`${threadId}:${diff.turnId}`} {...(onOpenDiff === undefined ? {} : { onOpenDiff })} />)}
           {hasRealtime ? <RealtimeStatus key={threadId} realtime={realtime} /> : null}
           <Failures failures={threadFailures} />
@@ -176,43 +173,6 @@ function Remaining({ label, used, total }: { readonly label: string; readonly us
 
 function Metric({ label, value }: { readonly label: string; readonly value: number }) {
   return <div><dt>{label}</dt><dd>{formatTokenCount(value)}</dd></div>;
-}
-
-function QueueStatus({ queue }: { readonly queue: ServerEventSnapshot["queuesByThread"][string] }) {
-  return <article className={styles.card}>
-    <h4>待处理输入 · {queue.entries.length} 条</h4>
-    {queue.status === "pending" ? <p className={styles.muted}>正在刷新输入队列</p> : null}
-    {queue.status === "unknown" ? <p className={styles.muted}>连接已断开，队列状态待同步</p> : null}
-    {queue.status === "error" ? <p>{queue.error}</p> : null}
-    <ol className={styles.queue}>{queue.entries.map((entry, index) => <li key={entry.id}>
-      <Detail title={`待处理输入 ${index + 1} · ${entry.inputs.map(inputLabel).join("、")}`}>
-        {entry.inputs.map((input, inputIndex) => <p className={styles.input} key={inputIndex}>{inputDescription(input)}</p>)}
-        {entry.truncated ? <Truncated /> : null}
-      </Detail>
-    </li>)}</ol>
-  </article>;
-}
-
-function inputLabel(input: QueueInputPreview): string {
-  switch (input.type) {
-    case "text": return "文字";
-    case "image": case "localImage": return "图片";
-    case "audio": case "localAudio": return "音频";
-    case "skill": return `技能 ${input.name}`;
-    case "mention": return `引用 ${input.name}`;
-  }
-}
-
-function inputDescription(input: QueueInputPreview): ReactNode {
-  switch (input.type) {
-    case "text": return input.text;
-    case "image": return "已附加图片";
-    case "audio": return "已附加音频";
-    case "localImage": return `本地图片 · ${input.path}`;
-    case "localAudio": return `本地音频 · ${input.path}`;
-    case "skill": return `技能 ${input.name} · ${input.path}`;
-    case "mention": return `引用 ${input.name} · ${input.path}`;
-  }
 }
 
 function RealtimeStatus({ realtime }: { readonly realtime: ServerEventSnapshot["realtimeByThread"][string] }) {

@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import type { ClientRequest, ThreadItemsListResponse } from "../generated";
+import type { ClientRequest, ThreadItemsListResponse, UserInput } from "../generated";
 import {
   parseJsonRpcMessage,
   validateConfigReadResponse,
@@ -16,9 +16,51 @@ import {
   validateThreadResumeResponse,
   validateThreadItemsListResponse,
   validateThreadTurnsListResponse,
+  validateUserInput,
 } from ".";
 
 describe("协议运行时边界", () => {
+  it("校验并保留用户输入中的文本元素、附件、引用与扩展字段", () => {
+    const inputs: UserInput[] = [
+      {
+        type: "text",
+        text: "查看 @file",
+        text_elements: [{ byteRange: { start: 7, end: 12 }, placeholder: "@file" }],
+        extra: { preserved: true },
+      },
+      { type: "image", url: "https://example.com/image.png", detail: "original" },
+      { type: "image", fileId: "file-1" },
+      { type: "localImage", path: "/workspace/image.png", detail: "high" },
+      { type: "audio", url: "https://example.com/audio.wav" },
+      { type: "localAudio", path: "/workspace/audio.wav" },
+      { type: "skill", name: "review", path: "/workspace/SKILL.md" },
+      { type: "mention", name: "file", path: "/workspace/file.ts" },
+    ];
+    const original = structuredClone(inputs);
+
+    for (const input of inputs) {
+      const result = validateUserInput(input);
+      expect(result).toEqual({ ok: true, value: input });
+      if (result.ok) expect(result.value).toBe(input);
+    }
+    expect(inputs).toEqual(original);
+  });
+
+  it("拒绝缺失关键字段或包含损坏文本元素的用户输入", () => {
+    for (const input of [
+      null,
+      {},
+      { type: "text", text: 1 },
+      { type: "image" },
+      { type: "localImage" },
+      { type: "audio" },
+      { type: "mention", name: "file" },
+      { type: "text", text: "file", text_elements: [{ byteRange: { start: -1, end: 4 } }] },
+    ]) {
+      expect(validateUserInput(input).ok).toBe(false);
+    }
+  });
+
   it("图片输入保留共同判别字段，同时接受 URL 和文件 ID", () => {
     type UserInput = Extract<
       ThreadItemsListResponse["data"][number]["item"],

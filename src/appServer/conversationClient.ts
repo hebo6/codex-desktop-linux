@@ -6,6 +6,8 @@ import type {
   ThreadStartResponse,
   ThreadQueueAddParams,
   ThreadQueueAddResponse,
+  ThreadQueueDeleteParams,
+  ThreadQueueDeleteResponse,
   ThreadSettingsUpdateParams,
   ThreadSettingsUpdateResponse,
   ThreadBackgroundTerminalsListParams,
@@ -30,6 +32,7 @@ import {
   validateThreadShellCommandResponse,
   validateThreadStartResponse,
   validateThreadQueueAddResponse,
+  validateThreadQueueDeleteResponse,
   validateThreadSettingsUpdateResponse,
   validateThreadBackgroundTerminalsListResponse,
   validateThreadBackgroundTerminalsTerminateResponse,
@@ -61,7 +64,14 @@ export type QueueTurnOptions = Pick<
   "clientUserMessageId" | "input"
 >;
 
-export interface ConversationClient {
+export interface QueueClient {
+  deleteQueuedSubmission(
+    threadId: string,
+    queuedSubmissionId: string,
+  ): RequestHandle<ThreadQueueDeleteResponse>;
+}
+
+export interface ConversationClient extends QueueClient {
   startThread(params?: ThreadStartParams): RequestHandle<ThreadStartResponse>;
   runShellCommand(
     threadId: string,
@@ -154,6 +164,18 @@ export class AppServerConversationClient
       method: "thread/queue/add",
       params,
       validateResult: threadQueueAddResponseValidator,
+    });
+  }
+
+  deleteQueuedSubmission(
+    threadId: string,
+    queuedSubmissionId: string,
+  ): RequestHandle<ThreadQueueDeleteResponse> {
+    const params: ThreadQueueDeleteParams = { threadId, queuedSubmissionId };
+    return this.session.sendRequest({
+      method: "thread/queue/delete",
+      params,
+      validateResult: threadQueueDeleteResponseValidator,
     });
   }
 
@@ -253,6 +275,8 @@ const threadStartResponseValidator: ResultValidator<ThreadStartResponse> =
   validateThreadStartResponse;
 const threadQueueAddResponseValidator: ResultValidator<ThreadQueueAddResponse> =
   validateThreadQueueAddResponse;
+const threadQueueDeleteResponseValidator: ResultValidator<ThreadQueueDeleteResponse> =
+  validateThreadQueueDeleteResponse;
 const threadShellCommandResponseValidator: ResultValidator<ThreadShellCommandResponse> =
   validateThreadShellCommandResponse;
 const threadSettingsUpdateResponseValidator: ResultValidator<ThreadSettingsUpdateResponse> =

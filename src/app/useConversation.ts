@@ -361,8 +361,8 @@ export function useConversation({
       client === null ||
       threadId === null ||
       input.length === 0 ||
-      state.activeTurnId === null ||
       state.submitting ||
+      submissionRef.current !== null ||
       state.stopping ||
       shellCommandActive
     ) {
@@ -403,7 +403,6 @@ export function useConversation({
   }, [
     client,
     shellCommandActive,
-    state.activeTurnId,
     state.stopping,
     state.submitting,
   ]);

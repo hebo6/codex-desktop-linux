@@ -10,9 +10,11 @@ import {
   type ConfiguredServerConnectionControllerOptions,
 } from "./app/useConfiguredServerConnection";
 import { useConversation } from "./app/useConversation";
+import { useQueueMessageEditing } from "./app/useQueueMessageEditing";
 import { recentAsyncQuestion } from "./app/asyncQuestions";
 import { useBackgroundTerminals } from "./app/useBackgroundTerminals";
 import { ServerActivityPanel } from "./components/ServerActivityPanel";
+import { ThreadQueuePanel } from "./components/ThreadQueuePanel";
 import { useComposerCapabilities } from "./app/useComposerCapabilities";
 import { useConfiguredProjects } from "./app/useConfiguredProjects";
 import {
@@ -400,6 +402,19 @@ export function App({
     () => createTransientDraftStore(draftStore),
     [draftStore],
   );
+  const activeComposerDraftKey = composerDraftKey(
+    windowState.windowState?.windowId ?? null,
+    boundServerId,
+    activeTabId,
+    currentThreadId,
+  );
+  const queueEditing = useQueueMessageEditing({
+    client: connection.conversationClient,
+    threadId: currentThreadId,
+    draftKey: activeComposerDraftKey,
+    draftStore: tabDraftStore,
+  });
+  const conversationBusy = conversation.submitting || queueEditing.pending;
   const { draft: attachmentDraft, tabIds: attachmentTabIds } = useTabAttachments(
     boundServerId,
     windowTabs,
@@ -669,7 +684,7 @@ export function App({
   const asyncQuestionSendingDisabled = connection.view.phase !== "ready"
     || conversation.threadId !== currentThreadId
     || threadRestorePhase !== "ready"
-    || conversation.submitting || conversation.stopping || conversation.shellCommandActive;
+    || conversationBusy || conversation.stopping || conversation.shellCommandActive;
   const recentQuestion = recentAsyncQuestion(displayedRestoredThread?.turns ?? EMPTY_THREAD_TURNS);
   useUserInputNotifications({
     client: connection.threadClient,
@@ -691,7 +706,7 @@ export function App({
       activeTabId !== composerFocusTabId ||
       restoredThread === null ||
       connection.view.phase !== "ready" ||
-      conversation.submitting
+      conversationBusy
     ) {
       return;
     }
@@ -707,7 +722,7 @@ export function App({
     activeTabId,
     composerFocusTabId,
     connection.view.phase,
-    conversation.submitting,
+    conversationBusy,
     restoredThread,
   ]);
 
@@ -1446,7 +1461,7 @@ export function App({
     threadId: string,
     focusComposer = false,
   ): Promise<void> => {
-    if (windowState.status !== "ready") {
+    if (windowState.status !== "ready" || queueEditing.pending) {
       return;
     }
     setWindowActionError(null);
@@ -1461,7 +1476,7 @@ export function App({
   };
 
   const openThreadFromSidebar = async (threadId: string): Promise<void> => {
-    if (windowState.status !== "ready") {
+    if (windowState.status !== "ready" || queueEditing.pending) {
       return;
     }
     const replaceableTab =
@@ -1509,7 +1524,7 @@ export function App({
   const openNewTask = async (
     targetCwd: string | null = restoredThread?.metadata.cwd ?? null,
   ): Promise<void> => {
-    if (windowState.status !== "ready") {
+    if (windowState.status !== "ready" || queueEditing.pending) {
       return;
     }
     setWindowActionError(null);
@@ -1540,7 +1555,7 @@ export function App({
   const openNewTab = useCallback(async (
     targetCwd: string | null = restoredThread?.metadata.cwd ?? null,
   ): Promise<void> => {
-    if (windowState.status !== "ready") {
+    if (windowState.status !== "ready" || queueEditing.pending) {
       return;
     }
     setWindowActionError(null);
@@ -1556,12 +1571,12 @@ export function App({
     } catch {
       setWindowActionError("无法新建会话标签，请重试");
     }
-  }, [restoredThread?.metadata.cwd, windowState]);
+  }, [queueEditing.pending, restoredThread?.metadata.cwd, windowState]);
 
   const activateTab = async (tabId: string): Promise<void> => {
     if (
       windowState.status !== "ready" ||
-      conversation.submitting ||
+      conversationBusy ||
       tabId === activeTabId
     ) {
       return;
@@ -1575,7 +1590,7 @@ export function App({
   };
 
   const closeTab = async (tabId: string): Promise<void> => {
-    if (windowState.status !== "ready" || conversation.submitting) {
+    if (windowState.status !== "ready" || conversationBusy) {
       return;
     }
     const tab = windowTabs.find(({ id }) => id === tabId);
@@ -1621,7 +1636,7 @@ export function App({
   const closeTabGroup = async (request: PendingTabClose): Promise<void> => {
     if (
       windowState.status !== "ready" ||
-      conversation.submitting ||
+      conversationBusy ||
       bulkTabsClosing
     ) {
       return;
@@ -1691,7 +1706,7 @@ export function App({
   ) => {
     if (
       windowState.status !== "ready" ||
-      conversation.submitting ||
+      conversationBusy ||
       activeTabId === null
     ) {
       return;
@@ -1761,7 +1776,7 @@ export function App({
       if (
         key === "tab" &&
         activeTabId !== null &&
-        !conversation.submitting
+        !conversationBusy
       ) {
         event.preventDefault();
         const target = adjacentTabId(
@@ -1775,7 +1790,7 @@ export function App({
       } else if (
         (event.key === "PageUp" || event.key === "PageDown") &&
         activeTabId !== null &&
-        !conversation.submitting
+        !conversationBusy
       ) {
         event.preventDefault();
         const target = adjacentTabId(
@@ -1790,7 +1805,7 @@ export function App({
         !event.shiftKey &&
         /^[1-9]$/u.test(key) &&
         windowTabs.length > 0 &&
-        !conversation.submitting
+        !conversationBusy
       ) {
         event.preventDefault();
         const index = key === "9"
@@ -1803,7 +1818,7 @@ export function App({
       } else if (
         (key === "n" || key === "t") &&
         !event.shiftKey &&
-        !conversation.submitting
+        !conversationBusy
       ) {
         event.preventDefault();
         void openNewTab();
@@ -1811,7 +1826,7 @@ export function App({
         (key === "w" || event.key === "F4") &&
         !event.shiftKey &&
         activeTabId !== null &&
-        !conversation.submitting
+        !conversationBusy
       ) {
         event.preventDefault();
         void closeTab(activeTabId);
@@ -1828,7 +1843,7 @@ export function App({
         key === "n" &&
         event.shiftKey &&
         boundServerId !== null &&
-        !conversation.submitting
+        !conversationBusy
       ) {
         event.preventDefault();
         openNewWindowTask();
@@ -1849,7 +1864,7 @@ export function App({
     boundServerId,
     activeTabId,
     conversation.activeTurnId,
-    conversation.submitting,
+    conversationBusy,
     conversation.stop,
     conversation.stopping,
     displayedRestoredThread,
@@ -2007,6 +2022,7 @@ export function App({
   const connectServer = async (
     serverId: ServerId,
   ): Promise<ServerConnectionStartResult> => {
+    if (queueEditing.pending) return "cancelled";
     setWindowActionError(null);
     if (profiles.status !== "ready" || windowState.status !== "ready") {
       setWindowActionError("服务器配置仍在加载，请稍后重试");
@@ -2086,7 +2102,7 @@ export function App({
     ],
   );
   const tabControlsDisabled =
-    windowState.status !== "ready" || conversation.submitting || bulkTabsClosing;
+    windowState.status !== "ready" || conversationBusy || bulkTabsClosing;
 
   const serverControl = (
     <ServerSwitcher
@@ -2173,13 +2189,11 @@ export function App({
                     currentThreadId !== null
                   }
                   cwd={composerCwd}
-                  draftKey={composerDraftKey(
-                    windowState.windowState?.windowId ?? null,
-                    boundServerId,
-                    activeTabId,
-                    currentThreadId,
-                  )}
+                  draftKey={activeComposerDraftKey}
                   draftStore={tabDraftStore}
+                  queueEdit={queueEditing.request}
+                  onQueueEditApplied={queueEditing.onApplied}
+                  onQueueEditAvailabilityChange={queueEditing.onAvailabilityChange}
                   error={conversation.error}
                   accessoryPanel={
                     <>
@@ -2192,6 +2206,14 @@ export function App({
                           });
                         }} />
                       )}
+                      {currentThreadId === null ? null : <ThreadQueuePanel
+                        key={`${boundServerId}:${currentThreadId}`}
+                        client={connection.conversationClient}
+                        store={connection.serverEvents}
+                        threadId={currentThreadId}
+                        canEdit={queueEditing.available}
+                        onEdit={queueEditing.edit}
+                      />}
                       <ServerActivityPanel
                         store={connection.serverEvents}
                         threadId={currentThreadId}
@@ -2280,7 +2302,7 @@ export function App({
                   shellCommandActive={conversation.shellCommandActive}
                   showProjectPicker={currentThreadId === null}
                   stopping={conversation.stopping}
-                  submitting={conversation.submitting}
+                  submitting={conversationBusy}
                 />
               ) : null
             }
@@ -2333,7 +2355,7 @@ export function App({
                           conversation.activeTurnId !== null ||
                           conversation.shellCommandActive ||
                           conversation.stopping ||
-                          conversation.submitting,
+                          conversationBusy,
                       }
                 )}
                 {...(serverThreads.offline || activeThreadSession?.offline

@@ -20,6 +20,7 @@ import type { ConversationTurnConfiguration } from "../app/useConversation";
 import type { ComposerMentionReference } from "../app/useComposerCapabilities";
 import type { AttachmentDraft, DraftAttachment } from "../app/useTabAttachments";
 import { useSavedPrompts } from "../app/useSavedPrompts";
+import { draftToInput, hasDraftContent, isMediaInput, restoreQueuedDraft } from "../content/queuedDraft";
 import {
   browserBlobUrls,
   useBlobUrl,
@@ -35,7 +36,7 @@ import {
   type ClipboardFileResult,
   type ClipboardFilesReader,
 } from "../transport/clipboard";
-import { draftStore as persistentDraftStore, type DraftStore } from "../transport/drafts";
+import { draftStore as persistentDraftStore, type DraftStore, type StoredDraft } from "../transport/drafts";
 import {
   savedPromptStore as persistentSavedPromptStore,
   type SavedPrompt,
@@ -100,10 +101,7 @@ const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: "attach", description: "选择并附加图片", behavior: "attach" },
 ];
 
-interface ComposerContent {
-  readonly text: string;
-  readonly tokens: readonly StructuredInput[];
-}
+type ComposerContent = StoredDraft;
 
 const MAX_IMAGE_SIZE = 16 * 1024 * 1024;
 const SUPPORTED_IMAGE_TYPES = Object.freeze([
@@ -128,6 +126,9 @@ export interface ComposerProps {
   readonly clipboardFilesReader?: ClipboardFilesReader;
   readonly imageValidator?: ImageValidator;
   readonly initialText?: string;
+  readonly queueEdit?: { readonly id: string; readonly input: TurnStartParams["input"] } | null;
+  readonly onQueueEditApplied?: (id: string) => void;
+  readonly onQueueEditAvailabilityChange?: (available: boolean) => void;
   readonly error: string | null;
   readonly models?: readonly Model[];
   readonly modelsLoading?: boolean;
@@ -186,6 +187,9 @@ export function Composer({
   clipboardFilesReader = readClipboardFiles,
   imageValidator = validateBrowserImage,
   initialText = "",
+  queueEdit = null,
+  onQueueEditApplied,
+  onQueueEditAvailabilityChange,
   error,
   models = [],
   modelsLoading = false,
@@ -240,7 +244,7 @@ export function Composer({
     collapsedSelection(initialText.length),
     composerContentsEqual,
   );
-  const { text, tokens } = composerContent;
+  const { text, tokens, restoredInput } = composerContent;
   const [attachments, setAttachments] = attachmentDraft;
   const [selectedTokenIndex, setSelectedTokenIndex] = useState<number | null>(null);
   const [editingCwd, setEditingCwd] = useState(false);
@@ -252,16 +256,21 @@ export function Composer({
   const [projectDeleteError, setProjectDeleteError] = useState<string | null>(
     null,
   );
-  const [trigger, setTrigger] = useState<Trigger | null>(() =>
+  const [triggerCandidate, setTrigger] = useState<Trigger | null>(() =>
     initialText.startsWith("!")
       ? null
       : findTrigger(initialText, initialText.length),
   );
+  const trigger = restoredInput !== undefined && triggerCandidate?.kind === "/"
+    ? null
+    : triggerCandidate;
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [fileResults, setFileResults] = useState<readonly FuzzyFileSearchResult[]>([]);
   const [fileSearchLoading, setFileSearchLoading] = useState(false);
   const [fileSearchError, setFileSearchError] = useState<string | null>(null);
   const [draftPersistenceError, setDraftPersistenceError] = useState<string | null>(null);
+  const [draftLoadFailed, setDraftLoadFailed] = useState(false);
+  const [draftLoadAttempt, setDraftLoadAttempt] = useState(0);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [selectedEffort, setSelectedEffort] = useState<string | null>(null);
   const [selectedServiceTier, setSelectedServiceTier] = useState<string | null>(null);
@@ -291,6 +300,7 @@ export function Composer({
   const clipboardReadRequestRef = useRef(0);
   const readingClipboardFilesRef = useRef(false);
   const sendingRef = useRef(false);
+  const submittingRef = useRef(submitting);
   const draftKeyRef = useRef(draftKey);
   const previousDraftKeyRef = useRef(draftKey);
   const loadedDraftKeyRef = useRef<string | null>(null);
@@ -299,12 +309,15 @@ export function Composer({
     readonly present: boolean;
   } | null>(null);
   const preserveDraftForNextKeyRef = useRef(false);
-  const currentDraftRef = useRef({ text, tokens });
+  const currentDraftRef = useRef(composerContent);
+  const queueEditTargetRef = useRef<{ readonly id: string; readonly draftKey: string | null } | null>(null);
+  const appliedQueueEditRef = useRef<string | null>(null);
   const savedPrompts = useSavedPrompts(savedPromptStore);
   draftKeyRef.current = draftKey;
-  currentDraftRef.current = { text, tokens };
+  submittingRef.current = submitting;
+  currentDraftRef.current = composerContent;
   const normalized = text.trim();
-  const shellMode = text.startsWith("!");
+  const shellMode = restoredInput === undefined && text.startsWith("!");
   const shellCommand = shellMode ? text.slice(1).trim() : "";
   const catalogDefaultModel = models.find(({ isDefault }) => isDefault) ?? null;
   const defaultModel = defaultModelId === null
@@ -340,8 +353,14 @@ export function Composer({
       : null;
   const selectedModelRejectsImages = activeModel !== null
     && !(activeModel.inputModalities ?? ["text"]).includes("image");
+  const restoredAttachments = (restoredInput ?? []).flatMap((input, index) =>
+    isMediaInput(input) ? [{ input, index }] : [],
+  );
+  const hasImages = attachments.length > 0 || restoredAttachments.some(({ input }) =>
+    input.type === "image" || input.type === "localImage",
+  );
   const hasPreparingAttachment = attachments.some(({ status }) => status === "preparing");
-  const hasInvalidAttachment = (selectedModelRejectsImages && attachments.length > 0)
+  const hasInvalidAttachment = (selectedModelRejectsImages && hasImages)
     || attachments.some(({ error }) => error !== null);
   const hasShellIncompatibleContent =
     shellMode && (tokens.length > 0 || attachments.length > 0);
@@ -350,9 +369,11 @@ export function Composer({
     : (
         normalized.length > 0 ||
         tokens.length > 0 ||
+        restoredAttachments.length > 0 ||
         attachments.some(({ blob }) => blob !== null)
       ) && !shellCommandActive;
   const canSend = hasSubmittableContent &&
+    loadedDraftKey === draftKey &&
     !hasInvalidAttachment &&
     !hasPreparingAttachment &&
     !preparingAttachments &&
@@ -360,6 +381,16 @@ export function Composer({
     !readingClipboardFiles &&
     !submitting &&
     !stopping;
+  const queueEditAvailable = loadedDraftKey === draftKey
+    && draftPersistenceError === null
+    && !hasDraftContent(composerContent)
+    && attachments.length === 0
+    && !submitting
+    && !stopping
+    && !preparingAttachments
+    && !readingClipboardFiles
+    && !serviceTierUpdating
+    && sendingPromptId === null;
   const normalizedSavedPromptQuery = savedPromptQuery.trim().toLocaleLowerCase();
   const filteredSavedPrompts = useMemo(() => normalizedSavedPromptQuery.length === 0
     ? savedPrompts.prompts
@@ -439,15 +470,18 @@ export function Composer({
     previousDraftKeyRef.current = draftKey;
     loadedDraftKeyRef.current = null;
     setLoadedDraftKey(null);
+    setDraftLoadFailed(false);
+    setDraftPersistenceError(null);
+    setMenuOpen(false);
+    setSavedPromptPickerOpen(false);
+    setTrigger(null);
     if (preserveDraftForNextKeyRef.current && previousDraftKey !== draftKey) {
       preserveDraftForNextKeyRef.current = false;
       loadedDraftKeyRef.current = draftKey;
       setLoadedDraftKey(draftKey);
       const preserved = currentDraftRef.current;
       if (draftKey !== null) {
-        const persisted = preserved.text.length === 0 && preserved.tokens.length === 0
-          ? null
-          : preserved;
+        const persisted = hasDraftContent(preserved) ? preserved : null;
         const persistence = previousDraftKey === null
           ? persisted === null
             ? draftStore.delete(draftKey)
@@ -468,12 +502,13 @@ export function Composer({
       previousDraftKey !== null &&
       previousDraftKey !== draftKey &&
       previousDraftWasLoaded &&
-      !sendingRef.current
+      !sendingRef.current &&
+      !submittingRef.current
     ) {
       const previous = currentDraftRef.current;
-      const persistence = previous.text.length === 0 && previous.tokens.length === 0
-        ? draftStore.delete(previousDraftKey)
-        : draftStore.save(previousDraftKey, previous);
+      const persistence = hasDraftContent(previous)
+        ? draftStore.save(previousDraftKey, previous)
+        : draftStore.delete(previousDraftKey);
       void persistence.then(
         () => setDraftPersistenceError(null),
         () => setDraftPersistenceError("草稿保存失败，当前内容可能无法恢复"),
@@ -509,48 +544,43 @@ export function Composer({
       },
       () => {
         if (disposed) return;
-        setDraftPersistenceError("草稿读取失败，请切换会话后重试");
-        resetComposerContent(
-          { text: "", tokens: [] },
-          collapsedSelection(0),
-        );
-        loadedDraftKeyRef.current = draftKey;
-        setLoadedDraftKey(draftKey);
+        setDraftLoadFailed(true);
+        setDraftPersistenceError("草稿读取失败，请重新加载后继续编辑");
       },
     );
     return () => { disposed = true; };
-  }, [draftKey, draftStore, initialText, resetComposerContent]);
+  }, [draftKey, draftLoadAttempt, draftStore, initialText, resetComposerContent]);
 
   useEffect(() => {
-    if (draftKey === null || loadedDraftKey !== draftKey) {
+    if (draftKey === null || loadedDraftKey !== draftKey || submitting) {
       return;
     }
     const timeout = window.setTimeout(() => {
-      const persistence = text.length === 0 && tokens.length === 0
-        ? draftStore.delete(draftKey)
-        : draftStore.save(draftKey, { text, tokens });
+      const persistence = hasDraftContent(composerContent)
+        ? draftStore.save(draftKey, composerContent)
+        : draftStore.delete(draftKey);
       void persistence.then(
         () => setDraftPersistenceError(null),
         () => setDraftPersistenceError("草稿保存失败，当前内容可能无法恢复"),
       );
     }, 500);
     return () => window.clearTimeout(timeout);
-  }, [draftKey, draftStore, loadedDraftKey, text, tokens]);
+  }, [composerContent, draftKey, draftStore, loadedDraftKey, submitting]);
 
   useEffect(() => () => {
     const currentDraftKey = draftKeyRef.current;
     if (
       currentDraftKey === null ||
       loadedDraftKeyRef.current !== currentDraftKey ||
-      sendingRef.current
+      sendingRef.current ||
+      submittingRef.current
     ) {
       return;
     }
     const current = currentDraftRef.current;
-    const persistence =
-      current.text.length === 0 && current.tokens.length === 0
-        ? draftStore.delete(currentDraftKey)
-        : draftStore.save(currentDraftKey, current);
+    const persistence = hasDraftContent(current)
+      ? draftStore.save(currentDraftKey, current)
+      : draftStore.delete(currentDraftKey);
     void persistence.catch(() => undefined);
   }, [draftStore]);
 
@@ -562,14 +592,57 @@ export function Composer({
     ) {
       return;
     }
-    const present = text.length > 0 || tokens.length > 0;
+    const present = hasDraftContent(composerContent);
     const reported = reportedDraftPresenceRef.current;
     if (reported?.draftKey === draftKey && reported.present === present) {
       return;
     }
     reportedDraftPresenceRef.current = { draftKey, present };
     onDraftPresenceChange(draftKey, present);
-  }, [draftKey, loadedDraftKey, onDraftPresenceChange, text, tokens]);
+  }, [composerContent, draftKey, loadedDraftKey, onDraftPresenceChange]);
+
+  useEffect(() => {
+    onQueueEditAvailabilityChange?.(queueEditAvailable);
+  }, [onQueueEditAvailabilityChange, queueEditAvailable]);
+
+  useEffect(() => {
+    if (queueEdit === null || appliedQueueEditRef.current === queueEdit.id) return;
+    if (queueEditTargetRef.current?.id !== queueEdit.id) {
+      queueEditTargetRef.current = { id: queueEdit.id, draftKey };
+    }
+    if (
+      queueEditTargetRef.current.draftKey !== draftKey
+      || loadedDraftKeyRef.current !== draftKey
+    ) return;
+    const restored = restoreQueuedDraft(queueEdit.input);
+    const alreadyRestored = jsonValuesEqual(currentDraftRef.current, restored);
+    if (!alreadyRestored && (
+      !queueEditAvailable
+      || hasDraftContent(currentDraftRef.current)
+      || sendingRef.current
+      || readingClipboardFilesRef.current
+    )) return;
+    appliedQueueEditRef.current = queueEdit.id;
+    if (!alreadyRestored) {
+      currentDraftRef.current = restored;
+      resetComposerContent(restored, collapsedSelection(restored.text.length));
+      if (draftKey !== null) {
+        void draftStore.save(draftKey, restored).then(
+          () => setDraftPersistenceError(null),
+          () => setDraftPersistenceError("草稿保存失败，当前内容可能无法恢复"),
+        );
+      }
+    }
+    setSelectedTokenIndex(null);
+    setTrigger(null);
+    setMarkdownPreview(false);
+    window.requestAnimationFrame(() => {
+      if (draftKeyRef.current === draftKey) {
+        focusAt(textareaRef.current, restored.text.length);
+      }
+    });
+    onQueueEditApplied?.(queueEdit.id);
+  }, [composerContent, draftKey, draftStore, loadedDraftKey, onQueueEditApplied, queueEdit, queueEditAvailable, resetComposerContent]);
 
   useEffect(() => {
     if (trigger?.kind !== "$" || onLoadSkills === undefined) {
@@ -629,7 +702,7 @@ export function Composer({
       skillsLoading,
       supportsImmediateCommands: canRunImmediateCommands && onRunImmediateCommand !== undefined,
     }),
-    [activeTurn, canRunImmediateCommands, cwd, fileResults, fileSearchError, fileSearchLoading, mentionReferences, mentionsError, mentionsLoading, onRunImmediateCommand, skills, skillsLoading, trigger],
+    [activeTurn, canRunImmediateCommands, cwd, fileResults, fileSearchError, fileSearchLoading, mentionReferences, mentionsError, mentionsLoading, onRunImmediateCommand, restoredInput, skills, skillsLoading, trigger],
   );
 
   useEffect(() => {
@@ -712,6 +785,7 @@ export function Composer({
       return;
     }
     const sourceDraftKey = draftKey;
+    const queueSubmission = target === "queue" || restoredInput !== undefined;
     preserveDraftForNextKeyRef.current = false;
     sendingRef.current = true;
     if (shellMode) {
@@ -764,20 +838,19 @@ export function Composer({
         return;
       }
       const input: TurnStartParams["input"] = [
-        ...(normalized.length === 0 ? [] : [{ type: "text" as const, text: normalized }]),
-        ...tokens,
+        ...draftToInput(composerContent),
         ...prepared.flatMap(({ url }) =>
           url === null ? [] : [{ type: "image" as const, url }],
         ),
       ];
       if (showProjectPicker) preserveDraftForNextKeyRef.current = true;
-      const accepted = target === "queue"
+      const accepted = queueSubmission
         ? await onQueue(input)
         : await onSend(input, turnConfiguration());
       if (accepted) {
         await clearSubmittedDraft(
           sourceDraftKey,
-          target === "queue"
+          queueSubmission
             ? "消息已排队，但草稿清理失败"
             : "消息已发送，但草稿清理失败",
         );
@@ -792,7 +865,7 @@ export function Composer({
 
   const updateTrigger = (value: string, cursor: number, composing = false) => {
     setTrigger(
-      composing || value.startsWith("!")
+      composing || (restoredInput === undefined && value.startsWith("!"))
         ? null
         : findTrigger(value, cursor),
     );
@@ -1064,14 +1137,14 @@ export function Composer({
   };
 
   const triggerShellCommand = () => {
-    if (text.length > 0 || tokens.length > 0 || attachments.length > 0) {
+    if (hasDraftContent(composerContent) || attachments.length > 0) {
       return;
     }
     setMenuOpen(false);
     setMarkdownPreview(false);
     setTrigger(null);
     changeComposerContent(
-      (current) => ({ ...current, text: "!" }),
+      () => ({ text: "!", tokens: [] }),
       collapsedSelection(1),
     );
     focusAt(textareaRef.current, 1);
@@ -1230,7 +1303,7 @@ export function Composer({
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    if (preparingAttachments || submitting) {
+    if (preparingAttachments || submitting || loadedDraftKey !== draftKey) {
       return;
     }
     if (event.dataTransfer.files.length > 0) {
@@ -1274,7 +1347,17 @@ export function Composer({
       {error === null ? null : <div className={styles.error} role="alert">{error}</div>}
       {draftPersistenceError === null
         ? null
-        : <div className={styles.error} role="alert">{draftPersistenceError}</div>}
+        : <div className={styles.error} role="alert">
+            {draftPersistenceError}
+            {draftLoadFailed ? (
+              <button
+                className={styles.retryDraftButton}
+                disabled={submitting}
+                onClick={() => setDraftLoadAttempt((attempt) => attempt + 1)}
+                type="button"
+              >重新加载草稿</button>
+            ) : null}
+          </div>}
       {capabilitiesError === null ? null : <div className={styles.capabilityError} role="status">{capabilitiesError}</div>}
       {showProjectPicker || accessoryPanel !== undefined ? (
         <ComposerAccessoryPanel>
@@ -1380,7 +1463,7 @@ export function Composer({
           <textarea
             aria-label="任务输入"
             data-composer-input
-            disabled={submitting || preparingAttachments}
+            disabled={submitting || preparingAttachments || loadedDraftKey !== draftKey}
             onBeforeInput={handleBeforeInput}
             onChange={handleChange}
             onClick={(event) => updateTrigger(text, event.currentTarget.selectionStart)}
@@ -1407,9 +1490,11 @@ export function Composer({
             placeholder={
               shellCommandActive
                 ? "Shell 命令执行完成后可发送消息"
-                : activeTurn
-                  ? "输入要追加的内容"
-                  : "向 Codex 描述任务"
+                : restoredInput !== undefined
+                  ? "编辑后重新排到队尾"
+                  : activeTurn
+                    ? "输入要追加的内容"
+                    : "向 Codex 描述任务"
             }
             onPaste={handlePaste}
             onSelect={rememberComposerSelection}
@@ -1422,7 +1507,7 @@ export function Composer({
           accept={IMAGE_ACCEPT}
           aria-label="选择图片附件"
           className={styles.fileInput}
-          disabled={submitting || preparingAttachments}
+          disabled={submitting || preparingAttachments || loadedDraftKey !== draftKey}
           multiple
           onChange={(event) => {
             if (event.target.files !== null) {
@@ -1457,8 +1542,44 @@ export function Composer({
             {clipboardReadError ?? "正在读取剪贴板图片"}
           </div>
         ) : null}
-        {attachments.length === 0 ? null : (
+        {attachments.length === 0 && restoredAttachments.length === 0 ? null : (
           <div aria-label="附件" className={styles.attachments}>
+            {restoredAttachments.map(({ input, index }, attachmentIndex) => {
+              const isImage = input.type === "image" || input.type === "localImage";
+              const name = input.type === "localImage" || input.type === "localAudio"
+                ? input.path
+                : `${isImage ? "图片" : "音频"}附件 ${attachmentIndex + 1}`;
+              return (
+                <article className={styles.attachmentCard} key={`restored:${index}`}>
+                  <span aria-hidden="true" className={styles.restoredAttachmentIcon}>
+                    {isImage ? "图" : "音"}
+                  </span>
+                  <span>
+                    <strong title={name}>{name}</strong>
+                    <small>
+                      {isImage && selectedModelRejectsImages
+                        ? "当前模型不支持图片输入"
+                        : "已从排队消息恢复"}
+                    </small>
+                  </span>
+                  <button
+                    aria-label={`移除 ${name}`}
+                    className={styles.attachmentRemove}
+                    disabled={preparingAttachments || submitting}
+                    onClick={() => changeComposerContent(
+                      (current) => ({
+                        ...current,
+                        restoredInput: current.restoredInput!.filter((_, itemIndex) => itemIndex !== index),
+                      }),
+                      getComposerSelection(),
+                    )}
+                    type="button"
+                  >
+                    ×
+                  </button>
+                </article>
+              );
+            })}
             {attachments.map((attachment) => (
               <article className={styles.attachmentCard} data-error={attachment.status === "error"} key={attachment.id}>
                 <AttachmentThumbnail attachment={attachment} blobUrlFactory={blobUrlFactory} />
@@ -1500,6 +1621,7 @@ export function Composer({
                 <span>{token.type === "skill" ? "$" : "@"}{token.name}</span>
                 <button
                   aria-label={`移除 ${token.name}`}
+                  disabled={preparingAttachments || submitting}
                   onClick={() => changeComposerContent(
                     (current) => ({
                       ...current,
@@ -1523,7 +1645,7 @@ export function Composer({
                 aria-haspopup="true"
                 aria-label="添加内容"
                 className={styles.addButton}
-                disabled={submitting || preparingAttachments || stopping}
+                disabled={submitting || preparingAttachments || stopping || loadedDraftKey !== draftKey}
                 onClick={() => {
                   if (savedPromptPickerOpen) {
                     setSavedPromptPickerOpen(false);
@@ -1551,8 +1673,7 @@ export function Composer({
                 <div className={styles.plusMenu} role="menu">
                   <button
                     disabled={
-                      text.length > 0 ||
-                      tokens.length > 0 ||
+                      hasDraftContent(composerContent) ||
                       attachments.length > 0
                     }
                     onClick={triggerShellCommand}
@@ -1566,7 +1687,7 @@ export function Composer({
                     <div className={styles.menuText}>
                       <strong>执行 Shell 命令</strong>
                       <small>
-                        {text.length > 0 || tokens.length > 0 || attachments.length > 0
+                        {hasDraftContent(composerContent) || attachments.length > 0
                           ? "请先清空当前输入"
                           : "在当前服务器无沙箱执行 (!)"}
                       </small>
@@ -1794,7 +1915,7 @@ export function Composer({
                 </svg>
               </button>
             ) : null}
-            {activeTurn && hasSubmittableContent && !shellMode ? (
+            {activeTurn && hasSubmittableContent && !shellMode && restoredInput === undefined ? (
               <button
                 aria-label="排队发送"
                 className={styles.queueButton}
@@ -1831,14 +1952,16 @@ export function Composer({
                       ? "正在提交"
                       : shellMode
                         ? "执行 Shell 命令"
-                        : activeTurn
-                          ? "追加"
-                          : "发送"
+                        : restoredInput !== undefined
+                          ? "重新排队"
+                          : activeTurn
+                            ? "追加"
+                            : "发送"
                 }
                 className={styles.sendButton}
                 disabled={!canSend}
                 onClick={() => void send()}
-                title={shellMode ? "执行 Shell 命令 Enter" : activeTurn ? "追加 Enter" : "发送 Enter"}
+                title={shellMode ? "执行 Shell 命令 Enter" : restoredInput !== undefined ? "重新排到队尾 Enter" : activeTurn ? "追加 Enter" : "发送 Enter"}
                 type="button"
               >
                 {shellMode ? (
@@ -2867,7 +2990,26 @@ function nextSelectableIndex(items: readonly Suggestion[], current: number, dire
 
 function composerContentsEqual(left: ComposerContent, right: ComposerContent): boolean {
   return left.text === right.text
-    && left.tokens === right.tokens;
+    && left.tokens === right.tokens
+    && left.restoredInput === right.restoredInput;
+}
+
+function jsonValuesEqual(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right)
+      && left.length === right.length
+      && left.every((value, index) => jsonValuesEqual(value, right[index]));
+  }
+  if (typeof left !== "object" || left === null || typeof right !== "object" || right === null) {
+    return false;
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const keys = Object.keys(leftRecord);
+  return keys.length === Object.keys(rightRecord).length
+    && keys.every((key) => Object.hasOwn(rightRecord, key)
+      && jsonValuesEqual(leftRecord[key], rightRecord[key]));
 }
 
 function collapsedSelection(position: number): ComposerSelection {

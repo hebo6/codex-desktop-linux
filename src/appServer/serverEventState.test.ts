@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { KNOWN_SERVER_NOTIFICATION_METHODS } from "../protocol/generated/methods";
 import type { HookRunSummary, ThreadGoal, ThreadTokenUsage } from "../protocol/generated/types/ServerNotification";
-import { SERVER_EVENT_LIMITS, SERVER_NOTIFICATION_POLICIES, ServerEventStore } from "./serverEventState";
+import { SERVER_EVENT_LIMITS, SERVER_NOTIFICATION_POLICIES, ServerEventStore, type QueuedSubmission } from "./serverEventState";
 
 const key = (...parts: string[]) => JSON.stringify(parts);
 const goal = (objective = "完成测试"): ThreadGoal => ({ objective, createdAt: 1, updatedAt: 2, status: "active", threadId: "t", tokensUsed: 40, tokenBudget: 100, timeUsedSeconds: 3 });
@@ -68,13 +68,52 @@ describe("ServerEventStore", () => {
     const input = [{ id: "q", clientUserMessageId: "u", input: [{ type: "text" as const, text: "运行测试" }, { type: "image" as const, url: "data:image/png;base64,SECRET" }, { type: "image" as const, fileId: "SECRET_FILE_ID" }, { type: "localImage" as const, path: "/tmp/image.png" }, { type: "skill" as const, path: "/tmp/skill", name: "test" }] }];
     expect(store.hydrateQueue("t", 0, input)).toBe(true);
     expect(store.getSnapshot().queuesByThread.t?.entries[0]?.inputs).toEqual([{ type: "text", text: "运行测试" }, { type: "image" }, { type: "image" }, { type: "localImage", path: "/tmp/image.png" }, { type: "skill", path: "/tmp/skill", name: "test" }]);
-    expect(JSON.stringify(store.getSnapshot())).not.toContain("SECRET");
+    expect(store.getSnapshot().queuesByThread.t?.entries[0]?.input).toEqual(input[0]!.input);
+    expect(JSON.stringify(store.getSnapshot().queuesByThread.t?.entries[0]?.inputs)).not.toContain("SECRET");
+    expect(JSON.stringify(store.getSnapshot().records)).not.toContain("SECRET");
     expect(store.getSnapshot().records[0]?.detail).toBe("1 条待处理输入");
     store.consume({ method: "thread/queue/changed", params: { threadId: "t" } });
     expect(store.hydrateQueue("t", 0, [])).toBe(false);
     expect(store.getSnapshot().queuesByThread.t?.status).toBe("pending");
     store.failQueue("t", 1, "查询失败");
     expect(store.getSnapshot().queuesByThread.t?.status).toBe("error");
+  });
+
+  it("为编辑保留完整输入和文本元素，展示摘要仍受长度与数量限制", () => {
+    const store = new ServerEventStore();
+    const text = `开头${"正文".repeat(SERVER_EVENT_LIMITS.text)}结尾`;
+    const input: QueuedSubmission["input"] = [
+      { type: "text", text, text_elements: [{ byteRange: { start: 0, end: 6 }, placeholder: "开头" }] },
+      { type: "image", url: "data:image/png;base64,IMAGE_PAYLOAD", detail: "original" },
+      { type: "image", fileId: "IMAGE_FILE_ID", detail: "high" },
+      { type: "localImage", path: "/tmp/image.png", detail: "low" },
+      { type: "audio", url: "data:audio/wav;base64,AUDIO_PAYLOAD" },
+      { type: "localAudio", path: "/tmp/audio.wav" },
+      { type: "skill", name: "检查", path: "/tmp/skill" },
+      { type: "mention", name: "参考", path: "/tmp/reference" },
+      ...Array.from({ length: SERVER_EVENT_LIMITS.entities }, (_, index) => ({ type: "mention" as const, name: `参考${index}`, path: `/tmp/reference-${index}` })),
+    ];
+
+    store.hydrateQueue("t", 0, [{ id: "q", clientUserMessageId: "u", input }]);
+
+    const entry = store.getSnapshot().queuesByThread.t!.entries[0]!;
+    expect(entry.input).toEqual(input);
+    expect(entry.input).toHaveLength(input.length);
+    expect(entry.text).toBe(text.slice(-SERVER_EVENT_LIMITS.text));
+    expect(entry.inputs).toHaveLength(SERVER_EVENT_LIMITS.entities);
+    expect(entry.inputs.slice(0, 8)).toEqual([
+      { type: "text", text: text.slice(-SERVER_EVENT_LIMITS.text) },
+      { type: "image" },
+      { type: "image" },
+      { type: "localImage", path: "/tmp/image.png" },
+      { type: "audio" },
+      { type: "localAudio", path: "/tmp/audio.wav" },
+      { type: "skill", name: "检查", path: "/tmp/skill" },
+      { type: "mention", name: "参考", path: "/tmp/reference" },
+    ]);
+    expect(entry.truncated).toBe(true);
+    expect(store.getSnapshot().records[0]).toMatchObject({ text: text.slice(-SERVER_EVENT_LIMITS.text), truncated: true });
+    expect(JSON.stringify(store.getSnapshot().records)).not.toContain("PAYLOAD");
   });
 
   it("Hook与自动审批以稳定ID更新生命周期，断线不伪造完成", () => {

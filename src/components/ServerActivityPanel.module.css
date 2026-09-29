@@ -214,18 +214,6 @@ button.diffFile:focus-visible {
   white-space: pre-wrap;
 }
 
-.queue {
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-
-.input {
-  max-height: 160px;
-  overflow: auto;
-  white-space: pre-wrap;
-}
-
 .audio {
   display: grid;
   justify-items: start;

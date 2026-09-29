@@ -104,6 +104,31 @@ describe("AppServerConversationClient", () => {
     }).ok).toBe(true);
   });
 
+  it("撤回队列消息并校验服务端删除结果", () => {
+    const session = new RecordingSession();
+    const client = new AppServerConversationClient(session);
+
+    const handle = client.deleteQueuedSubmission("thread-1", "queued-1");
+    const request = session.requests[0]!;
+
+    expect(handle.id).toBe("request-1");
+    expect(request).toMatchObject({
+      method: "thread/queue/delete",
+      params: { threadId: "thread-1", queuedSubmissionId: "queued-1" },
+    });
+    expect(request.validateResult({ deleted: true })).toEqual({
+      ok: true,
+      value: { deleted: true },
+    });
+    expect(request.validateResult({ deleted: false })).toEqual({
+      ok: true,
+      value: { deleted: false },
+    });
+    expect(request.validateResult({}).ok).toBe(false);
+    expect(request.validateResult({ deleted: "true" }).ok).toBe(false);
+    expect(request.validateResult(null).ok).toBe(false);
+  });
+
   it("透传已校验的服务端通知订阅", () => {
     const session = new RecordingSession();
     const client = new AppServerConversationClient(session);

@@ -1,10 +1,12 @@
-import { createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState, type ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { Composer } from "./Composer";
 import { useTabAttachments, type DraftAttachment } from "../app/useTabAttachments";
+import { restoreQueuedDraft } from "../content/queuedDraft";
+import type { TurnStartParams } from "../protocol/generated";
 import {
   createDraftStore,
   type DraftStore,
@@ -84,7 +86,7 @@ function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}
     create: vi.fn(() => `blob:attachment-${blobUrlIndex++}`),
     revoke: vi.fn(),
   };
-  function Harness() {
+  function Harness({ props = overrides }: { readonly props?: Partial<ComponentProps<typeof Composer>> }) {
     const attachmentDraft = useState<readonly DraftAttachment[]>([]);
     return (
       <Composer
@@ -101,7 +103,7 @@ function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}
         showProjectPicker={true}
         stopping={false}
         submitting={false}
-        {...overrides}
+        {...props}
       />
     );
   }
@@ -112,6 +114,9 @@ function renderComposer(overrides: Partial<ComponentProps<typeof Composer>> = {}
     onRunShellCommand,
     onSend,
     onStop,
+    rerender: (props: Partial<ComponentProps<typeof Composer>>) => result.rerender(
+      <Harness props={{ ...overrides, ...props }} />,
+    ),
     unmount: result.unmount,
   };
 }
@@ -164,7 +169,285 @@ function renderTabbedComposer(
   };
 }
 
+function memoryDraftStore(initial: readonly [string, StoredDraft][] = []): DraftStore {
+  const drafts = new Map(initial);
+  return {
+    listKeys: vi.fn(async () => [...drafts.keys()]),
+    load: vi.fn(async (key) => drafts.get(key) ?? null),
+    save: vi.fn(async (key, draft) => { drafts.set(key, draft); }),
+    delete: vi.fn(async (key) => { drafts.delete(key); }),
+    transition: vi.fn(async (source, target, draft) => {
+      drafts.delete(source);
+      if (draft === null) drafts.delete(target);
+      else drafts.set(target, draft);
+    }),
+  };
+}
+
+const QUEUED_INPUT: TurnStartParams["input"] = [
+  {
+    type: "text",
+    text: "  !explain @file  ",
+    text_elements: [{ byteRange: { start: 11, end: 16 }, placeholder: "@file" }],
+  },
+  { type: "image", fileId: "file-image", detail: "original" },
+  { type: "image", url: "data:image/png;base64,aW1hZ2U=", detail: "low" },
+  { type: "localImage", path: "/server/images/screen.png", detail: "high" },
+  { type: "audio", url: "data:audio/wav;base64,YXVkaW8=" },
+  { type: "localAudio", path: "/server/audio/recording.wav" },
+  { type: "skill", name: "review", path: "/skills/review" },
+  { type: "mention", name: "file", path: "/server/file" },
+  { type: "text", text: "第二段" },
+];
+
 describe("Composer", () => {
+  it("完整恢复排队消息并原样重新排队，只应用同一请求一次", async () => {
+    const draftStore = memoryDraftStore();
+    const onQueueEditApplied = vi.fn();
+    const queueEdit = { id: "queued:1", input: QUEUED_INPUT };
+    const { onQueue, onRunShellCommand, rerender } = renderComposer({
+      activeTurn: true,
+      draftKey: "tab:a",
+      draftStore,
+      queueEdit,
+      onQueueEditApplied,
+    });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    await waitFor(() => expect(editor).toHaveValue("  !explain @file  \n第二段"));
+    await waitFor(() => expect(editor).toHaveFocus());
+    expect(screen.getByLabelText("附件").querySelectorAll("article")).toHaveLength(5);
+    expect(screen.getByLabelText("结构化输入")).toHaveTextContent("$review");
+    expect(screen.getByLabelText("结构化输入")).toHaveTextContent("@file");
+    expect(draftStore.save).toHaveBeenCalledWith("tab:a", restoreQueuedDraft(QUEUED_INPUT));
+    expect(onQueueEditApplied).toHaveBeenCalledWith("queued:1");
+
+    fireEvent.click(screen.getByRole("button", { name: "重新排队" }));
+    await waitFor(() => expect(onQueue).toHaveBeenCalledWith(QUEUED_INPUT));
+    await waitFor(() => expect(editor).toHaveValue(""));
+    rerender({ queueEdit: { ...queueEdit } });
+    expect(editor).toHaveValue("");
+    expect(onQueueEditApplied).toHaveBeenCalledTimes(1);
+    expect(onRunShellCommand).not.toHaveBeenCalled();
+  });
+
+  it("恢复以感叹号开头的普通消息在无活动回合时仍默认重新排队", async () => {
+    const input: TurnStartParams["input"] = [{ type: "text", text: "!不要执行命令" }];
+    const { onQueue, onSend, onRunShellCommand } = renderComposer({ queueEdit: { id: "queued:bang", input } });
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "任务输入" })).toHaveValue("!不要执行命令"));
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "任务输入" }), { key: "Enter" });
+    await waitFor(() => expect(onQueue).toHaveBeenCalledWith(input));
+    expect(onSend).not.toHaveBeenCalled();
+    expect(onRunShellCommand).not.toHaveBeenCalled();
+  });
+
+  it.each(["/compact", "/review"])("恢复 %s 后点击原文再按 Enter 仍重新排队", async (command) => {
+    const input: TurnStartParams["input"] = [{ type: "text", text: command }];
+    const onRunImmediateCommand = vi.fn(async () => true);
+    const { onQueue } = renderComposer({
+      queueEdit: { id: `queued:${command}`, input },
+      canRunImmediateCommands: true,
+      onRunImmediateCommand,
+    });
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+    await waitFor(() => expect(editor).toHaveValue(command));
+    editor.setSelectionRange(command.length, command.length);
+    fireEvent.click(editor);
+    expect(screen.queryByRole("listbox", { name: "输入建议" })).not.toBeInTheDocument();
+    fireEvent.keyDown(editor, { key: "Enter" });
+    await waitFor(() => expect(onQueue).toHaveBeenCalledWith(input));
+    expect(onRunImmediateCommand).not.toHaveBeenCalled();
+  });
+
+  it("编辑文字、移除恢复附件和添加本地附件后保留其余完整输入", async () => {
+    const { onQueue } = renderComposer({ activeTurn: true, queueEdit: { id: "queued:edit", input: QUEUED_INPUT } });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    await waitFor(() => expect(editor).toHaveValue("  !explain @file  \n第二段"));
+    fireEvent.change(editor, { target: { value: "修改后的消息" } });
+    fireEvent.click(screen.getByRole("button", { name: "移除 图片附件 1" }));
+    expect(screen.getByLabelText("附件").querySelectorAll("article")).toHaveLength(4);
+    fireEvent.keyDown(editor, { key: "z", ctrlKey: true });
+    expect(screen.getByLabelText("附件").querySelectorAll("article")).toHaveLength(5);
+    fireEvent.keyDown(editor, { key: "y", ctrlKey: true });
+    expect(screen.getByLabelText("附件").querySelectorAll("article")).toHaveLength(4);
+    fireEvent.change(screen.getByLabelText("选择图片附件"), { target: { files: [imageFile("added.png")] } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "重新排队" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "重新排队" }));
+    await waitFor(() => expect(onQueue).toHaveBeenCalledWith([
+      { type: "text", text: "修改后的消息" },
+      ...QUEUED_INPUT.slice(2, -1),
+      { type: "image", url: expect.stringContaining("data:image/png;base64,") },
+    ]));
+  });
+
+  it("只有恢复附件的草稿切换标签后仍可完整发送", async () => {
+    const input = QUEUED_INPUT.slice(1, 6);
+    const draftStore = memoryDraftStore();
+    const { showTab, onQueue } = renderTabbedComposer({ draftStore, queueEdit: { id: "queued:media", input } });
+    await waitFor(() => expect(screen.getByLabelText("附件").querySelectorAll("article")).toHaveLength(5));
+    showTab("tab:b");
+    await waitFor(() => expect(screen.queryByLabelText("附件")).not.toBeInTheDocument());
+    showTab("tab:a");
+    await waitFor(() => expect(screen.getByLabelText("附件").querySelectorAll("article")).toHaveLength(5));
+    fireEvent.click(screen.getByRole("button", { name: "重新排队" }));
+    await waitFor(() => expect(onQueue).toHaveBeenCalledWith(input));
+  });
+
+  it("恢复请求等待草稿读取且不会覆盖已有草稿", async () => {
+    const pending = deferred<StoredDraft | null>();
+    const onQueueEditApplied = vi.fn();
+    const onQueueEditAvailabilityChange = vi.fn();
+    renderComposer({
+      draftKey: "tab:a",
+      draftStore: { ...memoryDraftStore(), load: vi.fn(() => pending.promise) },
+      queueEdit: { id: "queued:waiting", input: QUEUED_INPUT },
+      onQueueEditApplied,
+      onQueueEditAvailabilityChange,
+    });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    expect(editor).toBeDisabled();
+    expect(onQueueEditApplied).not.toHaveBeenCalled();
+    pending.resolve({ text: "已有草稿", tokens: [] });
+    await waitFor(() => expect(editor).toHaveValue("已有草稿"));
+    expect(onQueueEditApplied).not.toHaveBeenCalled();
+    expect(onQueueEditAvailabilityChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("草稿读取完成为空时才应用延迟恢复请求", async () => {
+    const pending = deferred<StoredDraft | null>();
+    const onQueueEditApplied = vi.fn();
+    renderComposer({
+      draftKey: "tab:a",
+      draftStore: { ...memoryDraftStore(), load: vi.fn(() => pending.promise) },
+      queueEdit: { id: "queued:waiting", input: QUEUED_INPUT },
+      onQueueEditApplied,
+    });
+    expect(onQueueEditApplied).not.toHaveBeenCalled();
+    pending.resolve(null);
+    await waitFor(() => expect(onQueueEditApplied).toHaveBeenCalledWith("queued:waiting"));
+    expect(screen.getByRole("textbox", { name: "任务输入" })).toHaveValue("  !explain @file  \n第二段");
+  });
+
+  it("读取失败时不删除未知草稿，并在用户重试成功后恢复编辑", async () => {
+    const stored = { text: "原有草稿", tokens: [] };
+    const draftStore = {
+      ...memoryDraftStore([["tab:a", stored]]),
+      load: vi.fn<DraftStore["load"]>()
+        .mockRejectedValueOnce(new Error("read failed"))
+        .mockResolvedValueOnce(stored),
+    };
+    const onQueueEditAvailabilityChange = vi.fn();
+    const { unmount } = renderComposer({ draftKey: "tab:a", draftStore, onQueueEditAvailabilityChange });
+    const retry = await screen.findByRole("button", { name: "重新加载草稿" });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    expect(editor).toBeDisabled();
+    expect(screen.getByRole("button", { name: "添加内容" })).toBeDisabled();
+    expect(onQueueEditAvailabilityChange).toHaveBeenLastCalledWith(false);
+    await act(async () => { await new Promise((resolve) => window.setTimeout(resolve, 550)); });
+    expect(draftStore.delete).not.toHaveBeenCalled();
+    expect(draftStore.save).not.toHaveBeenCalled();
+
+    fireEvent.click(retry);
+    await waitFor(() => expect(editor).toHaveValue("原有草稿"));
+    expect(editor).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "重新加载草稿" })).not.toBeInTheDocument();
+    expect(draftStore.load).toHaveBeenCalledTimes(2);
+    expect(onQueueEditAvailabilityChange).toHaveBeenLastCalledWith(false);
+    unmount();
+    expect(draftStore.save).toHaveBeenCalledWith("tab:a", stored);
+    expect(draftStore.delete).not.toHaveBeenCalled();
+  });
+
+  it("保存恢复草稿失败时仍允许继续编辑，不显示读取重试入口", async () => {
+    const draftStore = {
+      ...memoryDraftStore(),
+      save: vi.fn<DraftStore["save"]>().mockRejectedValue(new Error("write failed")),
+    };
+    renderComposer({ draftKey: "tab:a", draftStore, queueEdit: { id: "queued:unsaved", input: QUEUED_INPUT } });
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("草稿保存失败"));
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    expect(editor).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "重新加载草稿" })).not.toBeInTheDocument();
+    fireEvent.change(editor, { target: { value: "继续编辑" } });
+    expect(editor).toHaveValue("继续编辑");
+  });
+
+  it("加载到同一恢复草稿后确认请求，重新排队后不会重复恢复", async () => {
+    const restored = restoreQueuedDraft(QUEUED_INPUT);
+    const reorderedInput = restored.restoredInput!.map((input) =>
+      Object.fromEntries(Object.entries(input).reverse()),
+    ) as TurnStartParams["input"];
+    const draftStore = memoryDraftStore([["tab:a", { ...restored, restoredInput: reorderedInput }]]);
+    const onQueueEditApplied = vi.fn();
+    const queueEdit = { id: "queued:remounted", input: QUEUED_INPUT };
+    const { onQueue, rerender } = renderComposer({ draftKey: "tab:a", draftStore, queueEdit, onQueueEditApplied });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    await waitFor(() => expect(onQueueEditApplied).toHaveBeenCalledExactlyOnceWith(queueEdit.id));
+    expect(editor).toHaveValue(restored.text);
+    expect(draftStore.save).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "重新排队" }));
+    await waitFor(() => expect(onQueue).toHaveBeenCalledExactlyOnceWith(QUEUED_INPUT));
+    await waitFor(() => expect(editor).toHaveValue(""));
+    rerender({ queueEdit: { ...queueEdit } });
+    expect(editor).toHaveValue("");
+    expect(onQueueEditApplied).toHaveBeenCalledTimes(1);
+  });
+
+  it("加载的恢复草稿内容已修改时不覆盖，也不误认已应用请求", async () => {
+    const restored = { ...restoreQueuedDraft(QUEUED_INPUT), text: "用户已经修改的草稿" };
+    const onQueueEditApplied = vi.fn();
+    renderComposer({
+      draftKey: "tab:a",
+      draftStore: memoryDraftStore([["tab:a", restored]]),
+      queueEdit: { id: "queued:different", input: QUEUED_INPUT },
+      onQueueEditApplied,
+    });
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "任务输入" })).toHaveValue(restored.text));
+    expect(onQueueEditApplied).not.toHaveBeenCalled();
+  });
+
+  it("切换草稿键不会把待恢复消息写入另一个标签", async () => {
+    const pending = deferred<StoredDraft | null>();
+    const onQueueEditApplied = vi.fn();
+    const draftStore = {
+      ...memoryDraftStore(),
+      load: vi.fn((key: string) => key === "tab:a" ? pending.promise : Promise.resolve(null)),
+    };
+    const { showTab } = renderTabbedComposer({
+      draftStore,
+      queueEdit: { id: "queued:origin", input: QUEUED_INPUT },
+      onQueueEditApplied,
+    });
+    showTab("tab:b");
+    pending.resolve(null);
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    await waitFor(() => expect(editor).toBeEnabled());
+    expect(editor).toHaveValue("");
+    expect(screen.queryByLabelText("附件")).not.toBeInTheDocument();
+    expect(onQueueEditApplied).not.toHaveBeenCalled();
+    expect(draftStore.save).not.toHaveBeenCalled();
+  });
+
+  it("空白草稿、附件读取和提交期间不允许撤回编辑", async () => {
+    const clipboard = deferred<readonly []>();
+    const onQueueEditAvailabilityChange = vi.fn();
+    const { rerender } = renderComposer({
+      clipboardFilesReader: () => clipboard.promise,
+      onQueueEditAvailabilityChange,
+    });
+    expect(onQueueEditAvailabilityChange).toHaveBeenLastCalledWith(true);
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    fireEvent.change(editor, { target: { value: " " } });
+    expect(onQueueEditAvailabilityChange).toHaveBeenLastCalledWith(false);
+    fireEvent.change(editor, { target: { value: "" } });
+    expect(onQueueEditAvailabilityChange).toHaveBeenLastCalledWith(true);
+    fireEvent.paste(editor, { clipboardData: { files: [], items: [], types: [], getData: () => "" } });
+    expect(onQueueEditAvailabilityChange).toHaveBeenLastCalledWith(false);
+    clipboard.resolve([]);
+    await waitFor(() => expect(onQueueEditAvailabilityChange).toHaveBeenLastCalledWith(true));
+    rerender({ submitting: true });
+    expect(onQueueEditAvailabilityChange).toHaveBeenLastCalledWith(false);
+  });
+
   it("从 SQLite 草稿存储恢复并在停止输入后保存", async () => {
     const user = userEvent.setup();
     const draftStore = {

@@ -1,0 +1,76 @@
+.content {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.content p {
+  margin: 0;
+}
+
+.hint {
+  color: var(--color-text-tertiary);
+}
+
+.list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  /* 四个完整行；行内单行省略，避免半行和聚焦时的细微滚动 */
+  max-height: 128px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 32px;
+}
+
+.preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.content button {
+  flex-shrink: 0;
+  padding: 3px var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.content button:hover,
+.content button:focus-visible {
+  outline: none;
+  background: var(--color-fill-subtle);
+}
+
+.content button:disabled {
+  color: var(--color-text-tertiary);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.feedback {
+  display: flex;
+  align-items: start;
+  gap: var(--space-2);
+}
+
+.feedback p {
+  flex: 1;
+  overflow-wrap: anywhere;
+}

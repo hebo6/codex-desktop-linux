@@ -35,6 +35,7 @@ import type {
   ThreadItemsListResponse,
   ThreadListResponse,
   ThreadQueueAddResponse,
+  ThreadQueueDeleteResponse,
   ThreadQueueListResponse,
   ThreadReadResponse,
   ThreadResumeResponse,
@@ -48,6 +49,7 @@ import type {
   TurnInterruptResponse,
   TurnStartResponse,
   TurnSteerResponse,
+  UserInput,
 } from "./index";
 
 export interface StandaloneValidateFunction<T> {
@@ -100,3 +102,5 @@ export const validateThreadQueueListResponse: StandaloneValidateFunction<ThreadQ
 export const validateThreadGoalGetResponse: StandaloneValidateFunction<ThreadGoalGetResponse>;
 export const validateProjectListResponse: StandaloneValidateFunction<ProjectListResponse>;
 export const validateCommandExecResponse: StandaloneValidateFunction<CommandExecResponse>;
+export const validateThreadQueueDeleteResponse: StandaloneValidateFunction<ThreadQueueDeleteResponse>;
+export const validateUserInput: StandaloneValidateFunction<UserInput>;

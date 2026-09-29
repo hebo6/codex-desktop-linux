@@ -369,7 +369,7 @@ describe("ServerActivityPanel", () => {
     expect(screen.queryByText("不应重复展示的步骤")).not.toBeInTheDocument();
   });
 
-  it("显示当前会话队列中的非文本输入，隐藏全局项目", () => {
+  it("队列交给独立面板展示，运行状态不重复显示队列和全局项目", () => {
     const store = new ServerEventStore();
     store.consume({ method: "thread/queue/changed", params: { threadId: "thread-1" } });
     store.hydrateQueue("thread-1", 1, [{ id: "queued-1", clientUserMessageId: "message-1", input: [
@@ -378,14 +378,8 @@ describe("ServerActivityPanel", () => {
     ] }]);
     store.hydrateProjects(0, [{ id: "project-1", name: "协议客户端", roots: [{ path: "/workspace/client" }], createdAt: 1, updatedAt: 1, position: 0, metadata: {} }]);
     render(<ServerActivityPanel store={store} threadId="thread-1" />);
-    openPanel();
-    expect(screen.getByText("待处理输入 · 1 条")).toBeVisible();
-    const queueDetails = screen.getByText("待处理输入 1 · 文字、图片、音频、技能 review").closest("details")!;
-    queueDetails.open = true;
-    fireEvent(queueDetails, new Event("toggle"));
-    expect(screen.getByText("检查这些附件")).toBeVisible();
-    expect(screen.getByText("已附加图片")).toBeVisible();
-    expect(screen.getByText("本地音频 · /tmp/recording.wav")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /^运行状态/u })).not.toBeInTheDocument();
+    expect(screen.queryByText("检查这些附件")).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain("private-data");
     expect(screen.queryByText("项目 · 1 个")).not.toBeInTheDocument();
     expect(screen.queryByText("协议客户端")).not.toBeInTheDocument();

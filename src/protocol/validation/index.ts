@@ -19,6 +19,8 @@ import type {
   ThreadDeleteResponse,
   ThreadStartResponse,
   ThreadQueueAddResponse,
+  ThreadQueueDeleteResponse,
+  UserInput,
   ThreadQueueListResponse,
   ThreadGoalGetResponse,
   ProjectListResponse,
@@ -66,6 +68,8 @@ import {
   validateThreadDeleteResponse as validateThreadDeleteResponseSchema,
   validateThreadStartResponse as validateThreadStartResponseSchema,
   validateThreadQueueAddResponse as validateThreadQueueAddResponseSchema,
+  validateThreadQueueDeleteResponse as validateThreadQueueDeleteResponseSchema,
+  validateUserInput as validateUserInputSchema,
   validateThreadQueueListResponse as validateThreadQueueListResponseSchema,
   validateThreadGoalGetResponse as validateThreadGoalGetResponseSchema,
   validateProjectListResponse as validateProjectListResponseSchema,
@@ -342,6 +346,30 @@ export function validateThreadQueueAddResponse(
     "invalid_params",
     "params",
     "thread/queue/add 响应校验失败",
+  );
+}
+
+export function validateThreadQueueDeleteResponse(
+  value: unknown,
+): ProtocolValidationResult<ThreadQueueDeleteResponse> {
+  return validateWithSchema(
+    value,
+    validateThreadQueueDeleteResponseSchema,
+    "invalid_params",
+    "params",
+    "thread/queue/delete 响应校验失败",
+  );
+}
+
+export function validateUserInput(
+  value: unknown,
+): ProtocolValidationResult<UserInput> {
+  return validateWithSchema(
+    value,
+    validateUserInputSchema,
+    "invalid_params",
+    "params",
+    "用户输入校验失败",
   );
 }
 

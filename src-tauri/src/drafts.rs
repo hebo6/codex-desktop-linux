@@ -10,7 +10,8 @@ use sqlx::SqlitePool;
 use tauri::State;
 
 const MAX_DRAFT_KEY_BYTES: usize = 512;
-const MAX_DRAFT_BYTES: usize = 1024 * 1024;
+// Restored queue inputs may contain base64-encoded images and audio.
+const MAX_DRAFT_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Clone)]
 pub(crate) struct DraftRepository {
@@ -129,6 +130,12 @@ impl DraftRepository {
                    AND length(json_extract(draft_json, '$.text')) > 0)
                  OR (json_type(draft_json, '$.tokens') = 'array'
                    AND json_array_length(draft_json, '$.tokens') > 0)
+                 OR (json_type(draft_json, '$.restoredInput') = 'array'
+                   AND EXISTS (
+                     SELECT 1 FROM json_each(draft_json, '$.restoredInput') AS input
+                     WHERE json_extract(input.value, '$.type')
+                       IN ('image', 'localImage', 'audio', 'localAudio')
+                   ))
                )
              ORDER BY updated_at_ms DESC",
         )
@@ -286,8 +293,8 @@ mod tests {
     use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
     use super::{
-        DraftError, DraftKeyPrefixRequest, DraftKeyRequest, DraftRepository, SaveDraftRequest,
-        TransitionDraftRequest,
+        DraftError, DraftKeyPrefixRequest, DraftKeyRequest, DraftRepository, MAX_DRAFT_BYTES,
+        SaveDraftRequest, TransitionDraftRequest,
     };
 
     async fn repository() -> DraftRepository {
@@ -364,6 +371,98 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn round_trips_restored_media_larger_than_one_mib() {
+        let repository = repository().await;
+        let draft = json!({
+            "text": "",
+            "tokens": [],
+            "restoredInput": [{
+                "type": "image",
+                "url": format!("data:image/png;base64,{}", "A".repeat(2 * 1024 * 1024)),
+                "detail": "original"
+            }]
+        });
+        repository
+            .save(SaveDraftRequest {
+                draft_key: "window:server:media".to_owned(),
+                draft: draft.clone(),
+            })
+            .await
+            .unwrap();
+        assert_eq!(
+            repository
+                .load(DraftKeyRequest {
+                    draft_key: "window:server:media".to_owned(),
+                })
+                .await
+                .unwrap(),
+            Some(draft),
+        );
+        assert_eq!(
+            repository
+                .list_keys(DraftKeyPrefixRequest {
+                    key_prefix: "window:server:".to_owned(),
+                })
+                .await
+                .unwrap(),
+            vec!["window:server:media"],
+        );
+    }
+
+    #[tokio::test]
+    async fn lists_restored_media_without_reviving_cleared_text_and_tokens() {
+        let repository = repository().await;
+        for (name, input) in [
+            ("image", json!({ "type": "image", "fileId": "file-id" })),
+            (
+                "localImage",
+                json!({ "type": "localImage", "path": "/tmp/image.png" }),
+            ),
+            (
+                "audio",
+                json!({ "type": "audio", "url": "data:audio/wav;base64,AUDIO" }),
+            ),
+            (
+                "localAudio",
+                json!({ "type": "localAudio", "path": "/tmp/audio.wav" }),
+            ),
+            ("text", json!({ "type": "text", "text": "已清空文字" })),
+            (
+                "skill",
+                json!({ "type": "skill", "name": "已删除技能", "path": "/tmp/skill" }),
+            ),
+            (
+                "mention",
+                json!({ "type": "mention", "name": "已删除引用", "path": "/tmp/reference" }),
+            ),
+        ] {
+            repository
+                .save(SaveDraftRequest {
+                    draft_key: format!("window:server:{name}"),
+                    draft: json!({ "text": "", "tokens": [], "restoredInput": [input] }),
+                })
+                .await
+                .unwrap();
+        }
+        let mut keys = repository
+            .list_keys(DraftKeyPrefixRequest {
+                key_prefix: "window:server:".to_owned(),
+            })
+            .await
+            .unwrap();
+        keys.sort();
+        assert_eq!(
+            keys,
+            vec![
+                "window:server:audio",
+                "window:server:image",
+                "window:server:localAudio",
+                "window:server:localImage",
+            ],
+        );
+    }
+
+    #[tokio::test]
     async fn rejects_invalid_key_and_oversized_draft() {
         let repository = repository().await;
         assert!(matches!(
@@ -378,7 +477,7 @@ mod tests {
             repository
                 .save(SaveDraftRequest {
                     draft_key: "valid".to_owned(),
-                    draft: json!({"text":"x".repeat(1024 * 1024),"tokens":[]}),
+                    draft: json!({"text":"x".repeat(MAX_DRAFT_BYTES),"tokens":[]}),
                 })
                 .await,
             Err(DraftError::Invalid),

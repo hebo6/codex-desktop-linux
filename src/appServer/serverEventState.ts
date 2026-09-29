@@ -127,7 +127,7 @@ export type QueueInputPreview =
   | { readonly type: "localImage" | "localAudio"; readonly path: string }
   | { readonly type: "skill" | "mention"; readonly name: string; readonly path: string }
   | { readonly type: "image" | "audio" };
-export interface QueuedSubmissionSummary { readonly id: string; readonly clientUserMessageId: string; readonly text: string; readonly inputs: readonly QueueInputPreview[]; readonly truncated: boolean }
+export interface QueuedSubmissionSummary { readonly id: string; readonly clientUserMessageId: string; readonly input: QueuedSubmission["input"]; readonly text: string; readonly inputs: readonly QueueInputPreview[]; readonly truncated: boolean }
 export interface ServerQueueState {
   readonly version: number;
   readonly status: "pending" | "ready" | "error" | "unknown";
@@ -513,7 +513,7 @@ export class ServerEventStore {
           case "image": case "audio": return { type: input.type };
         }
       });
-      return { id: entry.id, clientUserMessageId: entry.clientUserMessageId, text: clipped(text), inputs, truncated: text.length > SERVER_EVENT_LIMITS.text || entry.input.length > SERVER_EVENT_LIMITS.entities };
+      return { id: entry.id, clientUserMessageId: entry.clientUserMessageId, input: entry.input, text: clipped(text), inputs, truncated: text.length > SERVER_EVENT_LIMITS.text || entry.input.length > SERVER_EVENT_LIMITS.entities };
     });
     this.patch({ queuesByThread: put(this.snapshot.queuesByThread, threadId, { version, status: "ready", entries: retained }) });
     this.record({ method: "thread/queue/changed", params: { threadId } }, "输入队列", `${entries.length} 条待处理输入`, "completed", keyOf("queue", threadId), threadId, undefined, retained.map((entry) => entry.text).join("\n"), false);

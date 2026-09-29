@@ -93,6 +93,9 @@ export type { ThreadGoalGetResponse } from "./types/ThreadGoalGetResponse";
 export type { ProjectListParams } from "./types/ProjectListParams";
 export type { ProjectListResponse } from "./types/ProjectListResponse";
 export type { CommandExecResponse } from "./types/CommandExecResponse";
+export type { ThreadQueueDeleteParams } from "./types/ThreadQueueDeleteParams";
+export type { ThreadQueueDeleteResponse } from "./types/ThreadQueueDeleteResponse";
+export type { UserInput } from "./types/UserInput";
 
 export {
   KNOWN_SERVER_NOTIFICATION_METHODS,

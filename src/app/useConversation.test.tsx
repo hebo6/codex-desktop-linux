@@ -67,6 +67,10 @@ class FakeConversationClient implements ConversationClient {
     } satisfies ThreadQueueAddResponse));
   }
 
+  deleteQueuedSubmission() {
+    return handle(Promise.resolve({ deleted: true }));
+  }
+
   runShellCommand(threadId: string, command: string) {
     this.shellCommandCalls.push({ threadId, command });
     return handle(Promise.resolve({} satisfies ThreadShellCommandResponse));
@@ -699,9 +703,9 @@ describe("useConversation", () => {
     ]);
   });
 
-  it("运行中把输入排到下一回合且不触发 steer", async () => {
+  it.each([true, false])("运行状态为 %s 时，排队仍由服务端决定启动时机", async (running) => {
     const client = new FakeConversationClient();
-    const snapshot = restored([RUNNING_TURN]);
+    const snapshot = restored(running ? [RUNNING_TURN] : []);
     const { result } = renderHook(() =>
       useConversation({
         client,
@@ -710,7 +714,7 @@ describe("useConversation", () => {
         onThreadCreated: vi.fn(async () => undefined),
       }),
     );
-    await waitFor(() => expect(result.current.activeTurnId).toBe(RUNNING_TURN.id));
+    await waitFor(() => expect(result.current.activeTurnId).toBe(running ? RUNNING_TURN.id : null));
 
     await act(async () => {
       expect(await result.current.queueInput([

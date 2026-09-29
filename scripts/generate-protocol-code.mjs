@@ -350,6 +350,21 @@ const schemaDeclarations = [
     schemaPath: "v2/CommandExecResponse.json",
     validatorName: "validateCommandExecResponse",
   },
+  {
+    typeName: "ThreadQueueDeleteParams",
+    schemaPath: "v2/ThreadQueueDeleteParams.json",
+  },
+  {
+    typeName: "ThreadQueueDeleteResponse",
+    schemaPath: "v2/ThreadQueueDeleteResponse.json",
+    validatorName: "validateThreadQueueDeleteResponse",
+  },
+  {
+    typeName: "UserInput",
+    schemaPath: "v2/ThreadQueueAddParams.json",
+    definitionName: "UserInput",
+    validatorName: "validateUserInput",
+  },
 ];
 
 const validatorDeclarations = schemaDeclarations.filter(
@@ -379,8 +394,9 @@ for (const { schemaPath } of schemaDeclarations) {
   schemas.set(schemaPath, await readSchema(schemaPath));
 }
 
-for (const { typeName, schemaPath } of schemaDeclarations) {
-  const schema = schemas.get(schemaPath);
+for (const declaration of schemaDeclarations) {
+  const { typeName } = declaration;
+  const schema = resolveDeclaredSchema(declaration);
   const source = await compile(prepareTypeSchema(structuredClone(schema)), typeName, {
     additionalProperties: true,
     bannerComment: generatedHeader.trimEnd(),
@@ -437,9 +453,10 @@ const ajv = new Ajv({
 });
 
 const standaloneExports = {};
-for (const { validatorName, typeName, schemaPath } of validatorDeclarations) {
+for (const declaration of validatorDeclarations) {
+  const { validatorName, typeName } = declaration;
   const schemaId = `urn:codex-app-server:${encodeURIComponent(codexVersion)}:${typeName}`;
-  const validationSchema = prepareValidationSchema(structuredClone(schemas.get(schemaPath)));
+  const validationSchema = prepareValidationSchema(structuredClone(resolveDeclaredSchema(declaration)));
   validationSchema.$id = schemaId;
   ajv.addSchema(validationSchema, schemaId);
   standaloneExports[validatorName] = schemaId;
@@ -466,6 +483,23 @@ addGeneratedOutput(
 );
 
 await persistOrCheckGeneratedOutputs();
+
+function resolveDeclaredSchema({ typeName, schemaPath, definitionName }) {
+  const schema = schemas.get(schemaPath);
+  if (definitionName === undefined) {
+    return schema;
+  }
+  const definition = schema.definitions?.[definitionName];
+  if (definition === undefined) {
+    throw new Error(`${schemaPath} 缺少定义 ${definitionName}`);
+  }
+  return {
+    $schema: schema.$schema,
+    ...definition,
+    definitions: schema.definitions,
+    title: typeName,
+  };
+}
 
 async function readSchema(schemaPath) {
   const absolutePath = join(schemaDirectory, schemaPath);
