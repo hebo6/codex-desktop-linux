@@ -317,6 +317,8 @@ Mermaid 按需加载，在不可见但可测量的临时容器内串行生成 SV
 
 生产和开发 CSP 均使用 `style-src 'self' 'unsafe-inline'`，允许图表生成所需的样式标签和属性，脚本仍使用 `script-src 'self'`，网络和资源来源继续受各自指令限制
 
+`freezePrototype` 保持 Tauri 默认的 `false`，避免冻结 `Object.prototype` 后，Day.js、D3 等依赖通过普通赋值定义自身原型方法时初始化失败
+
 URL 只允许明确白名单协议，远程内容不得访问应用内部 Tauri 地址或携带本地凭据
 
 链接和图片的 URL 存于语法树元数据，通过按钮回调交给统一 LinkResolver，不写入可导航的 `href` 或可加载资源的 `src`，组件不得自行打开浏览器或文件系统
