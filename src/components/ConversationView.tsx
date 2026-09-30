@@ -325,7 +325,16 @@ export function ConversationView({
   const scrollbarDragRef = useRef(false);
   const touchPositionRef = useRef<{ x: number; y: number } | null>(null);
   const observedThreadIdRef = useRef(restoredThread.metadata.id);
-  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+  const [showJumpToBottom, setJumpToBottomVisible] = useState(false);
+  const jumpToBottomVisibleRef = useRef(false);
+  const setShowJumpToBottom = useCallback((visible: boolean) => {
+    // 已有更新排队时，同值 setState 仍可能追加提交；在派发前去重并保持布局回调稳定
+    if (jumpToBottomVisibleRef.current === visible) {
+      return;
+    }
+    jumpToBottomVisibleRef.current = visible;
+    setJumpToBottomVisible(visible);
+  }, []);
   const [hasUnreadContent, setHasUnreadContent] = useState(false);
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(null);
   const latestReadingContentRef = useRef({

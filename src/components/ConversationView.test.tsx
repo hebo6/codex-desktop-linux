@@ -6,7 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import type { ReactElement, ReactNode } from "react";
+import { Profiler, type ReactElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { RestoredThread, ThreadTurn } from "../app/useServerThreads";
@@ -2143,6 +2143,60 @@ describe("ConversationView", () => {
 
     expect(scroller.scrollTop).toBe(400);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+  });
+
+  it("暂停跟随后连续更新正文不会为相同的底部按钮状态追加提交", async () => {
+    const contentResize = observeConversationResize();
+    const onRender = vi.fn();
+    const activeTurn = {
+      id: "turn-stream-commits",
+      items: [
+        { id: "question-stream-commits", type: "userMessage", content: [{ type: "text", text: "连续回复" }] },
+        { id: "answer-stream-commits", type: "agentMessage", text: "回复" },
+      ],
+      itemsView: "full",
+      status: "inProgress",
+    } satisfies ThreadTurn;
+    const view = (text: string) => (
+      <Profiler id="conversation-stream" onRender={onRender}>
+        <ConversationView restoredThread={{
+          ...RESTORED,
+          turns: [{
+            ...activeTurn,
+            items: activeTurn.items.map((item) => item.type === "agentMessage" ? { ...item, text } : item),
+          }],
+        }} />
+      </Profiler>
+    );
+    const { rerender } = render(view("回复"));
+    const scroller = screen.getByLabelText("会话消息");
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 500 },
+      scrollHeight: { configurable: true, value: 1_500 },
+    });
+    userScroll(scroller, 400);
+    await finishAnimationFrame();
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+    onRender.mockClear();
+
+    for (let index = 1; index <= 8; index += 1) {
+      rerender(view(`回复${"继续".repeat(index)}`));
+      act(contentResize);
+    }
+
+    expect(onRender).toHaveBeenCalledTimes(8);
+    expect(scroller.scrollTop).toBe(400);
+    expect(screen.getByText(`回复${"继续".repeat(8)}`)).toBeVisible();
+    expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+    userScroll(scroller, 1_000);
+    expect(screen.queryByRole("button", { name: "回到底部" })).not.toBeInTheDocument();
+
+    // 同一批事件内离开再回到底部，最终按钮状态应以最后一次位置为准
+    act(() => {
+      userScroll(scroller, 400);
+      userScroll(scroller, 1_000);
+    });
+    expect(screen.queryByRole("button", { name: "回到底部" })).not.toBeInTheDocument();
   });
 
   it.each([0, 28])("新问题对齐首问位置并由流式内容消耗尾部留白（绘制延伸 %ipx）", (scrollBleed) => {
