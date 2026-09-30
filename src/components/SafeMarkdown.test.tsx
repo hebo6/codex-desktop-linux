@@ -15,7 +15,38 @@ import type {
 } from "../content/syntaxHighlighting";
 import { markdownToPlainText, SafeMarkdown } from "./SafeMarkdown";
 
+vi.mock("./MermaidPreview", () => ({
+  MermaidPreview: ({ source }: { readonly source: string }) => (
+    <div aria-label="Mermaid 图表" role="img">{source}</div>
+  ),
+}));
+
 describe("SafeMarkdown", () => {
+  it("Mermaid 围栏闭合后才显示图表，源码选择不随后续流式正文改变", () => {
+    const source = "flowchart LR\n A --> B";
+    const { container, rerender } = render(<SafeMarkdown source={`\`\`\`mermaid\n${source}`} />);
+    expect(screen.queryByRole("img", { name: "Mermaid 图表" })).not.toBeInTheDocument();
+    expect(container.querySelector("pre code")?.textContent).toBe(source);
+
+    rerender(<SafeMarkdown source={`\`\`\`mermaid\n${source}\n\`\`\``} />);
+    expect(screen.getByRole("img", { name: "Mermaid 图表" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "源码" }));
+    expect(screen.queryByRole("img", { name: "Mermaid 图表" })).not.toBeInTheDocument();
+    expect(container.querySelector("pre code")?.textContent).toBe(source);
+
+    rerender(<SafeMarkdown source={`\`\`\`mermaid\n${source}\n\`\`\`\n\n后续正文`} />);
+    expect(screen.queryByRole("img", { name: "Mermaid 图表" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "图表" }));
+    expect(screen.getByRole("img", { name: "Mermaid 图表" })).toBeVisible();
+  });
+
+  it("紧凑摘要与纯文本保留 Mermaid 源码，不挂载图表", () => {
+    const source = "```mermaid\nflowchart LR\n A --> B\n```";
+    render(<SafeMarkdown source={source} variant="compact" />);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(markdownToPlainText(source)).toBe("flowchart LR\n A --> B");
+  });
+
   it("渲染 GFM 常用块并忽略原始 HTML", () => {
     render(<SafeMarkdown source={'# 标题\n\n- [x] 完成\n- [ ] 待办\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\n> 引用\n\n```ts\nconst x = 1\n```\n\n<script>危险</script>\n\n正文'} />);
     expect(screen.getByRole("heading", { name: "标题" })).toBeVisible();

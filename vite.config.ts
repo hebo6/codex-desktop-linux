@@ -12,8 +12,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      // 浏览器导出用 template.innerHTML 解析 KaTeX，触发严格 CSP 的样式拦截
-      // 选用同包的默认纯解析器，公式 HTML 全程作为数据处理
+      // 选用同包的默认纯解析器，公式 HTML 转语法树时不经过临时 DOM
       "hast-util-from-html-isomorphic": fileURLToPath(import.meta.resolve("hast-util-from-html-isomorphic")),
     },
   },

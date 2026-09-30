@@ -28,6 +28,7 @@ import {
 } from "../content/syntaxLanguages";
 import syntaxTokenStyles from "./SyntaxToken.module.css";
 import { isEscapeDismissal } from "./keyboardEvents";
+import { MermaidPreview } from "./MermaidPreview";
 import styles from "./SafeMarkdown.module.css";
 
 export { markdownToPlainText } from "../content/markdown";
@@ -157,6 +158,7 @@ function CodeBlock({
   readonly syntaxHighlighter: SyntaxHighlighter;
 }) {
   const [wrapped, setWrapped] = useState(false);
+  const [showSource, setShowSource] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -171,6 +173,8 @@ function CodeBlock({
   const confirmationId = useId();
   const confirmationTitleId = useId();
   const fenceLanguageName = markdownFenceLanguageName(language);
+  const isMermaid = fenceLanguageName === "mermaid";
+  const showDiagram = isMermaid && closed && !showSource;
   const sourceLanguage = sourceLanguageForMarkdownFence(language);
   const executable =
     onRunShellCommand !== undefined &&
@@ -271,7 +275,14 @@ function CodeBlock({
     <section className={styles.codeBlock}>
       <header>
         <span>{sourceLanguage?.label ?? (fenceLanguageName || "文本")}</span>
-        <button aria-pressed={wrapped} onClick={() => setWrapped((value) => !value)} type="button">{wrapped ? "不折行" : "折行"}</button>
+        {isMermaid && closed ? (
+          <button onClick={() => setShowSource((value) => !value)} type="button">
+            {showSource ? "图表" : "源码"}
+          </button>
+        ) : null}
+        {!showDiagram ? (
+          <button aria-pressed={wrapped} onClick={() => setWrapped((value) => !value)} type="button">{wrapped ? "不折行" : "折行"}</button>
+        ) : null}
         <button onClick={() => {
           void navigator.clipboard.writeText(source).then(() => {
             setCopied(true);
@@ -326,16 +337,18 @@ function CodeBlock({
           </div>
         </div>
       ) : null}
-      <pre data-wrapped={wrapped}>
-        <code>
-          {
-            highlightedSource?.source === source &&
-            highlightedSource.language === sourceLanguage?.id
-              ? renderHighlightedLines(highlightedSource.lines)
-              : source
-          }
-        </code>
-      </pre>
+      {showDiagram ? <MermaidPreview source={source} /> : (
+        <pre data-wrapped={wrapped}>
+          <code>
+            {
+              highlightedSource?.source === source &&
+              highlightedSource.language === sourceLanguage?.id
+                ? renderHighlightedLines(highlightedSource.lines)
+                : source
+            }
+          </code>
+        </pre>
+      )}
     </section>
   );
 }

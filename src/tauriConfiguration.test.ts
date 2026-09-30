@@ -42,15 +42,19 @@ describe("Tauri 发布配置", () => {
     expect(windowPermission).toContain('"open_html_in_browser"');
   });
 
-  it("不允许应用内 HTML 子框架和 Blob 样式资源", () => {
-    const csp = tauriConfiguration.app.security.csp;
-    expect(csp).not.toContain("frame-src");
-    expect(csp).toContain("font-src 'self'");
-    expect(csp).toContain("style-src 'self'");
-    expect(csp).not.toMatch(/(?:font|style)-src[^;]*blob:/u);
-    expect(csp).not.toContain("'unsafe-inline'");
-    expect(csp).toContain("media-src blob:");
-    expect(tauriConfiguration.app.security.devCsp).toContain("media-src blob:");
+  it("允许图表内联样式，保持脚本、字体和资源来源限制", () => {
+    for (const csp of [tauriConfiguration.app.security.csp, tauriConfiguration.app.security.devCsp]) {
+      const directives = new Map(csp.split(";").map((entry) => {
+        const [name, ...sources] = entry.trim().split(/\s+/u);
+        return [name, sources];
+      }));
+      expect(directives.get("style-src")).toEqual(["'self'", "'unsafe-inline'"]);
+      expect(directives.get("script-src")).toEqual(["'self'"]);
+      expect(directives.get("font-src")).toEqual(["'self'"]);
+      expect(directives.get("img-src")).toEqual(["'self'", "blob:"]);
+      expect(directives.get("media-src")).toEqual(["blob:"]);
+      expect(directives.get("object-src")).toEqual(["'none'"]);
+    }
   });
 
   it("允许应用窗口订阅和退订应用事件", () => {

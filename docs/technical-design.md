@@ -309,7 +309,13 @@ HTML 不在 WebView 中渲染；用户显式打开时，Rust 层将 app-server �
 
 Markdown 禁止原始 HTML，rehype-sanitize 先通过项目白名单移除脚本、事件属性、嵌入对象和输入中的内联样式，再由 rehype-katex 在 `trust: false` 下生成公式
 
-公式 HTML 使用 `hast-util-from-html-isomorphic` 的默认纯解析器转换为语法树，避免浏览器入口通过临时 DOM 解析时触发 CSP 拦截；KaTeX 的受信输出经 React 逐属性应用样式，生产环境 CSP 保持 `style-src 'self'`
+公式 HTML 使用 `hast-util-from-html-isomorphic` 的默认纯解析器转换为语法树，KaTeX 的受信输出经 React 逐属性应用样式
+
+Mermaid 按需加载，在不可见但可测量的临时容器内串行生成 SVG，再通过 Blob 图片展示；串行范围包含初始化和渲染，防止全局主题配置串扰，结束后移除临时容器
+
+图表使用 `securityLevel: strict` 和 SVG 文字标签，应用锁定安全级别、主题、自定义 CSS 和清洗配置，源码不得覆盖；源码长度限制为 50,000 字符，边数限制为 500
+
+生产和开发 CSP 均使用 `style-src 'self' 'unsafe-inline'`，允许图表生成所需的样式标签和属性，脚本仍使用 `script-src 'self'`，网络和资源来源继续受各自指令限制
 
 URL 只允许明确白名单协议，远程内容不得访问应用内部 Tauri 地址或携带本地凭据
 

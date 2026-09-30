@@ -1,0 +1,8 @@
+/* Mermaid 需要连接到文档才能测量文字，不能使用 display: none */
+.staging {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
