@@ -77,31 +77,43 @@ function mockOverflowingTitle(text: string) {
 }
 
 function observeConversationResize(selector = "[data-conversation-list]") {
-  let notify: (() => void) | null = null;
+  const observers = new Set<FakeResizeObserver>();
 
   class FakeResizeObserver {
     readonly callback: ResizeObserverCallback;
+    readonly targets = new Set<Element>();
 
     constructor(callback: ResizeObserverCallback) {
       this.callback = callback;
     }
 
-    disconnect() {}
+    disconnect() {
+      this.targets.clear();
+      observers.delete(this);
+    }
 
     observe(target: Element) {
       if (target.matches(selector)) {
-        notify = () => this.callback([], this as unknown as ResizeObserver);
+        this.targets.add(target);
+        observers.add(this);
       }
     }
 
-    unobserve() {}
+    unobserve(target: Element) {
+      this.targets.delete(target);
+      if (this.targets.size === 0) observers.delete(this);
+    }
   }
 
   Object.defineProperty(globalThis, "ResizeObserver", {
     configurable: true,
     value: FakeResizeObserver,
   });
-  return () => notify?.();
+  return () => {
+    for (const observer of [...observers]) {
+      if (observers.has(observer)) observer.callback([], observer as unknown as ResizeObserver);
+    }
+  };
 }
 
 function mockConversationContentBottom(
@@ -141,6 +153,19 @@ function mockConversationContentBottom(
         };
       }
       return originalBoundingRect.call(this);
+    });
+}
+
+function mockConversationRowHeight(rowHeight: () => number) {
+  const originalBoundingRect = HTMLElement.prototype.getBoundingClientRect;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: HTMLElement) {
+      if (!this.matches('[data-row-type="segment"]')) {
+        return originalBoundingRect.call(this);
+      }
+      const scroller = this.closest<HTMLElement>('[aria-label="会话消息"]');
+      const top = Number(this.dataset.rowIndex) * rowHeight() - (scroller?.scrollTop ?? 0);
+      return new DOMRect(0, top, 800, rowHeight());
     });
 }
 
@@ -2145,9 +2170,19 @@ describe("ConversationView", () => {
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
   });
 
-  it("暂停跟随后连续更新正文不会为相同的底部按钮状态追加提交", async () => {
+  it.each([0, 3, 7])("已有 %i 轮历史时连续更新正文不会为相同的滚动状态追加提交", async (historyCount) => {
     const contentResize = observeConversationResize();
+    mockConversationRowHeight(() => 100);
     const onRender = vi.fn();
+    const history = Array.from({ length: historyCount }, (_, index) => ({
+      id: `history-stream-commits-${index}`,
+      items: [
+        { id: `history-question-${index}`, type: "userMessage", content: [{ type: "text", text: `历史问题 ${index}` }] },
+        { id: `history-answer-${index}`, type: "agentMessage", text: `历史回答 ${index}` },
+      ],
+      itemsView: "full",
+      status: "completed",
+    })) satisfies ThreadTurn[];
     const activeTurn = {
       id: "turn-stream-commits",
       items: [
@@ -2161,7 +2196,7 @@ describe("ConversationView", () => {
       <Profiler id="conversation-stream" onRender={onRender}>
         <ConversationView restoredThread={{
           ...RESTORED,
-          turns: [{
+          turns: [...history, {
             ...activeTurn,
             items: activeTurn.items.map((item) => item.type === "agentMessage" ? { ...item, text } : item),
           }],
@@ -3464,6 +3499,52 @@ describe("ConversationView", () => {
     fireEvent.click(firstMarker);
     expect(scroller.scrollTop).toBe(24);
     expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+  });
+
+  it("历史导航在滚动、内容尺寸变化和新增问题后保持唯一正确的当前标记", () => {
+    const contentResize = observeConversationResize();
+    let rowHeight = 100;
+    mockConversationRowHeight(() => rowHeight);
+    const turns = Array.from({ length: 5 }, (_, index) => ({
+      id: `navigation-turn-${index}`,
+      items: [
+        { id: `navigation-question-${index}`, type: "userMessage", content: [{ type: "text", text: `导航问题 ${index + 1}` }] },
+        { id: `navigation-answer-${index}`, type: "agentMessage", text: `导航回答 ${index + 1}` },
+      ],
+      itemsView: "full",
+      status: "completed",
+    })) satisfies ThreadTurn[];
+    const view = (visibleTurns: readonly ThreadTurn[]) => (
+      <ConversationView restoredThread={{ ...RESTORED, turns: visibleTurns }} />
+    );
+    const { rerender } = render(view(turns.slice(0, 4)));
+    const scroller = screen.getByLabelText("会话消息");
+    let visibleTurnCount = 4;
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 50 },
+      scrollHeight: { configurable: true, get: () => visibleTurnCount * 2 * rowHeight },
+    });
+    const currentMarker = (questionNumber: number) => {
+      const navigation = screen.getByRole("navigation", { name: "历史问题快速导航" });
+      expect(navigation.querySelectorAll('[aria-current="location"]')).toHaveLength(1);
+      expect(within(navigation).getByRole("button", {
+        name: `跳转到问题 ${questionNumber}：导航问题 ${questionNumber}`,
+      })).toHaveAttribute("aria-current", "location");
+    };
+
+    userScroll(scroller, 250);
+    currentMarker(2);
+    rowHeight = 50;
+    act(contentResize);
+    currentMarker(3);
+
+    visibleTurnCount = turns.length;
+    rerender(view(turns));
+    currentMarker(5);
+    userScroll(scroller, 125);
+    currentMarker(2);
+    rerender(view(turns.map((turn) => ({ ...turn }))));
+    currentMarker(2);
   });
 
   it("滚动回答时不渲染问题的粘性副本", () => {

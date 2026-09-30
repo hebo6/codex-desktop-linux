@@ -336,7 +336,6 @@ export function ConversationView({
     setJumpToBottomVisible(visible);
   }, []);
   const [hasUnreadContent, setHasUnreadContent] = useState(false);
-  const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(null);
   const latestReadingContentRef = useRef({
     latestTurn: restoredThread.turns.at(-1) ?? null,
     runningTurnId: null as string | null,
@@ -1206,12 +1205,16 @@ export function ConversationView({
         // 在当前标记的前后半格内连续移动，保证当前问题始终对应最长条
         position = currentIndex - 0.5 + progress;
       }
-      // 逐像素更新仅修改导航的 CSS 变量，不让整段消息随每次滚动重新渲染
+      // 阅读位置由布局测量统一更新宽度和无障碍标记，避免回写 React 状态产生级联提交
       markers.forEach((marker, index) => {
         const width = position === null ? 12 : questionMarkerWidth(Math.abs(index - position));
         marker.style.setProperty("--question-marker-width", `${width}px`);
+        if (index === currentIndex) {
+          marker.setAttribute("aria-current", "location");
+        } else {
+          marker.removeAttribute("aria-current");
+        }
       });
-      setCurrentQuestionId(historyQuestions[currentIndex]?.itemId ?? null);
     };
     updateCurrentQuestion();
     scroller.addEventListener("scroll", updateCurrentQuestion);
@@ -1563,7 +1566,6 @@ export function ConversationView({
       </div>
       {historyQuestions.length >= 4 ? (
         <HistoryQuestionNavigation
-          currentQuestionId={currentQuestionId}
           navigationRef={questionNavigationRef}
           onSelect={(question) => {
             const scroller = scrollerRef.current;
@@ -1706,12 +1708,10 @@ function questionMarkerWidth(distance: number): number {
 }
 
 function HistoryQuestionNavigation({
-  currentQuestionId,
   navigationRef,
   onSelect,
   questions,
 }: {
-  readonly currentQuestionId: string | null;
   readonly navigationRef: RefObject<HTMLElement | null>;
   readonly onSelect: (question: HistoryQuestion) => void;
   readonly questions: readonly HistoryQuestion[];
@@ -1722,7 +1722,6 @@ function HistoryQuestionNavigation({
         const previewId = `history-question-preview-${index}`;
         return (
           <button
-            aria-current={question.itemId === currentQuestionId ? "location" : undefined}
             aria-describedby={previewId}
             aria-label={`跳转到问题 ${index + 1}：${question.question}`}
             className={styles.questionMarker}
