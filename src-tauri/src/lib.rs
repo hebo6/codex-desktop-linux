@@ -13,6 +13,7 @@ mod local_data;
 mod pending_thread_results;
 mod preferences;
 mod protocol_trace;
+mod remote_images;
 mod saved_prompts;
 mod sensitive;
 mod storage;
@@ -259,6 +260,7 @@ pub fn run() {
             configuration::commands::record_proxy_test,
             clipboard::read_clipboard_files,
             clipboard::read_clipboard_file_chunk,
+            remote_images::read_remote_image,
             windows::load_window_state,
             windows::bind_window_server,
             windows::update_window_tabs,

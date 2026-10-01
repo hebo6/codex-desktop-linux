@@ -462,6 +462,34 @@ function renderSidebarThreadScenario(
 }
 
 describe("App", () => {
+  it("回答内嵌图片点击后打开统一预览器", async () => {
+    const dataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==";
+    vi.stubGlobal("URL", class extends URL {
+      static override createObjectURL = vi.fn(() => "blob:markdown-image");
+      static override revokeObjectURL = vi.fn();
+    });
+    try {
+      const { emitNotification, requests } = renderSidebarThreadScenario();
+      fireEvent.click(await screen.findByRole("button", { name: /^侧边栏目标，/u }));
+      await screen.findByRole("textbox", { name: "任务输入" });
+      act(() => emitNotification({ method: "turn/started", params: {
+        threadId: SIDEBAR_THREAD.id,
+        turn: {
+          id: "image-turn", status: "completed", itemsView: "full",
+          items: [{ id: "image-answer", type: "agentMessage", phase: "final_answer", text: `![桌面截图](${dataUrl})` }],
+        },
+      } }));
+      fireEvent.click(await screen.findByRole("button", { name: "查看图片：桌面截图" }));
+      const dialog = await screen.findByRole("dialog", { name: "图片.png" });
+      expect(await within(dialog).findByRole("img", { name: "图片.png" })).toHaveAttribute("src", "blob:markdown-image");
+      expect(within(dialog).getByRole("button", { name: "放大" })).toBeVisible();
+      expect(requests.some((request) => request.method === "fs/readFile")).toBe(false);
+    } finally {
+      cleanup();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it.each([true, false])("后台标签的异步提问遵循独立通知开关（%s）", async (notifyUserInput) => {
     const notificationOptions = questionNotificationOptions(notifyUserInput);
     const { emitNotification } = renderSidebarThreadScenario(true, undefined, notificationOptions);

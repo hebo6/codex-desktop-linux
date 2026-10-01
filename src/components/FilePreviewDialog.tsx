@@ -13,12 +13,8 @@ import {
   contentProcessor as sharedContentProcessor,
   type ContentProcessor,
 } from "../content/contentProcessing";
-import {
-  decodeBase64Bytes,
-  decodedBase64Size,
-  parseDataImageUrl,
-} from "../content/dataImage";
-import { sanitizeSvg } from "../content/sanitizeSvg";
+import { decodedBase64Size, parseDataImageUrl } from "../content/dataImage";
+import { decodePreview, type DecodedPreview } from "../content/filePreview";
 import {
   syntaxHighlighter as sharedSyntaxHighlighter,
   type HighlightedLines,
@@ -41,10 +37,9 @@ import {
 import { useModalLayer } from "./modalStack";
 import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
 import { SafeMarkdown } from "./SafeMarkdown";
+import { MarkdownImageContext } from "./MarkdownImage";
 import syntaxTokenStyles from "./SyntaxToken.module.css";
 import styles from "./FilePreviewDialog.module.css";
-
-const MAX_PREVIEW_BYTES = 16 * 1024 * 1024;
 
 export interface RemoteFilePreviewRequest {
   readonly type?: "file";
@@ -452,7 +447,7 @@ export function FilePreviewDialog({
   const relativePath = blobImageRequest !== null
     ? "输入框中的图片"
     : dataImageRequest !== null
-      ? "用户消息中的图片"
+      ? "内嵌图片"
       : relativeRemotePath(fileRequest?.path ?? "", workspacePath);
   const previewSize = blobImageRequest !== null
     ? blobImageRequest.blob.size
@@ -644,7 +639,11 @@ export function FilePreviewDialog({
           ) : decoded?.type === "binary" ? (
             <div className={styles.placeholder}><strong>此文件不是有效的 UTF-8 文本或支持的图片</strong><span>为避免在 WebView 中执行未知内容，仅提供另存为</span></div>
           ) : activeView === "preview" && displayedText !== null && fileRequest !== null && isMarkdown(fileRequest.path) ? (
-            <article className={styles.markdownPreview}><SafeMarkdown {...(onOpenLink === undefined ? {} : { onOpenLink })} source={displayedText} /></article>
+            <article className={styles.markdownPreview}>
+              <MarkdownImageContext value={{ client, cwd: fileRequest.path.replace(/[^\\/]+$/u, "") }}>
+                <SafeMarkdown {...(onOpenLink === undefined ? {} : { onOpenLink })} source={displayedText} />
+              </MarkdownImageContext>
+            </article>
           ) : activeView === "preview" && displayedText !== null && fileRequest !== null && isJson(fileRequest.path) ? (
             <StructuredTextPreview highlightedLines={highlightedLines} text={displayedText} />
           ) : activeView === "preview" && decoded?.type === "image" && imageUrl !== null ? (
@@ -658,44 +657,6 @@ export function FilePreviewDialog({
       </section>
     </div>
   );
-}
-
-type DecodedPreview =
-  | { readonly type: "text"; readonly text: string }
-  | {
-      readonly type: "image";
-      readonly blob: Blob;
-      readonly sourceText?: string;
-    }
-  | { readonly type: "binary" | "tooLarge" };
-
-function decodePreview(path: string, dataBase64: string): DecodedPreview {
-  const size = decodedBase64Size(dataBase64);
-  if (size > MAX_PREVIEW_BYTES) return { type: "tooLarge" };
-  const extension = path.split(".").at(-1)?.toLocaleLowerCase() ?? "";
-  const imageMediaType: Readonly<Record<string, string | undefined>> = {
-    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
-  };
-  try {
-    if (extension === "svg") {
-      const sourceText = decodeUtf8(dataBase64);
-      return {
-        type: "image",
-        blob: new Blob([sanitizeSvg(sourceText)], {
-          type: "image/svg+xml;charset=utf-8",
-        }),
-        sourceText,
-      };
-    }
-    const mediaType = imageMediaType[extension];
-    if (mediaType !== undefined) {
-      return { type: "image", blob: new Blob([decodeBase64Bytes(dataBase64)], { type: mediaType }) };
-    }
-    const text = decodeUtf8(dataBase64);
-    return text.includes("\0") ? { type: "binary" } : { type: "text", text };
-  } catch {
-    return { type: "binary" };
-  }
 }
 
 function StructuredTextPreview({
@@ -817,12 +778,6 @@ function highlightTokenQuery(
   const start = Math.max(0, matchStart - tokenStart);
   const end = Math.min(content.length, matchEnd - tokenStart);
   return <>{content.slice(0, start)}<mark>{content.slice(start, end)}</mark>{content.slice(end)}</>;
-}
-
-function decodeUtf8(dataBase64: string): string {
-  return new TextDecoder("utf-8", { fatal: true }).decode(
-    decodeBase64Bytes(dataBase64),
-  );
 }
 
 function fileName(path: string): string { return path.split(/[\\/]/u).at(-1) || "远程文件"; }

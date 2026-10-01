@@ -80,6 +80,8 @@ import { SubAgentPanel } from "./components/SubAgentPanel";
 import { RateLimitIndicator } from "./components/RateLimitIndicator";
 import { ExternalLinkDialog } from "./components/ExternalLinkDialog";
 import { FilePreviewDialog, type FilePreviewRequest } from "./components/FilePreviewDialog";
+import { MarkdownImageContext } from "./components/MarkdownImage";
+import { decodeDataImageUrl } from "./content/dataImage";
 import { KeyboardShortcutsDialog } from "./components/KeyboardShortcutsDialog";
 import { PlaintextCredentialConfirmDialog } from "./components/PlaintextCredentialConfirmDialog";
 import { ServerDeleteDialog } from "./components/ServerDeleteDialog";
@@ -1988,6 +1990,16 @@ export function App({
   };
 
   const openContentLink = (raw: string) => {
+    if (/^data:/iu.test(raw)) {
+      const image = decodeDataImageUrl(raw);
+      if (image === null) {
+        setContentError("图片数据无效、格式不支持或超过 16 MiB");
+      } else {
+        setContentError(null);
+        setPreviewRequest({ type: "dataImage", dataUrl: raw, name: `图片.${image.extension}` });
+      }
+      return;
+    }
     const resolved = resolveLink(raw, composerCwd);
     setContentError(null);
     switch (resolved.type) {
@@ -2131,7 +2143,7 @@ export function App({
   );
 
   return (
-    <>
+    <MarkdownImageContext value={{ client: connection.fileClient, cwd: composerCwd }}>
       {windowTabs.map((tab) => {
         if (tab.threadId === null) {
           return null;
@@ -2722,7 +2734,7 @@ export function App({
         }}
         serverName={pendingReconnect?.serverName ?? null}
       />
-    </>
+    </MarkdownImageContext>
   );
 }
 

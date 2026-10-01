@@ -105,6 +105,59 @@ span.imageReference {
   cursor: text;
 }
 
+.imageButton {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-divider-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-fill-subtle);
+  vertical-align: middle;
+  cursor: zoom-in;
+}
+
+.imageButton:focus-visible {
+  outline: 2px solid var(--color-link);
+  outline-offset: 3px;
+}
+
+.image {
+  display: inline-block;
+  max-width: 100%;
+  max-height: 480px;
+  height: auto;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+.imageButton .image {
+  display: block;
+}
+
+.imageStatus {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-divider-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: 0.9em;
+}
+
+.imageStatus button {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--color-link);
+  background: var(--color-fill-subtle);
+  font: inherit;
+  cursor: pointer;
+}
+
 .codeBlock {
   position: relative;
   margin: var(--space-4) 0;

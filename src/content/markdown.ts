@@ -22,6 +22,8 @@ interface MarkdownCode {
 interface MarkdownLink {
   readonly target: string;
   readonly image: boolean;
+  readonly alt?: string;
+  readonly title?: string;
 }
 
 declare module "mdast" {
@@ -139,15 +141,19 @@ export const markdownRehypeOptions: NonNullable<MarkdownOptions["remarkRehypeOpt
   },
 };
 
-// URL 只作为按钮的业务数据传递，不写入可导航或可加载资源的 DOM 属性
-// 这样 file: 和带行号的相对路径仍由项目的 LinkResolver 统一校验
+// 原始 URL 只作为业务数据传递，由链接解析器和图片加载器校验
 const rehypeLinkReferences: Plugin<[], HtmlRoot> = () => (tree) => {
   visit(tree, "element", (node) => {
     if (node.tagName !== "a" && node.tagName !== "img") return;
     const image = node.tagName === "img";
     const target = node.properties[image ? "src" : "href"];
     if (typeof target !== "string") return;
-    node.data = { ...node.data, markdownLink: { target, image } };
+    node.data = { ...node.data, markdownLink: {
+      target,
+      image,
+      ...(image ? { alt: String(node.properties.alt ?? "") } : {}),
+      ...(typeof node.properties.title === "string" ? { title: node.properties.title } : {}),
+    } };
     if (image) {
       node.children = [{ type: "text", value: `图片：${String(node.properties.alt ?? "")}` }];
     }

@@ -31,6 +31,31 @@ function base64For(text: string): string {
 }
 
 describe("FilePreviewDialog", () => {
+  it("Markdown 内嵌图片相对文件所在目录解析，点击传递完整服务器路径", async () => {
+    const client = clientFor("# 文档\n\n![说明图](../assets/image.svg)");
+    vi.mocked(client.readFile).mockImplementation((path) => handle({
+      dataBase64: base64For(path.endsWith(".md")
+        ? "# 文档\n\n![说明图](../assets/image.svg)"
+        : '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" /></svg>'),
+    }));
+    vi.stubGlobal("URL", class extends URL {
+      static override createObjectURL = vi.fn(() => "blob:document-image");
+      static override revokeObjectURL = vi.fn();
+    });
+    const onOpenLink = vi.fn();
+    const { unmount } = render(<FilePreviewDialog client={client} onClose={vi.fn()} onOpenLink={onOpenLink}
+      request={{ path: "/remote/docs/README.md" }} serverName="远程服务器" workspacePath="/remote" />);
+    try {
+      expect(await screen.findByRole("img", { name: "说明图" })).toHaveAttribute("src", "blob:document-image");
+      expect(client.readFile).toHaveBeenCalledWith("/remote/assets/image.svg");
+      fireEvent.click(screen.getByRole("button", { name: "查看图片：说明图" }));
+      expect(onOpenLink).toHaveBeenCalledExactlyOnceWith("/remote/assets/image.svg");
+    } finally {
+      unmount();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("从服务器读取文本并定位链接行列", async () => {
     const client = clientFor("first\nsecond query\nthird");
     render(
@@ -349,7 +374,7 @@ describe("FilePreviewDialog", () => {
         "blob:user-message-image",
       ),
     );
-    expect(screen.getByText("用户消息中的图片")).toBeVisible();
+    expect(screen.getByText("内嵌图片")).toBeVisible();
     expect(screen.queryByRole("button", { name: "复制路径" })).not.toBeInTheDocument();
     expect(create).toHaveBeenCalledWith(expect.any(Blob));
   });

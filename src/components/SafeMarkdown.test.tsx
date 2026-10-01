@@ -60,9 +60,9 @@ describe("SafeMarkdown", () => {
 
   it("所有链接统一交给调用者处理", () => {
     const onOpenLink = vi.fn();
-    render(<SafeMarkdown onOpenLink={onOpenLink} source="[网页](https://example.com) ![图片](./a.png)" />);
+    render(<SafeMarkdown onOpenLink={onOpenLink} source="[网页](https://example.com) [文件](./a.png)" />);
     fireEvent.click(screen.getByRole("button", { name: "网页" }));
-    fireEvent.click(screen.getByRole("button", { name: "图片：图片" }));
+    fireEvent.click(screen.getByRole("button", { name: "文件" }));
     expect(onOpenLink).toHaveBeenNthCalledWith(1, "https://example.com");
     expect(onOpenLink).toHaveBeenNthCalledWith(2, "./a.png");
   });
@@ -438,7 +438,7 @@ describe("SafeMarkdown", () => {
     const onOpenLink = vi.fn();
     const { container } = render(<SafeMarkdown onOpenLink={onOpenLink} source="[![图](image.png)](https://example.com)" />);
     expect(container.querySelector("button button")).toBeNull();
-    fireEvent.click(screen.getByText("图片：图"));
+    fireEvent.click(screen.getByText("正在加载图片：图"));
     expect(onOpenLink).toHaveBeenCalledExactlyOnceWith("https://example.com");
   });
 

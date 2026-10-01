@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "remote-images",
+  "description": "Allows application windows to display internet images without granting the webview network access",
+  "windows": ["main", "app-*"],
+  "permissions": ["allow-read-remote-image"]
+}

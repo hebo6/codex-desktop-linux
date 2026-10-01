@@ -29,6 +29,7 @@ import {
 import syntaxTokenStyles from "./SyntaxToken.module.css";
 import { isEscapeDismissal } from "./keyboardEvents";
 import { MermaidPreview } from "./MermaidPreview";
+import { MarkdownImage } from "./MarkdownImage";
 import styles from "./SafeMarkdown.module.css";
 
 export { markdownToPlainText } from "../content/markdown";
@@ -122,6 +123,11 @@ function MarkdownSpan({ node, children, ...props }: ComponentProps<"span"> & Ext
   const insideLink = useContext(LinkLabelContext);
   const link = node?.data?.markdownLink;
   if (link === undefined) return <span {...props}>{children}</span>;
+  if (link.image && variant === "document") {
+    return <MarkdownImage source={link.target} alt={link.alt ?? ""} insideLink={insideLink}
+      {...(link.title === undefined ? {} : { title: link.title })}
+      {...(onOpenLink === undefined ? {} : { onOpenLink })} />;
+  }
   const className = link.image ? styles.imageReference : styles.link;
   return onOpenLink === undefined || variant === "compact" || insideLink
     ? <span className={className} id={props.id}>{children}</span>

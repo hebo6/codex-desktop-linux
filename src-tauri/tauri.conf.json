@@ -39,6 +39,7 @@
         "configuration",
         "configured-connection",
         "local-stdio",
+        "remote-images",
         "remote-websocket"
       ],
       "csp": "default-src 'self'; base-uri 'none'; connect-src ipc: http://ipc.localhost; font-src 'self'; form-action 'none'; frame-ancestors 'none'; img-src 'self' blob:; manifest-src 'self'; media-src blob:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:",

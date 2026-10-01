@@ -1179,13 +1179,13 @@ fn log_websocket_connect_error(error: &WebSocketError) {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct TlsConfigurationError;
+pub(crate) struct TlsConfigurationError;
 
 static TLS_CONFIG: OnceLock<Result<Arc<ClientConfig>, TlsConfigurationError>> = OnceLock::new();
 static ALLOW_INVALID_TLS_CONFIG: OnceLock<Result<Arc<ClientConfig>, TlsConfigurationError>> =
     OnceLock::new();
 
-pub(super) fn tls_config() -> Result<Arc<ClientConfig>, TlsConfigurationError> {
+pub(crate) fn tls_config() -> Result<Arc<ClientConfig>, TlsConfigurationError> {
     TLS_CONFIG.get_or_init(build_tls_config).clone()
 }
 
