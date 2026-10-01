@@ -135,7 +135,10 @@ export function ThreadQueuePanel({ client, store, threadId, canEdit, onEdit }: {
               ? `撤回到输入框，修改后重新排队${index === entries.length - 1 ? "（Alt+↑）" : ""}`
               : "请先处理输入框中的草稿，并等待当前操作完成"}
             type="button"
-          >编辑</button>
+          >
+            编辑
+            {index === entries.length - 1 ? <kbd aria-hidden="true" className={styles.shortcut}>Alt+↑</kbd> : null}
+          </button>
           <button aria-label={`撤销排队消息 ${index + 1}`} disabled={!ready || pending !== null} onClick={() => void withdraw(entry.id, false)} type="button">{pending === entry.id ? "处理中…" : "撤销"}</button>
         </li>)}
       </ol>

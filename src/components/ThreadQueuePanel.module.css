@@ -64,6 +64,17 @@
   opacity: 0.5;
 }
 
+.shortcut {
+  display: inline-block;
+  padding: 0 var(--space-1);
+  margin-left: var(--space-1);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: 4px;
+  background: var(--color-fill-subtle);
+  font: inherit;
+  line-height: 16px;
+}
+
 .feedback {
   display: flex;
   align-items: start;
