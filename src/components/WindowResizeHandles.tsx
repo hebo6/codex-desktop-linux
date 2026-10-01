@@ -27,23 +27,25 @@ const handles: { className: string | undefined; direction: ResizeDirection }[] =
 
 /**
  * Invisible resize handles rendered at the window edges and corners.
- * Only visible (pointer-interactive) when the window is not maximized.
+ * Only visible (pointer-interactive) outside maximized and fullscreen modes.
  */
 export function WindowResizeHandles() {
-  const [maximized, setMaximized] = useState(false);
+  const [resizable, setResizable] = useState(false);
 
   useEffect(() => {
     const appWindow = getCurrentWindow();
-    void appWindow.isMaximized().then(setMaximized);
-    const unlisten = appWindow.onResized(() => {
-      void appWindow.isMaximized().then(setMaximized);
-    });
+    const updateResizable = () => {
+      void Promise.all([appWindow.isMaximized(), appWindow.isFullscreen()])
+        .then(([maximized, fullscreen]) => setResizable(!maximized && !fullscreen));
+    };
+    updateResizable();
+    const unlisten = appWindow.onResized(updateResizable);
     return () => {
       void unlisten.then((fn) => fn());
     };
   }, []);
 
-  if (maximized) return null;
+  if (!resizable) return null;
 
   const appWindow = getCurrentWindow();
 

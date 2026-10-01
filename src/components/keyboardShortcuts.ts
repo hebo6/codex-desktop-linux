@@ -60,6 +60,7 @@ export const KEYBOARD_SHORTCUT_GROUPS: readonly KeyboardShortcutGroup[] = [
   {
     title: "应用",
     shortcuts: [
+      { label: "进入或退出全屏", keys: ["F11"] },
       { label: "打开设置", keys: ["Ctrl+,"] },
       { label: "显示键盘快捷键", keys: ["Ctrl+/"] },
       { label: "打开协议检查器", keys: ["Ctrl+Shift+D"] },

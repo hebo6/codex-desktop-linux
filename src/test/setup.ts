@@ -17,10 +17,12 @@ vi.mock("@tauri-apps/api/window", () => {
   const mockWindow = {
     isFocused: vi.fn().mockResolvedValue(true),
     isMaximized: vi.fn().mockResolvedValue(false),
+    isFullscreen: vi.fn().mockResolvedValue(false),
     onFocusChanged: vi.fn().mockResolvedValue(vi.fn()),
     onResized: vi.fn().mockResolvedValue(vi.fn()),
     minimize: vi.fn().mockResolvedValue(undefined),
     setTitle: vi.fn().mockResolvedValue(undefined),
+    setFullscreen: vi.fn().mockResolvedValue(undefined),
     toggleMaximize: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
     startResizeDragging: vi.fn().mockResolvedValue(undefined),

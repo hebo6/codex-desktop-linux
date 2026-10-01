@@ -25,10 +25,18 @@ describe("KeyboardShortcutsDialog", () => {
     expect(screen.getByText("显示或隐藏侧边栏")).toBeVisible();
     expect(screen.getByText("显示或隐藏限额详情")).toBeVisible();
     expect(screen.getByText("Alt+L")).toBeVisible();
+    expect(screen.getByText("进入或退出全屏")).toBeVisible();
+    expect(screen.getByText("F11")).toBeVisible();
     expect(screen.getByText("关闭当前窗口")).toBeVisible();
     expect(screen.getByText("Ctrl+Shift+W")).toBeVisible();
     expect(screen.getByText("退出程序")).toBeVisible();
     expect(screen.getByText("Ctrl+Q")).toBeVisible();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索键盘快捷键" }), {
+      target: { value: "F11" },
+    });
+    expect(screen.getByText("进入或退出全屏")).toBeVisible();
+    expect(screen.queryByText("显示或隐藏侧边栏")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索键盘快捷键" }), {
       target: { value: "F6" },

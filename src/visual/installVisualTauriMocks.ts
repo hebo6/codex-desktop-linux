@@ -6,7 +6,7 @@ export function installVisualTauriMocks() {
     if (command === "get_window_button_layout") {
       return "appmenu:close";
     }
-    if (command === "plugin:window|is_maximized") {
+    if (command === "plugin:window|is_maximized" || command === "plugin:window|is_fullscreen") {
       return false;
     }
     throw new Error(`视觉场景不支持 Tauri 命令：${command}`);

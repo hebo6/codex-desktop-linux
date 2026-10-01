@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "window-controls",
-  "description": "Allows application windows to use custom window controls (minimize, maximize, close, drag, resize)",
+  "description": "Allows application windows to use custom window controls (minimize, maximize, fullscreen, close, drag, resize)",
   "windows": ["main", "app-*"],
   "permissions": [
     "core:window:allow-minimize",
@@ -10,6 +10,8 @@
     "core:window:allow-internal-toggle-maximize",
     "core:window:allow-unmaximize",
     "core:window:allow-is-maximized",
+    "core:window:allow-is-fullscreen",
+    "core:window:allow-set-fullscreen",
     "core:window:allow-is-focused",
     "core:window:allow-close",
     "core:window:allow-set-title",
