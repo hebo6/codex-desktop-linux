@@ -11,13 +11,13 @@ import type { DraftAttachment } from "./useTabAttachments";
 
 const ENTRY: QueuedSubmission = {
   id: "queue-1", clientUserMessageId: "message-1", input: [
-    { type: "text", text: "!这仍是一条消息", text_elements: [{ byteRange: { start: 0, end: 1 } }] },
+    { type: "text", text: "检查结果", text_elements: [{ byteRange: { start: 0, end: 6 } }] },
     { type: "image", fileId: "server-image", detail: "original" },
     { type: "mention", name: "说明", path: "/workspace/readme.md" },
   ],
 };
 
-async function setup(expanded = true) {
+async function setup(expanded = true, activeTurn = false) {
   const store = new ServerEventStore();
   store.hydrateQueue("thread-1", 0, [ENTRY]);
   let resolveDelete!: (value: { deleted: boolean }) => void;
@@ -42,7 +42,7 @@ async function setup(expanded = true) {
     const attachmentDraft = useState<readonly DraftAttachment[]>([]);
     const editing = useQueueMessageEditing({ client, threadId: "thread-1", draftKey: "draft-1", draftStore });
     return <Composer
-      activeTurn={false}
+      activeTurn={activeTurn}
       attachmentDraft={attachmentDraft}
       cwd="/workspace"
       draftKey="draft-1"
@@ -66,13 +66,20 @@ async function setup(expanded = true) {
   return { ...view, store, client, drafts, draftStore, onQueue, onSend, onRunShellCommand, resolveDelete };
 }
 
-describe("队列撤回与输入框协作", () => {
-  it.each(["按钮", "Alt+↑"])("通过 %s 收到删除确认后恢复草稿并聚焦，空闲时提交也重新排队且保留附件", async (trigger) => {
-    const h = await setup(trigger === "按钮");
-    const input = screen.getByRole("textbox", { name: "任务输入" });
+describe("队列移回与输入框协作", () => {
+  it.each([
+    { trigger: "按钮", activeTurn: false, ctrlKey: false, action: "发送" },
+    { trigger: "Alt+↑", activeTurn: false, ctrlKey: false, action: "发送" },
+    { trigger: "按钮", activeTurn: true, ctrlKey: false, action: "追加" },
+    { trigger: "Alt+↑", activeTurn: true, ctrlKey: false, action: "追加" },
+    { trigger: "按钮", activeTurn: true, ctrlKey: true, action: "排队发送" },
+    { trigger: "Alt+↑", activeTurn: true, ctrlKey: true, action: "排队发送" },
+  ])("通过 $trigger 移回后按普通规则$action，完整保留输入", async ({ trigger, activeTurn, ctrlKey, action }) => {
+    const h = await setup(trigger === "按钮", activeTurn);
+    const input = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
     await waitFor(() => expect(input).toBeEnabled());
     if (trigger === "按钮") {
-      const edit = screen.getByRole("button", { name: "编辑排队消息 1" });
+      const edit = screen.getByRole("button", { name: "将排队消息 1 移回输入框" });
       await waitFor(() => expect(edit).toBeEnabled());
       fireEvent.click(edit);
     } else {
@@ -88,13 +95,20 @@ describe("队列撤回与输入框协作", () => {
       h.store.hydrateQueue("thread-1", 1, []);
     });
     await act(async () => h.resolveDelete({ deleted: true }));
-    await waitFor(() => expect(input).toHaveValue("!这仍是一条消息"));
+    await waitFor(() => expect(input).toHaveValue("检查结果"));
     await waitFor(() => expect(input).toHaveFocus());
+    expect(input.selectionStart).toBe(input.value.length);
+    expect(input.selectionEnd).toBe(input.value.length);
     expect(h.drafts.get("draft-1")?.restoredInput).toEqual(ENTRY.input);
-    expect(screen.getByRole("button", { name: "重新排队" })).toBeEnabled();
-    fireEvent.keyDown(input, { key: "Enter" });
-    await waitFor(() => expect(h.onQueue).toHaveBeenCalledExactlyOnceWith(ENTRY.input));
-    expect(h.onSend).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: action })).toBeEnabled();
+    fireEvent.keyDown(input, { key: "Enter", ctrlKey });
+    if (ctrlKey) {
+      await waitFor(() => expect(h.onQueue).toHaveBeenCalledExactlyOnceWith(ENTRY.input));
+      expect(h.onSend).not.toHaveBeenCalled();
+    } else {
+      await waitFor(() => expect(h.onSend).toHaveBeenCalledExactlyOnceWith(ENTRY.input, expect.any(Object)));
+      expect(h.onQueue).not.toHaveBeenCalled();
+    }
     expect(h.onRunShellCommand).not.toHaveBeenCalled();
     await waitFor(() => expect(input).toHaveValue(""));
     expect(h.drafts.has("draft-1")).toBe(false);
@@ -112,7 +126,7 @@ describe("队列撤回与输入框协作", () => {
 
   it("deleted:false 不产生恢复草稿，解锁输入并保持原消息状态", async () => {
     const h = await setup();
-    const edit = screen.getByRole("button", { name: "编辑排队消息 1" });
+    const edit = screen.getByRole("button", { name: "将排队消息 1 移回输入框" });
     await waitFor(() => expect(edit).toBeEnabled());
     fireEvent.click(edit);
     await act(async () => h.resolveDelete({ deleted: false }));

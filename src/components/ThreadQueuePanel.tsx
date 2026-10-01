@@ -127,22 +127,21 @@ export function ThreadQueuePanel({ client, store, threadId, canEdit, onEdit }: {
         {entries.map((entry, index) => <li key={entry.id}>
           <span className={styles.preview} title={entry.text}>{index + 1}. {entry.text || entry.inputs.map(inputLabel).join("、")}</span>
           <button
-            aria-label={`编辑排队消息 ${index + 1}`}
+            aria-label={`将排队消息 ${index + 1} 移回输入框`}
             aria-keyshortcuts={index === entries.length - 1 ? "Alt+ArrowUp" : undefined}
             disabled={!ready || !canEdit || pending !== null}
             onClick={() => void withdraw(entry.id, true)}
             title={canEdit
-              ? `撤回到输入框，修改后重新排队${index === entries.length - 1 ? "（Alt+↑）" : ""}`
+              ? `移回输入框${index === entries.length - 1 ? "（Alt+↑）" : ""}`
               : "请先处理输入框中的草稿，并等待当前操作完成"}
             type="button"
           >
-            编辑
+            移回输入框
             {index === entries.length - 1 ? <kbd aria-hidden="true" className={styles.shortcut}>Alt+↑</kbd> : null}
           </button>
           <button aria-label={`撤销排队消息 ${index + 1}`} disabled={!ready || pending !== null} onClick={() => void withdraw(entry.id, false)} type="button">{pending === entry.id ? "处理中…" : "撤销"}</button>
         </li>)}
       </ol>
-      {entries.length > 0 ? <p className={styles.hint}>编辑会先撤回到输入框，重新排队时进入队尾</p> : null}
     </div>
   </ComposerAccessoryDisclosure>;
 }

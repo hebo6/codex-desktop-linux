@@ -16,7 +16,7 @@ function setup(entries = [ENTRY]) {
   const store = new ServerEventStore();
   store.hydrateQueue("thread-1", 0, entries);
   const client = { deleteQueuedSubmission: vi.fn(() => handle(Promise.resolve({ deleted: true }))) };
-  const onEdit = vi.fn(async (_entry: QueuedSubmission) => ({ ok: true, message: "已撤回到输入框" }));
+  const onEdit = vi.fn(async (_entry: QueuedSubmission) => ({ ok: true, message: "已移回输入框" }));
   const props = { client, store, threadId: "thread-1", canEdit: true, onEdit };
   const view = render(<ThreadQueuePanel {...props} />);
   const toggle = () => fireEvent.click(screen.getByRole("button", { name: /^待发送队列/u }));
@@ -24,7 +24,7 @@ function setup(entries = [ENTRY]) {
 }
 
 describe("ThreadQueuePanel", () => {
-  it("Alt+↑ 在队列收起时编辑最新队尾，等待结果期间不重复撤回", async () => {
+  it("Alt+↑ 在队列收起时移回最新队尾，等待结果期间不重复撤回", async () => {
     const latest = { ...ENTRY, id: "queued-2", clientUserMessageId: "client-2" };
     const h = setup();
     h.toggle();
@@ -37,8 +37,8 @@ describe("ThreadQueuePanel", () => {
     fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
     expect(h.onEdit).toHaveBeenCalledExactlyOnceWith(latest);
     expect(h.client.deleteQueuedSubmission).not.toHaveBeenCalled();
-    await act(async () => result.resolve({ ok: true, message: "已撤回到输入框" }));
-    expect(screen.getByRole("status")).toHaveTextContent("已撤回到输入框");
+    await act(async () => result.resolve({ ok: true, message: "已移回输入框" }));
+    expect(screen.getByRole("status")).toHaveTextContent("已移回输入框");
 
     // A successful withdrawal must not be selected again before the next notification.
     fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
@@ -110,8 +110,8 @@ describe("ThreadQueuePanel", () => {
 
   it("只为队尾编辑按钮标注快捷键", () => {
     setup([ENTRY, { ...ENTRY, id: "queued-2" }]);
-    expect(screen.getByRole("button", { name: "编辑排队消息 1" })).not.toHaveAttribute("aria-keyshortcuts");
-    expect(screen.getByRole("button", { name: "编辑排队消息 2" })).toHaveAttribute("aria-keyshortcuts", "Alt+ArrowUp");
+    expect(screen.getByRole("button", { name: "将排队消息 1 移回输入框" })).not.toHaveAttribute("aria-keyshortcuts");
+    expect(screen.getByRole("button", { name: "将排队消息 2 移回输入框" })).toHaveAttribute("aria-keyshortcuts", "Alt+ArrowUp");
   });
 
   it("等待删除成功后移除最后一条消息并隐藏面板，期间阻止重复点击", async () => {
@@ -121,7 +121,7 @@ describe("ThreadQueuePanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "撤销排队消息 1" }));
     expect(screen.getByText("1. 下一项任务")).toBeVisible();
     expect(screen.getByRole("button", { name: "撤销排队消息 1" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "编辑排队消息 1" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "将排队消息 1 移回输入框" })).toBeDisabled();
     expect(h.client.deleteQueuedSubmission).toHaveBeenCalledExactlyOnceWith("thread-1", "queued-1");
     await act(async () => result.resolve({ deleted: true }));
     expect(screen.queryByRole("region", { name: "待发送队列" })).not.toBeInTheDocument();
@@ -146,7 +146,7 @@ describe("ThreadQueuePanel", () => {
     expect(screen.getByText("1. 下一项任务")).toBeVisible();
   });
 
-  it("编辑传递完整消息，并只在恢复操作成功后隐藏空队列面板", async () => {
+  it("移回传递完整消息，并只在恢复操作成功后隐藏空队列面板", async () => {
     const input: QueuedSubmission["input"] = [
       { type: "text", text: `开头${"长".repeat(33_000)}`, text_elements: [{ byteRange: { start: 0, end: 6 } }] },
       { type: "image", fileId: "file-1", detail: "original" },
@@ -156,19 +156,19 @@ describe("ThreadQueuePanel", () => {
     const h = setup([{ ...ENTRY, input }]);
     const result = deferred<{ ok: boolean; message: string }>();
     h.onEdit.mockReturnValue(result.promise);
-    fireEvent.click(screen.getByRole("button", { name: "编辑排队消息 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "将排队消息 1 移回输入框" }));
     expect(h.onEdit).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ input }));
     expect(h.client.deleteQueuedSubmission).not.toHaveBeenCalled();
     expect(document.body.textContent).not.toContain("PRIVATE");
-    await act(async () => result.resolve({ ok: true, message: "已撤回到输入框" }));
+    await act(async () => result.resolve({ ok: true, message: "已移回输入框" }));
     expect(screen.queryByRole("region", { name: "待发送队列" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "编辑排队消息 1" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "将排队消息 1 移回输入框" })).not.toBeInTheDocument();
   });
 
-  it("已有草稿时只禁用编辑，撤销仍可用", () => {
+  it("已有草稿时只禁用移回输入框，撤销仍可用", () => {
     const h = setup();
     h.rerender(<ThreadQueuePanel {...h} canEdit={false} />);
-    expect(screen.getByRole("button", { name: "编辑排队消息 1" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "将排队消息 1 移回输入框" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "撤销排队消息 1" })).toBeEnabled();
     expect(fireEvent.keyDown(window, { key: "ArrowUp", altKey: true })).toBe(true);
     expect(h.onEdit).not.toHaveBeenCalled();

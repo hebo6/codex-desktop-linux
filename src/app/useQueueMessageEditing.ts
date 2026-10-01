@@ -86,7 +86,7 @@ export function useQueueMessageEditing({
     }
     if (readiness === null || !sameSource(readiness.source, origin) || !readiness.available
       || recoveriesRef.current.some((recovery) => sameDraft(recovery.source, origin))) {
-      return { ok: false, message: "请先发送或清空输入框，再编辑队列消息" };
+      return { ok: false, message: "请先发送或清空输入框，再将队列消息移回输入框" };
     }
 
     pendingRef.current = true;
@@ -129,7 +129,7 @@ export function useQueueMessageEditing({
       }
       return {
         ok: true,
-        message: current ? "消息已撤回到输入框，修改后可重新排队" : "消息已撤回并保存到原会话草稿",
+        message: current ? "消息已移回输入框" : "消息已撤回并保存到原会话草稿",
       };
     } finally {
       pendingRef.current = false;

@@ -76,7 +76,7 @@ describe("useQueueMessageEditing", () => {
 
     await act(async () => {
       deletion.resolve({ deleted: true });
-      expect(await operation).toEqual({ ok: true, message: "消息已撤回到输入框，修改后可重新排队" });
+      expect(await operation).toEqual({ ok: true, message: "消息已移回输入框" });
     });
     expect(draftStore.save).toHaveBeenCalledWith("server-1:thread-1", restoreQueuedDraft(ENTRY.input));
     expect(result.current.request?.input).toBe(ENTRY.input);

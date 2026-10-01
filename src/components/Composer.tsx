@@ -257,14 +257,11 @@ export function Composer({
   const [projectDeleteError, setProjectDeleteError] = useState<string | null>(
     null,
   );
-  const [triggerCandidate, setTrigger] = useState<Trigger | null>(() =>
+  const [trigger, setTrigger] = useState<Trigger | null>(() =>
     initialText.startsWith("!")
       ? null
       : findTrigger(initialText, initialText.length),
   );
-  const trigger = restoredInput !== undefined && triggerCandidate?.kind === "/"
-    ? null
-    : triggerCandidate;
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [fileResults, setFileResults] = useState<readonly FuzzyFileSearchResult[]>([]);
   const [fileSearchLoading, setFileSearchLoading] = useState(false);
@@ -318,7 +315,7 @@ export function Composer({
   submittingRef.current = submitting;
   currentDraftRef.current = composerContent;
   const normalized = text.trim();
-  const shellMode = restoredInput === undefined && text.startsWith("!");
+  const shellMode = text.startsWith("!");
   const shellCommand = shellMode ? text.slice(1).trim() : "";
   const catalogDefaultModel = models.find(({ isDefault }) => isDefault) ?? null;
   const defaultModel = defaultModelId === null
@@ -364,7 +361,7 @@ export function Composer({
   const hasInvalidAttachment = (selectedModelRejectsImages && hasImages)
     || attachments.some(({ error }) => error !== null);
   const hasShellIncompatibleContent =
-    shellMode && (tokens.length > 0 || attachments.length > 0);
+    shellMode && (tokens.length > 0 || attachments.length > 0 || restoredAttachments.length > 0);
   const hasSubmittableContent = shellMode
     ? shellCommand.length > 0 && !hasShellIncompatibleContent
     : (
@@ -703,7 +700,7 @@ export function Composer({
       skillsLoading,
       supportsImmediateCommands: canRunImmediateCommands && onRunImmediateCommand !== undefined,
     }),
-    [activeTurn, canRunImmediateCommands, cwd, fileResults, fileSearchError, fileSearchLoading, mentionReferences, mentionsError, mentionsLoading, onRunImmediateCommand, restoredInput, skills, skillsLoading, trigger],
+    [activeTurn, canRunImmediateCommands, cwd, fileResults, fileSearchError, fileSearchLoading, mentionReferences, mentionsError, mentionsLoading, onRunImmediateCommand, skills, skillsLoading, trigger],
   );
 
   useEffect(() => {
@@ -786,7 +783,7 @@ export function Composer({
       return;
     }
     const sourceDraftKey = draftKey;
-    const queueSubmission = target === "queue" || restoredInput !== undefined;
+    const queueSubmission = target === "queue";
     preserveDraftForNextKeyRef.current = false;
     sendingRef.current = true;
     if (shellMode) {
@@ -866,7 +863,7 @@ export function Composer({
 
   const updateTrigger = (value: string, cursor: number, composing = false) => {
     setTrigger(
-      composing || (restoredInput === undefined && value.startsWith("!"))
+      composing || value.startsWith("!")
         ? null
         : findTrigger(value, cursor),
     );
@@ -1493,11 +1490,9 @@ export function Composer({
             placeholder={
               shellCommandActive
                 ? "Shell 命令执行完成后可发送消息"
-                : restoredInput !== undefined
-                  ? "编辑后重新排到队尾"
-                  : activeTurn
-                    ? "输入要追加的内容"
-                    : "向 Codex 描述任务"
+                : activeTurn
+                  ? "输入要追加的内容"
+                  : "向 Codex 描述任务"
             }
             onPaste={handlePaste}
             onSelect={rememberComposerSelection}
@@ -1918,7 +1913,7 @@ export function Composer({
                 </svg>
               </button>
             ) : null}
-            {activeTurn && hasSubmittableContent && !shellMode && restoredInput === undefined ? (
+            {activeTurn && hasSubmittableContent && !shellMode ? (
               <button
                 aria-label="排队发送"
                 className={styles.queueButton}
@@ -1955,16 +1950,14 @@ export function Composer({
                       ? "正在提交"
                       : shellMode
                         ? "执行 Shell 命令"
-                        : restoredInput !== undefined
-                          ? "重新排队"
-                          : activeTurn
-                            ? "追加"
-                            : "发送"
+                        : activeTurn
+                          ? "追加"
+                          : "发送"
                 }
                 className={styles.sendButton}
                 disabled={!canSend}
                 onClick={() => void send()}
-                title={shellMode ? "执行 Shell 命令 Enter" : restoredInput !== undefined ? "重新排到队尾 Enter" : activeTurn ? "追加 Enter" : "发送 Enter"}
+                title={shellMode ? "执行 Shell 命令 Enter" : activeTurn ? "追加 Enter" : "发送 Enter"}
                 type="button"
               >
                 {shellMode ? (
