@@ -1,9 +1,9 @@
-use std::{net::IpAddr, time::Duration};
+use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use reqwest::{Client, ClientBuilder, Response, StatusCode, header};
 use serde::Serialize;
-use url::{Host, Url};
+use url::Url;
 
 const MAX_IMAGE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_REDIRECTS: usize = 5;
@@ -69,18 +69,6 @@ fn parse_image_url(value: &str) -> Result<Url, String> {
     if !url.username().is_empty() || url.password().is_some() {
         return Err("图片地址不能包含用户名或密码".to_owned());
     }
-    match url.host().ok_or_else(|| "图片地址无效".to_owned())? {
-        Host::Domain(domain) => {
-            let domain = domain.trim_end_matches('.');
-            if domain == "localhost" || domain.ends_with(".localhost") {
-                return Err("互联网图片地址不能使用 localhost".to_owned());
-            }
-            // Trust the system resolver and routing, including proxy Fake-IP
-            // addresses. Only addresses written directly in the URL are checked.
-        }
-        Host::Ipv4(address) => require_public_address(address.into())?,
-        Host::Ipv6(address) => require_public_address(address.into())?,
-    }
     Ok(url)
 }
 
@@ -102,37 +90,6 @@ fn image_client_builder() -> Result<ClientBuilder, String> {
         .redirect(reqwest::redirect::Policy::none())
         .timeout(DOWNLOAD_TIMEOUT)
         .connect_timeout(Duration::from_secs(10)))
-}
-
-fn require_public_address(address: IpAddr) -> Result<(), String> {
-    let is_public = match address {
-        IpAddr::V4(address) => {
-            let [a, b, c, _] = address.octets();
-            // Exclude special-purpose ranges, including shared address space,
-            // documentation, benchmarking and transition-service addresses.
-            !matches!(a, 0 | 10 | 127 | 224..=255)
-                && !(a == 100 && (64..=127).contains(&b))
-                && !(a == 169 && b == 254)
-                && !(a == 172 && (16..=31).contains(&b))
-                && !(a == 192
-                    && (b == 168 || (b == 0 && matches!(c, 0 | 2)) || (b == 88 && c == 99)))
-                && !(a == 198 && (matches!(b, 18 | 19) || (b == 51 && c == 100)))
-                && !(a == 203 && b == 0 && c == 113)
-        }
-        IpAddr::V6(address) => {
-            let [a, b, ..] = address.segments();
-            // Only global unicast, excluding IETF special-purpose, 6to4 and
-            // documentation ranges. This also excludes mapped IPv4 and NAT64.
-            (a & 0xe000) == 0x2000
-                && !(a == 0x2001 && (b < 0x0200 || b == 0x0db8))
-                && a != 0x2002
-                && !(a == 0x3fff && b < 0x1000)
-        }
-    };
-    if !is_public {
-        return Err("图片地址不能直接指定本机、私网或保留 IP".to_owned());
-    }
-    Ok(())
 }
 
 async fn read_image_response(
@@ -202,6 +159,21 @@ mod tests {
             "https://images.example/a.png",
             "https://localhost.example/a.png",
             "https://1.1.1.1/a.png",
+            "https://localhost/a.png",
+            "https://localhost./a.png",
+            "https://LOCALHOST/a.png",
+            "https://images.localhost/a.png",
+            "https://images.localhost./a.png",
+            "http://127.0.0.1/a.png",
+            "http://127.1/a.png",
+            "http://2130706433/a.png",
+            "http://0x7f000001/a.png",
+            "http://10.1.2.3/a.png",
+            "http://192.168.1.1/a.png",
+            "http://198.18.0.1/a.png",
+            "http://[::1]/a.png",
+            "http://[fc00::1]/a.png",
+            "http://[2001:db8::1]/a.png",
         ] {
             assert!(parse_image_url(value).is_ok(), "{value}");
         }
@@ -212,68 +184,13 @@ mod tests {
             "https://user:secret@images.example/a.png",
             "https://user@images.example/a.png",
             "https://:secret@images.example/a.png",
-            "https://localhost/a.png",
-            "https://localhost./a.png",
-            "https://LOCALHOST/a.png",
-            "https://images.localhost/a.png",
-            "https://images.localhost./a.png",
-            "http://127.0.0.1/a.png",
-            "http://127.1/a.png",
-            "http://2130706433/a.png",
-            "http://0x7f000001/a.png",
-            "http://192.168.1.1/a.png",
-            "http://[::1]/a.png",
         ] {
             assert!(parse_image_url(value).is_err(), "{value}");
         }
     }
 
     #[test]
-    fn rejects_private_and_special_purpose_addresses() {
-        for value in [
-            "0.0.0.0",
-            "10.1.2.3",
-            "100.64.0.1",
-            "127.0.0.1",
-            "169.254.169.254",
-            "172.16.0.1",
-            "172.31.255.255",
-            "192.0.0.1",
-            "192.0.2.1",
-            "192.168.1.1",
-            "192.88.99.1",
-            "198.18.0.1",
-            "198.51.100.1",
-            "203.0.113.1",
-            "224.0.0.1",
-            "255.255.255.255",
-            "::",
-            "::1",
-            "::ffff:127.0.0.1",
-            "64:ff9b::7f00:1",
-            "fc00::1",
-            "fe80::1",
-            "ff02::1",
-            "2001::1",
-            "2001:db8::1",
-            "2002:7f00:1::",
-            "3fff::1",
-        ] {
-            assert!(
-                require_public_address(value.parse().unwrap()).is_err(),
-                "{value}"
-            );
-        }
-        for value in ["1.1.1.1", "8.8.8.8", "172.32.0.1", "2606:4700:4700::1111"] {
-            assert!(
-                require_public_address(value.parse().unwrap()).is_ok(),
-                "{value}"
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn validates_redirects_and_blocks_private_targets_before_connecting() {
+    fn validates_redirect_protocol_and_credentials_without_restricting_hosts() {
         let current = Url::parse("https://images.example/a/start").unwrap();
         assert_eq!(
             redirect_url(&current, "../image.png").unwrap().as_str(),
@@ -283,17 +200,13 @@ mod tests {
         assert!(redirect_url(&current, "https://secret@images.example/image.png").is_err());
         for location in [
             "http://127.0.0.1/image.png",
+            "http://192.168.1.1/image.png",
             "http://[::1]/image.png",
             "http://localhost/image.png",
             "http://images.localhost./image.png",
         ] {
-            assert!(redirect_url(&current, location).is_err(), "{location}");
+            assert!(redirect_url(&current, location).is_ok(), "{location}");
         }
-        assert!(
-            read_remote_image("http://127.0.0.1/image.png".to_owned())
-                .await
-                .is_err()
-        );
     }
 
     #[test]
@@ -316,7 +229,7 @@ mod tests {
         }
     }
 
-    async fn response_from_server(response_bytes: &[u8]) -> Response {
+    async fn start_image_server(response_bytes: &[u8]) -> String {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let response_bytes = response_bytes.to_vec();
@@ -326,14 +239,46 @@ mod tests {
             stream.read(&mut request).await.unwrap();
             stream.write_all(&response_bytes).await.unwrap();
         });
+        format!("http://{address}/image")
+    }
+
+    async fn response_from_server(response_bytes: &[u8]) -> Response {
+        let url = start_image_server(response_bytes).await;
         image_client_builder()
             .unwrap()
             .build()
             .unwrap()
-            .get(format!("http://{address}/image"))
+            .get(url)
             .send()
             .await
             .unwrap()
+    }
+
+    #[tokio::test]
+    async fn downloads_loopback_images_directly_and_after_redirect() {
+        for redirect in [false, true] {
+            let image_url = start_image_server(
+                b"HTTP/1.1 200 OK\r\nContent-Length: 8\r\n\r\n\x89PNG\r\n\x1a\n",
+            )
+            .await;
+            let url = if redirect {
+                start_image_server(
+                    format!(
+                        "HTTP/1.1 302 Found\r\nLocation: {image_url}\r\nContent-Length: 0\r\n\r\n"
+                    )
+                    .as_bytes(),
+                )
+                .await
+            } else {
+                image_url
+            };
+            let image = read_remote_image(url).await.unwrap();
+            assert_eq!(image.media_type, "image/png");
+            assert_eq!(
+                STANDARD.decode(image.data_base64).unwrap(),
+                b"\x89PNG\r\n\x1a\n"
+            );
+        }
     }
 
     #[tokio::test]

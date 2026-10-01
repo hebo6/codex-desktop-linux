@@ -325,7 +325,7 @@ URL 只允许明确白名单协议，远程内容不得访问应用内部 Tauri 
 
 图片加载上下文绑定当前 FileClient 和工作目录，Markdown 文件预览覆盖为文件所在目录；换图或切换上下文时忽略旧请求结果，卸载时释放 Blob URL，流式正文更新不重复读取同一图片
 
-互联网图片通过 Rust `read_remote_image` 读取，按文件签名识别媒体类型，限制下载大小、总时长和重定向次数；初始 URL 与每次重定向均拒绝显式本机或私网 IP 及 localhost 主机名，域名解析交给系统 DNS 和路由，以支持 Fake-IP 代理环境，不额外检查解析后的地址，WebView CSP 保持只允许本地与 Blob 图片
+网络图片通过 Rust `read_remote_image` 读取，按文件签名识别媒体类型，限制下载大小、总时长和重定向次数；初始 URL 与每次重定向只允许不含用户名和密码的 HTTP(S) 地址，不限制 IP 或主机名，连接遵循系统 DNS 和路由，WebView CSP 保持只允许本地与 Blob 图片
 
 外部网页由 Rust 层调用系统默认浏览器，WebView 不导航到远程网站
 

@@ -1,4 +1,4 @@
 [[permission]]
 identifier = "allow-read-remote-image"
-description = "Allows downloading bounded raster images from HTTP(S) URLs without credentials, localhost names or private IP literals"
+description = "Allows downloading bounded raster images from HTTP(S) URLs without credentials"
 commands.allow = ["read_remote_image"]
