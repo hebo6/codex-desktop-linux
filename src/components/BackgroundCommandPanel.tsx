@@ -11,6 +11,7 @@ import type { ThreadTurn } from "../app/useServerThreads";
 import { AnsiCommandOutput } from "./AnsiCommandOutput";
 import { commandDisplayText } from "./commandDisplay";
 import { ComposerAccessoryDisclosure } from "./ComposerAccessoryPanel";
+import { overflowTitleProps } from "./overflowTitle";
 import styles from "./BackgroundCommandPanel.module.css";
 
 type ThreadItem = ThreadTurn["items"][number];
@@ -135,7 +136,7 @@ export function BackgroundCommandPanel({
               <div className={styles.commandHeader}>
                 <div className={styles.commandCopy}>
                   <code>{command.command}</code>
-                  <small title={command.cwd}>
+                  <small {...overflowTitleProps}>
                     {command.cwd} · {formatDuration(command.durationMs)}
                   </small>
                 </div>

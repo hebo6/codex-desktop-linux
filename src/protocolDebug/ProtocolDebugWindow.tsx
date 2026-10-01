@@ -10,6 +10,7 @@ import {
 import syntaxTokenStyles from "../components/SyntaxToken.module.css";
 import { WindowControls } from "../components/WindowControls";
 import { useVirtualRows } from "../components/useVirtualRows";
+import { overflowTitleProps } from "../components/overflowTitle";
 import {
   syntaxHighlighter as sharedSyntaxHighlighter,
   type HighlightedLines,
@@ -461,7 +462,7 @@ function Metadata({ label, value }: {
   return (
     <div>
       <dt>{label}</dt>
-      <dd title={value}>{value}</dd>
+      <dd {...overflowTitleProps}>{value}</dd>
     </div>
   );
 }

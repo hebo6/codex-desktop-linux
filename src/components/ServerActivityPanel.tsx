@@ -9,6 +9,7 @@ import { ComposerAccessoryDisclosure } from "./ComposerAccessoryPanel";
 import { commandActivityTitle } from "./commandDisplay";
 import { formatTokenCount } from "./formatTokenCount";
 import { formatTerminalInput } from "./formatTerminalInput";
+import { overflowTitleProps } from "./overflowTitle";
 import styles from "./ServerActivityPanel.module.css";
 
 interface RequestFailure {
@@ -112,7 +113,7 @@ function TurnDiffSummary({ diff, onOpenDiff }: {
         const label = `${kinds[file.kind]} ${path}，新增 ${file.additions} 行，删除 ${file.deletions} 行`;
         const content = <>
           <span className={styles.diffKind}>{kinds[file.kind]}</span>
-          <code className={styles.diffPath} title={path}>{path}</code>
+          <code className={styles.diffPath} {...overflowTitleProps}>{path}</code>
           <DiffStats additions={file.additions} deletions={file.deletions} />
         </>;
         return <li key={file.path}>{onOpenDiff === undefined

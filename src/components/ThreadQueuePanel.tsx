@@ -5,6 +5,7 @@ import type { QueueClient } from "../appServer/conversationClient";
 import type { QueueInputPreview, QueuedSubmission, ServerEventStore } from "../appServer/serverEventState";
 import { RpcRemoteError } from "../protocol/rpc/errors";
 import { ComposerAccessoryDisclosure } from "./ComposerAccessoryPanel";
+import { overflowTitleProps } from "./overflowTitle";
 import styles from "./ThreadQueuePanel.module.css";
 
 export function ThreadQueuePanel({ client, store, threadId, canEdit, onEdit }: {
@@ -125,7 +126,7 @@ export function ThreadQueuePanel({ client, store, threadId, canEdit, onEdit }: {
       </div>}
       <ol className={styles.list} aria-label="待发送消息">
         {entries.map((entry, index) => <li key={entry.id}>
-          <span className={styles.preview} title={entry.text}>{index + 1}. {entry.text || entry.inputs.map(inputLabel).join("、")}</span>
+          <span className={styles.preview} {...overflowTitleProps}>{index + 1}. {entry.text || entry.inputs.map(inputLabel).join("、")}</span>
           <button
             aria-label={`将排队消息 ${index + 1} 移回输入框`}
             aria-keyshortcuts={index === entries.length - 1 ? "Alt+ArrowUp" : undefined}

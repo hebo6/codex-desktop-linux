@@ -38,6 +38,7 @@ import {
   type ConversationReadingStateStore,
 } from "./conversationReadingState";
 import { TerminalIcon } from "./SidebarIcons";
+import { overflowTitleProps } from "./overflowTitle";
 import styles from "./ConversationView.module.css";
 
 export type { ConversationReadingStateStore } from "./conversationReadingState";
@@ -2539,7 +2540,7 @@ function FileChangeActivity({
           <>
             <span className={styles.fileChangeTitle}>
               <strong>{verb}</strong>
-              <code title={path}>{path}</code>
+              <code {...overflowTitleProps}>{path}</code>
             </span>
             {statsText.length === 0 ? null : (
               <span aria-hidden="true" className={styles.fileChangeStats}>
@@ -2696,7 +2697,7 @@ function ActivityLine({
         className={styles.activityLine}
         data-status={status}
         onClick={onClick}
-        title={label}
+        {...overflowTitleProps}
         type="button"
       >
         {label}
@@ -2704,7 +2705,7 @@ function ActivityLine({
     );
   }
   return (
-    <div className={styles.activityLine} data-status={status} title={label}>
+    <div className={styles.activityLine} data-status={status} {...overflowTitleProps}>
       {label}
     </div>
   );

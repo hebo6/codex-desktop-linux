@@ -3,6 +3,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ServerId, ServerProfile } from "../configuration";
 import type { ConnectionPhase } from "../store/connectionSlice";
 import { isEscapeDismissal, isFocusTraversal } from "./keyboardEvents";
+import { overflowTitleProps } from "./overflowTitle";
 import styles from "./ServerSwitcher.module.css";
 
 export interface ServerSwitcherProps {
@@ -579,7 +580,7 @@ export function ServerSwitcher({
                       <ServerTypeIcon type={server.configuration.type} />
                       <span className={styles.serverIdentity}>
                         <strong>{server.name}</strong>
-                        <span className={styles.serverSummary} title={summary}>
+                        <span className={styles.serverSummary} {...overflowTitleProps}>
                           {summary}
                         </span>
                       </span>

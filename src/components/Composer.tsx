@@ -48,6 +48,7 @@ import {
 } from "./ComposerAccessoryPanel";
 import { FilePreviewDialog, type BlobImagePreviewRequest } from "./FilePreviewDialog";
 import { isEscapeDismissal } from "./keyboardEvents";
+import { overflowTitleProps } from "./overflowTitle";
 import { ProjectDeleteDialog } from "./ProjectDeleteDialog";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { SavedPromptManagerDialog } from "./SavedPromptManagerDialog";
@@ -1553,7 +1554,7 @@ export function Composer({
                     {isImage ? "图" : "音"}
                   </span>
                   <span>
-                    <strong title={name}>{name}</strong>
+                    <strong {...overflowTitleProps}>{name}</strong>
                     <small>
                       {isImage && selectedModelRejectsImages
                         ? "当前模型不支持图片输入"
