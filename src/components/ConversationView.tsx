@@ -2753,7 +2753,9 @@ function activityGroupLabel(
   if (duration === null) {
     return completed ? "已完成" : "正在运行";
   }
-  return `${completed ? "已运行" : "正在运行"} ${formatDuration(duration)}`;
+  return completed
+    ? `已运行 ${formatDuration(duration)}`
+    : `正在运行 ${formatDuration(duration, "seconds")}`;
 }
 
 function JsonBlock({ value }: { readonly value: unknown }) {
@@ -3338,13 +3340,16 @@ function toolActivityLabel(
   return parts.join(" · ");
 }
 
-function formatDuration(durationMs: number): string {
-  if (durationMs < 1_000) {
+function formatDuration(
+  durationMs: number,
+  precision: "auto" | "seconds" = "auto",
+): string {
+  if (precision === "auto" && durationMs < 1_000) {
     return `${durationMs} 毫秒`;
   }
   const totalSeconds = Math.round(durationMs / 1_000);
   if (totalSeconds < 60) {
-    return durationMs < 10_000
+    return precision === "auto" && durationMs < 10_000
       ? `${(durationMs / 1_000).toFixed(1)} 秒`
       : `${totalSeconds} 秒`;
   }

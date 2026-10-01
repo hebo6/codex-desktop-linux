@@ -1260,7 +1260,7 @@ describe("ConversationView", () => {
         <ConversationView restoredThread={{ ...RESTORED, turns: [resumedTurn] }} />,
       );
 
-      const resumedGroup = screen.getByRole("button", { name: "正在运行 6.0 秒" });
+      const resumedGroup = screen.getByRole("button", { name: "正在运行 6 秒" });
       expect(resumedGroup).toHaveAttribute("aria-expanded", "true");
       expect(screen.getByText("继续验证结果")).toBeVisible();
       expect(previousGroup).toHaveAttribute("aria-expanded", "false");
@@ -1268,7 +1268,7 @@ describe("ConversationView", () => {
       expect(screen.getByText("第一阶段结果")).toBeVisible();
 
       await act(() => vi.advanceTimersByTimeAsync(1_000));
-      expect(resumedGroup).toHaveAccessibleName("正在运行 7.0 秒");
+      expect(resumedGroup).toHaveAccessibleName("正在运行 7 秒");
       expect(previousGroup).toHaveAccessibleName("已运行 5.0 秒");
 
       const finishedTurn: ThreadTurn = ending === "最终回答"
