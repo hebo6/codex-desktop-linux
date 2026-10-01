@@ -125,7 +125,11 @@ const ActivityTransitionContext = createContext<{
   readonly startExpansion: () => void;
   readonly finishExpansion: (expanded: boolean) => void;
   readonly startCollapse: (element: HTMLElement) => void;
-  readonly finishCollapse: (element: HTMLElement, scope: "self" | "subtree") => void;
+  readonly finishCollapse: (
+    element: HTMLElement,
+    scope: "self" | "subtree",
+    reason: "completed" | "cancelled",
+  ) => void;
 } | null>(null);
 
 function useCollapsibleContent(initiallyExpanded: boolean) {
@@ -161,7 +165,7 @@ function useCollapsibleContent(initiallyExpanded: boolean) {
 
   useLayoutEffect(() => {
     if (!contentMounted && elementRef.current !== null) {
-      finishCollapse?.(elementRef.current, "subtree");
+      finishCollapse?.(elementRef.current, "subtree", "completed");
     }
   }, [contentMounted, finishCollapse]);
 
@@ -169,7 +173,7 @@ function useCollapsibleContent(initiallyExpanded: boolean) {
     const element = elementRef.current;
     return () => {
       if (element !== null) {
-        finishCollapse?.(element, "subtree");
+        finishCollapse?.(element, "subtree", "cancelled");
       }
     };
   }, [finishCollapse]);
@@ -189,7 +193,7 @@ function useCollapsibleContent(initiallyExpanded: boolean) {
 
   const setOpen = useCallback((open: boolean, userInitiated = false) => {
     if (elementRef.current !== null) {
-      finishCollapse?.(elementRef.current, !open && !userInitiated ? "subtree" : "self");
+      finishCollapse?.(elementRef.current, !open && !userInitiated ? "subtree" : "self", "cancelled");
     }
     cancelTransition();
     if (!open) {
@@ -322,6 +326,7 @@ export function ConversationView({
     readonly finish: () => void;
     readonly reclaim: () => void;
   }>());
+  const [userActivityCollapseCompleted, setUserActivityCollapseCompleted] = useState(false);
   const scrollbarDragRef = useRef(false);
   const touchPositionRef = useRef<{ x: number; y: number } | null>(null);
   const observedThreadIdRef = useRef(restoredThread.metadata.id);
@@ -438,17 +443,17 @@ export function ConversationView({
   );
 
   const updateBottomState = useCallback(
-    (scroller: HTMLDivElement, source: "user" | "scrollbar" | "layout" = "layout") => {
+    (scroller: HTMLDivElement, source: "user" | "scrollbar" | "layout" | "collapse" = "layout") => {
       const atBottom =
         scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <=
           BOTTOM_THRESHOLD;
       if (atBottom) {
-        if (source === "user") {
+        if (source === "user" || source === "collapse") {
           followBottomRef.current = true;
           setHasUnreadContent(false);
         }
         setShowJumpToBottom(false);
-      } else if (source !== "layout" || !followBottomRef.current) {
+      } else if (source === "user" || source === "scrollbar" || !followBottomRef.current) {
         followBottomRef.current = false;
         setShowJumpToBottom(true);
       }
@@ -528,13 +533,34 @@ export function ConversationView({
     }
   }, []);
 
-  const finishUserActivityCollapse = useCallback((element: HTMLElement, scope: "self" | "subtree") => {
+  const finishUserActivityCollapse = useCallback((
+    element: HTMLElement,
+    scope: "self" | "subtree",
+    reason: "completed" | "cancelled",
+  ) => {
+    let finished = false;
     for (const [target, collapse] of userActivityCollapsesRef.current) {
       if (element === target || (scope === "subtree" && element.contains(target))) {
         collapse.finish();
+        finished = true;
       }
     }
+    if (finished && reason === "completed") {
+      setUserActivityCollapseCompleted(true);
+    }
   }, []);
+
+  useLayoutEffect(() => {
+    if (!userActivityCollapseCompleted) {
+      return;
+    }
+    setUserActivityCollapseCompleted(false);
+    const scroller = scrollerRef.current;
+    // 占位回收提交后再判断最终位置；并行收起期间仍暂停翻页
+    if (scroller !== null && userActivityCollapsesRef.current.size === 0) {
+      updateBottomState(scroller, "collapse");
+    }
+  }, [userActivityCollapseCompleted, updateBottomState]);
 
   const startUserActivityCollapse = useCallback((element: HTMLElement) => {
     const scroller = scrollerRef.current;
@@ -546,7 +572,7 @@ export function ConversationView({
         collapse.reclaim();
       }
     }
-    // 滚动范围缩短会产生延迟 scroll 事件，不能借此恢复已暂停的跟随
+    // 跟随状态由收起完成后的最终位置决定，不使用布局产生的延迟 scroll 事件
     userScrollTopRef.current = null;
     pendingFinalAnswerQuestionPositionRef.current = null;
     let smallestHeight = element.getBoundingClientRect().height;
@@ -850,6 +876,7 @@ export function ConversationView({
     if (historyQuestions.length <= previousQuestionCount) {
       return;
     }
+    setUserActivityCollapseCompleted(false);
     userScrollTopRef.current = null;
     pendingFinalAnswerQuestionPositionRef.current = null;
     const scroller = scrollerRef.current;
@@ -975,6 +1002,7 @@ export function ConversationView({
       return;
     }
     const wasFollowing = followBottomRef.current;
+    setUserActivityCollapseCompleted(false);
     userScrollTopRef.current = null;
     followBottomRef.current = false;
     const scroller = scrollerRef.current;
@@ -1038,6 +1066,7 @@ export function ConversationView({
     if (finishedTurn?.status !== "completed") {
       return;
     }
+    setUserActivityCollapseCompleted(false);
     const question = historyQuestions.findLast((question) => {
       const row = rows[question.rowIndex];
       return row?.type === "segment" && row.turn.id === finishedTurn.id;
@@ -1123,6 +1152,7 @@ export function ConversationView({
     for (const collapse of userActivityCollapsesRef.current.values()) {
       collapse.finish();
     }
+    setUserActivityCollapseCompleted(false);
     pendingQuestionPositionRef.current = null;
     pendingFinalAnswerQuestionPositionRef.current = null;
     setRunningTurnFloor(null);

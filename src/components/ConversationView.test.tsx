@@ -1943,7 +1943,8 @@ describe("ConversationView", () => {
     expect(scroller.scrollTop).toBe(800);
   });
 
-  it("主动展开后内容底部仍可见时保留自动跟随", async () => {
+  it("主动展开后内容底部仍可见时保留自动跟随", () => {
+    vi.useFakeTimers();
     let contentDocumentBottom = 880;
     const contentResize = observeConversationResize();
     mockConversationContentBottom(() => contentDocumentBottom, 200);
@@ -1958,7 +1959,7 @@ describe("ConversationView", () => {
       clientHeight: { configurable: true, value: 200 },
       scrollHeight: { configurable: true, get: () => scrollHeight },
     });
-    await finishAnimationFrame();
+    act(() => vi.advanceTimersByTime(20));
     scroller.scrollTop = 800;
     fireEvent.scroll(scroller);
 
@@ -1967,9 +1968,8 @@ describe("ConversationView", () => {
     contentDocumentBottom = 950;
     act(() => contentResize());
     expect(scroller.scrollTop).toBe(800);
-    await waitFor(() =>
-      expect(screen.getByText("Ran pnpm test")).toBeVisible()
-    );
+    act(() => vi.advanceTimersByTime(270));
+    expect(screen.getByText("Ran pnpm test")).toBeVisible();
 
     scrollHeight = 1_100;
     act(() => contentResize());
@@ -2817,17 +2817,27 @@ describe("ConversationView", () => {
       expect(scroller.scrollTop).toBe(948);
     });
 
-    it("单项收起夹紧到滚动底部后仍保持用户暂停的跟随状态", () => {
+    it.each([
+      [900, "收起期间"],
+      [900, "收起完成时"],
+      [650, "收起期间"],
+    ] as const)("单项收起后根据最终位置恢复跟随（原位置 %ipx，%s测量）", (previousTop, measureTiming) => {
       const { item, itemHeader, layout, notify, scroller, turn, updateTurn } = setupItem();
-      userScroll(scroller, 900);
+      userScroll(scroller, previousTop);
       fireEvent.click(itemHeader);
       layout.itemHeight = 32;
       layout.groupHeight = 132;
       layout.contentHeight = 1_182;
-      notify(item);
-      expect(scroller.scrollTop).toBe(680);
+      if (measureTiming === "收起期间") {
+        notify(item);
+        expect(scroller.scrollTop).toBe(Math.min(previousTop, 680));
+      }
       act(() => vi.advanceTimersByTime(270));
+      expect(scroller.scrollTop).toBe(Math.min(previousTop, 680));
       fireEvent.scroll(scroller);
+      const reachedBottom = previousTop >= 680;
+      expect(screen.queryByRole("button", { name: "回到底部" }) !== null)
+        .toBe(!reachedBottom);
 
       layout.contentHeight = 1_800;
       updateTurn({
@@ -2838,8 +2848,107 @@ describe("ConversationView", () => {
           text: "收起完成后回答继续增长",
         }],
       });
+      expect(scroller.scrollTop).toBe(reachedBottom ? 1_628 : previousTop);
+      expect(screen.queryByRole("button", { name: "回到底部" }) !== null)
+        .toBe(!reachedBottom);
+    });
+
+    it("单项收起触底后中途反向展开，不将取消收起当作完成来恢复跟随", () => {
+      const { item, itemHeader, layout, notify, scroller, turn, updateTurn } = setupItem();
+      userScroll(scroller, 900);
+      fireEvent.click(itemHeader);
+      layout.itemHeight = 32;
+      layout.groupHeight = 132;
+      layout.contentHeight = 1_182;
+      notify(item);
+      expect(scroller.scrollTop).toBe(680);
+
+      fireEvent.click(itemHeader);
+      act(() => vi.advanceTimersByTime(270));
+      layout.contentHeight = 1_800;
+      updateTurn({ ...turn, items: [...turn.items, {
+        id: "reasoning-after-cancelled-collapse",
+        type: "reasoning",
+        summary: ["取消收起后继续增长"],
+      }] });
       expect(scroller.scrollTop).toBe(680);
       expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+    });
+
+    it("单项收起完成时最终回答同时到达，完成回调不覆盖最终回答的暂停", () => {
+      const { group, item, itemHeader, layout, notify, scroller, turn, updateTurn } = setupItem();
+      userScroll(scroller, 900);
+      fireEvent.click(itemHeader);
+      layout.itemHeight = 32;
+      layout.groupHeight = 132;
+      layout.contentHeight = 1_182;
+      notify(item);
+      const finalAnswer = {
+        id: "final-with-collapse-completion",
+        type: "agentMessage" as const,
+        phase: "final_answer" as const,
+        text: "最终回答开始",
+      };
+      act(() => {
+        vi.advanceTimersByTime(270);
+        updateTurn({ ...turn, items: [...turn.items, finalAnswer] });
+      });
+      layout.groupHeight = 36;
+      layout.contentHeight = 1_100;
+      notify(scroller.querySelector("[data-conversation-list]")!);
+      act(() => vi.advanceTimersByTime(270));
+      expect(group).toHaveAttribute("data-content-mounted", "false");
+      const pausedTop = scroller.scrollTop;
+
+      layout.contentHeight = 1_800;
+      updateTurn({ ...turn, items: [...turn.items, {
+        ...finalAnswer,
+        text: "最终回答继续增长",
+      }] });
+      expect(scroller.scrollTop).toBe(pausedTop);
+      expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+    });
+
+    it("展开单项超出视口后收起至不足一屏，新增活动触底时恢复自动翻页", () => {
+      vi.useFakeTimers();
+      const { group, layout, notify, scroller, turn, updateTurn } = setup({
+        questionTop: 52,
+        contentHeight: 200,
+        activity: {
+          id: "reasoning-short-collapse",
+          type: "reasoning",
+          summary: ["查看详细过程"],
+          content: ["较长的思考详情"],
+        },
+      });
+      act(() => vi.advanceTimersByTime(20));
+      const itemHeader = within(group).getByRole("button", { name: "查看详细过程" });
+      const item = itemHeader.closest<HTMLElement>("section")!;
+      fireEvent.click(itemHeader);
+      layout.itemHeight = 732;
+      layout.groupHeight = 850;
+      layout.contentHeight = 900;
+      notify(scroller.querySelector("[data-conversation-list]")!);
+      act(() => vi.advanceTimersByTime(270));
+      expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+
+      fireEvent.click(itemHeader);
+      layout.itemHeight = 32;
+      layout.groupHeight = 150;
+      layout.contentHeight = 200;
+      notify(item);
+      act(() => vi.advanceTimersByTime(270));
+      expect(scroller.scrollTop).toBe(0);
+      expect(screen.queryByRole("button", { name: "回到底部" })).not.toBeInTheDocument();
+
+      layout.contentHeight = 1_000;
+      updateTurn({ ...turn, items: [...turn.items, {
+        id: "reasoning-after-short-collapse",
+        type: "reasoning",
+        summary: ["后续活动继续增长"],
+      }] });
+      expect(scroller.scrollTop).toBe(828);
+      expect(screen.queryByRole("button", { name: "回到底部" })).not.toBeInTheDocument();
     });
 
     it("只按工作流减少量回收占位，即使回答同时增长抵消会话高度变化", () => {
@@ -2904,7 +3013,7 @@ describe("ConversationView", () => {
     });
 
     it.each(["收起期间", "收起完成后"])(
-      "%s滚动范围夹紧产生的滚动事件不会恢复已暂停的跟随",
+      "%s产生布局滚动事件，整组收起完成后在底部恢复跟随",
       async (scrollTiming) => {
         const { group, header, layout, notify, scroller, turn, updateTurn } = setup();
         await finishAnimationFrame();
@@ -2932,8 +3041,8 @@ describe("ConversationView", () => {
             },
           ],
         });
-        expect(scroller.scrollTop).toBe(584);
-        expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+        expect(scroller.scrollTop).toBe(1_328);
+        expect(screen.queryByRole("button", { name: "回到底部" })).not.toBeInTheDocument();
       },
     );
 
@@ -2966,7 +3075,7 @@ describe("ConversationView", () => {
       expect(scroller.scrollTop).toBe(948);
     });
 
-    it("最终回答暂停跟随后重新展开再收起仍回收占位，后续回答增长不抢滚动位置", async () => {
+    it("最终回答暂停跟随后手动重新展开再收起，触底后恢复跟随", async () => {
       const { floor, group, header, layout, notify, scroller, turn, updateTurn } = setup();
       await finishAnimationFrame();
       const finalAnswer = {
@@ -3003,8 +3112,8 @@ describe("ConversationView", () => {
         ...turn,
         items: [...turn.items, { ...finalAnswer, text: "最终回答继续增长" }],
       });
-      expect(scroller.scrollTop).toBe(584);
-      expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+      expect(scroller.scrollTop).toBe(1_628);
+      expect(screen.queryByRole("button", { name: "回到底部" })).not.toBeInTheDocument();
     });
 
     it.each(["收起期间", "收起完成后"])("%s已在底部时向下输入恢复跟随，并取消最终回答定位", async (timing) => {
@@ -3038,7 +3147,7 @@ describe("ConversationView", () => {
       expect(scroller.scrollTop).toBe(828);
     });
 
-    it("按住滚动条时布局夹紧到底部不会恢复跟随", async () => {
+    it("按住滚动条时布局夹紧到底部，手动收起完成后恢复跟随", async () => {
       const { group, header, layout, notify, scroller, turn, updateTurn } = setup();
       await finishAnimationFrame();
       userScroll(scroller, 900);
@@ -3062,8 +3171,8 @@ describe("ConversationView", () => {
         type: "agentMessage",
         text: "继续执行",
       }] });
-      expect(scroller.scrollTop).toBe(584);
-      expect(screen.getByRole("button", { name: "回到底部" })).toBeVisible();
+      expect(scroller.scrollTop).toBe(1_328);
+      expect(screen.queryByRole("button", { name: "回到底部" })).not.toBeInTheDocument();
     });
 
     it("切换线程后断开旧工作流观察，延迟回调不修改新线程", () => {
