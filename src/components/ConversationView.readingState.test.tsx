@@ -57,12 +57,20 @@ afterEach(() => {
 
 function mockLayout() {
   const heights = new Map([["q1", 80], ["a1", 800], ["q2", 80], ["a2", 900]]);
+  const expandedHeights = new Map<string, number>();
   const positions = new WeakMap<HTMLElement, number>();
   const observers = new Set<() => void>();
   const rows = (element: HTMLElement) => Array.from(
     element.querySelectorAll<HTMLElement>("[data-reading-item-id]"),
   );
-  const height = (row: HTMLElement) => heights.get(row.dataset.readingItemId!)!;
+  const expanded = (element: HTMLElement) =>
+    element.closest('[data-test-layout="expanded"]') !== null;
+  const viewportHeight = (element: HTMLElement) => expanded(element) ? 900 : 600;
+  const viewportTop = (element: HTMLElement) =>
+    element.closest('[data-test-layout="normal"]') === null ? 0 : 80;
+  const height = (row: HTMLElement) =>
+    (expanded(row) ? expandedHeights.get(row.dataset.readingItemId!) : undefined)
+      ?? heights.get(row.dataset.readingItemId!)!;
   const contentHeight = (element: HTMLElement) => rows(element)
     .reduce((total, row) => total + height(row), 0);
   const rect = (top: number, rectHeight: number) => ({
@@ -70,7 +78,7 @@ function mockLayout() {
     width: 880, height: rectHeight, toJSON: () => ({}),
   });
   vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
-    return this.matches("[data-conversation-scroller]") ? 600 : 0;
+    return this.matches("[data-conversation-scroller]") ? viewportHeight(this) : 0;
   });
   vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
     const column = this.querySelector<HTMLElement>("[data-running-turn-floor]");
@@ -79,23 +87,28 @@ function mockLayout() {
   });
   Object.defineProperty(HTMLElement.prototype, "scrollTop", {
     configurable: true,
-    get() { return positions.get(this) ?? 0; },
+    get() {
+      // 浏览器会在布局变小时夹紧滚动位置；读取时模拟这一行为
+      const value = Math.max(0, Math.min(positions.get(this) ?? 0, this.scrollHeight - this.clientHeight));
+      positions.set(this, value);
+      return value;
+    },
     set(value: number) {
       positions.set(this, Math.max(0, Math.min(value, this.scrollHeight - this.clientHeight)));
     },
   });
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
-    if (this.matches("[data-conversation-scroller]")) return rect(0, 600);
+    if (this.matches("[data-conversation-scroller]")) return rect(viewportTop(this), viewportHeight(this));
     const scroller = this.closest<HTMLElement>("[data-conversation-scroller]");
     if (scroller === null) return rect(0, 0);
     if (this.matches("[data-conversation-list]")) {
-      return rect(-scroller.scrollTop, contentHeight(scroller));
+      return rect(viewportTop(scroller) - scroller.scrollTop, contentHeight(scroller));
     }
     const row = this.closest<HTMLElement>("[data-reading-item-id]");
     if (row === null) return rect(0, 0);
     const previous = rows(scroller);
     const top = previous.slice(0, previous.indexOf(row))
-      .reduce((total, element) => total + height(element), 0) - scroller.scrollTop;
+      .reduce((total, element) => total + height(element), 0) + viewportTop(scroller) - scroller.scrollTop;
     return this.matches("[data-user-message]")
       ? rect(top + 24, height(row) - 24)
       : rect(top, height(row));
@@ -106,14 +119,16 @@ function mockLayout() {
     observe() { observers.add(this.notify); }
     disconnect() { observers.delete(this.notify); }
   });
-  return { heights, resize: () => act(() => observers.forEach((notify) => notify())) };
+  return { heights, expandedHeights, resize: () => act(() => observers.forEach((notify) => notify())) };
 }
 
-function view(thread: RestoredThread, readingState: ConversationReadingStateStore) {
+function view(thread: RestoredThread, readingState: ConversationReadingStateStore, expanded?: boolean) {
   return (
     <StrictMode>
       <style>{"[data-conversation-scroller] { padding-bottom: 0px; }"}</style>
-      <ConversationView restoredThread={thread} readingState={readingState} />
+      <div data-test-layout={expanded === undefined ? undefined : expanded ? "expanded" : "normal"}>
+        <ConversationView restoredThread={thread} readingState={readingState} layoutKey={expanded} />
+      </div>
     </StrictMode>
   );
 }
@@ -131,6 +146,74 @@ async function nextFrame() {
     await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
   });
 }
+
+describe("布局切换阅读位置", () => {
+  it("在父布局修改前保存消息锚点，抵抗正文重排和滚动夹紧并支持往返切换", async () => {
+    const layout = mockLayout();
+    const state: ConversationReadingStateStore = { current: null };
+    const thread = { ...THREAD, turns: [HISTORY, { ...RUNNING, status: "completed" as const }] };
+    layout.expandedHeights.set("q1", 48);
+    layout.expandedHeights.set("a1", 280);
+    layout.expandedHeights.set("q2", 48);
+    layout.expandedHeights.set("a2", 1_200);
+    const rendered = render(view(thread, state, false));
+    await nextFrame();
+    const scroller = screen.getByLabelText("会话消息");
+    fireEvent.wheel(scroller, { deltaY: -100 });
+    scroller.scrollTop = 1_100;
+    fireEvent.scroll(scroller);
+
+    rendered.rerender(view(thread, state, true));
+    expect(screen.getByLabelText("会话消息")).toBe(scroller);
+    expect(scroller.scrollTop).toBe(516);
+    layout.resize();
+    expect(scroller.scrollTop).toBe(516);
+
+    rendered.rerender(view(thread, state, false));
+    layout.resize();
+    expect(scroller.scrollTop).toBe(1_100);
+    rendered.unmount();
+    expect(state.current?.following).toBe(false);
+    expect(state.current?.anchor).toEqual({ turnId: "running", itemId: "a2", offset: -140 });
+  });
+
+  it("手动阅读时切换布局后收到流式内容，仍保留位置而不恢复自动跟随", async () => {
+    const layout = mockLayout();
+    layout.expandedHeights.set("q1", 48);
+    const state: ConversationReadingStateStore = { current: null };
+    const rendered = render(view(THREAD, state, false));
+    await nextFrame();
+    const scroller = scrollToHistory();
+    rendered.rerender(view(THREAD, state, true));
+    layout.resize();
+    expect(scroller.scrollTop).toBe(248);
+    layout.heights.set("a2", 2_500);
+    rendered.rerender(view({ ...THREAD, turns: [HISTORY, {
+      ...RUNNING,
+      items: [RUNNING.items[0]!, { ...RUNNING.items[1]!, text: "新增进度" }],
+    }] }, state, true));
+    layout.resize();
+    await nextFrame();
+    expect(scroller.scrollTop).toBe(248);
+    rendered.unmount();
+    expect(state.current?.following).toBe(false);
+  });
+
+  it("自动跟随时切换布局后继续跟随新增内容", async () => {
+    const layout = mockLayout();
+    const state: ConversationReadingStateStore = { current: null };
+    const rendered = render(view(THREAD, state, false));
+    await nextFrame();
+    rendered.rerender(view(THREAD, state, true));
+    layout.resize();
+    const scroller = screen.getByLabelText("会话消息");
+    layout.heights.set("a2", 2_500);
+    layout.resize();
+    expect(scroller.scrollTop).toBe(scroller.scrollHeight - 900);
+    rendered.unmount();
+    expect(state.current?.following).toBe(true);
+  });
+});
 
 describe("历史问题导航阅读标记", () => {
   it("波形随区段内滚动连续变化，保持顶部问题最长并在布局变化和恢复后更新", async () => {

@@ -1,5 +1,6 @@
 import {
   Children,
+  Component,
   createContext,
   useCallback,
   useContext,
@@ -53,6 +54,7 @@ export interface ItemLocationRequest {
 export interface ConversationViewProps {
   readonly restoredThread: RestoredThread;
   readonly readingState?: ConversationReadingStateStore;
+  readonly layoutKey?: unknown;
   readonly blobUrlFactory?: BlobUrlFactory;
   readonly commandLocationRequest?: ItemLocationRequest | null;
   readonly questionLocationRequest?: ItemLocationRequest | null;
@@ -303,6 +305,7 @@ export function ConversationView({
   onRunShellCommand,
   restoredThread,
   readingState,
+  layoutKey,
   shellCommandDisabled = false,
   turnItemPages = EMPTY_TURN_ITEM_PAGES,
 }: ConversationViewProps) {
@@ -1484,6 +1487,22 @@ export function ConversationView({
 
   return (
     <section className={styles.conversation}>
+      <ReadingPositionSnapshot
+        layoutKey={layoutKey}
+        capture={() => {
+          const scroller = scrollerRef.current;
+          return scroller === null || followBottomRef.current
+            ? null
+            : captureReadingAnchor(scroller);
+        }}
+        restore={(anchor) => {
+          const scroller = scrollerRef.current;
+          if (scroller === null) return;
+          userScrollTopRef.current = null;
+          restoreReadingAnchor(scroller, anchor);
+          updateBottomState(scroller);
+        }}
+      />
       <div
         aria-label="会话消息"
         className={styles.scroller}
@@ -1641,6 +1660,37 @@ export function ConversationView({
       ) : null}
     </section>
   );
+}
+
+interface ReadingPositionSnapshotProps {
+  readonly layoutKey: unknown;
+  readonly capture: () => ReturnType<typeof captureReadingAnchor>;
+  readonly restore: (anchor: NonNullable<ReturnType<typeof captureReadingAnchor>>) => void;
+}
+
+// snapshot 生命周期在所有 DOM 修改前执行；layout effect cleanup 无法保证父布局尚未改变
+class ReadingPositionSnapshot extends Component<
+  ReadingPositionSnapshotProps,
+  Record<string, never>,
+  ReturnType<typeof captureReadingAnchor>
+> {
+  getSnapshotBeforeUpdate(previous: ReadingPositionSnapshotProps) {
+    return Object.is(previous.layoutKey, this.props.layoutKey)
+      ? null
+      : previous.capture();
+  }
+
+  componentDidUpdate(
+    _previous: ReadingPositionSnapshotProps,
+    _state: Record<string, never>,
+    anchor: ReturnType<typeof captureReadingAnchor>,
+  ) {
+    if (anchor !== null) this.props.restore(anchor);
+  }
+
+  render() {
+    return null;
+  }
 }
 
 function ConversationRowView({

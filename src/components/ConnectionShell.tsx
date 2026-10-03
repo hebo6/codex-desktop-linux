@@ -92,6 +92,9 @@ interface ConnectionShellProps {
   announcement?: string | null;
   sidebarWidth?: number;
   onSidebarWidthChange?: (width: number) => void;
+  focusMode?: boolean;
+  onFocusModeChange?: (enabled: boolean) => void;
+  onShowComposer?: () => void;
 }
 
 interface PhaseContent {
@@ -219,6 +222,9 @@ export function ConnectionShell({
   announcement = null,
   sidebarWidth = 288,
   onSidebarWidthChange,
+  focusMode = false,
+  onFocusModeChange,
+  onShowComposer,
 }: ConnectionShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -234,6 +240,9 @@ export function ConnectionShell({
   const threadActionsRef = useRef<HTMLDivElement>(null);
   const threadActionsButtonRef = useRef<HTMLButtonElement>(null);
   const threadActionsMenuRef = useRef<HTMLDivElement>(null);
+  const exitFocusModeRef = useRef<HTMLButtonElement>(null);
+  const focusToolbarId = useId();
+  const restoreSearchFocusRef = useRef(false);
   const content = PHASE_CONTENT[phase];
   const isError = phase === "error";
   const [liveSidebarWidth, setLiveSidebarWidth] = useState(sidebarWidth);
@@ -304,7 +313,7 @@ export function ConnectionShell({
 
 
   useEffect(() => {
-    if (!isSidebarOpen) {
+    if (!isSidebarOpen || focusMode) {
       return;
     }
 
@@ -322,7 +331,17 @@ export function ConnectionShell({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isSidebarOpen]);
+  }, [focusMode, isSidebarOpen]);
+
+  useEffect(() => {
+    if (focusMode || !restoreSearchFocusRef.current) return;
+    restoreSearchFocusRef.current = false;
+    if (searchOpen) {
+      searchInputRef.current?.focus();
+    } else {
+      threadActionsButtonRef.current?.focus();
+    }
+  }, [focusMode, searchOpen]);
 
   useEffect(() => {
     const handleNavigationShortcut = (event: KeyboardEvent) => {
@@ -338,6 +357,7 @@ export function ConnectionShell({
       }
       if (event.key.toLowerCase() === "b") {
         event.preventDefault();
+        if (focusMode) onFocusModeChange?.(false);
         setSearchOpen(false);
         const narrow =
           typeof window.matchMedia === "function" &&
@@ -350,6 +370,10 @@ export function ConnectionShell({
       } else if (event.key.toLowerCase() === "k") {
         event.preventDefault();
         if (event.repeat) return;
+        if (focusMode) {
+          restoreSearchFocusRef.current = true;
+          onFocusModeChange?.(false);
+        }
         if (searchOpen) {
           closeThreadSearch();
         } else {
@@ -359,7 +383,7 @@ export function ConnectionShell({
     };
     window.addEventListener("keydown", handleNavigationShortcut);
     return () => window.removeEventListener("keydown", handleNavigationShortcut);
-  }, [closeThreadSearch, openThreadSearch, searchOpen]);
+  }, [closeThreadSearch, focusMode, onFocusModeChange, openThreadSearch, searchOpen]);
 
   const closeSidebar = () => {
     setSearchOpen(false);
@@ -424,6 +448,7 @@ export function ConnectionShell({
   return (
     <div
       className={styles.appShell}
+      data-focus-mode={focusMode}
       data-sidebar-collapsed={isSidebarCollapsed}
       style={{ "--sidebar-width": `${liveSidebarWidth}px` } as CSSProperties}
     >
@@ -431,6 +456,8 @@ export function ConnectionShell({
         aria-label="关闭侧栏"
         className={styles.backdrop}
         data-visible={isSidebarOpen}
+        hidden={focusMode}
+        inert={focusMode}
         onClick={closeSidebar}
         tabIndex={isSidebarOpen ? 0 : -1}
         type="button"
@@ -440,7 +467,9 @@ export function ConnectionShell({
         aria-label="会话侧栏"
         className={styles.sidebar}
         data-open={isSidebarOpen}
+        hidden={focusMode}
         id={sidebarId}
+        inert={focusMode}
       >
         <header className={styles.sidebarHeader}>
           <button
@@ -748,6 +777,8 @@ export function ConnectionShell({
           className={styles.topbar}
           data-tauri-drag-region="deep"
           data-window-menu-region="self"
+          hidden={focusMode}
+          inert={focusMode}
         >
           <WindowControls side="left" />
           {isSidebarCollapsed && (
@@ -789,6 +820,17 @@ export function ConnectionShell({
           )}
 
           {topbarAccessory}
+          {onFocusModeChange ? (
+            <button
+              aria-label="进入专注模式"
+              className={styles.settingsButton}
+              onClick={() => onFocusModeChange(true)}
+              title="进入专注模式（Ctrl+Shift+F）"
+              type="button"
+            >
+              <FocusModeIcon />
+            </button>
+          ) : null}
           {onOpenSettings ? (
             <button
               aria-label="打开设置"
@@ -804,8 +846,57 @@ export function ConnectionShell({
             </button>
           ) : null}
           <WindowControls side="right" />
-          <span aria-live="polite" className={styles.visuallyHidden}>{announcement}</span>
         </header>
+
+        <span aria-live="polite" className={styles.visuallyHidden}>{announcement}</span>
+        {focusMode ? (
+          <div className={styles.focusToolbarReveal}>
+            <button
+              aria-controls={focusToolbarId}
+              aria-label="显示专注模式工具栏"
+              className={styles.focusToolbarHandle}
+              onClick={() => exitFocusModeRef.current?.focus()}
+              type="button"
+            >
+              <span aria-hidden="true" />
+            </button>
+            <div
+              aria-label="专注模式工具栏"
+              className={styles.focusToolbar}
+              data-tauri-drag-region="deep"
+              data-window-menu-region="self"
+              id={focusToolbarId}
+              role="group"
+            >
+              <WindowControls side="left" />
+              <button
+                aria-label="退出专注模式"
+                className={styles.focusToolbarButton}
+                disabled={onFocusModeChange === undefined}
+                onClick={() => onFocusModeChange?.(false)}
+                ref={exitFocusModeRef}
+                title="退出专注模式（Ctrl+Shift+F）"
+                type="button"
+              >
+                <FocusModeIcon active />
+                <span>退出专注模式</span>
+              </button>
+              <button
+                aria-label="临时输入"
+                className={styles.focusToolbarButton}
+                disabled={onShowComposer === undefined}
+                onClick={onShowComposer}
+                title="临时输入（Ctrl+L）"
+                type="button"
+              >
+                <ComposeIcon />
+                <span>临时输入</span>
+              </button>
+              <div className={styles.focusToolbarDragArea} data-window-menu-region="deep" />
+              <WindowControls side="right" />
+            </div>
+          </div>
+        ) : null}
 
         {(phase === "ready" || offline) && mainContent !== undefined ? (
           <div className={styles.mainContent}>
@@ -899,3 +990,13 @@ export function ConnectionShell({
 }
 
 const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set();
+
+function FocusModeIcon({ active = false }: { readonly active?: boolean }) {
+  return (
+    <svg aria-hidden="true" height="18" viewBox="0 0 24 24" width="18">
+      <path d={active
+        ? "M4 9h5V4m6 0v5h5M4 15h5v5m6 0v-5h5"
+        : "M9 4H4v5m11-5h5v5M4 15v5h5m6 0h5v-5"} />
+    </svg>
+  );
+}

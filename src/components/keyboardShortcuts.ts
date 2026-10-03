@@ -54,6 +54,7 @@ export const KEYBOARD_SHORTCUT_GROUPS: readonly KeyboardShortcutGroup[] = [
       { label: "消息区向上或向下滚动（聚焦后）", keys: ["↑", "↓"] },
       { label: "转到已加载消息顶部或底部（聚焦后）", keys: ["Home", "End"] },
       { label: "显示或隐藏侧边栏", keys: ["Ctrl+B"] },
+      { label: "进入或退出专注模式", keys: ["Ctrl+Shift+F"] },
       { label: "显示或隐藏限额详情", keys: ["Alt+L"] },
     ],
   },

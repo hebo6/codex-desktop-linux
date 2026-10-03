@@ -16,6 +16,35 @@
   pointer-events: auto;
 }
 
+.collapsedActions {
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: var(--space-2);
+}
+
+.collapsedActions button {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-divider-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: var(--color-content-bg);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.collapsedActions button:hover:not(:disabled) {
+  background: var(--color-fill-hover);
+}
+
+.composer[data-input-hidden="true"] .error,
+.composer[data-input-hidden="true"] .capabilityError {
+  background: var(--color-content-bg);
+  border-radius: var(--radius-sm);
+}
+
 .error {
   justify-content: flex-start;
   color: var(--color-status-danger);

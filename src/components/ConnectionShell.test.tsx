@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ThreadSummary } from "../app/useServerThreads";
@@ -21,6 +22,142 @@ describe("ConnectionShell", () => {
     expect(titlebar).toHaveAttribute("data-window-menu-region", "self");
     expect(titlebar?.querySelector("[data-window-menu-region='deep']"))
       .not.toBeNull();
+  });
+
+  it("从顶栏进入专注模式前关闭会话右键菜单", () => {
+    const onFocusModeChange = vi.fn();
+    render(
+      <ConnectionShell
+        onFocusModeChange={onFocusModeChange}
+        onOpenThreadInNewTab={vi.fn()}
+        phase="ready"
+        threadListPhase="ready"
+        threads={[threadSummary("项目", 1)]}
+      />,
+    );
+    fireEvent.contextMenu(screen.getByRole("button", { name: /^项目，/u }));
+    expect(screen.getByRole("menuitem", { name: "在新标签打开" })).toBeVisible();
+    const button = screen.getByRole("button", { name: "进入专注模式" });
+    expect(button).toHaveAttribute("title", "进入专注模式（Ctrl+Shift+F）");
+    fireEvent.pointerDown(button);
+    fireEvent.click(button);
+
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(onFocusModeChange).toHaveBeenCalledWith(true);
+  });
+
+  it("专注模式保留主内容和原侧栏状态并继续播报通知", () => {
+    const props = {
+      announcement: "需要审批",
+      mainContent: <textarea aria-label="保留的草稿" />,
+      onFocusModeChange: vi.fn(),
+      phase: "ready" as const,
+    };
+    const { container, rerender } = render(<ConnectionShell {...props} />);
+    const sidebar = screen.getByRole("complementary", { name: "会话侧栏" });
+    const header = container.querySelector("header[data-tauri-drag-region]");
+    const content = screen.getByRole("textbox", { name: "保留的草稿" });
+    fireEvent.change(content, { target: { value: "尚未发送" } });
+    fireEvent.click(screen.getByRole("button", { name: "隐藏侧栏" }));
+
+    rerender(<ConnectionShell {...props} focusMode />);
+    expect(sidebar).toHaveAttribute("hidden");
+    expect(sidebar).toHaveAttribute("inert");
+    expect(header).toHaveAttribute("hidden");
+    expect(header).toHaveAttribute("inert");
+    expect(screen.getByRole("textbox", { name: "保留的草稿" })).toBe(content);
+    expect(content).toHaveValue("尚未发送");
+    expect(content).toBeVisible();
+    const announcement = screen.getByText("需要审批");
+    expect(announcement).toHaveAttribute("aria-live", "polite");
+    expect(announcement.closest("[hidden], [inert]")).toBeNull();
+
+    rerender(<ConnectionShell {...props} />);
+    expect(screen.getByRole("complementary", { name: "会话侧栏" })).toBe(sidebar);
+    expect(sidebar).not.toHaveAttribute("hidden");
+    expect(sidebar.closest("[data-sidebar-collapsed]"))
+      .toHaveAttribute("data-sidebar-collapsed", "true");
+    expect(screen.getByRole("textbox", { name: "保留的草稿" })).toBe(content);
+    expect(screen.getByRole("button", { name: "显示侧栏" })).toBeVisible();
+  });
+
+  it("专注工具条保留窗口控制和拖动区，并支持退出、临时输入与触摸入口", async () => {
+    const onFocusModeChange = vi.fn();
+    const onShowComposer = vi.fn();
+    render(
+      <ConnectionShell
+        focusMode
+        onFocusModeChange={onFocusModeChange}
+        onShowComposer={onShowComposer}
+        phase="ready"
+      />,
+    );
+    const toolbar = screen.getByRole("group", { name: "专注模式工具栏" });
+    expect(toolbar).toHaveAttribute("data-tauri-drag-region", "deep");
+    expect(toolbar).toHaveAttribute("data-window-menu-region", "self");
+    expect(await within(toolbar).findByRole("button", { name: "关闭" }))
+      .toBeInTheDocument();
+    const exit = within(toolbar).getByRole("button", { name: "退出专注模式" });
+    fireEvent.click(screen.getByLabelText("显示专注模式工具栏"));
+    expect(exit).toHaveFocus();
+    fireEvent.click(within(toolbar).getByRole("button", { name: "临时输入" }));
+    fireEvent.click(exit);
+    expect(onShowComposer).toHaveBeenCalledOnce();
+    expect(onFocusModeChange).toHaveBeenCalledWith(false);
+  });
+
+  it("专注模式不让隐藏的覆盖式侧栏消费 Esc", () => {
+    const { rerender } = render(<ConnectionShell phase="ready" />);
+    const sidebar = screen.getByRole("complementary", { name: "会话侧栏" });
+    fireEvent.click(screen.getByLabelText("打开侧栏"));
+    expect(sidebar).toHaveAttribute("data-open", "true");
+    rerender(<ConnectionShell focusMode phase="ready" />);
+    const event = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "Escape",
+    });
+    fireEvent(window, event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(sidebar).toHaveAttribute("data-open", "true");
+    rerender(<ConnectionShell phase="ready" />);
+    expect(sidebar).toHaveAttribute("data-open", "true");
+  });
+
+  it("Ctrl+B 先退出专注模式再恢复侧栏导航", () => {
+    function Harness() {
+      const [focusMode, setFocusMode] = useState(false);
+      return <ConnectionShell focusMode={focusMode} onFocusModeChange={setFocusMode} phase="ready" />;
+    }
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "隐藏侧栏" }));
+    fireEvent.click(screen.getByRole("button", { name: "进入专注模式" }));
+    fireEvent.keyDown(window, { ctrlKey: true, key: "b" });
+    const sidebar = screen.getByRole("complementary", { name: "会话侧栏" });
+    expect(sidebar.closest("[data-focus-mode]"))
+      .toHaveAttribute("data-focus-mode", "false");
+    expect(sidebar.closest("[data-sidebar-collapsed]"))
+      .toHaveAttribute("data-sidebar-collapsed", "false");
+  });
+
+  it.each([false, true])("Ctrl+K 退出专注模式后切换搜索并恢复焦点，原搜索打开：%s", (searchOpen) => {
+    function Harness() {
+      const [focusMode, setFocusMode] = useState(false);
+      return <ConnectionShell focusMode={focusMode} onFocusModeChange={setFocusMode} phase="ready" />;
+    }
+    render(<Harness />);
+    if (searchOpen) fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
+    fireEvent.click(screen.getByRole("button", { name: "进入专注模式" }));
+    fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
+    const sidebar = screen.getByRole("complementary", { name: "会话侧栏" });
+    expect(sidebar.closest("[data-focus-mode]"))
+      .toHaveAttribute("data-focus-mode", "false");
+    if (searchOpen) {
+      expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "最近会话操作" })).toHaveFocus();
+    } else {
+      expect(screen.getByRole("searchbox", { name: "搜索会话" })).toHaveFocus();
+    }
   });
 
   it("以可访问状态展示初始化进度", () => {

@@ -877,6 +877,112 @@ describe("App", () => {
     expect(settings).not.toBeInTheDocument();
   });
 
+  it("专注模式保留对话与草稿，临时输入可以收起并在成功发送后自动收起", async () => {
+    const user = userEvent.setup();
+    const { requests } = renderSidebarThreadScenario();
+    await user.click(await screen.findByRole("button", { name: /^侧边栏目标，/u }));
+    const messages = await screen.findByRole("region", { name: "会话消息" });
+    const composer = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+    await user.type(composer, "保留阅读时的草稿");
+    composer.setSelectionRange(2, 5, "backward");
+    await user.keyboard("{Control>}{Shift>}f{/Shift}{/Control}");
+
+    expect(composer).toBeInTheDocument();
+    expect(document.querySelector('[data-conversation-workspace]')).toHaveAttribute("data-focus-mode", "true");
+    expect(screen.queryByRole("complementary", { name: "会话侧栏" })).not.toBeInTheDocument();
+    expect(composer.closest("[data-conversation-composer]")).toHaveAttribute("data-input-hidden", "true");
+    expect(screen.queryByRole("textbox", { name: "任务输入" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "会话消息" })).toBe(messages);
+    expect(messages).toHaveFocus();
+
+    await user.keyboard("{Control>}l{/Control}");
+    expect(screen.getByRole("dialog", { name: "临时输入" })).toBeVisible();
+    expect(composer).toHaveFocus();
+    expect(composer).toHaveValue("保留阅读时的草稿");
+    expect([composer.selectionStart, composer.selectionEnd]).toEqual([2, 5]);
+    await user.keyboard("{F6}");
+    expect(screen.queryByRole("dialog", { name: "临时输入" })).not.toBeInTheDocument();
+    expect(messages).toHaveFocus();
+    await user.keyboard("{F6}");
+    expect(composer).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "发送" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "临时输入" })).not.toBeInTheDocument());
+    expect(requests).toContainEqual(expect.objectContaining({
+      method: "turn/start",
+      params: expect.objectContaining({ input: [{ type: "text", text: "保留阅读时的草稿" }] }),
+    }));
+    expect(composer).toHaveValue("");
+    await user.keyboard("{Control>}{Shift>}f{/Shift}{/Control}");
+    expect(composer).toBeVisible();
+    expect(screen.getByRole("complementary", { name: "会话侧栏" })).toBeVisible();
+  });
+
+  it("专注模式保留 Markdown 预览，Ctrl+L 仍能唤出编辑入口", async () => {
+    const user = userEvent.setup();
+    renderSidebarThreadScenario();
+    await user.click(await screen.findByRole("button", { name: /^侧边栏目标，/u }));
+    const composer = await screen.findByRole("textbox", { name: "任务输入" });
+    await user.type(composer, "保留预览内容");
+    await user.click(screen.getByRole("button", { name: "预览 Markdown" }));
+    await user.keyboard("{Control>}{Shift>}f{/Shift}{/Control}{Control>}l{/Control}");
+    expect(screen.getByRole("dialog", { name: "临时输入" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "编辑 Markdown" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("textbox", { name: "任务输入" })).toHaveValue("保留预览内容");
+  });
+
+  it("专注模式临时输入的 Esc 只收起输入，下一次按下才停止生成", async () => {
+    const user = userEvent.setup();
+    const { emitNotification, requests } = renderSidebarThreadScenario();
+    await user.click(await screen.findByRole("button", { name: /^侧边栏目标，/u }));
+    await screen.findByRole("region", { name: "会话消息" });
+    act(() => emitNotification({
+      method: "turn/started",
+      params: { threadId: SIDEBAR_THREAD.id, turn: { id: "focus-turn", items: [], status: "inProgress" } },
+    }));
+    await user.keyboard("{Control>}{Shift>}f{/Shift}{/Control}");
+    expect(screen.getByRole("button", { name: "停止生成" })).toBeVisible();
+    await user.keyboard("{Alt>}l{/Alt}");
+    expect(screen.queryByRole("dialog", { name: "账户剩余限额详情", hidden: true })).not.toBeInTheDocument();
+    await user.keyboard("{Control>}l{/Control}");
+    await user.type(screen.getByRole("textbox", { name: "任务输入" }), "尚未发送");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "临时输入" })).not.toBeInTheDocument();
+    expect(requests.filter(({ method }) => method === "turn/interrupt")).toHaveLength(0);
+    fireEvent.keyDown(document.activeElement!, { key: "Escape", repeat: true });
+    expect(requests.filter(({ method }) => method === "turn/interrupt")).toHaveLength(0);
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(requests.filter(({ method }) => method === "turn/interrupt")).toHaveLength(1));
+    expect(document.querySelector('[data-focus-mode="true"]')).not.toBeNull();
+  });
+
+  it("专注模式快捷键忽略模态、菜单、长按、输入法及已消费事件", async () => {
+    const user = userEvent.setup();
+    renderSidebarThreadScenario();
+    const composer = await screen.findByRole("textbox", { name: "任务输入" });
+    for (const modifiers of [{ repeat: true }, { isComposing: true }, { altKey: true }, { metaKey: true }]) {
+      fireEvent.keyDown(composer, { key: "f", ctrlKey: true, shiftKey: true, ...modifiers });
+      expect(composer).toBeVisible();
+    }
+    const handled = new KeyboardEvent("keydown", { key: "f", ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true });
+    handled.preventDefault();
+    fireEvent(composer, handled);
+    expect(composer).toBeVisible();
+    composer.focus();
+    await user.keyboard("{Control>}/{/Control}{Control>}{Shift>}f{/Shift}{/Control}");
+    expect(screen.getByRole("dialog", { name: "键盘快捷键" })).toBeVisible();
+    expect(composer).toBeVisible();
+    await user.keyboard("{Escape}");
+    await user.keyboard("{Alt>}l{/Alt}{Control>}{Shift>}f{/Shift}{/Control}");
+    expect(screen.getByRole("dialog", { name: "账户剩余限额详情" })).toBeVisible();
+    expect(composer).toBeVisible();
+    await user.keyboard("{Escape}");
+    fireEvent.contextMenu(screen.getByRole("button", { name: /^侧边栏目标，/u }));
+    await user.keyboard("{Control>}{Shift>}f{/Shift}{/Control}");
+    expect(screen.getByRole("menu")).toBeVisible();
+    expect(composer).toBeVisible();
+  });
+
   it("F6 在输入框和消息区之间切换，保留草稿选区与滚动位置，Ctrl+L 直接返回输入框", async () => {
     const user = userEvent.setup();
     renderSidebarThreadScenario();

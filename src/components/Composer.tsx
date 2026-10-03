@@ -148,6 +148,9 @@ export interface ComposerProps {
   readonly mentionsError?: string | null;
   readonly accessoryPanel?: ReactNode;
   readonly interactionPanel?: ReactNode;
+  readonly inputHidden?: boolean;
+  readonly onDismiss?: () => void;
+  readonly onSubmitted?: () => void;
   readonly skills?: readonly SkillMetadata[];
   readonly skillsLoading?: boolean;
   readonly shellCommandActive?: boolean;
@@ -209,6 +212,9 @@ export function Composer({
   mentionsError = null,
   accessoryPanel,
   interactionPanel,
+  inputHidden = false,
+  onDismiss,
+  onSubmitted,
   skills = [],
   skillsLoading = false,
   shellCommandActive = false,
@@ -400,12 +406,12 @@ export function Composer({
 
   useEffect(() => {
     const textarea = textareaRef.current;
-    if (textarea === null) {
+    if (textarea === null || inputHidden) {
       return;
     }
     textarea.style.height = "0";
     textarea.style.height = `${Math.min(textarea.scrollHeight, window.innerHeight * 0.4)}px`;
-  }, [markdownPreview, text]);
+  }, [inputHidden, markdownPreview, text]);
 
   useEffect(() => {
     setCwdInput(cwd ?? "");
@@ -777,6 +783,7 @@ export function Composer({
     setSelectedTokenIndex(null);
     setTrigger(null);
     setMarkdownPreview(false);
+    onSubmitted?.();
   };
 
   const send = async (target: "current" | "queue" = "current") => {
@@ -1124,6 +1131,7 @@ export function Composer({
       );
       if (sent) {
         setSavedPromptPickerOpen(false);
+        onSubmitted?.();
       } else {
         if (showProjectPicker) releaseDraftPreservationIfUnchanged();
         setSavedPromptActionError("未能发送常用提示词，当前草稿未受影响");
@@ -1341,7 +1349,7 @@ export function Composer({
   };
 
   return (
-    <section className={styles.composer} data-conversation-composer>
+    <section className={styles.composer} data-conversation-composer data-input-hidden={inputHidden}>
       {interactionPanel}
       {error === null ? null : <div className={styles.error} role="alert">{error}</div>}
       {draftPersistenceError === null
@@ -1358,6 +1366,19 @@ export function Composer({
             ) : null}
           </div>}
       {capabilitiesError === null ? null : <div className={styles.capabilityError} role="status">{capabilitiesError}</div>}
+      {inputHidden && activeTurn ? (
+        <div className={styles.collapsedActions}>
+          <button disabled={stopping} onClick={() => void onStop()} type="button">
+            {stopping ? "正在停止" : "停止生成"}
+          </button>
+        </div>
+      ) : null}
+      <div hidden={inputHidden} inert={inputHidden}>
+      {onDismiss === undefined ? null : (
+        <div className={styles.collapsedActions}>
+          <button onClick={onDismiss} title="收起输入框 Esc" type="button">收起输入框</button>
+        </div>
+      )}
       {showProjectPicker || accessoryPanel !== undefined ? (
         <ComposerAccessoryPanel>
           {showProjectPicker ? (
@@ -1367,6 +1388,7 @@ export function Composer({
                   cwd={cwd}
                   directories={cwdOptions}
                   disabled={
+                    inputHidden ||
                     onCwdChange === undefined ||
                     activeTurn ||
                     submitting ||
@@ -1420,6 +1442,7 @@ export function Composer({
       >
         <button
           aria-label={markdownPreview ? "编辑 Markdown" : "预览 Markdown"}
+          data-composer-focus-target={markdownPreview ? true : undefined}
           aria-pressed={markdownPreview}
           className={styles.markdownModeButton}
           disabled={shellMode || (!markdownPreview && normalized.length === 0)}
@@ -1975,6 +1998,7 @@ export function Composer({
             )}
           </div>
         </footer>
+      </div>
       </div>
       <ProjectDeleteDialog
         deleting={deletingProject}

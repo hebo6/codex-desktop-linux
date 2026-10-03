@@ -410,6 +410,146 @@
   stroke-width: 1.6;
 }
 
+.appShell[data-focus-mode="true"] {
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--color-content-bg);
+}
+
+.appShell[data-focus-mode="true"] .sidebar,
+.appShell[data-focus-mode="true"] .backdrop,
+.appShell[data-focus-mode="true"] .topbar {
+  display: none;
+}
+
+.appShell[data-focus-mode="true"] .main {
+  grid-template-rows: minmax(0, 1fr);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.focusToolbarReveal {
+  position: absolute;
+  z-index: var(--z-popover);
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 16px;
+}
+
+.focusToolbar {
+  position: absolute;
+  top: 6px;
+  right: var(--space-2);
+  left: var(--space-2);
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-divider-subtle);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: var(--color-content-bg);
+  box-shadow: var(--shadow-drawer);
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.focusToolbarReveal:hover .focusToolbar,
+.focusToolbarReveal:focus-within .focusToolbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.focusToolbarButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 36px;
+  min-height: 36px;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.focusToolbarButton:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: var(--color-fill-hover);
+}
+
+.focusToolbarButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.focusToolbarButton svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.focusToolbarDragArea {
+  align-self: stretch;
+  flex: 1;
+  min-width: 16px;
+}
+
+.focusToolbarHandle {
+  display: none;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .focusToolbarHandle {
+    position: absolute;
+    top: 0;
+    left: calc(50% - 22px);
+    display: grid;
+    width: 44px;
+    height: 44px;
+    padding-top: 6px;
+    border: 0;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    place-items: start center;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .focusToolbarHandle span {
+    width: 24px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--color-text-tertiary);
+  }
+
+  .focusToolbarReveal:focus-within .focusToolbarHandle {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .focusToolbarButton {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 420px) {
+  .focusToolbarButton span {
+    display: none;
+  }
+}
+
 .desktopSidebarButton:hover,
 .menuButton:hover,
 .sidebarInnerToggle:hover {

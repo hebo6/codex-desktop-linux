@@ -544,6 +544,15 @@ export function App({
   const [recentConnectionError, setRecentConnectionError] = useState<string | null>(null);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [composerFocusTabId, setComposerFocusTabId] = useState<string | null>(null);
+  const [focusMode, setFocusMode] = useState(false);
+  const [focusComposerOpen, setFocusComposerOpen] = useState(false);
+  const changeFocusMode = useCallback((enabled: boolean) => {
+    setComposerFocusTabId(null);
+    setFocusMode(enabled);
+    setFocusComposerOpen(false);
+  }, []);
+  const showFocusComposer = useCallback(() => setFocusComposerOpen(true), []);
+  const hideFocusComposer = useCallback(() => setFocusComposerOpen(false), []);
   const [draftThreadPresence, setDraftThreadPresence] =
     useState<DraftThreadPresence>({ keyPrefix: null, threadIds: new Set() });
   const [transientDraftPresence, setTransientDraftPresence] =
@@ -718,11 +727,13 @@ export function App({
     if (composer === null || composer.disabled) {
       return;
     }
-    composer.focus();
+    if (focusMode) setFocusComposerOpen(true);
+    else composer.focus();
     setComposerFocusTabId(null);
   }, [
     activeTabId,
     composerFocusTabId,
+    focusMode,
     connection.view.phase,
     conversationBusy,
     restoredThread,
@@ -1758,11 +1769,11 @@ export function App({
       if (event.defaultPrevented || event.isComposing) return;
       if (event.key === "Escape") {
         if (event.repeat) return;
-        const blockingLayer = document.querySelector(
+        const blockingLayer = Array.from(document.querySelectorAll(
           '[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"], [aria-label="会话侧栏"][data-open="true"]',
-        );
+        )).find((element) => element.closest("[hidden], [inert]") === null);
         if (
-          blockingLayer === null &&
+          blockingLayer === undefined &&
           conversation.activeTurnId !== null &&
           !conversation.stopping
         ) {
@@ -1773,6 +1784,14 @@ export function App({
       }
       if (!event.ctrlKey || event.altKey || event.metaKey) return;
       const key = event.key.toLowerCase();
+      if (key === "f" && event.shiftKey) {
+        if (event.repeat || Array.from(document.querySelectorAll(
+          '[aria-modal="true"], [role="dialog"]:not([data-focus-composer]), [role="menu"], [role="listbox"]',
+        )).some((element) => element.closest("[hidden], [inert]") === null)) return;
+        event.preventDefault();
+        changeFocusMode(!focusMode);
+        return;
+      }
       const editing = event.target instanceof HTMLElement && (
         event.target.matches("input, textarea, select") || event.target.isContentEditable
       );
@@ -1864,6 +1883,8 @@ export function App({
     window.addEventListener("keydown", handleGlobalShortcut);
     return () => window.removeEventListener("keydown", handleGlobalShortcut);
   }, [
+    focusMode,
+    changeFocusMode,
     boundServerId,
     activeTabId,
     conversation.activeTurnId,
@@ -2167,6 +2188,10 @@ export function App({
       })}
       <WindowResizeHandles />
       <ConnectionShell
+        focusMode={focusMode}
+        onFocusModeChange={changeFocusMode}
+        {...(connection.view.phase === "ready" && (restoredThread !== null || currentThreadId === null)
+          ? { onShowComposer: showFocusComposer } : {})}
         announcement={shortcutStatus}
         archiveNotices={serverThreads.archiveNotices}
         archivedThreadListError={serverThreads.archivedThreadListError}
@@ -2185,12 +2210,19 @@ export function App({
         loadingMorePinnedThreads={serverThreads.loadingMorePinnedThreads}
         mainContent={
           <ConversationWorkspace
+            focusMode={focusMode}
+            composerExpanded={focusComposerOpen}
+            onShowComposer={showFocusComposer}
+            onHideComposer={hideFocusComposer}
             composer={
               connection.view.phase === "ready" && (
                 restoredThread !== null ||
                 currentThreadId === null
               ) ? (
                 <Composer
+                  inputHidden={focusMode && !focusComposerOpen}
+                  {...(focusMode ? { onDismiss: hideFocusComposer } : {})}
+                  onSubmitted={hideFocusComposer}
                   activeTurn={conversation.activeTurnId !== null}
                   attachmentDraft={attachmentDraft}
                   capabilitiesError={
@@ -2322,6 +2354,7 @@ export function App({
           >
             {displayedRestoredThread !== null ? (
               <ConversationView
+                layoutKey={focusMode}
                 key={`${boundServerId}:${activeTabId}:${currentThreadId}`}
                 {...(activeTabId === null ? {} : {
                   readingState: tabReadingStates.get(activeTabId)!,
@@ -2476,7 +2509,7 @@ export function App({
             />
           )
         }
-        topbarAccessory={
+        topbarAccessory={focusMode ? null : (
           <RateLimitIndicator
             accountEmail={accountIdentity.email}
             data={accountRateLimits.data}
@@ -2491,7 +2524,7 @@ export function App({
             tokenUsageError={accountTokenUsage.error}
             tokenUsageLoading={accountTokenUsage.loading}
           />
-        }
+        )}
       />
 
       <ServerDeleteDialog

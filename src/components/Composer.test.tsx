@@ -201,6 +201,103 @@ const QUEUED_INPUT: TurnStartParams["input"] = [
 ];
 
 describe("Composer", () => {
+  it("隐藏输入区时保留审批、错误和停止操作，编辑控件退出键盘与无障碍导航", () => {
+    const onRespond = vi.fn();
+    const { onStop, rerender } = renderComposer({
+      activeTurn: true,
+      inputHidden: true,
+      initialText: "尚未提交的草稿",
+      error: "请求失败，请重试",
+      capabilitiesError: "模型列表读取失败",
+      interactionPanel: <button onClick={onRespond} type="button">允许命令</button>,
+      accessoryPanel: <span>后台任务详情</span>,
+    });
+
+    expect(screen.queryByRole("textbox", { name: "任务输入" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("任务输入")).not.toBeVisible();
+    expect(screen.getByLabelText("任务输入").closest("[hidden]")).toHaveAttribute("inert");
+    expect(screen.getByText("后台任务详情")).not.toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent("请求失败，请重试");
+    expect(screen.getByText("模型列表读取失败")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "允许命令" }));
+    expect(onRespond).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "停止生成" }));
+    expect(onStop).toHaveBeenCalledOnce();
+
+    rerender({ stopping: true });
+    expect(screen.getByRole("button", { name: "正在停止" })).toBeDisabled();
+  });
+
+  it("隐藏再恢复输入区保留草稿、附件、光标选区和编辑器滚动位置", async () => {
+    const { blobUrlFactory, rerender } = renderComposer({ initialText: "保留图像草稿" });
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "任务输入" });
+    fireEvent.change(screen.getByLabelText("选择图片附件"), {
+      target: { files: [imageFile("draft.png")] },
+    });
+    await waitFor(() => expect(screen.getByLabelText("附件")).toHaveTextContent("draft.png"));
+    const attachment = screen.getByLabelText("附件");
+    editor.focus();
+    editor.setSelectionRange(2, 5, "backward");
+    editor.scrollTop = 24;
+
+    rerender({ inputHidden: true });
+    expect(editor).not.toBeVisible();
+    expect(attachment).not.toBeVisible();
+    rerender({ inputHidden: false });
+
+    expect(screen.getByRole("textbox", { name: "任务输入" })).toBe(editor);
+    expect(editor).toHaveValue("保留图像草稿");
+    expect(editor.selectionStart).toBe(2);
+    expect(editor.selectionEnd).toBe(5);
+    expect(editor.selectionDirection).toBe("backward");
+    expect(editor.scrollTop).toBe(24);
+    expect(screen.getByLabelText("附件")).toBe(attachment);
+    expect(attachment).toBeVisible();
+    expect(blobUrlFactory.create).toHaveBeenCalledOnce();
+    expect(blobUrlFactory.revoke).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { operation: "发送", text: "保留待发送草稿", queue: false },
+    { operation: "排队", text: "保留待排队草稿", queue: true },
+    { operation: "Shell 执行", text: "!pwd", queue: false },
+  ])("$operation 失败保留草稿，仅成功并完成草稿清理后通知收起输入区", async ({ text, queue }) => {
+    const cleanup = deferred();
+    const draftStore = {
+      ...memoryDraftStore([["tab:a", { text, tokens: [] }]]),
+      transition: vi.fn(() => cleanup.promise),
+    };
+    const submit = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    const onSubmitted = vi.fn();
+    renderComposer({
+      activeTurn: queue,
+      draftKey: "tab:a",
+      draftStore,
+      onQueue: submit,
+      onRunShellCommand: submit,
+      onSend: submit,
+      onSubmitted,
+      showProjectPicker: false,
+    });
+    const editor = screen.getByRole("textbox", { name: "任务输入" });
+    await waitFor(() => expect(editor).toHaveValue(text));
+
+    await act(async () => { fireEvent.keyDown(editor, { key: "Enter", ctrlKey: queue }); });
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(editor).toHaveValue(text);
+    expect(draftStore.transition).not.toHaveBeenCalled();
+    expect(onSubmitted).not.toHaveBeenCalled();
+
+    await act(async () => { fireEvent.keyDown(editor, { key: "Enter", ctrlKey: queue }); });
+    expect(submit).toHaveBeenCalledTimes(2);
+    expect(draftStore.transition).toHaveBeenCalledWith("tab:a", "tab:a", null);
+    expect(editor).toHaveValue(text);
+    expect(onSubmitted).not.toHaveBeenCalled();
+    await act(async () => { cleanup.resolve(); });
+    expect(editor).toHaveValue("");
+    expect(onSubmitted).toHaveBeenCalledOnce();
+  });
+
   it.each([false, true])("运行状态为 %s 时，移回完整消息后原样发送或追加，只应用同一请求一次", async (activeTurn) => {
     const draftStore = memoryDraftStore();
     const onQueueEditApplied = vi.fn();
