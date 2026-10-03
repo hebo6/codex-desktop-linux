@@ -27,6 +27,7 @@ import {
   SidebarCollapseIcon,
 } from "./SidebarIcons";
 import { WindowControls } from "./WindowControls";
+import { FullscreenButton } from "./FullscreenButton";
 import { isEscapeDismissal } from "./keyboardEvents";
 import styles from "./ConnectionShell.module.css";
 
@@ -845,6 +846,7 @@ export function ConnectionShell({
               </svg>
             </button>
           ) : null}
+          <FullscreenButton className={styles.settingsButton} />
           <WindowControls side="right" />
         </header>
 
@@ -893,6 +895,7 @@ export function ConnectionShell({
                 <span>临时输入</span>
               </button>
               <div className={styles.focusToolbarDragArea} data-window-menu-region="deep" />
+              <FullscreenButton className={styles.focusToolbarButton} />
               <WindowControls side="right" />
             </div>
           </div>

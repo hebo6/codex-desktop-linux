@@ -24,6 +24,18 @@ describe("ConnectionShell", () => {
       .not.toBeNull();
   });
 
+  it("普通顶栏和专注工具条均提供鼠标全屏入口", async () => {
+    const { container, rerender } = render(<ConnectionShell phase="ready" />);
+    const header = container.querySelector<HTMLElement>("header[data-tauri-drag-region]")!;
+    expect(within(header).getByRole("button", { name: "进入全屏" })).toBeVisible();
+
+    rerender(<ConnectionShell focusMode phase="ready" />);
+    const toolbar = screen.getByRole("group", { name: "专注模式工具栏" });
+    const button = within(toolbar).getByRole("button", { name: "进入全屏" });
+    expect(button).toHaveAttribute("aria-keyshortcuts", "F11");
+    expect(screen.getAllByRole("button", { name: "进入全屏" })).toEqual([button]);
+  });
+
   it("从顶栏进入专注模式前关闭会话右键菜单", () => {
     const onFocusModeChange = vi.fn();
     render(
