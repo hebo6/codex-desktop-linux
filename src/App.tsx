@@ -1555,7 +1555,7 @@ export function App({
   };
 
   const openNewTab = useCallback(async (
-    targetCwd: string | null = restoredThread?.metadata.cwd ?? null,
+    targetCwd: string | null = composerCwd,
   ): Promise<void> => {
     if (windowState.status !== "ready" || queueEditing.pending) {
       return;
@@ -1573,7 +1573,7 @@ export function App({
     } catch {
       setWindowActionError("无法新建会话标签，请重试");
     }
-  }, [queueEditing.pending, restoredThread?.metadata.cwd, windowState]);
+  }, [composerCwd, queueEditing.pending, windowState]);
 
   const activateTab = async (tabId: string): Promise<void> => {
     if (
